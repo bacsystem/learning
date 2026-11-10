@@ -1,5 +1,7 @@
 {
-  "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "teammateMode": "auto",
   "permissions": {
     "allow": [
@@ -16,8 +18,26 @@
       "Bash(git log:*)"
     ],
     "deny": [
-      "Read(./.env)",
-      "Read(./assets/**)"
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.development)",
+      "Read(**/.env.production)",
+      "Read(**/.env.*.local)",
+      "Read(./assets/**)",
+      "Bash(cat *.env*)",
+      "Bash(grep * *.env*)",
+      "Bash(go test -exec:*)",
+      "Bash(go test * -exec:*)",
+      "Bash(go vet -vettool:*)",
+      "Bash(go vet * -vettool:*)",
+      "Bash(git diff --output:*)",
+      "Bash(git diff * --output:*)",
+      "Bash(git diff --ext-diff:*)",
+      "Bash(git diff * --ext-diff:*)",
+      "Bash(git log --output:*)",
+      "Bash(git log * --output:*)",
+      "Bash(git log --ext-diff:*)",
+      "Bash(git log * --ext-diff:*)"
     ]
   }
 }

@@ -47,6 +47,7 @@ El frontend no tiene runner de tests todavía; la verificación es `tsc`, `lint`
 - **Componentes del design system:** si hace falta un componente que khipu no tiene, o cambiar uno de los suyos, primero se abre un PR en [khipu-design-system](https://github.com/bacsystem/khipu-design-system), se revisa con `/pr-review` corrigiendo todos los hallazgos, se avisa al usuario de los PRs abiertos, y recién después se usa en este proyecto.
 - GitFlow: `feature/*` y `fix/*` salen de `develop` y vuelven por PR a `develop`; a `main` solo llegan `release/*` y `hotfix/*`, con tag `vX.Y.Z`. Commits Conventional Commits en inglés.
 - GitHub Actions solo corre con tags `v*` (producción). Antes de abrir un PR a `develop` se corre en local todo lo que corre el CI (ver `.github/workflows/`) y se reportan los resultados en el PR.
+- **Equipo de agentes:** `setup-team.sh` es la fuente de verdad de `.claude/agents/` y `.claude/settings.json`. Todo cambio a esos archivos actualiza el script en el mismo PR y se verifica con `bash setup-team.sh --check`.
 - Nunca subir `assets/`, binarios de `backend/` ni archivos `.env`.
 
 ## Equipo de agentes
