@@ -43,7 +43,19 @@ El frontend no tiene runner de tests todavía; la verificación es `tsc`, `lint`
 
 ## Reglas
 
+- **Design system obligatorio:** [khipu-design-system](https://github.com/bacsystem/khipu-design-system) es la referencia de system design. Todo elemento o componente de UI que se implemente usa sus componentes, tokens y recetas (copiados con su CLI); se consulta el repo khipu antes de implementar. No se crean componentes propios que dupliquen uno de khipu ni estilos fuera de sus tokens.
 - **Componentes del design system:** si hace falta un componente que khipu no tiene, o cambiar uno de los suyos, primero se abre un PR en [khipu-design-system](https://github.com/bacsystem/khipu-design-system), se revisa con `/pr-review` corrigiendo todos los hallazgos, se avisa al usuario de los PRs abiertos, y recién después se usa en este proyecto.
 - GitFlow: `feature/*` y `fix/*` salen de `develop` y vuelven por PR a `develop`; a `main` solo llegan `release/*` y `hotfix/*`, con tag `vX.Y.Z`. Commits Conventional Commits en inglés.
 - GitHub Actions solo corre con tags `v*` (producción). Antes de abrir un PR a `develop` se corre en local todo lo que corre el CI (ver `.github/workflows/`) y se reportan los resultados en el PR.
+- **Equipo de agentes:** `setup-team.sh` es la fuente de verdad de `.claude/agents/` y `.claude/settings.json`. Todo cambio a esos archivos actualiza el script en el mismo PR y se verifica con `bash setup-team.sh --check`.
 - Nunca subir `assets/`, binarios de `backend/` ni archivos `.env`.
+
+## Equipo de agentes
+Roles (definidos en .claude/agents/): po, tech-lead (sesión principal), backend-dev, frontend-dev, qa.
+Flujo: po escribe historias en docs/stories/ -> tech-lead define contrato en docs/api/ y reparte tareas ->
+backend-dev (backend/) y frontend-dev (frontend/) trabajan en paralelo, cada uno dueño de sus archivos ->
+qa valida contra criterios de aceptación -> cada developer crea su PR a develop -> tech-lead lo revisa con el skill /pr-review ->
+si hay hallazgos, los corrige el developer autor y el tech-lead vuelve a revisar, hasta que quede limpio.
+Ninguna tarea se cierra sin ese review limpio. El merge requiere aprobación del usuario.
+Comunicación siempre activa: cada integrante avisa al empezar, al terminar, al bloquearse y cuando su cambio afecta a otro.
+Respetar las convenciones de este archivo (GitFlow, Conventional Commits, i18n, tokens de khipu). Sin push ni deploy sin aprobación del usuario.

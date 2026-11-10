@@ -1,0 +1,31 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "teammateMode": "auto",
+  "permissions": {
+    "allow": [
+      "Bash(make test)",
+      "Bash(make lint)",
+      "Bash(make build)",
+      "Bash(go test ./...)",
+      "Bash(go vet ./...)",
+      "Bash(npm run lint)",
+      "Bash(npm run build)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(git status)",
+      "Bash(git status --short)",
+      "Bash(git diff)",
+      "Bash(git diff --stat)",
+      "Bash(git diff --cached)",
+      "Bash(git diff --cached --stat)",
+      "Bash(git log --oneline -20)"
+    ],
+    "deny": [
+      "Read(**/.env*)",
+      "Read(./assets/**)",
+      "Bash(cat *.env*)",
+      "Bash(grep * *.env*)"
+    ]
+  }
+}
