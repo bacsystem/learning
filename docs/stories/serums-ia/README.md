@@ -4,17 +4,17 @@ Fuente: «Prompt 1» del requerimiento (capacidades 1–9 y restricciones). Alca
 
 ## Índice de épicas
 
-| Épica | Archivo | Historias |
-|---|---|---|
-| E1 Taxonomía SERUMS | [E1-epica-taxonomia.md](E1-epica-taxonomia.md) | 4 |
-| E2 Repositorio de fuentes académicas | [E2-epica-fuentes.md](E2-epica-fuentes.md) | 8 |
-| E3 Banco SERUMS | [E3-epica-banco.md](E3-epica-banco.md) | 6 |
-| E4 Diagnóstico y modelo de dominio | [E4-epica-diagnostico-dominio.md](E4-epica-diagnostico-dominio.md) | 4 |
-| E5 Dashboard de rendimiento y acciones rápidas | [E5-epica-dashboard.md](E5-epica-dashboard.md) | 6 |
-| E6 Generación con IA, citas y aprobación | [E6-epica-generacion-ia.md](E6-epica-generacion-ia.md) | 9 |
-| E7 Plan de estudio personalizado | [E7-epica-plan-estudio.md](E7-epica-plan-estudio.md) | 4 |
-| E8 Cronograma, alertas y reporte semanal | [E8-epica-cronograma-alertas.md](E8-epica-cronograma-alertas.md) | 5 |
-| E9 Aprendizaje continuo | [E9-epica-aprendizaje-continuo.md](E9-epica-aprendizaje-continuo.md) | 7 |
+| Épica | Archivo | Historias | Issue |
+|---|---|---|---|
+| E1 Taxonomía SERUMS | [E1-epica-taxonomia.md](E1-epica-taxonomia.md) | 4 | #2 |
+| E2 Repositorio de fuentes académicas | [E2-epica-fuentes.md](E2-epica-fuentes.md) | 8 | #3 |
+| E3 Banco SERUMS | [E3-epica-banco.md](E3-epica-banco.md) | 6 | #4 |
+| E4 Diagnóstico y modelo de dominio | [E4-epica-diagnostico-dominio.md](E4-epica-diagnostico-dominio.md) | 4 | #5 |
+| E5 Dashboard de rendimiento y acciones rápidas | [E5-epica-dashboard.md](E5-epica-dashboard.md) | 6 | #6 |
+| E6 Generación con IA, citas y aprobación | [E6-epica-generacion-ia.md](E6-epica-generacion-ia.md) | 9 | #7 |
+| E7 Plan de estudio personalizado | [E7-epica-plan-estudio.md](E7-epica-plan-estudio.md) | 4 | #8 |
+| E8 Cronograma, alertas y reporte semanal | [E8-epica-cronograma-alertas.md](E8-epica-cronograma-alertas.md) | 5 | #9 |
+| E9 Aprendizaje continuo | [E9-epica-aprendizaje-continuo.md](E9-epica-aprendizaje-continuo.md) | 7 | #10 |
 
 Total: 53 historias. Cada historia vive en `E<n>-<nn>-<slug>.md` en esta carpeta.
 
