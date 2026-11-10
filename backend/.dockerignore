@@ -1,0 +1,12 @@
+.git
+.gitignore
+*.md
+.env
+.env.*
+tmp/
+*.test
+*.out
+coverage.out
+bin/
+/server
+/fix-encrypt-personas

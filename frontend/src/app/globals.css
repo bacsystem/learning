@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+/* Variantes data-open/data-closed/... de shadcn (MIT) que usan los componentes de khipu. */
+@import "../styles/shadcn.css";
+/* khipu design system: tokens (claro/oscuro, paletas, diseños) y tema de Tailwind v4. */
+@import "../styles/tokens.css";
+@import "../styles/theme.css";
+
+@media print {
+  [data-sin-imprimir] {
+    display: none !important;
+  }
+}

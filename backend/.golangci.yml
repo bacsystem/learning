@@ -1,0 +1,32 @@
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        # `defer tx.Rollback()`: tras Commit es un no-op, y ante un error
+        # previo ya se devuelve ese error.
+        - (*database/sql.Tx).Rollback
+        - (*github.com/jmoiron/sqlx.Tx).Rollback
+        # writeJSON: las cabeceras ya se enviaron; si falla la escritura del
+        # cuerpo (cliente desconectado) no hay nada más que hacer.
+        - (*encoding/json.Encoder).Encode
+    staticcheck:
+      checks:
+        - all
+        # Los errores exportados son los mensajes en español que ve el
+        # usuario ("Ya estás inscrito en este proceso."): llevan mayúscula y
+        # punto a propósito.
+        - -ST1005
+        # Estilo, sin efecto en el comportamiento.
+        - -ST1000
+        - -ST1003
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        - -QF1008
+        - -S1016
+  exclusions:
+    # Close/Flush/print diferidos e idiomáticos (`defer rows.Close()`).
+    presets:
+      - std-error-handling

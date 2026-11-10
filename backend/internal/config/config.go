@@ -1,0 +1,115 @@
+package config
+
+import (
+	"fmt"
+	"net/url"
+	"strings"
+
+	"github.com/spf13/viper"
+)
+
+// MinJWTSecretBytes is the minimum JWT_SECRET length: HS256 needs a key of at
+// least 256 bits to keep its security margin.
+const MinJWTSecretBytes = 32
+
+type Config struct {
+	Port          string
+	Env           string
+	DatabaseURL   string
+	JWTSecret     string
+	EncryptionKey string
+
+	CORSOrigins    string
+	TrustedProxies string // comma-separated CIDRs or IPs, e.g. "10.0.0.0/8,172.16.0.0/12"
+
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUser     string
+	SMTPPassword string
+	SMTPFrom     string
+
+	FrontendBaseURL string
+
+	// LogLevel (trace|debug|info|warn|error) overrides the logger's default
+	// level. Read through viper so a value in .env applies too.
+	LogLevel string
+}
+
+// Load reads configuration from environment / .env file.
+func Load() (*Config, error) {
+	viper.SetConfigFile(".env")
+	viper.SetConfigType("env")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	_ = viper.ReadInConfig()
+
+	cfg := &Config{
+		Port:            viper.GetString("PORT"),
+		Env:             viper.GetString("ENV"),
+		DatabaseURL:     viper.GetString("DATABASE_URL"),
+		JWTSecret:       viper.GetString("JWT_SECRET"),
+		EncryptionKey:   viper.GetString("ENCRYPTION_KEY"),
+		SMTPHost:        viper.GetString("SMTP_HOST"),
+		SMTPPort:        viper.GetInt("SMTP_PORT"),
+		SMTPUser:        viper.GetString("SMTP_USER"),
+		SMTPPassword:    viper.GetString("SMTP_PASSWORD"),
+		SMTPFrom:        viper.GetString("SMTP_FROM"),
+		CORSOrigins:     viper.GetString("CORS_ORIGINS"),
+		TrustedProxies:  viper.GetString("TRUSTED_PROXIES"),
+		FrontendBaseURL: viper.GetString("FRONTEND_BASE_URL"),
+		LogLevel:        viper.GetString("LOG_LEVEL"),
+	}
+
+	if cfg.Port == "" {
+		cfg.Port = "8080"
+	}
+
+	if cfg.DatabaseURL == "" {
+		return nil, fmt.Errorf("DATABASE_URL is required")
+	}
+	if cfg.JWTSecret == "" {
+		return nil, fmt.Errorf("JWT_SECRET is required")
+	}
+	if len(cfg.JWTSecret) < MinJWTSecretBytes {
+		return nil, fmt.Errorf("JWT_SECRET must be at least %d bytes (got %d)", MinJWTSecretBytes, len(cfg.JWTSecret))
+	}
+	if cfg.EncryptionKey == "" {
+		return nil, fmt.Errorf("ENCRYPTION_KEY is required")
+	}
+
+	// CORS must be configured explicitly unless ENV says, exactly,
+	// development or test: the empty-list fallback to http://localhost:3000
+	// (middleware.CORS) is only meant for local work, and an unset or
+	// misspelled ENV must fail closed rather than run with it.
+	localEnv := cfg.Env == "development" || cfg.Env == "test"
+	if !localEnv && strings.TrimSpace(cfg.CORSOrigins) == "" {
+		return nil, fmt.Errorf("CORS_ORIGINS is required unless ENV is development or test (ENV=%q)", cfg.Env)
+	}
+
+	// Same rule for the e-mail settings: outside development/test the worker
+	// must be able to send, and the links in the e-mails must not fall back
+	// to http://localhost:3000 (cmd/server).
+	if !localEnv {
+		switch {
+		case strings.TrimSpace(cfg.SMTPHost) == "":
+			return nil, fmt.Errorf("SMTP_HOST is required unless ENV is development or test (ENV=%q)", cfg.Env)
+		case cfg.SMTPPort <= 0:
+			return nil, fmt.Errorf("SMTP_PORT must be a positive port unless ENV is development or test (ENV=%q)", cfg.Env)
+		case strings.TrimSpace(cfg.SMTPFrom) == "":
+			return nil, fmt.Errorf("SMTP_FROM is required unless ENV is development or test (ENV=%q)", cfg.Env)
+		case strings.TrimSpace(cfg.FrontendBaseURL) == "":
+			return nil, fmt.Errorf("FRONTEND_BASE_URL is required unless ENV is development or test (ENV=%q)", cfg.Env)
+		}
+	}
+
+	if cfg.FrontendBaseURL != "" {
+		// The e-mail links are built as FrontendBaseURL + "/auth/...", so a
+		// trailing slash would produce "//auth/...".
+		cfg.FrontendBaseURL = strings.TrimRight(strings.TrimSpace(cfg.FrontendBaseURL), "/")
+		if u, err := url.ParseRequestURI(cfg.FrontendBaseURL); err != nil || u.Scheme == "" || u.Host == "" {
+			return nil, fmt.Errorf("FRONTEND_BASE_URL must be a valid URL (e.g. https://example.com)")
+		}
+	}
+
+	return cfg, nil
+}

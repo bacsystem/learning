@@ -1,0 +1,55 @@
+# Claude Code
+.claude/worktrees/
+.claude/settings.local.json
+.superpowers/brainstorm/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go (backend/)
+backend/bin/
+backend/tmp/
+backend/server
+backend/fix-encrypt-personas
+backend/*.out
+backend/*.test
+
+# Node / Next.js (frontend/)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.vercel/
+frontend/.wrangler/
+frontend/.open-next/
+frontend/next-env.d.ts
+frontend/*.tsbuildinfo
+frontend/.env.local
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Secrets / env
+/.env
+backend/.env
+frontend/.env
+frontend/.env.production
+*.pem
+
+# Datos locales (balotarios, datos personales, prompts): nunca se versionan.
+# H126: sin ancla, para cubrir también backend/assets/ (cmd/seed busca
+# assets/data/sql/... relativo a backend/, con el padrón con PII real). Ningún
+# archivo versionado vive en una carpeta assets; si el frontend necesitara una,
+# que use otro nombre o una excepción explícita con !.
+assets/

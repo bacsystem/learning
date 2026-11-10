@@ -1,0 +1,100 @@
+name: backend
+
+# Solo al publicar a producción: un tag de versión (p. ej. v1.2.0).
+# No corre en pull requests ni en pushes a ramas.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: backend
+
+env:
+  GOOSE_VERSION: v3.21.1
+  GOVULNCHECK_VERSION: v1.9.0
+  TEST_DATABASE_URL: postgres://learning:learning@localhost:5432/learning_test?sslmode=disable
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: learning
+          POSTGRES_PASSWORD: learning
+          POSTGRES_DB: learning_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U learning -d learning_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: go mod tidy is clean
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      # Igual que la verificación local de docs/puesta-en-marcha.md (H81).
+      - name: govulncheck
+        run: go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...
+
+      - name: Install goose
+        run: go install "github.com/pressly/goose/v3/cmd/goose@${GOOSE_VERSION}"
+
+      - name: Migrations up, full down/up round trip
+        run: |
+          goose -dir migrations postgres "$TEST_DATABASE_URL" up
+          goose -dir migrations postgres "$TEST_DATABASE_URL" down-to 0
+          goose -dir migrations postgres "$TEST_DATABASE_URL" up
+          goose -dir migrations postgres "$TEST_DATABASE_URL" version
+
+      - name: Test
+        run: go test -race -count=1 ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      # H97/H47: v1.64.8 estaba compilado con go1.24 y no cargaba un módulo
+      # go1.27. golangci-lint v2.15.0 está compilado con go1.27. H116: el
+      # módulo está en 0 issues (backend/.golangci.yml), así que se analiza
+      # entero y cualquier hallazgo hace fallar el job. No se usa
+      # only-new-issues: depende del diff del PR por la API de GitHub, que
+      # falla en PRs de más de 20 000 líneas.
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+          working-directory: backend
+          args: --timeout=5m

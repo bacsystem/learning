@@ -1,0 +1,91 @@
+# Stack local: Postgres + backend (Go) + frontend (Next.js)
+#
+#   make compose/init       # crea .env con secretos (o: cp .env.example .env y complétalo)
+#   make compose/up         # o: docker compose up -d --build
+#
+# Frontend: http://localhost:3000   Backend: http://localhost:8080   Postgres: localhost:5433
+#
+# Los puertos se publican SOLO en 127.0.0.1 (no accesibles desde la red). Para
+# exponer uno a otras máquinas (p.ej. probar desde el móvil), redefine los
+# ports de ese servicio en un docker-compose.override.yml local con !override
+# (sin él, compose SUMA las listas, publica el puerto dos veces y el arranque
+# falla con "failed to bind host port ...: address already in use"), y ajusta
+# CORS_ORIGINS/NEXT_PUBLIC_API_URL:
+#
+#   services:
+#     backend:
+#       ports: !override
+#         - "0.0.0.0:${BACKEND_PORT:-8080}:8080"
+#
+# POSTGRES_PASSWORD no tiene valor por defecto: lo genera make compose/init.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-learning}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio (ver .env.example)}
+      POSTGRES_DB: ${POSTGRES_DB:-learning}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    # Se construye para la arquitectura del host (H70: el Dockerfile ya no
+    # fija amd64, así que en Apple Silicon/arm64 corre nativa).
+    restart: unless-stopped
+    # H148: el apagado del servidor puede tardar hasta 40 s (shutdown HTTP 10 s
+    # + drain del worker de email 30 s, cmd/server/main.go); con el default de
+    # 10 s Docker lo mataría con SIGKILL a mitad del drain.
+    stop_grace_period: 45s
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      ENV: ${ENV:-development}
+      DATABASE_URL: postgres://${POSTGRES_USER:-learning}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio (ver .env.example)}@db:5432/${POSTGRES_DB:-learning}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET es obligatorio (ver .env.example)}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY es obligatorio (ver .env.example)}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-}
+      # Vacío = nivel por defecto según ENV (debug en development, info en el resto).
+      LOG_LEVEL: ${LOG_LEVEL:-}
+      # Espera máxima por el advisory lock de migraciones (entrypoint.sh, cmd/migrate).
+      MIGRATE_LOCK_TIMEOUT: ${MIGRATE_LOCK_TIMEOUT:-10m}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      # Las NEXT_PUBLIC_* se incrustan en el bundle al construir:
+      # si cambian, ejecuta `docker compose build frontend`.
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        NEXT_PUBLIC_STORAGE_PREFIX: ${NEXT_PUBLIC_STORAGE_PREFIX:-}
+        NEXT_PUBLIC_CONTACT_EMAIL: ${NEXT_PUBLIC_CONTACT_EMAIL:-}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+
+volumes:
+  pgdata:

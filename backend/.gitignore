@@ -1,0 +1,14 @@
+# Binaries
+bin/
+tmp/server
+tmp/build-errors.log
+
+# Air
+tmp/
+
+# Environment (keep .env.example, ignore .env with real secrets)
+# .env  ← committed intentionally with placeholder values
+
+# Go test cache
+*.test
+*.out

@@ -1,0 +1,276 @@
+/*
+ * khipu design system: color, radius, chart, shadow and motion tokens and the user's appearance preferences.
+ * Light in :root, dark in .dark; palettes in html[data-paleta], dark tones in .dark[data-oscuro], designs in html[data-diseno].
+ * Plain CSS, no Tailwind directives. Override any of them after importing this file to rebrand an app.
+ * Source of truth for both the demo app (src/app/globals.css) and the package (khipu-design-system/tokens.css).
+ */
+
+/*
+ * Diseño base «khipu» 0.5: pastel compacto. Lienzo gris claro, tarjetas blancas sin borde, el color de la paleta en
+ * superficies (ítem activo, métrica destacada, gráficos) y no en botones: la acción principal es casi negra.
+ * La paleta por defecto (Lima) y el tono oscuro por defecto (Medianoche) viven aquí; las demás son bloques más abajo.
+ * Todo par texto/fondo de las 20 combinaciones (5 paletas × claro + 3 oscuros) lo verifica `npm run check:contraste`.
+ * Las duraciones deben coincidir con DURACION de src/lib/movimiento.ts.
+ */
+:root {
+  --duracion-rapida: 120ms;
+  --duracion-media: 200ms;
+  --duracion-lenta: 320ms;
+  /* Paleta Lima (por defecto). Cada paleta redefine solo estos cinco. */
+  --acento: #d4f06b;
+  --acento-texto: #2f3a07;
+  --acento-2: #cfe2fb;
+  --acento-2-texto: #1d4f91;
+  --acento-3: #f8ec84;
+  /* Derivados de la paleta: en claro, el acento al 30 % sobre blanco; la superficie de acento es el acento pleno. */
+  --acento-suave: color-mix(in srgb, var(--acento) 30%, #ffffff);
+  --acento-2-suave: color-mix(in srgb, var(--acento-2) 30%, #ffffff);
+  --acento-3-suave: color-mix(in srgb, var(--acento-3) 30%, #ffffff);
+  --acento-superficie: var(--acento);
+  --acento-superficie-texto: var(--acento-texto);
+  --acento-borde: transparent;
+  --background: #eceef1;
+  --foreground: #16181d;
+  --card: #ffffff;
+  --card-foreground: #16181d;
+  --popover: #ffffff;
+  --popover-foreground: #16181d;
+  --primary: #16181d;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f5f7;
+  --secondary-foreground: #16181d;
+  --muted: #f4f5f7;
+  --muted-foreground: #5d6170;
+  --texto-terciario: #666a76;
+  --accent: var(--acento-suave);
+  --accent-foreground: var(--acento-texto);
+  --destructive: #dc2547;
+  --destructive-foreground: #ffffff;
+  --destructive-suave: #fde3e7;
+  --destructive-texto: #a3263c;
+  --border: rgba(16, 17, 20, 0.08);
+  --input: #dcdee4;
+  --ring: var(--acento-texto);
+  --success: #e5f5c4;
+  --success-foreground: #2f6b12;
+  --success-border: rgba(47, 107, 18, 0.18);
+  --success-solid: #16a34a;
+  --warning: #fdf0c2;
+  --warning-foreground: #8a5a00;
+  --warning-border: rgba(138, 90, 0, 0.18);
+  --warning-solid: #f59e0b;
+  --info: #dcebfd;
+  --info-foreground: #1d4f91;
+  --destructive-border: rgba(163, 38, 60, 0.2);
+  --accent-border: color-mix(in srgb, var(--acento-texto) 20%, transparent);
+  --primary-light: #3a3d45;
+  --overlay: rgba(16, 17, 20, 0.22);
+  --brand: var(--acento);
+  --brand-foreground: var(--acento-texto);
+  --codigo: #16181d;
+  --codigo-foreground: #e4e4e9;
+  /* Gráficos: chart-1 es la serie principal (líneas, sparklines); chart-base las barras de una serie y chart-destacado la barra resaltada. */
+  --chart-1: var(--acento-2-texto);
+  --chart-base: var(--acento-2);
+  --chart-destacado: var(--acento);
+  --chart-2: #10b981;
+  --chart-3: #f59e0b;
+  --chart-4: #e11d48;
+  --chart-5: #0ea5e9;
+  /* Borde de 1 px de cada marca de gráfico: el relleno pastel queda bajo 3:1 sobre la tarjeta (WCAG 1.4.11), el borde no. */
+  --chart-trazo-base: var(--acento-2-texto);
+  --chart-trazo-destacado: var(--acento-texto);
+  --chart-trazo-3: color-mix(in srgb, var(--acento-3) 55%, #000000);
+  --chart-trazo-4: var(--chart-4);
+  --chart-trazo-5: color-mix(in srgb, var(--chart-5) 70%, #000000);
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #5d6170;
+  --sidebar-primary: var(--acento-superficie);
+  --sidebar-primary-foreground: var(--acento-superficie-texto);
+  --sidebar-accent: #f4f5f7;
+  --sidebar-accent-foreground: #16181d;
+  --sidebar-border: transparent;
+  --sidebar-ring: var(--ring);
+  /* Tarjetas: sin borde ni sombra en reposo en claro; en oscuro llevan borde fino y brillo arriba. */
+  --borde-tarjeta: transparent;
+  --brillo-tarjeta: 0 0 #0000;
+  --sombra-xs: 0 1px 2px rgba(16, 17, 20, 0.05);
+  --sombra-sm: 0 1px 2px rgba(16, 17, 20, 0.06), 0 1px 3px rgba(16, 17, 20, 0.04);
+  --sombra-md: 0 4px 12px -2px rgba(16, 17, 20, 0.08), 0 2px 4px -2px rgba(16, 17, 20, 0.05);
+  --sombra-lg: 0 16px 40px -8px rgba(16, 17, 20, 0.16), 0 4px 12px -4px rgba(16, 17, 20, 0.08);
+  --sombra-elevada: 0 1px 2px rgba(16, 17, 20, 0.04), 0 10px 24px -10px rgba(16, 17, 20, 0.14);
+}
+
+/* Oscuro Medianoche (por defecto). El acento se usa como luz: superficie teñida + texto pastel, nunca relleno pastel grande. */
+.dark {
+  --acento-suave: color-mix(in srgb, var(--acento) 14%, var(--card));
+  --acento-2-suave: color-mix(in srgb, var(--acento-2) 14%, var(--card));
+  --acento-3-suave: color-mix(in srgb, var(--acento-3) 14%, var(--card));
+  --acento-superficie: color-mix(in srgb, var(--acento) 14%, var(--card));
+  --acento-superficie-texto: var(--acento);
+  --acento-borde: color-mix(in srgb, var(--acento) 26%, transparent);
+  --background: #0a0f1c;
+  --foreground: #e9eef8;
+  --card: #111a2c;
+  --card-foreground: #e9eef8;
+  --popover: #16203a;
+  --popover-foreground: #e9eef8;
+  --primary: #f4f5f7;
+  --primary-foreground: #0a0b0e;
+  --secondary: #19233a;
+  --secondary-foreground: #e9eef8;
+  --muted: #19233a;
+  --muted-foreground: #a3afc7;
+  --texto-terciario: #8794ad;
+  --accent: var(--acento-suave);
+  --accent-foreground: var(--acento);
+  --destructive: #fb7189;
+  --destructive-foreground: #0a0b0e;
+  --destructive-suave: color-mix(in srgb, #f7899b 13%, var(--card));
+  --destructive-texto: #f7899b;
+  --border: rgba(233, 238, 248, 0.07);
+  --input: rgba(233, 238, 248, 0.12);
+  --ring: var(--acento);
+  --success: color-mix(in srgb, #b9e45a 13%, var(--card));
+  --success-foreground: #b9e45a;
+  --success-border: rgba(185, 228, 90, 0.25);
+  --success-solid: #a3d94a;
+  --warning: color-mix(in srgb, #f3cf5a 13%, var(--card));
+  --warning-foreground: #f3cf5a;
+  --warning-border: rgba(243, 207, 90, 0.25);
+  --warning-solid: #fbbf24;
+  --info: color-mix(in srgb, #8fc0f7 14%, var(--card));
+  --info-foreground: #8fc0f7;
+  --destructive-border: rgba(247, 137, 155, 0.3);
+  --accent-border: var(--acento-borde);
+  --primary-light: #ffffff;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --codigo: #0b1222;
+  --codigo-foreground: #e4e4e9;
+  --chart-1: var(--acento-2);
+  --chart-base: color-mix(in srgb, var(--acento-2) 38%, transparent);
+  /* Marcas de gráfico en oscuro: pasos validados para CVD y contraste (se conservan de 0.4). */
+  --chart-2: #27a070;
+  --chart-3: #bf8a26;
+  --chart-4: #dc4a68;
+  --chart-5: #3a88c6;
+  /* En oscuro los pasteles ya contrastan con la tarjeta: el borde es el mismo color, pleno. */
+  --chart-trazo-base: var(--acento-2);
+  --chart-trazo-destacado: var(--acento);
+  --chart-trazo-3: var(--acento-3);
+  --chart-trazo-4: var(--chart-4);
+  --chart-trazo-5: var(--chart-5);
+  --sidebar: #0f1626;
+  --sidebar-foreground: #a3afc7;
+  --sidebar-accent: #19233a;
+  --sidebar-accent-foreground: #e9eef8;
+  --sidebar-border: rgba(233, 238, 248, 0.06);
+  --borde-tarjeta: color-mix(in srgb, var(--foreground) 7%, transparent);
+  --brillo-tarjeta: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.5);
+  --sombra-xs: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sombra-sm: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 3px rgba(0, 0, 0, 0.45);
+  --sombra-md: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 24px -4px rgba(0, 0, 0, 0.6);
+  --sombra-lg: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 48px -12px rgba(0, 0, 0, 0.7);
+  --sombra-elevada: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 28px -12px rgba(0, 0, 0, 0.8);
+}
+
+/*
+ * Paletas (preferencia del usuario, components/apariencia.tsx). `html:root` es solo especificidad: le gana a :root y a .dark sin depender del orden. Cada una redefine solo los cinco acentos; todo lo demás
+ * se deriva. Contraste acento-texto/acento · acento-2-texto/acento-2: Índigo 9.09 · 6.53, Océano 8.32 · 6.31,
+ * Coral 8.65 · 7.78, Violeta 9.58 · 6.49 (Lima 9.53 · 6.17).
+ */
+html:root[data-paleta="indigo"] {
+  --acento: #c9c8ff;
+  --acento-texto: #23215e;
+  --acento-2: #cdeee9;
+  --acento-2-texto: #0f5a52;
+  --acento-3: #ffdcc2;
+}
+
+html:root[data-paleta="oceano"] {
+  --acento: #9fe3dc;
+  --acento-texto: #0b3d3a;
+  --acento-2: #d3e4fd;
+  --acento-2-texto: #1d4f91;
+  --acento-3: #ffe7a0;
+}
+
+html:root[data-paleta="coral"] {
+  --acento: #ffc6b3;
+  --acento-texto: #5a1d0c;
+  --acento-2: #e3dafb;
+  --acento-2-texto: #4a2b8c;
+  --acento-3: #fbe39b;
+}
+
+html:root[data-paleta="violeta"] {
+  --acento: #dacbff;
+  --acento-texto: #34146b;
+  --acento-2: #c6efdf;
+  --acento-2-texto: #0f5b40;
+  --acento-3: #ffd3e6;
+}
+
+/*
+ * Tonos del modo oscuro (preferencia del usuario). Medianoche es `.dark`; estos redefinen solo superficies y textos.
+ * Contraste sobre tarjeta / soft: Grafito principal 14.81, secundario 7.51, terciario 5.41 / 4.82;
+ * Tintado (calculado para las 5 paletas) terciario 5.67–5.72 / 4.78–4.94.
+ */
+html:root.dark[data-oscuro="grafito"] {
+  --background: #111214;
+  --foreground: #eceef2;
+  --card: #1a1b1f;
+  --card-foreground: #eceef2;
+  --popover: #202126;
+  --popover-foreground: #eceef2;
+  --secondary: #232529;
+  --secondary-foreground: #eceef2;
+  --muted: #232529;
+  --muted-foreground: #a9abb3;
+  --texto-terciario: #8e9099;
+  --codigo: #0e0f11;
+  --sidebar: #161719;
+  --sidebar-foreground: #a9abb3;
+  --sidebar-accent: #232529;
+  --sidebar-accent-foreground: #eceef2;
+}
+
+html:root.dark[data-oscuro="tintado"] {
+  --background: color-mix(in srgb, var(--acento) 5%, #0b0c10);
+  --foreground: #eceef2;
+  --card: color-mix(in srgb, var(--acento) 6%, #15171b);
+  --card-foreground: #eceef2;
+  --popover: color-mix(in srgb, var(--acento) 7%, #1a1c22);
+  --popover-foreground: #eceef2;
+  --secondary: color-mix(in srgb, var(--acento) 8%, #1d2025);
+  --secondary-foreground: #eceef2;
+  --muted: color-mix(in srgb, var(--acento) 8%, #1d2025);
+  --muted-foreground: #a2a6b2;
+  --texto-terciario: #979ba7;
+  --codigo: color-mix(in srgb, var(--acento) 4%, #0d0e12);
+  --sidebar: color-mix(in srgb, var(--acento) 5%, #121317);
+  --sidebar-foreground: #a2a6b2;
+  --sidebar-accent: color-mix(in srgb, var(--acento) 8%, #1d2025);
+  --sidebar-accent-foreground: #eceef2;
+}
+
+/*
+ * Tipografía (preferencia del usuario). Cada fuente la carga la app en --fuente-<valor> (next/font, ver src/app/layout.tsx);
+ * aquí solo se elige cuál va en --font-sans. Inter es la de la app (sin bloque). JetBrains Mono (--font-mono) no cambia.
+ */
+html:root[data-fuente="jakarta"] {
+  --font-sans: var(--fuente-jakarta), ui-sans-serif, system-ui, sans-serif;
+}
+
+html:root[data-fuente="manrope"] {
+  --font-sans: var(--fuente-manrope), ui-sans-serif, system-ui, sans-serif;
+}
+
+html:root[data-fuente="dmsans"] {
+  --font-sans: var(--fuente-dmsans), ui-sans-serif, system-ui, sans-serif;
+}
+
+html:root[data-fuente="figtree"] {
+  --font-sans: var(--fuente-figtree), ui-sans-serif, system-ui, sans-serif;
+}

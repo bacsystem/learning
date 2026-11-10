@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Cap body -->
+  <path d="M4 14h24l-4 10H8L4 14z" fill="#b0ba9f"/>
+  <ellipse cx="16" cy="24" rx="8" ry="3.5" fill="#b0ba9f"/>
+  <!-- Board (flat mortarboard top) -->
+  <ellipse cx="16" cy="12" rx="14" ry="5" fill="#60743e"/>
+  <!-- Tassel cord -->
+  <line x1="27" y1="12" x2="27" y2="20" stroke="#b0ba9f" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Tassel ball -->
+  <circle cx="27" cy="21.5" r="1.5" fill="#60743e"/>
+</svg>

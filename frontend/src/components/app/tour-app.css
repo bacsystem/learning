@@ -1,0 +1,166 @@
+/* Popover del tour (driver.js) con los tokens de khipu: superficie de popup, texto con la escala, botones píldora. */
+.app-tour-popover {
+  min-width: 260px;
+  max-width: 360px !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border-radius: calc(var(--radius) * 1.5) !important;
+  background: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  box-shadow: var(--sombra-lg), 0 0 0 1px var(--border) !important;
+  font-family: var(--font-sans);
+  animation: tour-entrada var(--duracion-media) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tour-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-tour-popover {
+    animation: none;
+  }
+}
+
+.app-tour-popover .driver-popover-title {
+  margin: 0 !important;
+  padding: 18px 48px 4px 20px !important;
+  font-family: var(--font-heading, var(--font-sans)) !important;
+  font-size: 0.90625rem !important; /* text-titulo: 14.5 px */
+  font-weight: 620 !important;
+  line-height: 1.375 !important;
+  letter-spacing: -0.014em;
+  color: var(--foreground) !important;
+}
+
+.app-tour-popover .driver-popover-description {
+  margin: 0 !important;
+  padding: 2px 20px 16px !important;
+  font-size: 0.8125rem !important; /* text-cuerpo: 13 px */
+  font-weight: 400 !important;
+  line-height: 1.6 !important;
+  color: var(--muted-foreground) !important;
+}
+
+.app-tour-popover .driver-popover-footer {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 12px 20px 16px !important;
+  border-top: 1px solid var(--border) !important;
+}
+
+.app-tour-popover .driver-popover-progress-text {
+  font-size: 0.71875rem !important; /* text-etiqueta: 11.5 px */
+  font-weight: 500 !important;
+  font-variant-numeric: tabular-nums;
+  color: var(--texto-terciario) !important;
+}
+
+.app-tour-popover .driver-popover-navigation-btns {
+  display: flex !important;
+  gap: 8px !important;
+  margin-left: auto !important;
+}
+
+.app-tour-popover .driver-popover-footer button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  height: 2rem; /* h-control */
+  padding: 0 14px !important;
+  border-radius: 9999px !important;
+  font-family: var(--font-sans) !important;
+  font-size: 0.8125rem !important; /* text-control */
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  text-shadow: none !important;
+  border: none !important;
+  cursor: pointer;
+  transition:
+    background-color var(--duracion-rapida) cubic-bezier(0.16, 1, 0.3, 1),
+    transform var(--duracion-rapida) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-tour-popover .driver-popover-footer button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.app-tour-popover .driver-popover-footer button:active {
+  transform: scale(0.98);
+}
+
+.app-tour-popover .driver-popover-prev-btn {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  box-shadow: inset 0 0 0 1px var(--border) !important;
+  font-weight: 500 !important;
+}
+
+.app-tour-popover .driver-popover-prev-btn:hover {
+  background: var(--secondary) !important;
+}
+
+.app-tour-popover .driver-popover-next-btn,
+.app-tour-popover .driver-popover-done-btn {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  box-shadow: var(--sombra-xs) !important;
+}
+
+.app-tour-popover .driver-popover-next-btn:hover,
+.app-tour-popover .driver-popover-done-btn:hover {
+  background: color-mix(in oklch, var(--primary) 85%, transparent) !important;
+}
+
+.app-tour-popover .driver-popover-close-btn {
+  top: 14px !important;
+  right: 14px !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 9999px !important;
+  font-size: 1rem !important;
+  color: var(--muted-foreground) !important;
+}
+
+.app-tour-popover .driver-popover-close-btn:hover {
+  background: var(--secondary) !important;
+  color: var(--foreground) !important;
+}
+
+/* Flecha: del color del popup en el lado que apunta al elemento. */
+.app-tour-popover .driver-popover-arrow {
+  border-color: var(--popover);
+}
+.app-tour-popover .driver-popover-arrow-side-left {
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-top-color: transparent;
+}
+.app-tour-popover .driver-popover-arrow-side-right {
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  border-top-color: transparent;
+}
+.app-tour-popover .driver-popover-arrow-side-top {
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+}
+.app-tour-popover .driver-popover-arrow-side-bottom {
+  border-left-color: transparent;
+  border-top-color: transparent;
+  border-right-color: transparent;
+}
