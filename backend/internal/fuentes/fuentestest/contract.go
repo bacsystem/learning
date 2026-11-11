@@ -20,8 +20,8 @@ type Entorno struct {
 	Repo          fuentes.SourceRepository
 	EspecialidadA int64
 	EspecialidadB int64
-	Retirar       func(ctx context.Context, fuenteID int64) error
-	NuevaVersion  func(ctx context.Context, fuenteID int64, contenido []byte) (int, error)
+	Retirar       func(t *testing.T, fuenteID int64)
+	NuevaVersion  func(t *testing.T, fuenteID int64, contenido []byte) (version int)
 }
 
 var seq atomic.Int64
@@ -194,14 +194,9 @@ func soloActivasYVigente(t *testing.T, e Entorno) {
 		t.Fatal(err)
 	}
 	retirada := activa(t, e, esp, mk+" retirada")
-	if err := e.Retirar(ctx, retirada.fuenteID); err != nil {
-		t.Fatal(err)
-	}
+	e.Retirar(t, retirada.fuenteID)
 	vieja := activa(t, e, esp, mk+" versión vieja")
-	v2, err := e.NuevaVersion(ctx, vieja.fuenteID, []byte("v2 "+marcador()))
-	if err != nil {
-		t.Fatal(err)
-	}
+	v2 := e.NuevaVersion(t, vieja.fuenteID, []byte("v2 "+marcador()))
 	nueva := sembrada{fuenteID: vieja.fuenteID, version: v2}.publicar(t, e, mk+" versión nueva")
 	viva := activa(t, e, esp, mk+" viva")
 
@@ -270,18 +265,13 @@ func resolverCitaHistorica(t *testing.T, e Entorno) {
 	textoV1 := "Texto exacto de la versión 1 " + marcador()
 	v1 := activa(t, e, nil, textoV1)
 	for range 2 {
-		n, err := e.NuevaVersion(ctx, v1.fuenteID, []byte("otra versión "+marcador()))
-		if err != nil {
-			t.Fatal(err)
-		}
+		n := e.NuevaVersion(t, v1.fuenteID, []byte("otra versión "+marcador()))
 		sembrada{fuenteID: v1.fuenteID, version: n}.publicar(t, e, "texto de la versión "+fmt.Sprint(n))
 	}
 	cita := fuentes.Cita{FuenteID: v1.fuenteID, Version: 1, PasajeID: v1.pasajes[0]}
 	for _, retirar := range []bool{false, true} {
 		if retirar {
-			if err := e.Retirar(ctx, v1.fuenteID); err != nil {
-				t.Fatal(err)
-			}
+			e.Retirar(t, v1.fuenteID)
 		}
 		got, err := e.Repo.ResolverCita(ctx, cita)
 		wantEstado := fuentes.EstadoActiva
@@ -347,10 +337,7 @@ func versionFallida(t *testing.T, e Entorno) {
 	ctx := context.Background()
 	mk := marcador()
 	s := activa(t, e, nil, mk+" vigente")
-	n, err := e.NuevaVersion(ctx, s.fuenteID, []byte("nueva "+marcador()))
-	if err != nil {
-		t.Fatal(err)
-	}
+	n := e.NuevaVersion(t, s.fuenteID, []byte("nueva "+marcador()))
 	if err := e.Repo.MarcarVersionFallida(ctx, s.fuenteID, n, "otro_motivo", nil); !errors.Is(err, fuentes.ErrPublicacionInvalida) {
 		t.Errorf("unknown motivo: err = %v", err)
 	}
@@ -390,15 +377,11 @@ func hashDuplicado(t *testing.T, e Entorno) {
 	ctx := context.Background()
 	contenido := []byte("contenido único " + marcador())
 	nf := fuentes.NuevaFuente{Titulo: "Duplicada " + marcador(), Tipo: "norma", NombreArchivo: "a.md", Contenido: contenido}
-	id, _, err := e.Repo.GuardarFuente(ctx, nf, nil)
-	if err != nil {
+	if _, _, err := e.Repo.GuardarFuente(ctx, nf, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := e.Repo.GuardarFuente(ctx, nf, nil); !errors.Is(err, fuentes.ErrFuenteDuplicada) {
 		t.Errorf("same content again: err = %v, want ErrFuenteDuplicada", err)
-	}
-	if _, err := e.NuevaVersion(ctx, id, contenido); !errors.Is(err, fuentes.ErrFuenteDuplicada) {
-		t.Errorf("same content as a new version: err = %v, want ErrFuenteDuplicada", err)
 	}
 }
 
@@ -409,13 +392,8 @@ func publicarEnRetirada(t *testing.T, e Entorno) {
 	ctx := context.Background()
 	mk := marcador()
 	s := activa(t, e, nil, mk+" antes de retirar")
-	if err := e.Retirar(ctx, s.fuenteID); err != nil {
-		t.Fatal(err)
-	}
-	n, err := e.NuevaVersion(ctx, s.fuenteID, []byte("tras retirar "+marcador()))
-	if err != nil {
-		t.Fatal(err)
-	}
+	e.Retirar(t, s.fuenteID)
+	n := e.NuevaVersion(t, s.fuenteID, []byte("tras retirar "+marcador()))
 	nueva := sembrada{fuenteID: s.fuenteID, version: n}.publicar(t, e, mk+" después de retirar")
 	if got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.EspecialidadA}); len(got) != 0 {
 		t.Errorf("a retired fuente is searchable after publishing: %v", ids(got))

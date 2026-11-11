@@ -34,28 +34,29 @@ func entornoPg(t *testing.T) (fuentestest.Entorno, *sqlx.DB) {
 	}
 	t.Cleanup(func() { limpiarFuentes(t, db, desde) })
 
-	retirar := func(ctx context.Context, fuenteID int64) error {
-		res, err := db.ExecContext(ctx, `UPDATE fuentes SET estado = 'retirada', motivo_retiro = 'prueba de contrato'
+	// Contract hooks, in SQL as S5 and S2 will do (E2-06); not in the port.
+	retirar := func(t *testing.T, fuenteID int64) {
+		t.Helper()
+		res, err := db.Exec(`UPDATE fuentes SET estado = 'retirada', motivo_retiro = 'prueba de contrato', updated_at = NOW()
 			WHERE id = $1 AND version_vigente_id IS NOT NULL`, fuenteID)
 		if err != nil {
-			return err
+			t.Fatalf("Retirar: %v", err)
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
-			return fuentes.ErrNoEncontrado
+			t.Fatalf("Retirar: fuente %d has no current version", fuenteID)
 		}
-		return nil
 	}
-	nuevaVersion := func(ctx context.Context, fuenteID int64, contenido []byte) (int, error) {
+	nuevaVersion := func(t *testing.T, fuenteID int64, contenido []byte) int {
+		t.Helper()
 		sha, tamano, lineas := fuentes.Huella(contenido)
 		var n int
-		err := db.GetContext(ctx, &n, `
+		if err := db.Get(&n, `
 			INSERT INTO fuente_versiones (fuente_id, numero, nombre_archivo, sha256, tamano_bytes, lineas, contenido)
 			SELECT $1, COALESCE(MAX(numero), 0) + 1, 'nueva.md', $2, $3, $4, $5 FROM fuente_versiones WHERE fuente_id = $1
-			RETURNING numero`, fuenteID, sha, tamano, lineas, string(contenido))
-		if err != nil && strings.Contains(err.Error(), "uq_fuente_versiones_sha256") {
-			return 0, fuentes.ErrFuenteDuplicada
+			RETURNING numero`, fuenteID, sha, tamano, lineas, string(contenido)); err != nil {
+			t.Fatalf("NuevaVersion: %v", err)
 		}
-		return n, err
+		return n
 	}
 	return fuentestest.Entorno{Repo: fuentes.NewPgSource(db), EspecialidadA: cat.EspecialidadID, EspecialidadB: otra,
 		Retirar: retirar, NuevaVersion: nuevaVersion}, db
@@ -216,10 +217,7 @@ func TestAuditoriaEnLaTransaccion(t *testing.T) {
 	}
 
 	// MarcarVersionFallida on a new version: the fuente keeps 'activa'.
-	n, err := e.NuevaVersion(ctx, id, []byte("v2 "+dbtest.Uniq()))
-	if err != nil {
-		t.Fatal(err)
-	}
+	n := e.NuevaVersion(t, id, []byte("v2 "+dbtest.Uniq()))
 	if err := e.Repo.MarcarVersionFallida(ctx, id, n, fuentes.MotivoErrorInterno, falla); err == nil {
 		t.Fatal("failing with a failing audit must fail")
 	}

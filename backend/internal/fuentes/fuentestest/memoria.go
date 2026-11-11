@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 	"unicode"
 
@@ -216,32 +217,36 @@ func (m *Memoria) MarcarVersionFallida(_ context.Context, fuenteID int64, versio
 
 // ── Test hooks (outside the port) ─────────────────────────────────────────────
 
-// Retirar retires a fuente, as S5 will (E2-06); the life cycle is not in the port.
-func (m *Memoria) Retirar(_ context.Context, fuenteID int64) error {
+// Retirar retires an active fuente, as S5 will (E2-06); the life cycle is
+// not in the port. Contract hook (Entorno.Retirar).
+func (m *Memoria) Retirar(t *testing.T, fuenteID int64) {
+	t.Helper()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	f, ok := m.fuentes[fuenteID]
 	if !ok || f.vigente == 0 {
-		return fuentes.ErrNoEncontrado
+		t.Fatalf("Retirar: fuente %d has no current version", fuenteID)
 	}
 	f.estado = fuentes.EstadoRetirada
-	return nil
+	f.actualizada = m.ahora()
 }
 
-// NuevaVersion adds the next version in 'procesando', as S2 will (E2-06).
-func (m *Memoria) NuevaVersion(_ context.Context, fuenteID int64, contenido []byte) (int, error) {
+// NuevaVersion adds version n+1 in 'procesando', as S2 will (E2-06); the
+// contract then publishes it through the port. Contract hook.
+func (m *Memoria) NuevaVersion(t *testing.T, fuenteID int64, contenido []byte) int {
+	t.Helper()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	f, ok := m.fuentes[fuenteID]
 	if !ok {
-		return 0, fuentes.ErrNoEncontrado
+		t.Fatalf("NuevaVersion: fuente %d does not exist", fuenteID)
 	}
 	if err := m.registrarHash(contenido); err != nil {
-		return 0, err
+		t.Fatalf("NuevaVersion: %v", err)
 	}
 	n := len(f.versiones) + 1
 	f.versiones[n] = &versionMem{numero: n, estado: fuentes.EstadoProcesando}
-	return n, nil
+	return n
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
