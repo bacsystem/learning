@@ -40,7 +40,9 @@ type DBLimiter struct {
 const dbLimiterSweepEvery = time.Minute
 
 // dbLimiterSweepMargin is how long an expired window is kept before the
-// sweep deletes it: at least the longest window in use (1 h in auth).
+// sweep deletes it. It is a constant so the sweep can use the expira_en index;
+// it must stay above the test window (ventanaPrueba, 15 min), so a window that
+// a test still counts is never swept.
 const dbLimiterSweepMargin = time.Hour
 
 // NewDBLimiter returns a limiter allowing limit events per window per key.
