@@ -9,19 +9,22 @@ import type { Tono } from "@/components/patrones/metricas";
 import { PillEstado } from "@/components/patrones/pill-estado";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AYUDA_CAMPO } from "@/lib/estilos";
+import type { IconoComponente } from "@/lib/iconos";
 import { type CategoriaFallo, desglosarDuracion, type EstadoServicio, type ServicioSalud } from "@/lib/salud/reglas";
 import { cn } from "@/lib/utils";
+import { CheckCircleIcon, MinusCircleIcon, QuestionIcon, WarningIcon, XCircleIcon } from "@phosphor-icons/react";
 
 /** Hora de Lima en toda la pantalla (PLT-02 regla 1, decisión 6 del PO). */
 export const ZONA_HORARIA = "America/Lima";
 const SIN_DATO = "—";
 
-const TONO_ESTADO: Record<EstadoServicio, Tono> = {
-  operativo: "ok",
-  degradado: "aviso",
-  desconocido: "aviso",
-  caido: "error",
-  no_configurado: "neutro",
+/** Icono + texto + color por estado: el estado nunca se comunica solo con el color (PLT-02 regla 3). */
+const ASPECTO_ESTADO: Record<EstadoServicio, { tono: Tono; icono: IconoComponente }> = {
+  operativo: { tono: "ok", icono: CheckCircleIcon },
+  degradado: { tono: "aviso", icono: WarningIcon },
+  desconocido: { tono: "aviso", icono: QuestionIcon },
+  caido: { tono: "error", icono: XCircleIcon },
+  no_configurado: { tono: "neutro", icono: MinusCircleIcon },
 };
 
 /** Estado traducido, con la categoría de fallo si la hay («Caído — Sin conexión»). */
@@ -35,7 +38,7 @@ export function PillEstadoServicio({
   const t = useTranslations("dashboard");
   const texto = t(`saludServicios.estado.${estado}`);
   return (
-    <PillEstado tono={TONO_ESTADO[estado]}>
+    <PillEstado tono={ASPECTO_ESTADO[estado].tono} icon={ASPECTO_ESTADO[estado].icono}>
       {categoria
         ? t("saludServicios.estadoConCategoria", {
             estado: texto,
