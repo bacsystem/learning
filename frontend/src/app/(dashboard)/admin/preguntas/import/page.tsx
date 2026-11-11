@@ -3,9 +3,9 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import React, { useEffect, useRef, useState } from "react";
 
+import { Campo } from "@/components/app/campo";
 import { PieTabla } from "@/components/app/pie-tabla";
 import { Alerta } from "@/components/feedback/alerta";
-import { Campo } from "@/components/formularios/campo";
 import { SelectCampo } from "@/components/formularios/select-campo";
 import { ZonaArchivos } from "@/components/formularios/zona-archivos";
 import { Pasos } from "@/components/navegacion/pasos";

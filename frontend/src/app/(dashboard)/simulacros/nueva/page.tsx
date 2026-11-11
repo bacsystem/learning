@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Campo } from "@/components/app/campo";
 import { DialogContent } from "@/components/app/dialogo";
 import { Alerta } from "@/components/feedback/alerta";
 import { Skeleton } from "@/components/feedback/skeleton";
-import { Campo } from "@/components/formularios/campo";
 import { Combobox } from "@/components/formularios/combobox";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { CabeceraDialogo, PieDialogo } from "@/components/patrones/cabecera-dialogo";

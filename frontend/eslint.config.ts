@@ -116,4 +116,27 @@ export default [
       "@next/next/google-font-display": "error",
     },
   },
+  // Las pantallas usan los envoltorios de components/app, que pasan los textos traducidos a khipu (PR #82).
+  {
+    files: ["src/app/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        {
+          paths: [
+            ["@/components/ui/dialog", "DialogContent", "@/components/app/dialogo"],
+            ["@/components/ui/sheet", "SheetContent", "@/components/app/dialogo"],
+            ["@/components/patrones/pie-tabla", "PieTabla", "@/components/app/pie-tabla"],
+            ["@/components/datos/tabla-datos", "TablaDatos", "@/components/app/tabla-datos"],
+            ["@/components/datos/tabla-listado", "TablaListado", "@/components/app/tabla-listado"],
+            ["@/components/formularios/campo", "Campo", "@/components/app/campo"],
+          ].map(([name, importName, app]) => ({
+            name,
+            importNames: [importName],
+            message: `Importa ${importName} desde "${app}": pasa los textos traducidos.`,
+          })),
+        },
+      ],
+    },
+  },
 ];

@@ -8,8 +8,9 @@ import * as yup from "yup";
 
 import { useEtiquetasContrasena } from "@/app/auth/esquema-contrasena";
 import { ENLACE, TarjetaAuth } from "@/app/auth/tarjeta-auth";
+import { Campo } from "@/components/app/campo";
 import { Alerta } from "@/components/feedback/alerta";
-import { Campo, Entrada } from "@/components/formularios/campo";
+import { Entrada } from "@/components/formularios/campo";
 import { Contrasena } from "@/components/formularios/contrasena";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { useAuth } from "@/lib/auth/auth-context";
