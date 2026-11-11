@@ -11,6 +11,7 @@ import { TourApp } from "@/components/app/tour-app";
 import { Alerta } from "@/components/feedback/alerta";
 import { Shell } from "@/components/nav/shell";
 import { DEFAULTS } from "@/config";
+import { useHidratado } from "@/hooks/use-hidratado";
 import { useAuth } from "@/lib/auth/auth-context";
 
 export default function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -18,6 +19,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
   const t = useTranslations("dashboard");
   const router = useRouter();
   const pathname = usePathname();
+  const hidratado = useHidratado();
 
   // Sesión con token pero perfil aún sin cargar (p. ej. `/auth/me` falló por red o 5xx; el contexto lo reintenta):
   // no se redirige a ningún sitio, se espera con el indicador de carga.
@@ -35,7 +37,9 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
     }
   }, [loading, perfilPendiente, token, user, pathname, router]);
 
-  if (loading) return <Loading />;
+  // La sesión vive en localStorage y `AuthProvider` puede resolverla antes de que este layout hidrate: hasta hidratar
+  // se pinta lo mismo que en el servidor, el indicador de carga (issue #143).
+  if (!hidratado || loading) return <Loading />;
   // La sesión se restauró pero `/auth/me` falla (p. ej. 503 con la BD caída): la sesión se conserva y se avisa en vez
   // de dejar solo el indicador de carga. El contexto reintenta cada 5 s y, al responder, se muestra la app.
   if (perfilPendiente) {
