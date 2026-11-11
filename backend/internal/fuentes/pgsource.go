@@ -239,16 +239,14 @@ func (s *PgSource) PublicarVersion(ctx context.Context, fuenteID int64, version 
 		versionID, len(pasajes)); err != nil {
 		return fmt.Errorf("marcar lista la versión %d: %w", versionID, err)
 	}
-	var cambio struct {
-		Anterior string `db:"anterior"`
-		Nuevo    string `db:"nuevo"`
+	var cambio cambioEstado
+	if cambio.Anterior, err = bloquearFuente(ctx, tx, fuenteID); err != nil {
+		return err
 	}
-	if err := tx.GetContext(ctx, &cambio, `
-		UPDATE fuentes f SET version_vigente_id = $2, updated_at = NOW(),
-		       estado = CASE WHEN f.estado = 'retirada' THEN 'retirada' ELSE 'activa' END
-		FROM (SELECT estado FROM fuentes WHERE id = $1) AS antes
-		WHERE f.id = $1
-		RETURNING antes.estado AS anterior, f.estado AS nuevo`, fuenteID, versionID); err != nil {
+	if err := tx.GetContext(ctx, &cambio.Nuevo, `
+		UPDATE fuentes SET version_vigente_id = $2, updated_at = NOW(),
+		       estado = CASE WHEN estado = 'retirada' THEN 'retirada' ELSE 'activa' END
+		WHERE id = $1 RETURNING estado`, fuenteID, versionID); err != nil {
 		return fmt.Errorf("publicar la versión %d de la fuente %d: %w", version, fuenteID, err)
 	}
 	if err := auditar(ctx, tx, aud, Evento{Accion: AccionProcesar, Entidad: EntidadFuente, EntidadID: fuenteID, Detalle: map[string]any{
@@ -280,16 +278,14 @@ func (s *PgSource) MarcarVersionFallida(ctx context.Context, fuenteID int64, ver
 		versionID, motivo); err != nil {
 		return fmt.Errorf("marcar fallida la versión %d: %w", versionID, err)
 	}
-	var cambio struct {
-		Anterior string `db:"anterior"`
-		Nuevo    string `db:"nuevo"`
+	var cambio cambioEstado
+	if cambio.Anterior, err = bloquearFuente(ctx, tx, fuenteID); err != nil {
+		return err
 	}
-	if err := tx.GetContext(ctx, &cambio, `
-		UPDATE fuentes f SET updated_at = NOW(),
-		       estado = CASE WHEN f.version_vigente_id IS NULL THEN 'fallida' ELSE f.estado END
-		FROM (SELECT estado FROM fuentes WHERE id = $1) AS antes
-		WHERE f.id = $1
-		RETURNING antes.estado AS anterior, f.estado AS nuevo`, fuenteID); err != nil {
+	if err := tx.GetContext(ctx, &cambio.Nuevo, `
+		UPDATE fuentes SET updated_at = NOW(),
+		       estado = CASE WHEN version_vigente_id IS NULL THEN 'fallida' ELSE estado END
+		WHERE id = $1 RETURNING estado`, fuenteID); err != nil {
 		return fmt.Errorf("marcar fallida la fuente %d: %w", fuenteID, err)
 	}
 	if err := auditar(ctx, tx, aud, Evento{Accion: AccionFallar, Entidad: EntidadFuente, EntidadID: fuenteID, Detalle: map[string]any{
@@ -301,6 +297,26 @@ func (s *PgSource) MarcarVersionFallida(ctx context.Context, fuenteID int64, ver
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// cambioEstado is the fuente's state before and after a worker transition,
+// for the audit (ADR 0003 § Auditoría).
+type cambioEstado struct {
+	Anterior string
+	Nuevo    string
+}
+
+// bloquearFuente locks the fuente and returns its state. The worker reads
+// estado_anterior here, after the lock, so a transaction that changed the
+// state while the worker waited is seen (a subquery of the UPDATE would keep
+// the snapshot taken before the wait). The worker already holds the version,
+// so its order stays version → fuente.
+func bloquearFuente(ctx context.Context, tx *sqlx.Tx, fuenteID int64) (string, error) {
+	var estado string
+	if err := tx.GetContext(ctx, &estado, `SELECT estado FROM fuentes WHERE id = $1 FOR UPDATE`, fuenteID); err != nil {
+		return "", fmt.Errorf("bloquear la fuente %d: %w", fuenteID, err)
+	}
+	return estado, nil
+}
 
 // auditar calls aud when there is one (a nil Auditor audits nothing).
 func auditar(ctx context.Context, tx *sqlx.Tx, aud Auditor, ev Evento) error {
