@@ -101,11 +101,25 @@ Se **rechaza**, no se enmascara: la entrada que coincida no sale del servidor.
 
 | Patrón | Expresión (RE2, sin lookbehind) |
 |---|---|
-| DNI | `\b\d{8}\b`: 8 dígitos aislados |
-| Email | `\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b` |
-| Teléfono | `(?:\+?51[\s-]?)?\b9\d{2}[\s-]?\d{3}[\s-]?\d{3}\b` (móvil peruano) y `\(0\d{1,2}\)\s?\d{6,7}` (fijo con código) |
+| DNI | `\d{8}`, con **frontera de dígito** (ver abajo) |
+| Email | `[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}` |
+| Teléfono móvil | `(?:\+?51[\s-]?)?9\d{2}[\s-]?\d{3}[\s-]?\d{3}`, con frontera de dígito |
+| Teléfono fijo | `\(0\d{1,2}\)\s?\d{6,7}` |
 
-- **Un DNI no se distingue de otro número de 8 dígitos**, y no se intenta: todo número de 8 dígitos aislado se trata como posible DNI y se rechaza (la historia dice «un número de 8 dígitos aislado como DNI»). Que esté «aislado» significa que no forma parte de un número más largo ni de una palabra: `123456789`, `A12345678` y `12345678B` no coinciden. El precio es algún falso positivo, como una fecha `20261111`, y es aceptado (ADR 0006).
+**Frontera de dígito** (corrección H3 del review):
+- Go usa RE2, sin lookbehind, y `\b` falla cuando el número va pegado a `+` o a letras. Por eso los patrones **no** usan `\b`.
+- En su lugar, el código comprueba cada coincidencia: el rune **anterior** al inicio y el **posterior** al final no deben ser dígitos, o la coincidencia debe estar al principio o al final del texto.
+- Para el teléfono, se prueba primero con el prefijo `51` y después sin él, para que `51987654321` no se lea como un número de 11 dígitos.
+
+| Entrada | ¿Se detecta? |
+|---|---|
+| `+51987654321`, `51987654321`, `+51 987 654 321`, `987654321`, `987-654-321` | sí (teléfono) |
+| `1987654321`, `9876543210` | no (forman parte de un número más largo) |
+| `12345678`, `DNI12345678`, `A12345678`, `12345678B` | sí (DNI: no hay dígitos al lado) |
+| `123456789`, `20261111` incluido en `202611110` | no (son 9 dígitos) |
+| `20261111` suelto | sí (falso positivo aceptado) |
+
+- **Un DNI no se distingue de otro número de 8 dígitos**, y no se intenta: todo número de 8 dígitos aislado se trata como posible DNI y se rechaza (la historia dice «un número de 8 dígitos aislado como DNI»). Que esté «aislado» significa que **no tiene dígitos al lado**: `123456789` no coincide, pero `DNI12345678`, `A12345678` y `12345678B` sí, porque así suele escribirse un DNI junto a su etiqueta (corrección H3). El precio es algún falso positivo, como una fecha `20261111`, y es aceptado (ADR 0006).
 - Se evalúa sobre `Instrucciones` y sobre cada `Bloque.Texto`.
 - El error **no** incluye el texto que coincidió: solo el tipo (`dni`, `email`, `telefono`) y el índice del bloque, para que el consumidor sepa qué revisar. Ni el log ni `ia_usos` guardan el texto.
 - **Documentos oficiales:** las normas MINSA traen teléfonos y correos de contacto, y pasar esos pasajes completos haría fallar la llamada. Decisión del PO (§7): el consumidor los enmascara antes de llamar.

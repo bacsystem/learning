@@ -18,7 +18,8 @@
 | I5 | `catalogs/repository.go:767` (listado de áreas: `preguntas_disponibles`) | `p.estado = 'activo'` **fijo** | Pasa a `questions.PreguntaServible("p")` |
 | I6 | Respuesta durante un intento en curso (`practices/repository.go:398-405`; simulacros, análogo) | Busca la pregunta por id **dentro del intento**, sin filtrar por estado | Sin cambios. Cumple «Intento en curso»: el intento conserva la pregunta aunque cambie de estado |
 | I7 | Rutas `/preguntas*` (`questions/routes.go:31-40`) | Todas son **admin** | Sin cambios. El alumno no puede pedir una pregunta por id (sección Seguridad) |
-| I8 | `POST /preguntas`, `POST /preguntas/import` | Insertan con `estado` `activo` (default de `014:14`) | Nacen en `borrador` con `origen = 'manual'` (ver §8, P1) |
+| I8 | `POST /preguntas`, `POST /preguntas/import` | `CreatePregunta` escribe el literal `'activo'` en el INSERT (`questions/repository.go:130-132`). Es el único INSERT de `internal/questions`, y la importación pasa por él | El literal pasa a `'borrador'` y se agrega `origen = 'manual'` (ver §8, P1). El DEFAULT de la columna también cambia a `borrador` en la 065, pero el código no depende de él |
+| I12 | Fixture de tests `questions/questionstest/seed.go:197-200` (usado por 14 archivos de test) y seed de demo `cmd/seed/demo/sembrar.go:359-381` | El fixture inserta **sin** `estado` y depende del DEFAULT `activo`. La demo crea preguntas con `CreatePregunta` | Con la 065, el fixture daría `borrador` y la demo quedaría **sin preguntas servibles**. Tarea B8 (§9) |
 | I9 | `DELETE /preguntas/{id}` (`questions/repository.go:575`) | Elimina en cualquier estado | Solo desde los estados permitidos (§3); si no, `409 estado_invalido` (ver §8, P2) |
 | I10 | `internal/fuentes` (`extension.go:12-26`, `service.go:25-27`) | `Citantes` = `sinCitantes`; sin suscriptores | E3-02 registra en `cmd/server/main.go` un `Citantes` y un `SuscriptorRetiro` reales (§5) |
 | I11 | Frontend `src/lib/questions/api.ts:81` | `estado: "activo" \| "eliminada"` | El tipo se amplía con los 4 estados nuevos, más `origen` y `citas`. Hay que mostrar el estado en el listado admin (tarea de frontend-dev) |
@@ -101,7 +102,7 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 | 3 | `motivo` obligatorio para `rechazada`, 5–500 runes tras `TrimSpace`. Opcional para `en_revision` (≤ 500). En otro caso se ignora | 422 `validacion` (`detalle.campos.motivo`) |
 | 4 | La pregunta existe y no está `eliminada` | 404 `no_encontrado` |
 | 5 | La transición está permitida (§3) | 409 `estado_invalido` (`detalle = {"estado_actual"}`) |
-| 6 | Solo para `aprobada`: ≥ 1 cita a un pasaje de una fuente en estado `activa`, de cualquier versión | **422 `falta_cita`** (escenario «Aprobar sin cita») |
+| 6 | Solo para `aprobada`: ≥ 1 cita a un pasaje de una fuente en estado `activa`, de cualquier versión. Se exige en **todos los procesos**, no solo en SERUMS (decisión del usuario, 2026-11-11). Una pregunta nueva de cualquier proceso necesita una fuente cargada para publicarse | **422 `falta_cita`** (escenario «Aprobar sin cita») |
 
 - **Origen `balotario`** (regla 3): su cita es a la propia fuente del balotario, que crea SIA-E3-01. El requisito es el mismo (≥ 1 cita a una fuente `activa`), así que no hay rama especial en el código. La excepción vale solo si la fuente del balotario está `activa` (P4).
 - **Revalidar** (`en_revision` → `aprobada`) exige lo mismo: ≥ 1 cita a una fuente `activa` (P4, decidida).
@@ -126,7 +127,14 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 - Se permite en `borrador`, `en_revision`, `rechazada` y `activo` (agregar trazabilidad al banco heredado).
 - En `aprobada` responde `409 estado_invalido`: una aprobada no puede quedar sin su cita. Para cambiarla se pasa antes a `en_revision`.
 - Se puede citar un pasaje de una fuente `retirada`, pero esa cita no cuenta para aprobar (§4.1, regla 6).
-- Mismo orden de bloqueo que §4.1.
+- **Bloqueo** (corrección H2 del review): se bloquean las fuentes de las citas **actuales y las nuevas**.
+  1. Resolver los `fuente_id` de los `pasaje_ids` del cuerpo y unirlos con los de las citas actuales de la pregunta.
+  2. `SELECT … FROM fuentes WHERE id = ANY($unión) ORDER BY id FOR SHARE`.
+  3. `SELECT … FROM preguntas WHERE id = $1 FOR UPDATE`.
+  4. Volver a leer las citas actuales: si su conjunto de fuentes ya no está dentro de la unión bloqueada, responder `409 estado_invalido`.
+  5. Validar y escribir.
+
+  Bloquear también las fuentes **nuevas** evita dos carreras. Una: que se agregue una cita a una fuente que se retira a la vez, y que una pregunta servida quede citando solo una fuente retirada. Otra: que `liberarVersion` (`fuentes/repository.go:328`) archive esa versión y borre sus pasajes mientras se inserta la cita, lo que daría un error de FK convertido en 500. El orden fuente → pregunta es el mismo que en §4.1 y en el retiro.
 - `200` con el objeto pregunta.
 - Auditoría: `pregunta.citas`, `detalle = {"antes": [ids], "despues": [ids]}`.
 
@@ -251,4 +259,5 @@ Los códigos de esta tabla usan el **formato 2** (`{"error": "<codigo>", "messag
 | B6 | I9, `DELETE` según el estado | 1 |
 | B6b | §4.5: `PUT` con contenido → `en_revision` (comparando con lo guardado) y `422 clave_oficial` en `balotario` | 2 |
 | B7 | §5, `SuscriptorRetiro`: registro en `main` y tests de «Retirar fuente citada» (12 aprobadas y 3 en borrador), «Restaurar no reaprueba» y «todo o nada» con un fallo provocado | 3 |
+| B8 | I12 (vía acordada con backend-dev):<br>• **seed de demo:** siembra una «Fuente demo» activa por el puerto (`GuardarFuente` + `PublicarVersion`) con texto sintético, nunca de `assets/`. Después cita cada pregunta (uno o pocos pasajes) y la aprueba con la transición de B4, sin crear ninguna en `activo`.<br>• **fixture `questionstest/seed.go:198`:** lleva `estado` **explícito** en el INSERT (`activo`, que representa el banco heredado), más casos aparte con `aprobada`, para no depender del DEFAULT | 2 |
 | F1 | frontend-dev: tipos de `questions/api.ts`, estado visible en el listado admin y claves i18n es/en de los 6 estados y del origen | 2 |
