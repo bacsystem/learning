@@ -161,14 +161,17 @@ func SetTrustedProxies(list string) { internalmw.SetTrustedProxies(list) }
 func clientIP(r *http.Request) string { return internalmw.ClientIP(r) }
 
 func NewHandler(svc *Service) *Handler {
+	limitador := func(prefix string, limit int, window time.Duration) *internalmw.DBLimiter {
+		return internalmw.NewDBLimiter(svc.repo.db.DB, prefix, limit, window).ConReloj(svc.relojLimites)
+	}
 	return &Handler{
 		svc:                    svc,
-		registerFailures:       internalmw.NewDBLimiter(svc.repo.db.DB, registerPairPrefix, registerFailuresPerDNIAndIP, registerFailureWindow),
-		registerFailuresPerDNI: internalmw.NewDBLimiter(svc.repo.db.DB, registerDNIPrefix, registerFailuresPerDNI, registerFailurePerDNIWindow),
-		verifyAttempts:         internalmw.NewDBLimiter(svc.repo.db.DB, "verify_tok:", verifyAttemptsPerToken, verifyAttemptWindow),
-		checkDNIPair:           internalmw.NewDBLimiter(svc.repo.db.DB, checkDNIPairPrefix, checkDNIPerDNIAndIP, checkDNIWindow),
-		checkDNIPerDNIAll:      internalmw.NewDBLimiter(svc.repo.db.DB, checkDNIPerDNIPrefix, checkDNIPerDNI, checkDNIPerDNIWindow),
-		checkDNIPerIP:          internalmw.NewDBLimiter(svc.repo.db.DB, checkDNIPerIPPrefix, checkDNIDistinctPerIP, checkDNIWindow),
+		registerFailures:       limitador(registerPairPrefix, registerFailuresPerDNIAndIP, registerFailureWindow),
+		registerFailuresPerDNI: limitador(registerDNIPrefix, registerFailuresPerDNI, registerFailurePerDNIWindow),
+		verifyAttempts:         limitador("verify_tok:", verifyAttemptsPerToken, verifyAttemptWindow),
+		checkDNIPair:           limitador(checkDNIPairPrefix, checkDNIPerDNIAndIP, checkDNIWindow),
+		checkDNIPerDNIAll:      limitador(checkDNIPerDNIPrefix, checkDNIPerDNI, checkDNIPerDNIWindow),
+		checkDNIPerIP:          limitador(checkDNIPerIPPrefix, checkDNIDistinctPerIP, checkDNIWindow),
 		registerMinDuration:    registerMinDuration,
 		now:                    time.Now,
 		sleep:                  sleepCtx,
