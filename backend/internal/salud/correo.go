@@ -90,16 +90,6 @@ func estadoCorreo(m medidasCorreo) (string, *string) {
 }
 
 func datosCorreo(m medidasCorreo) map[string]any {
-	var ultimo any
-	if m.UltimoEnviadoEn != nil {
-		ultimo = m.UltimoEnviadoEn.UTC().Truncate(time.Second)
-	}
-	var antiguedad any
-	if m.AntiguedadMaxMin != nil {
-		antiguedad = *m.AntiguedadMaxMin
-	}
-	return map[string]any{"sin_enviar": m.SinEnviar, "antiguedad_max_min": antiguedad,
-		"fallidos_24h": m.Fallidos24h, "ultimo_enviado_en": ultimo}
+	return map[string]any{"sin_enviar": m.SinEnviar, "antiguedad_max_min": valor(m.AntiguedadMaxMin),
+		"fallidos_24h": m.Fallidos24h, "ultimo_enviado_en": fechaUTC(m.UltimoEnviadoEn)}
 }
-
-func ptrCategoria(c string) *string { return &c }
