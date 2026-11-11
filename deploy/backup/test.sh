@@ -1,7 +1,7 @@
 #!/bin/sh
 # Prueba de punta a punta del cron de copia, sin R2 ni credenciales reales:
 #   Postgres 16 desechable con TLS (sslmode=require, como en producción),
-#   migraciones reales + copias_bd (064) + backup_ro, y versitygw (servidor S3
+#   migraciones reales (incluida la 064, copias_bd) + backup_ro, y versitygw (servidor S3
 #   que valida SigV4, solo para esta prueba). Casos:
 #     1. pg_dump sin permisos  → fallida y NINGÚN objeto subido
 #     2. copia correcta        → objeto cifrado con age + fila correcta
@@ -55,27 +55,13 @@ docker run -d --name "$S3C" --network "$NET" --entrypoint versitygw "$S3IMG" \
 # por socket pasa dentro de esa ventana y la migración, por TCP, fallaba a veces.
 until docker exec "$PGC" pg_isready -h 127.0.0.1 -U owner -d capacitate >/dev/null 2>&1; do sleep 1; done
 
-# Esquema real (goose) + copias_bd del contrato (migración 064) + aprovisionamiento.
+# Esquema real (goose, hasta la 064) + aprovisionamiento de backup_ro.
 # Puerto del host asignado por Docker (127.0.0.1::5432): nunca choca con otra corrida.
 PGPORT_HOST=$(docker port "$PGC" 5432/tcp | head -1 | sed 's/.*://')
 make -s migrate/up DATABASE_URL="postgres://owner:ownerpw@127.0.0.1:${PGPORT_HOST}/capacitate?sslmode=require" >"$TMP/migrate.log" 2>&1 \
   || fail "migraciones: $(tail -3 "$TMP/migrate.log")"
-# copias_bd sale de la migración real (064) cuando ya está en el repo. Mientras
-# no exista, se crea con el DDL del contrato (docs/api/plataforma-salud.md):
-# es el único caso en que el test copia el esquema.
-if ls backend/migrations/064_*.sql >/dev/null 2>&1; then
-  echo "· copias_bd: migración 064 del repo"
-else
-  echo "· copias_bd: DDL del contrato (la 064 todavía no está en esta rama)"
-  docker exec -i "$PGC" psql -U owner -d capacitate -q -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
-CREATE TABLE copias_bd (
-    id BIGSERIAL PRIMARY KEY, iniciada_en TIMESTAMPTZ NOT NULL, terminada_en TIMESTAMPTZ NOT NULL,
-    resultado VARCHAR(10) NOT NULL CHECK (resultado IN ('correcta', 'fallida')),
-    tamano_bytes BIGINT CHECK (tamano_bytes >= 0),
-    CONSTRAINT ck_copias_bd_tamano CHECK ((resultado = 'correcta') = (tamano_bytes IS NOT NULL)),
-    CONSTRAINT ck_copias_bd_tiempos CHECK (terminada_en >= iniciada_en));
-SQL
-fi
+# copias_bd sale de la migración real (064), como en producción: el test no copia el esquema.
+ls backend/migrations/064_*.sql >/dev/null 2>&1 || fail "falta la migración 064 (copias_bd)"
 docker exec -i "$PGC" psql -U owner -d capacitate -q -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 CREATE ROLE backup_ro LOGIN PASSWORD 'backuppw';
 GRANT pg_read_all_data TO backup_ro;
