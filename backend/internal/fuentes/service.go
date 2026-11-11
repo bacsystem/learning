@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/cbaciliod/learning/internal/texto"
 )
 
 // maxConsultaTitulo bounds the S3 title search (contract S3, q).
@@ -23,6 +25,7 @@ type almacen interface {
 	MarcarOficial(ctx context.Context, id int64, entidad, nota string, actor int64, aud Auditor) error
 	DesmarcarOficial(ctx context.Context, id int64, motivo string, aud Auditor) error
 	Editar(ctx context.Context, id int64, titulo string, especialidades []int64, aud Auditor) error
+	BuscarPasajes(ctx context.Context, consulta string) ([]PasajeConFuente, error)
 }
 
 // Service holds the upload rules of SIA-E2-03 (S1), the new version, state
@@ -163,4 +166,24 @@ func (s *Service) conDetalleDuplicado(ctx context.Context, err error, contenido 
 		return dup
 	}
 	return err
+}
+
+// BuscarPasajes is the admin search for citing a passage (E3-07 §2): ErrConsultaInvalida
+// outside 3–300 runes, otherwise at most MaxResultados hits with their extract.
+func (s *Service) BuscarPasajes(ctx context.Context, q string) (ListaPasajes, error) {
+	consulta, err := NormalizarConsulta(q)
+	if err != nil {
+		return ListaPasajes{}, err
+	}
+	hallados, err := s.repo.BuscarPasajes(ctx, consulta)
+	if err != nil {
+		return ListaPasajes{}, err
+	}
+	lista := ListaPasajes{Data: make([]PasajeBuscado, 0, len(hallados))}
+	for _, h := range hallados {
+		lista.Data = append(lista.Data, PasajeBuscado{PasajeID: h.PasajeID, FuenteID: h.FuenteID,
+			FuenteTitulo: h.TituloFuente, Version: h.Version, Seccion: h.Seccion,
+			LineaInicio: h.LineaInicio, LineaFin: h.LineaFin, Extracto: texto.Extracto(h.Texto)})
+	}
+	return lista, nil
 }

@@ -157,6 +157,12 @@ type PasajeEncontrado struct {
 // Pasaje has the same fields as PasajeEncontrado (ADR 0003).
 type Pasaje = PasajeEncontrado
 
+// PasajeConFuente is a search hit with the title of its fuente.
+type PasajeConFuente struct {
+	Pasaje
+	TituloFuente string
+}
+
 // PasajeCitado is a resolved citation, with the fuente data of that version.
 type PasajeCitado struct {
 	Pasaje
@@ -200,11 +206,20 @@ type SourceRepository interface {
 	MarcarVersionFallida(ctx context.Context, fuenteID int64, version int, motivo string, aud Auditor) error
 }
 
+// NormalizarConsulta trims q and checks the 3–300 runes of a search text.
+func NormalizarConsulta(q string) (string, error) {
+	q = strings.TrimSpace(q)
+	if n := utf8.RuneCountInString(q); n < MinConsulta || n > MaxConsulta {
+		return "", ErrConsultaInvalida
+	}
+	return q, nil
+}
+
 // NormalizarBusqueda validates a search and returns the trimmed query and the
 // effective limit. It is shared by every adapter so they reject the same input.
 func NormalizarBusqueda(b Busqueda) (consulta string, limite int, err error) {
-	consulta = strings.TrimSpace(b.Consulta)
-	if n := utf8.RuneCountInString(consulta); n < MinConsulta || n > MaxConsulta || b.EspecialidadID <= 0 {
+	consulta, err = NormalizarConsulta(b.Consulta)
+	if err != nil || b.EspecialidadID <= 0 {
 		return "", 0, ErrConsultaInvalida
 	}
 	limite = b.Limite

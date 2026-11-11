@@ -27,6 +27,9 @@ const (
 	RutaEditar        = "PUT /admin/fuentes/{id}"
 )
 
+// RutaBuscarPasajes is the admin search of passages to cite (E3-07, ADR 0007).
+const RutaBuscarPasajes = "GET /admin/pasajes"
+
 // Mount registers the fuentes admin routes S1–S7 (contract E2).
 func Mount(mux *http.ServeMux, svc *Service, audLog *audit.Logger, jwtSecret string, checkSession auth.SessionChecker) {
 	h := NewHandler(svc, audLog)
@@ -40,4 +43,5 @@ func Mount(mux *http.ServeMux, svc *Service, audLog *audit.Logger, jwtSecret str
 	mux.Handle(RutaCambiarEstado, authn(admin(http.HandlerFunc(h.CambiarEstado))))
 	mux.Handle(RutaOficial, authn(admin(http.HandlerFunc(h.Oficial))))
 	mux.Handle(RutaEditar, authn(admin(http.HandlerFunc(h.Editar))))
+	mux.Handle(RutaBuscarPasajes, authn(admin(http.HandlerFunc(h.BuscarPasajes))))
 }
