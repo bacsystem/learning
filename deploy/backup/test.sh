@@ -30,6 +30,9 @@ cleanup() {
   rm -rf "$TMP"
 }
 trap cleanup EXIT
+# Restos de una corrida interrumpida (Ctrl-C, timeout): se limpian antes de empezar.
+docker rm -f bkt-pg bkt-s3 bkt-restore >/dev/null 2>&1 || true
+docker network rm "$NET" >/dev/null 2>&1 || true
 
 [ -n "${BACKUP_TEST_IMAGE:-}" ] || docker build -q -t "$IMG" deploy/backup >/dev/null
 docker network create "$NET" >/dev/null
@@ -48,15 +51,29 @@ until docker exec bkt-pg pg_isready -U owner -d capacitate >/dev/null 2>&1; do s
 sleep 2
 
 # Esquema real (goose) + copias_bd del contrato (migración 064) + aprovisionamiento.
-make -s migrate/up DATABASE_URL='postgres://owner:ownerpw@127.0.0.1:55445/capacitate?sslmode=require' >/dev/null 2>&1 \
-  || fail "migraciones"
-docker exec -i bkt-pg psql -U owner -d capacitate -q -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
-CREATE TABLE IF NOT EXISTS copias_bd (
+# Postgres responde a pg_isready durante su inicialización y luego se reinicia:
+# se reintenta unos segundos antes de dar la migración por fallida.
+n=0
+until make -s migrate/up DATABASE_URL='postgres://owner:ownerpw@127.0.0.1:55445/capacitate?sslmode=require' >"$TMP/migrate.log" 2>&1; do
+  n=$((n + 1)); [ "$n" -lt 10 ] || fail "migraciones: $(tail -3 "$TMP/migrate.log")"; sleep 2
+done
+# copias_bd sale de la migración real (064) cuando ya está en el repo. Mientras
+# no exista, se crea con el DDL del contrato (docs/api/plataforma-salud.md):
+# es el único caso en que el test copia el esquema.
+if ls backend/migrations/064_*.sql >/dev/null 2>&1; then
+  echo "· copias_bd: migración 064 del repo"
+else
+  echo "· copias_bd: DDL del contrato (la 064 todavía no está en esta rama)"
+  docker exec -i bkt-pg psql -U owner -d capacitate -q -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+CREATE TABLE copias_bd (
     id BIGSERIAL PRIMARY KEY, iniciada_en TIMESTAMPTZ NOT NULL, terminada_en TIMESTAMPTZ NOT NULL,
     resultado VARCHAR(10) NOT NULL CHECK (resultado IN ('correcta', 'fallida')),
     tamano_bytes BIGINT CHECK (tamano_bytes >= 0),
     CONSTRAINT ck_copias_bd_tamano CHECK ((resultado = 'correcta') = (tamano_bytes IS NOT NULL)),
     CONSTRAINT ck_copias_bd_tiempos CHECK (terminada_en >= iniciada_en));
+SQL
+fi
+docker exec -i bkt-pg psql -U owner -d capacitate -q -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 CREATE ROLE backup_ro LOGIN PASSWORD 'backuppw';
 GRANT pg_read_all_data TO backup_ro;
 GRANT INSERT ON copias_bd TO backup_ro;
