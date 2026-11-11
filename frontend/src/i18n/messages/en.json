@@ -15,6 +15,7 @@
     "menu-admin-especialidades": "Specialties",
     "menu-admin-asignaturas": "Subjects",
     "menu-admin-temas": "Topics",
+    "menu-admin-pesos": "Weights by profession",
     "menu-admin-procesos": "Processes (Admin)",
     "menu-admin-preguntas": "Questions",
     "menu-admin-etiquetas": "Tags",
@@ -1303,6 +1304,74 @@
         "estado_invalido": "The topic is already in that state. Reload the list.",
         "no_encontrado": "The topic no longer exists. Reload the list.",
         "error_interno": "Internal server error. Please try again."
+      },
+      "pesos": {
+        "titulo": "Weights for {especialidad}",
+        "ayuda": "Weight, number of questions and coefficient of each area. Saving replaces the whole configuration.",
+        "guardado": "Weights saved: the configuration is complete.",
+        "estimados": "No configuration: estimated weights are used.",
+        "errorCargar": "The weight configuration could not be loaded.",
+        "errorCatalogos": "Processes and subjects could not be loaded.",
+        "estado": {
+          "completa": "Complete",
+          "incompleta": "Incomplete"
+        },
+        "filtro": {
+          "proceso": "Process",
+          "procesoElegir": "Choose a process",
+          "especialidad": "Specialty",
+          "especialidadElegir": "Choose a specialty"
+        },
+        "sinProceso": {
+          "titulo": "Choose a process",
+          "texto": "Weights are configured per process and specialty."
+        },
+        "sinEspecialidad": {
+          "titulo": "Choose a specialty",
+          "texto": "Each specialty has its own weight configuration."
+        },
+        "sinEspecialidades": {
+          "titulo": "The process has no active specialties",
+          "texto": "Activate specialties of the process institution to configure their weights."
+        },
+        "vacio": {
+          "titulo": "No areas yet",
+          "texto": "Add the exam areas with their weight and number of questions."
+        },
+        "usarPlantilla": "Use the general configuration of the process ({n, plural, one {# area} other {# areas}})",
+        "col": {
+          "area": "Area",
+          "peso": "Weight (%)",
+          "preguntas": "Questions",
+          "coeficiente": "Coefficient"
+        },
+        "campoDe": "{campo} for {nombre}",
+        "quitar": "Remove {nombre}",
+        "anadir": "Add area",
+        "anadirPlaceholder": "Search an area…",
+        "anadirVacio": "No areas left to add.",
+        "sumaPesos": "Sum of weights: {suma, number} %",
+        "totalPreguntas": "Questions: {n} / {max}",
+        "validacion": {
+          "areasMin": "Add at least one area.",
+          "areasMax": "At most {max} areas are allowed.",
+          "peso": "The weight goes from {min} to {max} with up to 2 decimals.",
+          "preguntas": "Questions go from {min} to {max} (whole number).",
+          "coeficiente": "The coefficient goes from {min} to {max} with up to 2 decimals.",
+          "repetidas": "There are repeated areas.",
+          "repetidasNombres": "Repeated area: {nombres}.",
+          "limitePreguntas": "The total of questions cannot exceed {max}.",
+          "sumaPesos": "Weights must sum 100 %.",
+          "sumaPesosActual": "Weights sum {suma, number} %: they must sum 100 %."
+        },
+        "errores": {
+          "validacion": "Check the values of the areas.",
+          "referencia_invalida": "The specialty or an area is no longer active. Reload and try again.",
+          "peso_duplicado": "An area is repeated, or someone else saved at the same time. Reload and try again.",
+          "limite_preguntas": "The total of questions exceeds 200.",
+          "pesos_no_suman_100": "The weights do not sum 100 %.",
+          "no_encontrado": "The process no longer exists. Reload the page."
+        }
       }
     }
   }
