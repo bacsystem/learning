@@ -37,7 +37,10 @@ const (
 )
 
 type Service struct {
-	repo            *Repository
+	repo *Repository
+	// login is what Login needs from the store; it is the repository, and a
+	// test double can fail one step to pin each 503 (#133).
+	login           loginStore
 	jwtSecret       string
 	frontendBaseURL string
 	// registerIssues caps accepted registrations per persona (dni_hmac), in
@@ -47,7 +50,7 @@ type Service struct {
 
 func NewService(repo *Repository, jwtSecret string, frontendBaseURL string) *Service {
 	return &Service{
-		repo: repo, jwtSecret: jwtSecret, frontendBaseURL: frontendBaseURL,
+		repo: repo, login: repo, jwtSecret: jwtSecret, frontendBaseURL: frontendBaseURL,
 		registerIssues: internalmw.NewDBLimiter(repo.db.DB, registerIssuesPrefix, registerIssuesPerPersona, registerIssueWindow),
 	}
 }
@@ -342,14 +345,33 @@ func (s *Service) VerifyEmail(ctx context.Context, req VerifyEmailRequest, ip, u
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 
-// noDisponible marks a database error of Login as ErrServicioNoDisponible (503)
-// and keeps the cause for the log; it must never read as bad credentials.
-func noDisponible(op string, err error) error {
-	return fmt.Errorf("%w: login %s: %w", ErrServicioNoDisponible, op, err)
+// loginStore is the part of the repository that Login uses.
+type loginStore interface {
+	FindByUsername(ctx context.Context, username string) (*usuarioRow, error)
+	RegisterFailedLogin(ctx context.Context, id int64, maxAttempts int, lockout time.Duration) (attempts int, locked bool, err error)
+	ResetLoginIntentos(ctx context.Context, id int64) error
+	GetUserProfileByID(ctx context.Context, userID int64) (*UserProfile, error)
+	LoadLoginClaims(ctx context.Context, userID int64) (LoginClaims, error)
+	GetMaxSesiones(ctx context.Context) (int, error)
+	AbrirSesion(ctx context.Context, usuarioID int64, maxSesiones int, tokenHash, ip, userAgent string, expiresAt time.Time) error
+	WriteAudit(ctx context.Context, e AuditEntry)
 }
 
+// fallaBD is a database error of a Login step: it is ErrServicioNoDisponible
+// (503) and keeps the step for the log and the cause in the chain. It must
+// never read as bad credentials.
+type fallaBD struct {
+	paso  string
+	causa error
+}
+
+func (e *fallaBD) Error() string   { return "login " + e.paso + ": " + e.causa.Error() }
+func (e *fallaBD) Unwrap() []error { return []error{ErrServicioNoDisponible, e.causa} }
+
+func noDisponible(paso string, err error) error { return &fallaBD{paso: paso, causa: err} }
+
 func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua string) (*LoginResponse, error) {
-	u, err := s.repo.FindByUsername(ctx, req.Username)
+	u, err := s.login.FindByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, noDisponible("find user", err)
 	}
@@ -364,15 +386,15 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua string) (*
 
 	// Validate password
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password)); err != nil {
-		_, locked, err := s.repo.RegisterFailedLogin(ctx, u.ID, maxLoginAttempts, lockoutDuration)
+		_, locked, err := s.login.RegisterFailedLogin(ctx, u.ID, maxLoginAttempts, lockoutDuration)
 		if err != nil {
 			return nil, noDisponible("register failed login", err)
 		}
 		if locked {
-			s.repo.WriteAudit(ctx, AuditEntry{UsuarioID: &u.ID, Accion: "lockout", Entidad: "usuarios", EntidadID: &u.ID, IP: ip})
+			s.login.WriteAudit(ctx, AuditEntry{UsuarioID: &u.ID, Accion: "lockout", Entidad: "usuarios", EntidadID: &u.ID, IP: ip})
 			return nil, ErrAccountLocked
 		}
-		s.repo.WriteAudit(ctx, AuditEntry{UsuarioID: &u.ID, Accion: "login_failed", Entidad: "usuarios", EntidadID: &u.ID, IP: ip})
+		s.login.WriteAudit(ctx, AuditEntry{UsuarioID: &u.ID, Accion: "login_failed", Entidad: "usuarios", EntidadID: &u.ID, IP: ip})
 		return nil, ErrInvalidCredentials
 	}
 
@@ -387,33 +409,22 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua string) (*
 	}
 
 	// Reset brute-force counter
-	if err := s.repo.ResetLoginIntentos(ctx, u.ID); err != nil {
+	if err := s.login.ResetLoginIntentos(ctx, u.ID); err != nil {
 		return nil, noDisponible("reset login attempts", err)
 	}
 
 	// Fetch profile for claims
-	profile, err := s.repo.GetUserProfileByID(ctx, u.ID)
+	profile, err := s.login.GetUserProfileByID(ctx, u.ID)
 	if err != nil {
 		return nil, noDisponible("load profile", err)
 	}
 
-	// Raw IDs and nivel from grados for JWT claims
-	var rawIDs struct {
-		GradoID        int64  `db:"grado_id"`
-		EspecialidadID int64  `db:"especialidad_id"`
-		InstitucionID  int64  `db:"institucion_id"`
-		Nivel          string `db:"nivel"`
-	}
-	if err := s.repo.db.GetContext(ctx, &rawIDs,
-		`SELECT p.grado_id, p.especialidad_id, p.institucion_id, g.nivel
-		 FROM personas p
-		 JOIN usuarios u ON u.persona_id=p.id
-		 JOIN grados g ON g.id=p.grado_id
-		 WHERE u.id=$1`, u.ID); err != nil {
+	claims, err := s.login.LoadLoginClaims(ctx, u.ID)
+	if err != nil {
 		return nil, noDisponible("load claims", err)
 	}
 
-	token, expiresAt, err := jwtpkg.Issue(s.jwtSecret, u.ID, u.Rol, rawIDs.Nivel, rawIDs.GradoID, rawIDs.EspecialidadID, rawIDs.InstitucionID)
+	token, expiresAt, err := jwtpkg.Issue(s.jwtSecret, u.ID, u.Rol, claims.Nivel, claims.GradoID, claims.EspecialidadID, claims.InstitucionID)
 	if err != nil {
 		return nil, err
 	}
@@ -422,16 +433,16 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua string) (*
 	// one transaction. Without the session every request with this token
 	// would be rejected, so a failure fails the login and no token is
 	// returned; an older session is never evicted for a login that failed.
-	maxSes, err := s.repo.GetMaxSesiones(ctx)
+	maxSes, err := s.login.GetMaxSesiones(ctx)
 	if err != nil {
 		return nil, noDisponible("max sessions", err)
 	}
 	tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(token)))
-	if err := s.repo.AbrirSesion(ctx, u.ID, maxSes, tokenHash, ip, ua, time.Unix(expiresAt, 0)); err != nil {
+	if err := s.login.AbrirSesion(ctx, u.ID, maxSes, tokenHash, ip, ua, time.Unix(expiresAt, 0)); err != nil {
 		return nil, noDisponible("open session", err)
 	}
 
-	s.repo.WriteAudit(ctx, AuditEntry{UsuarioID: &u.ID, Accion: "login", Entidad: "usuarios", EntidadID: &u.ID, IP: ip})
+	s.login.WriteAudit(ctx, AuditEntry{UsuarioID: &u.ID, Accion: "login", Entidad: "usuarios", EntidadID: &u.ID, IP: ip})
 
 	return &LoginResponse{Token: token, ExpiresAt: expiresAt, User: *profile}, nil
 }

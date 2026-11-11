@@ -441,8 +441,14 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrInvalidCredentials):
 			jsonError(w, http.StatusUnauthorized, ErrInvalidCredentials.Error())
 		case errors.Is(err, ErrServicioNoDisponible):
-			// The driver error may carry connection details: log the op only.
-			log.Error().Str("op", "auth.login").Msg("login unavailable: database error")
+			// The driver error may carry connection details: log the op and
+			// the failed step only, never the cause or the username.
+			ev := log.Error().Str("op", "auth.login")
+			var f *fallaBD
+			if errors.As(err, &f) {
+				ev = ev.Str("paso", f.paso)
+			}
+			ev.Msg("login unavailable: database error")
 			jsonError(w, http.StatusServiceUnavailable, ErrServicioNoDisponible.Error())
 		default:
 			httpx.InternalError(w, "auth.login", err)

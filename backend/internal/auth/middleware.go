@@ -56,7 +56,7 @@ func RequireAuth(secret string, checkSession SessionChecker) func(http.Handler) 
 			if err != nil {
 				// The driver error may carry connection details: log the op only.
 				log.Error().Str("op", "auth.check_session").Msg("session check failed")
-				jsonError(w, http.StatusServiceUnavailable, "Servicio no disponible.")
+				jsonError(w, http.StatusServiceUnavailable, ErrServicioNoDisponible.Error())
 				return
 			}
 			if sess == nil || sess.UserID != claims.UserID {

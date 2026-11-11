@@ -578,6 +578,26 @@ func (r *Repository) CountSesionesActivas(ctx context.Context, usuarioID int64) 
 	return count, err
 }
 
+// LoginClaims are the raw ids and nivel of the JWT claims of a login.
+type LoginClaims struct {
+	GradoID        int64  `db:"grado_id"`
+	EspecialidadID int64  `db:"especialidad_id"`
+	InstitucionID  int64  `db:"institucion_id"`
+	Nivel          string `db:"nivel"`
+}
+
+// LoadLoginClaims reads the claims of userID from its persona and grado.
+func (r *Repository) LoadLoginClaims(ctx context.Context, userID int64) (LoginClaims, error) {
+	var c LoginClaims
+	err := r.db.GetContext(ctx, &c,
+		`SELECT p.grado_id, p.especialidad_id, p.institucion_id, g.nivel
+		 FROM personas p
+		 JOIN usuarios u ON u.persona_id=p.id
+		 JOIN grados g ON g.id=p.grado_id
+		 WHERE u.id=$1`, userID)
+	return c, err
+}
+
 // AbrirSesion stores the session of a new login and evicts the user's oldest
 // sessions so that at most maxSesiones remain, in one transaction: if the
 // INSERT fails, no older session has been removed.
