@@ -15,6 +15,9 @@ FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.23 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG GOOSE_VERSION=v3.21.1
+# Versión que reporta /health (main.version). La pasa make docker/build: el tag
+# del release sin la «v» (v1.0.0 → 1.0.0). Fuera de un release, 0.0.0-dev.
+ARG VERSION=0.0.0-dev
 
 WORKDIR /app
 
@@ -40,7 +43,7 @@ COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     export CGO_ENABLED=0 GOOS="${TARGETOS:-linux}" GOARCH="${TARGETARCH:-amd64}" \
- && go build -ldflags="-s -w" -o /out/server ./cmd/server \
+ && go build -ldflags="-s -w -X main.version=${VERSION}" -o /out/server ./cmd/server \
  && go build -ldflags="-s -w" -o /out/migrate ./cmd/migrate
 
 # ── Stage 2: Runtime ────────────────────────────────────────────────────────
