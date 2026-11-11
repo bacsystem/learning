@@ -16,7 +16,7 @@ Fuente: pedido del usuario al tech-lead (2026-11-11): «desde el panel de admini
 | PLT-02 | [Pantalla «Salud de servicios» en el panel admin](PLT-02-pantalla-salud-servicios.md) | MVP | 3 | PLT-01 |
 | PLT-03 | [Salud del correo y versión del frontend](PLT-03-salud-correo-version-frontend.md) | MVP | 2 | PLT-01, PLT-02 |
 | PLT-04 | [Latido del worker de ingesta de fuentes](PLT-04-latido-worker-ingesta.md) | v2 | 2 | PLT-01, PLT-02, worker de ingesta (SIA-E2-03/E2-05) |
-| PLT-05 | [Última copia diaria a Cloudflare R2](PLT-05-copia-diaria-r2.md) | v2 | 2 | PLT-01, PLT-02, job de copia (devops, no existe aún) |
+| PLT-05 | [Última copia diaria a Cloudflare R2](PLT-05-copia-diaria-r2.md) | v2 | 2 | PLT-01, PLT-02, cron de copia (ADR 0004, Decisión 11) que registre la última copia correcta |
 
 Total: 5 historias, 12 pts (MVP 3 historias / 8 pts; v2 2 historias / 4 pts). Cada historia se reparte en tareas de 1–3 h.
 
@@ -28,12 +28,12 @@ flowchart TD
   PLT-02 --> PLT-04
   PLT-02 --> PLT-05
   W[Worker de ingesta registra latido] --> PLT-04
-  B[Job de copia a R2 registra ejecución] --> PLT-05
+  B[Cron de copia R2, ADR 0004, registra la última copia correcta] --> PLT-05
 ```
 
 **Por qué PLT-04 y PLT-05 van en v2:**
 - **Worker de ingesta:** está definido en el contrato de E2 (`docs/api/serums-ia-e2-fuentes.md`, SIA-E2-03/E2-05), pero no registra ningún latido. PLT-04 **incluye** que lo registre.
-- **Copia a R2:** no hay rastro de un job de copia en el repo. El agente devops tiene pendiente «backups y restauración probada». Puede que exista fuera del repo (en Railway): **por confirmar con devops**. PLT-05 depende de que esa copia registre cada ejecución en un lugar que la API pueda leer.
+- **Copia a R2:** está decidida en la [ADR 0004, Decisión 11](../../adr/0004-alojamiento-base-de-datos-produccion.md), aprobada por el usuario: un cron de Railway con `pg_dump` cifrado con `age` hacia Cloudflare R2. Devops la implementa en `deploy/backup/`. PLT-05 depende de que el cron registre la última copia correcta en un lugar que la API pueda leer; lo definen el architect y devops (`backup_ro` es de solo lectura y el backend no recibe las credenciales de R2).
 
 No se escriben criterios sobre datos que nadie produce.
 
@@ -74,7 +74,7 @@ Cada una ya tiene una decisión por defecto, para no bloquear al architect. Si e
 | Q3 | ¿Qué es «degradado» frente a «caído»? | Degradado: funciona, pero lento, con atraso o con fallos parciales (umbrales de la tabla). Caído: no responde, da error o pasa el umbral de caído. | PLT-01, PLT-03..05 |
 | Q4 | ¿Los umbrales de la tabla sirven para producción? | Sí, para el MVP. Se ajustan con datos reales después del primer mes. | PLT-01, PLT-03..05 |
 | Q5 | ¿Hacen falta alertas (correo o mensaje cuando algo cae)? | Fuera de alcance en esta épica. Si se quieren, es una historia nueva, idealmente con un monitor externo, porque el panel solo ve el estado cuando alguien lo abre. | — |
-| Q6 | ¿Existe ya la copia diaria a R2 (fuera del repo, en Railway)? | Se asume que no. PLT-05 queda en v2 y depende del job de devops. | PLT-05 |
+| Q6 | ~~¿Existe ya la copia diaria a R2?~~ | **Resuelta:** sí, como decisión aprobada por el usuario ([ADR 0004, Decisión 11](../../adr/0004-alojamiento-base-de-datos-produccion.md)); devops la implementa en `deploy/backup/`. Queda para el architect y devops: dónde registra el cron la última copia correcta para que la API la lea. PLT-05 sigue en v2 hasta que exista ese registro. | PLT-05 |
 
 ## Fuera de alcance de la épica
 

@@ -6,7 +6,7 @@ fase: v2
 prioridad: Media
 estimacion: 2
 roles: [admin]
-depende_de: [PLT-01, PLT-02]
+depende_de: [PLT-01, PLT-02, ADR-0004]
 ---
 
 # PLT-05 Última copia diaria a Cloudflare R2
@@ -14,7 +14,11 @@ depende_de: [PLT-01, PLT-02]
 **Como** admin, **quiero** ver cuándo se hizo la última copia correcta de la base de datos, **para** saber que, si hay que restaurar, tenemos una copia reciente.
 
 ## Contexto
-**No hay rastro de un job de copia en el repo.** Devops lo tiene pendiente («backups y restauración probada»). Puede existir fuera del repo, en Railway: por confirmar con devops (README, Q6). Esta historia depende de que devops cree la copia diaria a Cloudflare R2 y de que esa copia **registre cada ejecución** (inicio, fin, resultado y tamaño) en un lugar que la API pueda leer. La API no consulta R2 en cada comprobación ni guarda sus credenciales para esto.
+La copia diaria está decidida en la [ADR 0004, Decisión 11](../../adr/0004-alojamiento-base-de-datos-produccion.md), aprobada por el usuario. Es un cron job de Railway que hace un `pg_dump` con el rol de solo lectura `backup_ro`, lo cifra con `age` y lo sube a un bucket privado de Cloudflare R2. Devops lo implementa en `deploy/backup/`. Según la ADR, el script registra solo fecha, tamaño y resultado.
+
+**Dependencia de esta historia:** el cron debe registrar cada ejecución (inicio, fin, resultado y tamaño), o al menos la **última copia correcta**, en un lugar que la API pueda leer. **Lo definen el architect y devops**, con dos restricciones de la ADR:
+- El cron conecta con `backup_ro`, que es de solo lectura: no puede escribir en la base con ese rol.
+- El backend no recibe las credenciales de R2: la API no consulta R2 ni hace HEAD al bucket para esto.
 
 ## Reglas de negocio
 1. Servicio `copia_r2`:
@@ -57,7 +61,11 @@ Escenario: Sin datos de R2
 Lanzar una copia o restaurar desde el panel, listar o descargar copias, verificar la integridad de la copia y política de retención (devops).
 
 ## Dependencias
-PLT-01, PLT-02 y el job de copia diaria a R2 de devops, que registra cada ejecución. El architect define dónde queda el registro.
+- PLT-01 y PLT-02.
+- Cron de copia diaria de la ADR 0004 (Decisión 11), que implementa devops en `deploy/backup/`.
+- Registro de la última copia correcta en un lugar que la API pueda leer: lo definen el architect y devops, respetando que `backup_ro` es de solo lectura y que el backend no recibe credenciales de R2.
+
+Las alertas por fallo del cron (notificación de Railway, ADR 0004) siguen siendo de devops: este panel no las reemplaza.
 
 ## Seguridad y privacidad
 Ni credenciales, ni bucket, ni rutas, ni endpoint. La copia contiene datos personales: este panel solo muestra metadatos (fecha, resultado y tamaño).
