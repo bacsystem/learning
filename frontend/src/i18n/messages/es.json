@@ -1370,13 +1370,13 @@
         "totalPreguntas": "Preguntas: {n} / {max}",
         "validacion": {
           "areasMin": "Añade al menos un área.",
-          "areasMax": "Admite como máximo {max} áreas.",
-          "peso": "El peso va de {min} a {max} con hasta 2 decimales.",
-          "preguntas": "Las preguntas van de {min} a {max} (número entero).",
-          "coeficiente": "El coeficiente va de {min} a {max} con hasta 2 decimales.",
+          "areasMax": "Admite como máximo {max, number} áreas.",
+          "peso": "El peso va de {min, number} a {max, number} con hasta 2 decimales.",
+          "preguntas": "Las preguntas van de {min, number} a {max, number} (número entero).",
+          "coeficiente": "El coeficiente va de {min, number} a {max, number} con hasta 2 decimales.",
           "repetidas": "Hay áreas repetidas.",
           "repetidasNombres": "Área repetida: {nombres}.",
-          "limitePreguntas": "El total de preguntas no puede pasar de {max}.",
+          "limitePreguntas": "El total de preguntas no puede pasar de {max, number}.",
           "sumaPesos": "Los pesos deben sumar 100 %.",
           "sumaPesosActual": "Los pesos suman {suma, number} %: deben sumar 100 %."
         },
