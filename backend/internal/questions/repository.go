@@ -70,6 +70,31 @@ func validarClasificacion(ctx context.Context, q sqlx.QueryerContext, procesoID,
 	return nil
 }
 
+// validarTema checks, inside the caller's transaction, the optional tema of a
+// question (T8): it must exist in the same asignatura and be active. The one
+// exception is actual, the tema the question already has, which may be sent
+// back on update even if it was archived since. FOR SHARE keeps the tema from
+// being archived until the question is saved.
+func validarTema(ctx context.Context, q sqlx.QueryerContext, temaID *int64, asignaturaID int64, actual *int64) error {
+	if temaID == nil {
+		return nil
+	}
+	var estado string
+	err := sqlx.GetContext(ctx, q, &estado,
+		`SELECT estado FROM temas WHERE id = $1 AND asignatura_id = $2 FOR SHARE`, *temaID, asignaturaID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrTemaInvalido
+	}
+	if err != nil {
+		return err
+	}
+	conservaElActual := actual != nil && *actual == *temaID
+	if estado != "activo" && !conservaElActual {
+		return ErrTemaInvalido
+	}
+	return nil
+}
+
 // CreatePregunta inserts a new question with its answers, tags, and optional feedback.
 func (r *Repository) CreatePregunta(ctx context.Context, req CreatePreguntaRequest, institucionID int64) (PreguntaResponse, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -81,15 +106,18 @@ func (r *Repository) CreatePregunta(ctx context.Context, req CreatePreguntaReque
 	if err := validarClasificacion(ctx, tx, req.ProcesoID, req.AsignaturaID, req.EtiquetaIDs); err != nil {
 		return PreguntaResponse{}, err
 	}
+	if err := validarTema(ctx, tx, req.TemaID, req.AsignaturaID, nil); err != nil {
+		return PreguntaResponse{}, err
+	}
 
 	var preguntaID int64
 	err = tx.QueryRowContext(ctx, `
 		INSERT INTO preguntas (institucion_id, proceso_id, asignatura_id, grado_id, especialidad_id,
-			enunciado, tipo, dificultad, estado)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'activo')
+			tema_id, enunciado, tipo, dificultad, estado)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'activo')
 		RETURNING id`,
 		institucionID, req.ProcesoID, req.AsignaturaID, req.GradoID, req.EspecialidadID,
-		req.Enunciado, req.Tipo, req.Dificultad,
+		req.TemaID, req.Enunciado, req.Tipo, req.Dificultad,
 	).Scan(&preguntaID)
 	if err != nil {
 		return PreguntaResponse{}, err
@@ -151,6 +179,8 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 		Grado            *string  `db:"grado"`
 		EspecialidadID   *int64   `db:"especialidad_id"`
 		Especialidad     *string  `db:"especialidad"`
+		TemaID           *int64   `db:"tema_id"`
+		Tema             *string  `db:"tema"`
 		Enunciado        string   `db:"enunciado"`
 		Tipo             string   `db:"tipo"`
 		Dificultad       string   `db:"dificultad"`
@@ -178,6 +208,8 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 			g.nombre  AS grado,
 			p.especialidad_id,
 			e.nombre  AS especialidad,
+			p.tema_id,
+			t.nombre  AS tema,
 			p.enunciado, p.tipo, p.dificultad, p.estado,
 			p.created_at::text,
 			ret.explicacion AS retro_explicacion,
@@ -208,12 +240,14 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 		JOIN asignaturas a  ON a.id  = p.asignatura_id
 		LEFT JOIN grados g         ON g.id = p.grado_id
 		LEFT JOIN especialidades e ON e.id = p.especialidad_id
+		LEFT JOIN temas t          ON t.id = p.tema_id
 		LEFT JOIN pregunta_retroalimentacion ret ON ret.pregunta_id = p.id
 		LEFT JOIN pregunta_estadisticas      est ON est.pregunta_id = p.id
 		WHERE p.id = $1 AND p.estado != 'eliminada'`, id,
 	).Scan(
 		&r0.ID, &r0.ProcesoID, &r0.Proceso, &r0.AsignaturaID, &r0.Asignatura,
 		&r0.GradoID, &r0.Grado, &r0.EspecialidadID, &r0.Especialidad,
+		&r0.TemaID, &r0.Tema,
 		&r0.Enunciado, &r0.Tipo, &r0.Dificultad, &r0.Estado, &r0.CreatedAt,
 		&r0.RetroExplicacion, &r0.RetroReferencia,
 		&r0.EstIntentos, &r0.EstAciertos, &r0.EstIndDif, &r0.EstIndDisc,
@@ -256,6 +290,8 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 		Grado:          r0.Grado,
 		EspecialidadID: r0.EspecialidadID,
 		Especialidad:   r0.Especialidad,
+		TemaID:         r0.TemaID,
+		Tema:           r0.Tema,
 		Enunciado:      r0.Enunciado,
 		Tipo:           r0.Tipo,
 		Dificultad:     r0.Dificultad,
@@ -326,6 +362,11 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 		args = append(args, q.EtiquetaID)
 		i++
 	}
+	if q.TemaID > 0 {
+		where = append(where, fmt.Sprintf("p.tema_id = $%d", i))
+		args = append(args, q.TemaID)
+		i++
+	}
 	if q.Search != "" {
 		where = append(where, fmt.Sprintf("p.enunciado ILIKE $%d", i))
 		args = append(args, "%"+q.Search+"%")
@@ -351,6 +392,8 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 			a.nombre  AS asignatura,
 			g.nombre  AS grado,
 			e.nombre  AS especialidad,
+			p.tema_id,
+			t.nombre  AS tema,
 			p.enunciado, p.tipo, p.dificultad, p.estado,
 			p.created_at::text,
 			COUNT(*) OVER() AS total_count
@@ -359,6 +402,7 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 		JOIN asignaturas a ON a.id = p.asignatura_id
 		LEFT JOIN grados g ON g.id = p.grado_id
 		LEFT JOIN especialidades e ON e.id = p.especialidad_id
+		LEFT JOIN temas t ON t.id = p.tema_id
 		WHERE %s
 		ORDER BY p.id DESC
 		LIMIT $%d OFFSET $%d`, whereClause, i, i+1)
@@ -377,6 +421,7 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 		var p PreguntaResponse
 		if err := rows.Scan(
 			&p.ID, &p.Proceso, &p.Asignatura, &p.Grado, &p.Especialidad,
+			&p.TemaID, &p.Tema,
 			&p.Enunciado, &p.Tipo, &p.Dificultad, &p.Estado, &p.CreatedAt,
 			&total,
 		); err != nil {
@@ -414,9 +459,10 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 	// proceso_id is immutable; the stored one also scopes the asignatura and
 	// etiquetas check below (H19). FOR UPDATE keeps the row stable meanwhile.
 	var storedProcesoID int64
+	var storedTemaID *int64
 	err = tx.QueryRowContext(ctx,
-		`SELECT proceso_id FROM preguntas WHERE id = $1 AND estado != 'eliminada' FOR UPDATE`, id,
-	).Scan(&storedProcesoID)
+		`SELECT proceso_id, tema_id FROM preguntas WHERE id = $1 AND estado != 'eliminada' FOR UPDATE`, id,
+	).Scan(&storedProcesoID, &storedTemaID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PreguntaResponse{}, ErrNotFound
 	}
@@ -438,13 +484,18 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 	if err := validarClasificacion(ctx, tx, storedProcesoID, req.AsignaturaID, etiquetas); err != nil {
 		return PreguntaResponse{}, err
 	}
+	// tema_id is replaced like any PUT field (absent or null = no tema), in
+	// the same UPDATE as asignatura_id so the composite FK sees both.
+	if err := validarTema(ctx, tx, req.TemaID, req.AsignaturaID, storedTemaID); err != nil {
+		return PreguntaResponse{}, err
+	}
 
 	res, err := tx.ExecContext(ctx, `
 		UPDATE preguntas
-		SET asignatura_id = $1, grado_id = $2, especialidad_id = $3,
-		    enunciado = $4, tipo = $5, dificultad = $6, updated_at = NOW()
-		WHERE id = $7 AND estado != 'eliminada'`,
-		req.AsignaturaID, req.GradoID, req.EspecialidadID,
+		SET asignatura_id = $1, grado_id = $2, especialidad_id = $3, tema_id = $4,
+		    enunciado = $5, tipo = $6, dificultad = $7, updated_at = NOW()
+		WHERE id = $8 AND estado != 'eliminada'`,
+		req.AsignaturaID, req.GradoID, req.EspecialidadID, req.TemaID,
 		req.Enunciado, req.Tipo, req.Dificultad, id,
 	)
 	if err != nil {

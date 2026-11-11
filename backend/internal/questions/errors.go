@@ -17,7 +17,16 @@ var (
 	ErrInsufficientQuestions = errors.New("Preguntas insuficientes para generar el conjunto.")
 	// ErrLimiteExcedido is returned when a request asks for more items than allowed.
 	ErrLimiteExcedido = errors.New("Se excedió el máximo permitido.")
+	// ErrTemaInvalido: the tema_id does not exist, is archived or belongs to
+	// another asignatura (T8). It answers 422 tema_invalido in the coded format.
+	ErrTemaInvalido = errors.New("El tema no existe, está archivado o es de otra área.")
 )
+
+// codigoTemaInvalido is the stable code of ErrTemaInvalido (docs/api/README.md §3).
+const codigoTemaInvalido = "tema_invalido"
+
+// constraintTema is the composite FK (tema_id, asignatura_id) of migration 059.
+const constraintTema = "fk_preguntas_tema"
 
 const msgAlternativaConIntentos = "no se puede eliminar una alternativa que ya tiene intentos registrados"
 
@@ -45,10 +54,18 @@ func isUniqueViolation(err error) bool {
 	return errors.As(err, &pqErr) && pqErr.Code == "23505"
 }
 
-// isForeignKeyViolation returns true for a 23503 that is not the alternative
-// RESTRICT above: a grado_id or especialidad_id that does not exist. Etiquetas
-// are checked before the insert (validarClasificacion), so they never get here.
+// isTemaFKViolation reports a tema that does not match the asignatura of the
+// question. validarTema checks it first; this only catches a race.
+func isTemaFKViolation(err error) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "23503" && pqErr.Constraint == constraintTema
+}
+
+// isForeignKeyViolation returns true for a 23503 that is neither the
+// alternative RESTRICT above nor the tema FK: a grado_id or especialidad_id
+// that does not exist. Etiquetas are checked before the insert
+// (validarClasificacion), so they never get here.
 func isForeignKeyViolation(err error) bool {
 	var pqErr *pq.Error
-	return errors.As(err, &pqErr) && pqErr.Code == "23503" && !isAlternativaConIntentos(err)
+	return errors.As(err, &pqErr) && pqErr.Code == "23503" && !isAlternativaConIntentos(err) && !isTemaFKViolation(err)
 }

@@ -297,6 +297,10 @@ func (f *Fixture) cleanup(t *testing.T) {
 		}
 	}
 	for _, a := range f.Asignaturas {
+		// Temas (059) hang from the asignatura; their preguntas are gone already.
+		if _, err := f.DB.ExecContext(ctx, `DELETE FROM temas WHERE asignatura_id = $1`, a); err != nil {
+			t.Errorf("cleanup temas: %v", err)
+		}
 		if _, err := f.DB.ExecContext(ctx, `DELETE FROM asignaturas WHERE id = $1`, a); err != nil {
 			t.Errorf("cleanup asignatura: %v", err)
 		}
