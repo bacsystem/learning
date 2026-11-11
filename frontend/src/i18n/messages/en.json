@@ -1328,7 +1328,12 @@
         "fuente_no_activa": "One of the sources is no longer active. Review the citations and try again.",
         "limite_citas": "A question allows at most {maximo} citations. Remove one to add another.",
         "ultima_cita_activa": "You cannot remove the last active citation of an approved question. Add another first or reject the question.",
-        "generico": "The operation could not be completed. Try again."
+        "generico": "The operation could not be completed. Try again.",
+        "falta_cita": "The question needs at least one citation to an active source.",
+        "verificacion_requerida": "Tick the verification box before approving.",
+        "nota_obligatoria": "Write a review note of {min} to {max} characters.",
+        "conflicto_clave": "This question has an unresolved answer-key conflict.",
+        "revision_especializada": "This question is reviewed in its specialised queue, not from here."
       },
       "pesos": {
         "titulo": "Weights for {especialidad}",
@@ -1674,10 +1679,6 @@
           "quitarDe": "Remove the citation from “{fuente}”",
           "guardando": "Saving citations…",
           "guardadas": "Citations updated.",
-          "acciones": {
-            "titulo": "Review",
-            "motivoRechazo": "Rejection reason"
-          },
           "buscador": {
             "titulo": "Search passages",
             "etiqueta": "Search the active sources",
@@ -1693,6 +1694,27 @@
             "yaCitado": "Already cited",
             "limiteAlcanzado": "The maximum number of citations was reached."
           }
+        },
+        "acciones": {
+          "titulo": "Review",
+          "motivoRechazo": "Rejection reason",
+          "verificado": "I have verified the question and its key against the citation",
+          "aprobar": "Approve",
+          "revalidar": "Revalidate",
+          "rechazar": "Reject",
+          "reabrir": "Reopen",
+          "seRevisaEnCola": "Reviewed in its queue",
+          "sinAcciones": "There are no review actions for the current state.",
+          "nota": "Review note",
+          "notaObligatoria": "The note is required (at least {min} characters).",
+          "notaOpcional": "Optional, up to {max} characters.",
+          "notaAyuda": "Between {min} and {max} characters.",
+          "motivo": "Rejection reason",
+          "motivoMinimo": "Write at least {min} characters.",
+          "motivoAyuda": "Between {min} and {max} characters.",
+          "procesando": "Saving…",
+          "rechazarTitulo": "Reject the question",
+          "reabrirAyuda": "It goes back to draft so you can fix it and cite it again."
         }
       },
       "preguntas": {

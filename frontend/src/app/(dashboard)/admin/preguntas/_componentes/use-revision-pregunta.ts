@@ -3,16 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/lib/auth/auth-context";
-import { type Pregunta, questionsApi } from "@/lib/questions/api";
+import { type CambiarEstadoPayload, type Pregunta, questionsApi } from "@/lib/questions/api";
 import { idsTrasAnadir, idsTrasQuitar } from "@/lib/serums-ia/revision/reglas";
 
 type Carga = "cargando" | "lista" | "error" | "no_encontrada";
 
 /**
- * Pregunta con sus citas y las dos operaciones que las cambian. Cada operación envía la lista completa (E3-07 §4) y
- * pinta lo que responde el servidor; tras un error recarga la pregunta para no mostrar un estado supuesto.
+ * Pregunta con las operaciones que la cambian: citas (E3-07 §4, siempre la lista completa) y estado (§3). Pinta lo
+ * que responde el servidor; tras cualquier error, y en particular un 409, recarga la pregunta para no mostrar un
+ * estado supuesto.
  */
-export function useCitasPregunta(preguntaId: number) {
+export function useRevisionPregunta(preguntaId: number) {
   const { token } = useAuth();
   const [pregunta, setPregunta] = useState<Pregunta | null>(null);
   const [carga, setCarga] = useState<Carga>("cargando");
@@ -34,13 +35,13 @@ export function useCitasPregunta(preguntaId: number) {
     void cargar();
   }, [cargar]);
 
-  const cambiarCitas = useCallback(
-    async (ids: number[]) => {
+  const operar = useCallback(
+    async (operacion: (token: string) => Promise<Pregunta>) => {
       if (!token) return;
       setGuardando(true);
       setError(null);
       try {
-        setPregunta(await questionsApi.reemplazarCitas(token, preguntaId, ids));
+        setPregunta(await operacion(token));
       } catch (e: unknown) {
         setError(e);
         await cargar();
@@ -48,7 +49,17 @@ export function useCitasPregunta(preguntaId: number) {
         setGuardando(false);
       }
     },
-    [token, preguntaId, cargar],
+    [token, cargar],
+  );
+
+  const cambiarCitas = useCallback(
+    (ids: number[]) => operar((tk) => questionsApi.reemplazarCitas(tk, preguntaId, ids)),
+    [operar, preguntaId],
+  );
+
+  const cambiarEstado = useCallback(
+    (payload: CambiarEstadoPayload) => operar((tk) => questionsApi.cambiarEstado(tk, preguntaId, payload)),
+    [operar, preguntaId],
   );
 
   const anadir = useCallback(
@@ -60,5 +71,5 @@ export function useCitasPregunta(preguntaId: number) {
     [pregunta, cambiarCitas],
   );
 
-  return { pregunta, carga, guardando, error, cargar, anadir, quitar };
+  return { pregunta, carga, guardando, error, cargar, anadir, quitar, cambiarEstado };
 }
