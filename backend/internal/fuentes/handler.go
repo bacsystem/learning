@@ -53,9 +53,12 @@ type servicio interface {
 	NuevaVersion(ctx context.Context, fuenteID string, archivo ArchivoSubido, actor *int64, aud Auditor) (FuenteDetalle, error)
 	Listar(ctx context.Context, f FiltroListado) (ListaFuentes, error)
 	Obtener(ctx context.Context, id int64) (FuenteDetalle, error)
+	CambiarEstado(ctx context.Context, id int64, req CambioEstadoRequest, actor int64, aud Auditor) (FuenteDetalle, error)
+	Oficial(ctx context.Context, id int64, req OficialRequest, actor int64, aud Auditor) (FuenteDetalle, error)
+	Editar(ctx context.Context, id int64, req EditarRequest, aud Auditor) (FuenteDetalle, error)
 }
 
-// Handler exposes S1–S4.
+// Handler exposes S1–S7.
 type Handler struct {
 	svc    servicio
 	audLog *audit.Logger
@@ -123,9 +126,8 @@ func (h *Handler) Listar(w http.ResponseWriter, r *http.Request) {
 
 // Obtener handles GET /admin/fuentes/{id} (S4).
 func (h *Handler) Obtener(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil || id <= 0 {
-		parametroInvalido(w)
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	d, err := h.svc.Obtener(r.Context(), id)
@@ -134,6 +136,76 @@ func (h *Handler) Obtener(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonStatus(w, http.StatusOK, d)
+}
+
+// CambiarEstado handles PATCH /admin/fuentes/{id}/estado (S5).
+func (h *Handler) CambiarEstado(w http.ResponseWriter, r *http.Request) {
+	var req CambioEstadoRequest
+	id, actor, aud, ok := h.cambio(w, r, &req)
+	if !ok {
+		return
+	}
+	d, err := h.svc.CambiarEstado(r.Context(), id, req, actor, aud)
+	if err != nil {
+		responderError(w, "cambiar_estado", err)
+		return
+	}
+	jsonStatus(w, http.StatusOK, d)
+}
+
+// Oficial handles PATCH /admin/fuentes/{id}/oficial (S6).
+func (h *Handler) Oficial(w http.ResponseWriter, r *http.Request) {
+	var req OficialRequest
+	id, actor, aud, ok := h.cambio(w, r, &req)
+	if !ok {
+		return
+	}
+	d, err := h.svc.Oficial(r.Context(), id, req, actor, aud)
+	if err != nil {
+		responderError(w, "oficial", err)
+		return
+	}
+	jsonStatus(w, http.StatusOK, d)
+}
+
+// Editar handles PUT /admin/fuentes/{id} (S7).
+func (h *Handler) Editar(w http.ResponseWriter, r *http.Request) {
+	var req EditarRequest
+	id, _, aud, ok := h.cambio(w, r, &req)
+	if !ok {
+		return
+	}
+	d, err := h.svc.Editar(r.Context(), id, req, aud)
+	if err != nil {
+		responderError(w, "editar", err)
+		return
+	}
+	jsonStatus(w, http.StatusOK, d)
+}
+
+// cambio reads what every JSON change of S5–S7 needs: the admin and its
+// Auditor, the path id (400 parametro_invalido) and the body, strict (400
+// cuerpo_invalido for unknown fields, 413 when oversized).
+func (h *Handler) cambio(w http.ResponseWriter, r *http.Request, req any) (int64, int64, Auditor, bool) {
+	actor, aud, ok := h.auditor(w, r)
+	if !ok {
+		return 0, 0, nil, false
+	}
+	id, ok := pathID(w, r)
+	if !ok || !httpx.DecodeJSONStrict(w, r, req) {
+		return 0, 0, nil, false
+	}
+	return id, actor, aud, true
+}
+
+// pathID reads {id} > 0, answering 400 parametro_invalido otherwise.
+func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		parametroInvalido(w)
+		return 0, false
+	}
+	return id, true
 }
 
 // parsearListado reads the S3 query strictly: an unknown estado or tipo, a

@@ -18,14 +18,16 @@ const (
 // the 2 MiB file is not cut by the 1 MB JSON limit.
 var RutasSubida = []string{RutaCrear, RutaNuevaVersion}
 
-// Route patterns of the admin listing and detail (S3, S4).
+// Route patterns of the admin listing, detail and changes (S3–S7).
 const (
-	RutaListar  = "GET /admin/fuentes"
-	RutaObtener = "GET /admin/fuentes/{id}"
+	RutaListar        = "GET /admin/fuentes"
+	RutaObtener       = "GET /admin/fuentes/{id}"
+	RutaCambiarEstado = "PATCH /admin/fuentes/{id}/estado"
+	RutaOficial       = "PATCH /admin/fuentes/{id}/oficial"
+	RutaEditar        = "PUT /admin/fuentes/{id}"
 )
 
-// Mount registers the fuentes admin routes (contract E2). For now S1–S4;
-// S5–S7 come with E2-06 and E2-07.
+// Mount registers the fuentes admin routes S1–S7 (contract E2).
 func Mount(mux *http.ServeMux, svc *Service, audLog *audit.Logger, jwtSecret string, checkSession auth.SessionChecker) {
 	h := NewHandler(svc, audLog)
 	authn := auth.RequireAuth(jwtSecret, checkSession)
@@ -35,4 +37,7 @@ func Mount(mux *http.ServeMux, svc *Service, audLog *audit.Logger, jwtSecret str
 	mux.Handle(RutaNuevaVersion, authn(admin(http.HandlerFunc(h.NuevaVersion))))
 	mux.Handle(RutaListar, authn(admin(http.HandlerFunc(h.Listar))))
 	mux.Handle(RutaObtener, authn(admin(http.HandlerFunc(h.Obtener))))
+	mux.Handle(RutaCambiarEstado, authn(admin(http.HandlerFunc(h.CambiarEstado))))
+	mux.Handle(RutaOficial, authn(admin(http.HandlerFunc(h.Oficial))))
+	mux.Handle(RutaEditar, authn(admin(http.HandlerFunc(h.Editar))))
 }

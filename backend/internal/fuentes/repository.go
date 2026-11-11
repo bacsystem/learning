@@ -50,7 +50,7 @@ func (r *Repository) CrearFuente(ctx context.Context, f NuevaFuente, aud Auditor
 		if err := comprobarDuplicado(ctx, tx, sha); err != nil {
 			return err
 		}
-		if err := comprobarLimite(ctx, tx, f.EspecialidadIDs); err != nil {
+		if err := comprobarLimite(ctx, tx, f.EspecialidadIDs, sinExcluir); err != nil {
 			return err
 		}
 		var err error
@@ -68,20 +68,9 @@ func (r *Repository) NuevaVersion(ctx context.Context, fuenteID int64, nombre st
 	creadoPor *int64, citantes Citantes, aud Auditor) (int, error) {
 	var numero int
 	err := r.enTxBloqueada(ctx, func(tx *sqlx.Tx) error {
-		var fuente struct {
-			Estado     string        `db:"estado"`
-			VigenteID  sql.NullInt64 `db:"version_vigente_id"`
-			Procesando bool          `db:"procesando"`
-		}
-		err := tx.GetContext(ctx, &fuente, `
-			SELECT estado, version_vigente_id,
-			       EXISTS (SELECT 1 FROM fuente_versiones WHERE fuente_id = f.id AND estado = 'procesando') AS procesando
-			FROM fuentes f WHERE id = $1 FOR UPDATE`, fuenteID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNoEncontrado
-		}
+		fuente, err := bloquearParaCambio(ctx, tx, fuenteID)
 		if err != nil {
-			return fmt.Errorf("bloquear fuente %d: %w", fuenteID, err)
+			return err
 		}
 		admite := fuente.Estado == EstadoFallida || (fuente.Estado == EstadoActiva && !fuente.Procesando)
 		if !admite {
@@ -96,7 +85,7 @@ func (r *Repository) NuevaVersion(ctx context.Context, fuenteID int64, nombre st
 			if err != nil {
 				return err
 			}
-			if err := comprobarLimite(ctx, tx, especialidades); err != nil {
+			if err := comprobarLimite(ctx, tx, especialidades, sinExcluir); err != nil {
 				return err
 			}
 		}
@@ -256,17 +245,22 @@ func comprobarDuplicado(ctx context.Context, q sqlx.QueryerContext, sha string) 
 	return &DuplicadaError{FuenteID: d.FuenteID, Titulo: d.Titulo, Estado: d.Estado, Version: d.Version}
 }
 
+// sinExcluir is the excluir of comprobarLimite when the fuente does not count yet.
+const sinExcluir int64 = 0
+
 // comprobarLimite checks that one more counted fuente (activa or procesando)
 // with these especialidades (none = all) fits: ≤ 100 per active profession,
 // where a fuente without professions counts for every one, then ≤ 500 in
 // total. The first profession that breaks it, by id, goes in the detail.
-func comprobarLimite(ctx context.Context, tx *sqlx.Tx, especialidades []int64) error {
+// excluir leaves out a fuente that already counts and is being changed (S7),
+// so it is counted once, with its new especialidades.
+func comprobarLimite(ctx context.Context, tx *sqlx.Tx, especialidades []int64, excluir int64) error {
 	if especialidades == nil {
 		especialidades = []int64{}
 	}
 	var llena sql.NullInt64
 	if err := tx.GetContext(ctx, &llena, `
-		WITH contadas AS (SELECT id FROM fuentes WHERE estado IN ('activa', 'procesando')),
+		WITH contadas AS (SELECT id FROM fuentes WHERE estado IN ('activa', 'procesando') AND id <> $3),
 		     sin_esp  AS (SELECT COUNT(*) AS n FROM contadas c
 		                  WHERE NOT EXISTS (SELECT 1 FROM fuente_especialidades fe WHERE fe.fuente_id = c.id))
 		SELECT MIN(e.id) FROM especialidades e
@@ -274,7 +268,7 @@ func comprobarLimite(ctx context.Context, tx *sqlx.Tx, especialidades []int64) e
 		  AND (SELECT n FROM sin_esp)
 		      + (SELECT COUNT(*) FROM fuente_especialidades fe JOIN contadas c ON c.id = fe.fuente_id
 		         WHERE fe.especialidad_id = e.id) + 1 > $2`,
-		pq.Array(especialidades), MaxFuentesPorProfesion); err != nil {
+		pq.Array(especialidades), MaxFuentesPorProfesion, excluir); err != nil {
 		return fmt.Errorf("límite por profesión: %w", err)
 	}
 	if llena.Valid {
@@ -282,13 +276,38 @@ func comprobarLimite(ctx context.Context, tx *sqlx.Tx, especialidades []int64) e
 		return &LimiteError{Limite: MaxFuentesPorProfesion, EspecialidadID: &id}
 	}
 	var total int
-	if err := tx.GetContext(ctx, &total, `SELECT COUNT(*) FROM fuentes WHERE estado IN ('activa', 'procesando')`); err != nil {
+	if err := tx.GetContext(ctx, &total, `SELECT COUNT(*) FROM fuentes WHERE estado IN ('activa', 'procesando') AND id <> $1`, excluir); err != nil {
 		return fmt.Errorf("límite total: %w", err)
 	}
 	if total+1 > MaxFuentesTotal {
 		return &LimiteError{Limite: MaxFuentesTotal}
 	}
 	return nil
+}
+
+// fuenteBloqueada is the fuente as a change sees it, with its row locked.
+type fuenteBloqueada struct {
+	Estado     string        `db:"estado"`
+	VigenteID  sql.NullInt64 `db:"version_vigente_id"`
+	Procesando bool          `db:"procesando"` // some version is 'procesando'
+}
+
+// bloquearParaCambio locks the fuente for an admin change (after the fuentes
+// lock, so the order is advisory → fuente → versions; no admin change locks
+// a 'procesando' version, which is the worker's). ErrNoEncontrado if missing.
+func bloquearParaCambio(ctx context.Context, tx *sqlx.Tx, fuenteID int64) (fuenteBloqueada, error) {
+	var f fuenteBloqueada
+	err := tx.GetContext(ctx, &f, `
+		SELECT estado, version_vigente_id,
+		       EXISTS (SELECT 1 FROM fuente_versiones WHERE fuente_id = f.id AND estado = 'procesando') AS procesando
+		FROM fuentes f WHERE id = $1 FOR UPDATE`, fuenteID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fuenteBloqueada{}, ErrNoEncontrado
+	}
+	if err != nil {
+		return fuenteBloqueada{}, fmt.Errorf("bloquear fuente %d: %w", fuenteID, err)
+	}
+	return f, nil
 }
 
 func especialidadesDe(ctx context.Context, q sqlx.QueryerContext, fuenteID int64) ([]int64, error) {
