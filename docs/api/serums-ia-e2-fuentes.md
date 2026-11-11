@@ -241,7 +241,7 @@ Rol admin. Edita los metadatos editables **sin** crear versión nueva (E2-07 reg
 
 | # | Regla | Error |
 |---|---|---|
-| 1 | `titulo` 3–150 tras `TrimSpace`; `especialidad_ids` 0–50 sin repetidos (vacío = todas). `tipo`, `anio` y `proceso_id` no se editan: si vienen, es un campo desconocido | 400 `cuerpo_invalido` / 422 `validacion` |
+| 1 | `titulo` 3–150 tras `TrimSpace`; `especialidad_ids` **obligatorio**, 0–50 sin repetidos (`[]` = todas). Si falta o es `null`: 422 `validacion` con `detalle.campos.especialidad_ids = "requerido"`. No se interpreta como «todas», para que un cuerpo incompleto no le quite las profesiones a una fuente (precisión del 2026-11-11; excepción a README §1). `tipo`, `anio` y `proceso_id` no se editan: si vienen, es un campo desconocido | 400 `cuerpo_invalido` / 422 `validacion` |
 | 2 | La fuente existe. Va antes de la regla 3 porque esa necesita leer las especialidades actuales de la fuente | 404 `no_encontrado` |
 | 3 | Cada especialidad existe y está `activo`, **o** la fuente ya la tenía asociada antes de la edición, aunque hoy esté inactiva (misma regla que T4 de temas, contrato E1) | 422 `referencia_invalida` (inexistente, o inactiva y nueva para la fuente) |
 | 4 | Estado `activa`, `fallida` o `retirada`; en `procesando` no se puede | 409 `estado_invalido` |
