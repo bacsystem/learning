@@ -264,7 +264,7 @@ Lo verifica devops en el panel, con soporte o con pruebas, y registra el resulta
 | C11 | Las imágenes públicas no llevan secretos, datos ni `.env` | `make docker/verify` (`deploy/verify-image.sh`): revisa `/app`, `docker history` y ENV, y `docker/push` no publica si falla |
 | C12 | **Ubicación o jurisdicción del bucket de R2** para los datos personales. R2 ofrece buckets jurisdiccionales (endpoints `.eu.`, `.fedramp.`) | **La decide el usuario** antes de crear el bucket |
 | C13 | El cron alerta si falla o no corre | Ejecución fallida provocada a propósito |
-| C14 | Uptime Kuma vigila `/health` y avisa por correo al usuario (Decisión 12; `docs/ops/railway.md` §7.1) | Un monitor temporal hacia una ruta 404: llega el correo de caído y, al pausarlo, el de recuperado. Lo crea el usuario |
+| C14 | Uptime Kuma vigila `/health` y avisa por correo al usuario (Decisión 12; `docs/ops/railway.md` §7.1) | Un monitor temporal hacia una ruta 404 hace llegar el correo de **caído**. Al cambiar ese mismo monitor para que apunte a `/health`, llega el de **recuperado**. Pausar un monitor no envía aviso. Después se borra. Lo crea el usuario |
 
 ## Consecuencias
 
