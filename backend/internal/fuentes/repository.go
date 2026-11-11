@@ -126,42 +126,36 @@ func (r *Repository) NuevaVersion(ctx context.Context, fuenteID int64, nombre st
 	return numero, err
 }
 
-// Detalle returns the FuenteDetalle of a fuente, or ErrNoEncontrado.
+// Detalle returns the FuenteDetalle of a fuente, or ErrNoEncontrado: its
+// summary (listado.go), metadata, the mark of the current version, every
+// version newest first and the citing contents.
 func (r *Repository) Detalle(ctx context.Context, id int64, citantes Citantes) (FuenteDetalle, error) {
 	var f struct {
-		ID           int64          `db:"id"`
-		Titulo       string         `db:"titulo"`
-		Tipo         string         `db:"tipo"`
-		Estado       string         `db:"estado"`
+		filaResumen
 		Anio         *int           `db:"anio"`
 		ProcesoID    sql.NullInt64  `db:"proceso_id"`
 		Proceso      sql.NullString `db:"proceso"`
 		MotivoRetiro *string        `db:"motivo_retiro"`
 		VigenteID    sql.NullInt64  `db:"version_vigente_id"`
-		CreatedAt    time.Time      `db:"created_at"`
-		UpdatedAt    time.Time      `db:"updated_at"`
 	}
 	err := sqlx.GetContext(ctx, r.db, &f, `
-		SELECT f.id, f.titulo, f.tipo, f.estado, f.anio, f.proceso_id, p.nombre AS proceso, f.motivo_retiro,
-		       f.version_vigente_id, f.created_at, f.updated_at
-		FROM fuentes f LEFT JOIN procesos p ON p.id = f.proceso_id WHERE f.id = $1`, id)
+		SELECT`+columnasResumen+`, f.anio, f.proceso_id, p.nombre AS proceso, f.motivo_retiro, f.version_vigente_id`+
+		desdeResumen+` LEFT JOIN procesos p ON p.id = f.proceso_id WHERE f.id = $1`, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return FuenteDetalle{}, ErrNoEncontrado
 	}
 	if err != nil {
 		return FuenteDetalle{}, fmt.Errorf("leer fuente %d: %w", id, err)
 	}
-	d := FuenteDetalle{ID: f.ID, Titulo: f.Titulo, Tipo: f.Tipo, Estado: f.Estado, Anio: f.Anio, MotivoRetiro: f.MotivoRetiro,
-		CreatedAt: f.CreatedAt.UTC(), UpdatedAt: f.UpdatedAt.UTC(), Especialidades: []EspecialidadRef{}, Versiones: []VersionDetalle{}}
+	especialidades, err := especialidadesConNombre(ctx, r.db, []int64{id})
+	if err != nil {
+		return FuenteDetalle{}, err
+	}
+	d := FuenteDetalle{ResumenFuente: f.resumen(especialidades[id]), Anio: f.Anio, MotivoRetiro: f.MotivoRetiro,
+		Versiones: []VersionDetalle{}}
 	if f.ProcesoID.Valid {
 		d.Proceso = &ProcesoRef{ID: f.ProcesoID.Int64, Nombre: f.Proceso.String}
 	}
-	if err := sqlx.SelectContext(ctx, r.db, &d.Especialidades, `
-		SELECT e.id, e.nombre FROM fuente_especialidades fe JOIN especialidades e ON e.id = fe.especialidad_id
-		WHERE fe.fuente_id = $1 ORDER BY e.nombre, e.id`, id); err != nil {
-		return FuenteDetalle{}, fmt.Errorf("especialidades de la fuente %d: %w", id, err)
-	}
-	d.AplicaATodas = len(d.Especialidades) == 0
 	var versiones []struct {
 		ID int64 `db:"id"`
 		VersionDetalle
@@ -174,27 +168,14 @@ func (r *Repository) Detalle(ctx context.Context, id int64, citantes Citantes) (
 		FROM fuente_versiones WHERE fuente_id = $1 ORDER BY numero DESC`, id); err != nil {
 		return FuenteDetalle{}, fmt.Errorf("versiones de la fuente %d: %w", id, err)
 	}
-	vigente := 0
 	for _, v := range versiones {
 		vd := v.VersionDetalle
 		vd.CreatedAt = vd.CreatedAt.UTC()
 		d.Versiones = append(d.Versiones, vd)
-		if f.VigenteID.Valid && v.ID == f.VigenteID.Int64 {
-			vigente = v.Numero
-			d.VersionVigente = &VersionVigenteResumen{Numero: v.Numero, OficialVerificada: v.OficialVerificada, PasajesCount: v.PasajesCount}
-			if v.OficialVerificada && v.OficialEntidad != nil && v.OficialNota != nil && v.OficialAt != nil {
-				d.Oficial = &Oficial{EntidadEmisora: *v.OficialEntidad, Nota: *v.OficialNota, MarcadoAt: v.OficialAt.UTC()}
-			}
+		esVigente := f.VigenteID.Valid && v.ID == f.VigenteID.Int64
+		if esVigente && v.OficialVerificada && v.OficialEntidad != nil && v.OficialNota != nil && v.OficialAt != nil {
+			d.Oficial = &Oficial{EntidadEmisora: *v.OficialEntidad, Nota: *v.OficialNota, MarcadoAt: v.OficialAt.UTC()}
 		}
-	}
-	// version_en_proceso: the newest version after the current one that is
-	// not 'lista' (versions are sorted newest first).
-	for _, v := range d.Versiones {
-		if v.Numero <= vigente || v.Estado == VersionLista || v.Estado == versionArchivada {
-			continue
-		}
-		d.VersionEnProceso = &VersionEnProceso{Numero: v.Numero, Estado: v.Estado, MotivoFallo: v.MotivoFallo}
-		break
 	}
 	if d.ContenidosCitantes, err = citantes.ContarPorFuente(ctx, r.db, id); err != nil {
 		return FuenteDetalle{}, fmt.Errorf("citantes de la fuente %d: %w", id, err)
@@ -209,8 +190,6 @@ func (r *Repository) DuplicadoDe(ctx context.Context, sha string) error {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const versionArchivada = "archivada"
 
 func (r *Repository) enTxBloqueada(ctx context.Context, fn func(tx *sqlx.Tx) error) error {
 	tx, err := r.db.BeginTxx(ctx, nil)

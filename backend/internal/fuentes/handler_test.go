@@ -25,16 +25,28 @@ type fakeServicio struct {
 	err     error
 	archivo ArchivoSubido
 	form    FormularioFuente
+	filtro  FiltroListado
+	id      int64
 }
 
 func (f *fakeServicio) Crear(_ context.Context, a ArchivoSubido, fm FormularioFuente, _ *int64, _ Auditor) (FuenteDetalle, error) {
 	f.archivo, f.form = a, fm
-	return FuenteDetalle{ID: 7, Estado: EstadoProcesando}, f.err
+	return FuenteDetalle{ResumenFuente: ResumenFuente{ID: 7, Estado: EstadoProcesando}}, f.err
 }
 
 func (f *fakeServicio) NuevaVersion(_ context.Context, _ string, a ArchivoSubido, _ *int64, _ Auditor) (FuenteDetalle, error) {
 	f.archivo = a
-	return FuenteDetalle{ID: 7}, f.err
+	return FuenteDetalle{ResumenFuente: ResumenFuente{ID: 7}}, f.err
+}
+
+func (f *fakeServicio) Listar(_ context.Context, fl FiltroListado) (ListaFuentes, error) {
+	f.filtro = fl
+	return ListaFuentes{Data: []ResumenFuente{}}, f.err
+}
+
+func (f *fakeServicio) Obtener(_ context.Context, id int64) (FuenteDetalle, error) {
+	f.id = id
+	return FuenteDetalle{ResumenFuente: ResumenFuente{ID: id}}, f.err
 }
 
 // subidaMux is the handler behind the real MaxBodySize with the routes of
@@ -49,6 +61,8 @@ func subidaMux(svc servicio) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle(RutaCrear, conClaims(h.Crear))
 	mux.Handle(RutaNuevaVersion, conClaims(h.NuevaVersion))
+	mux.Handle(RutaListar, conClaims(h.Listar))
+	mux.Handle(RutaObtener, conClaims(h.Obtener))
 	return middleware.MaxBodySize(middleware.DefaultJSONBodyLimit, middleware.DefaultMultipartBodyLimit, RutasSubida...)(mux)
 }
 
@@ -174,6 +188,67 @@ func TestResponderError(t *testing.T) {
 			_ = json.Unmarshal(rr.Body.Bytes(), &body)
 			if rr.Code != c.status || body["error"] != c.code || body["message"] == "" || fmt.Sprint(body["detalle"]) != c.detalle {
 				t.Errorf("got %d %v, want %d %s %s", rr.Code, body, c.status, c.code, c.detalle)
+			}
+		})
+	}
+}
+
+// S3 parses its query strictly: every malformed value is 400
+// parametro_invalido before the service runs; valid ones reach it parsed.
+func TestListado_Parametros(t *testing.T) {
+	verdadero, falso := true, false
+	cases := []struct {
+		name   string
+		query  string
+		status int
+		filtro FiltroListado
+	}{
+		{"sin filtros", "", 200, FiltroListado{Page: 1, PerPage: 20}},
+		{"todos los filtros", "?estado=activa&tipo=norma&especialidad_id=4&oficial=true&q=Guía&page=3&per_page=50", 200,
+			FiltroListado{Estado: "activa", Tipo: "norma", EspecialidadID: 4, Oficial: &verdadero, Q: "Guía", Page: 3, PerPage: 50}},
+		{"oficial false", "?oficial=false", 200, FiltroListado{Oficial: &falso, Page: 1, PerPage: 20}},
+		{"per_page sobre el máximo", "?per_page=500", 200, FiltroListado{Page: 1, PerPage: 100}},
+		{"estado desconocido", "?estado=borrada", 400, FiltroListado{}},
+		{"estado de versión", "?estado=lista", 400, FiltroListado{}},
+		{"tipo desconocido", "?tipo=libro", 400, FiltroListado{}},
+		{"especialidad no numérica", "?especialidad_id=abc", 400, FiltroListado{}},
+		{"especialidad cero", "?especialidad_id=0", 400, FiltroListado{}},
+		{"oficial no booleano", "?oficial=si", 400, FiltroListado{}},
+		{"página cero", "?page=0", 400, FiltroListado{}},
+		{"per_page negativo", "?per_page=-1", 400, FiltroListado{}},
+		{"q con NUL", "?q=a%00b", 400, FiltroListado{}},
+		{"q con UTF-8 inválido", "?q=%ff%fe", 400, FiltroListado{}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			svc := &fakeServicio{}
+			status, body := enviar(t, subidaMux(svc), "GET /admin/fuentes"+c.query, &bytes.Buffer{}, "")
+			if status != c.status {
+				t.Fatalf("got %d %v, want %d", status, body, c.status)
+			}
+			if c.status == 400 && body["error"] != "parametro_invalido" {
+				t.Errorf("code = %v", body["error"])
+			}
+			if fmt.Sprint(svc.filtro.Oficial == nil, svc.filtro.Estado, svc.filtro.Tipo, svc.filtro.EspecialidadID, svc.filtro.Q, svc.filtro.Page, svc.filtro.PerPage) !=
+				fmt.Sprint(c.filtro.Oficial == nil, c.filtro.Estado, c.filtro.Tipo, c.filtro.EspecialidadID, c.filtro.Q, c.filtro.Page, c.filtro.PerPage) ||
+				(c.filtro.Oficial != nil && *svc.filtro.Oficial != *c.filtro.Oficial) {
+				t.Errorf("filtro = %+v, want %+v", svc.filtro, c.filtro)
+			}
+		})
+	}
+}
+
+// S4 answers 400 parametro_invalido for an id that is not a positive number.
+func TestObtener_ID(t *testing.T) {
+	for _, c := range []struct {
+		id     string
+		status int
+	}{{"9", 200}, {"abc", 400}, {"0", 400}, {"-3", 400}, {"99999999999999999999", 400}} {
+		t.Run(c.id, func(t *testing.T) {
+			svc := &fakeServicio{}
+			status, body := enviar(t, subidaMux(svc), "GET /admin/fuentes/"+c.id, &bytes.Buffer{}, "")
+			if status != c.status || (c.status == 400 && body["error"] != "parametro_invalido") || (c.status == 200 && svc.id != 9) {
+				t.Errorf("got %d %v (id %d), want %d", status, body, svc.id, c.status)
 			}
 		})
 	}

@@ -7,6 +7,9 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/auth"
@@ -31,19 +34,28 @@ const (
 	codigoNoEncontrado    = "no_encontrado"
 	codigoEstadoInvalido  = "estado_invalido"
 	codigoLimiteVersiones = "limite_versiones"
+	codigoParametro       = "parametro_invalido"
 	msgCuerpoInvalido     = "El formulario multipart con el archivo es obligatorio."
+	msgParametroInvalido  = "Parámetro inválido."
 	msgNoEncontrado       = "Fuente no encontrada."
 	msgNoAutenticado      = "No autenticado."
 	campoArchivo          = "file"
+	// maxPagina bounds ?page so the OFFSET can never overflow (as in temas).
+	maxPagina = 1_000_000
 )
+
+// estadosFuente are the values of the S3 estado filter.
+var estadosFuente = map[string]bool{EstadoProcesando: true, EstadoActiva: true, EstadoFallida: true, EstadoRetirada: true}
 
 // servicio is what the handler needs from the Service.
 type servicio interface {
 	Crear(ctx context.Context, archivo ArchivoSubido, formulario FormularioFuente, actor *int64, aud Auditor) (FuenteDetalle, error)
 	NuevaVersion(ctx context.Context, fuenteID string, archivo ArchivoSubido, actor *int64, aud Auditor) (FuenteDetalle, error)
+	Listar(ctx context.Context, f FiltroListado) (ListaFuentes, error)
+	Obtener(ctx context.Context, id int64) (FuenteDetalle, error)
 }
 
-// Handler exposes S1 and S2.
+// Handler exposes S1–S4.
 type Handler struct {
 	svc    servicio
 	audLog *audit.Logger
@@ -91,6 +103,77 @@ func (h *Handler) NuevaVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonStatus(w, http.StatusAccepted, d)
+}
+
+// Listar handles GET /admin/fuentes (S3). A malformed filter is 400
+// parametro_invalido; a title search over 100 characters, 422.
+func (h *Handler) Listar(w http.ResponseWriter, r *http.Request) {
+	f, ok := parsearListado(r)
+	if !ok {
+		parametroInvalido(w)
+		return
+	}
+	lista, err := h.svc.Listar(r.Context(), f)
+	if err != nil {
+		responderError(w, "listar", err)
+		return
+	}
+	jsonStatus(w, http.StatusOK, lista)
+}
+
+// Obtener handles GET /admin/fuentes/{id} (S4).
+func (h *Handler) Obtener(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		parametroInvalido(w)
+		return
+	}
+	d, err := h.svc.Obtener(r.Context(), id)
+	if err != nil {
+		responderError(w, "obtener", err)
+		return
+	}
+	jsonStatus(w, http.StatusOK, d)
+}
+
+// parsearListado reads the S3 query strictly: an unknown estado or tipo, a
+// non-positive id, an oficial other than true/false, a bad page or a q that
+// PostgreSQL cannot take as text (invalid UTF-8 or a NUL byte) is false.
+func parsearListado(r *http.Request) (FiltroListado, bool) {
+	q := r.URL.Query()
+	f := FiltroListado{Estado: q.Get("estado"), Tipo: q.Get("tipo"), Q: q.Get("q")}
+	if !utf8.ValidString(f.Q) || strings.ContainsRune(f.Q, 0) {
+		return FiltroListado{}, false
+	}
+	if (f.Estado != "" && !estadosFuente[f.Estado]) || (f.Tipo != "" && !tiposFuente[f.Tipo]) {
+		return FiltroListado{}, false
+	}
+	if s := q.Get("especialidad_id"); s != "" {
+		id, err := strconv.ParseInt(s, 10, 64)
+		if err != nil || id <= 0 {
+			return FiltroListado{}, false
+		}
+		f.EspecialidadID = id
+	}
+	if s := q.Get("oficial"); s != "" {
+		if s != "true" && s != "false" {
+			return FiltroListado{}, false
+		}
+		oficial := s == "true"
+		f.Oficial = &oficial
+	}
+	var err error
+	if f.Page, err = httpx.ParsePage(q.Get("page"), maxPagina); err != nil {
+		return FiltroListado{}, false
+	}
+	if f.PerPage, err = httpx.ParsePerPage(q.Get("per_page"), perPageDefecto, perPageMax); err != nil {
+		return FiltroListado{}, false
+	}
+	return f, true
+}
+
+func parametroInvalido(w http.ResponseWriter) {
+	httpx.JSONErrorCode(w, http.StatusBadRequest, codigoParametro, msgParametroInvalido, nil)
 }
 
 // leerArchivo applies steps 1–2 of S1: the reader limit and the file part,
