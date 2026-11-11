@@ -21,7 +21,7 @@ Pantalla nueva en el área de admin de `(dashboard)`, con entrada en la navegaci
 2. Una tarjeta por servicio conocido (en esta historia: API y base de datos), con nombre traducido, estado, categoría de fallo traducida si la hay y su dato (latencia en ms, versión y tiempo en marcha). Los servicios con identificador desconocido no se muestran y no rompen la pantalla.
 3. El estado se comunica con **icono + texto + color** (tokens de khipu), nunca solo con color. Se usa el componente de estado o insignia de khipu. Si khipu no tiene uno adecuado, primero se abre un PR en khipu-design-system (regla del repo) y esta historia depende de él.
 4. **Refresco automático cada 30 s** mientras la pestaña está visible. Se pausa en segundo plano y, al volver, refresca de inmediato. El botón «Actualizar» pide el estado al momento y se deshabilita mientras la petición está en curso.
-5. Si la consulta falla (backend caído, red o 5xx), la pantalla muestra el aviso «No se pudo consultar el estado de los servicios». Si había datos, los conserva marcados como «desactualizados», con la hora de su última comprobación válida. Sigue reintentando en el siguiente ciclo.
+5. Si la consulta falla (backend caído, red o 5xx), la pantalla muestra el aviso «No se pudo consultar el estado de los servicios». Si había datos, los conserva marcados como «desactualizados», con la hora de su última comprobación válida. Sigue reintentando en el siguiente ciclo. Un 503 (la base de datos está caída y la autenticación no puede verificar, PLT-01 regla 9) se trata igual: **no** cierra la sesión ni redirige al login.
 6. Estados de UI: carga inicial, datos, error sin datos previos y error con datos previos (regla 5).
 7. Texto fijo de ayuda: «Este panel muestra el estado al abrirlo. No envía alertas.»
 
@@ -56,6 +56,11 @@ Escenario: Backend inalcanzable con datos previos
   Dado la pantalla mostró datos a las 10:00
   Cuando la siguiente consulta falla
   Entonces ve «No se pudo consultar el estado de los servicios» y los datos de las 10:00 marcados como desactualizados
+
+Escenario: Base de datos totalmente caída
+  Dado la pantalla abierta y la API responde 503 porque la base de datos está caída
+  Cuando se refresca el estado
+  Entonces ve «No se pudo consultar el estado de los servicios», sigue en la pantalla con su sesión y no es redirigido al login
 
 Escenario: Backend inalcanzable al abrir
   Dado el backend no responde

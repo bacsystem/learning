@@ -28,7 +28,7 @@ Los correos se encolan en `email_queue` y los envía un worker por SMTP. Si no h
    - `caido` (categoría `sin_conexion`): en los últimos 30 min hay ≥ 3 fallidos definitivos y ningún enviado. Es la señal de un SMTP caído: como los reintentos se agotan en unos 15 min, un SMTP caído no deja correos «sin enviar» mucho tiempo, sino fallidos definitivos.
    - Limitación aceptada: 1 o 2 fallidos aislados (p. ej. una dirección mal escrita) no cambian el estado.
 3. Datos que se muestran: nº de correos sin enviar, antigüedad del más antiguo (min), nº de fallidos definitivos en 24 h y hora del último enviado. **Nunca** destinatarios, asuntos, contenido ni `last_error`.
-4. **Frontend:** tarjeta con la versión desplegada del frontend que el admin está viendo, tomada del build. No tiene estado operativo/caído (decisión 10 del README): si el frontend está caído, el panel no se ve. Si la versión del frontend no coincide con la del backend, se muestra una nota informativa, «El frontend y el backend tienen versiones distintas», que no cambia el estado global.
+4. **Frontend:** tarjeta con la versión desplegada del frontend que el admin está viendo. Es el `version` de `frontend/package.json`, el mismo que ya se ve en «Acerca de», sin variable nueva. El release asegura que coincide con el tag sin la «v», en el mismo formato que el backend (architect). No tiene estado operativo/caído (decisión 10 del README): si el frontend está caído, el panel no se ve. Si la versión del frontend no coincide con la del backend, se muestra una nota informativa, «El frontend y el backend tienen versiones distintas», que no cambia el estado global.
 5. El servicio `correo` cuenta para el estado global según las reglas de PLT-01. El frontend no cuenta.
 
 ## Criterios de aceptación
@@ -83,7 +83,7 @@ Escenario: Versiones distintas
 Prueba de conexión SMTP en vivo, reenviar o reencolar correos desde el panel, ver el detalle de los correos y comprobar la disponibilidad del frontend desde fuera (monitor externo).
 
 ## Dependencias
-PLT-01, PLT-02. La versión del frontend se expone en el build (devops / frontend-dev; la forma la define el architect).
+PLT-01, PLT-02. La versión del frontend sale del `version` de `frontend/package.json` (decisión del architect). El release la alinea con el tag.
 
 ## Seguridad y privacidad
 Solo conteos y antigüedades: ni destinatarios, ni asuntos, ni cuerpo, ni `last_error`, ni host, puerto o usuario SMTP.
