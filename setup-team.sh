@@ -381,7 +381,15 @@ emit .claude/settings.json <<'SETTINGS_EOF'
       "Bash(git log --oneline -20)"
     ],
     "deny": [
-      "Read(**/.env*)",
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/.env.development)",
+      "Read(**/.env.test)",
+      "Read(**/.env.staging)",
+      "Read(**/.env.preprod)",
+      "Read(**/.env.prod)",
+      "Read(**/.env.production)",
       "Read(./assets/**)",
       "Bash(cat *.env*)",
       "Bash(grep * *.env*)"
