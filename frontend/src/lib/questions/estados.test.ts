@@ -3,7 +3,8 @@ import es from "../../i18n/messages/es.json";
 import type { EstadoPregunta, Pregunta } from "./api";
 import {
   cambiaElContenido,
-  claveErrorPregunta,
+  claveErrorEdicion,
+  claveErrorEliminacion,
   claveEstadoPregunta,
   claveOrigenPregunta,
   contenidoDePregunta,
@@ -36,18 +37,23 @@ describe("estados de la pregunta (SIA-E3-02)", () => {
   });
 });
 
-describe("claveErrorPregunta", () => {
+describe("claves de error por operación", () => {
   const error = (code?: string) => Object.assign(new Error("x"), { status: 409, code });
 
-  it("maps the coded errors of E3-02", () => {
-    expect(claveErrorPregunta(error("estado_invalido"))).toBe("serumsIa.avisosPregunta.eliminarAyuda");
-    expect(claveErrorPregunta(error("clave_oficial"))).toBe("serumsIa.errores.clave_oficial");
+  it("translates clave_oficial only when editing", () => {
+    expect(claveErrorEdicion(error("clave_oficial"))).toBe("serumsIa.errores.clave_oficial");
+    expect(claveErrorEdicion(error("estado_invalido"))).toBeUndefined();
+  });
+
+  it("translates estado_invalido only when deleting", () => {
+    expect(claveErrorEliminacion(error("estado_invalido"))).toBe("serumsIa.avisosPregunta.eliminarAyuda");
+    expect(claveErrorEliminacion(error("clave_oficial"))).toBeUndefined();
   });
 
   it("leaves other errors to the screen", () => {
-    expect(claveErrorPregunta(error("no_encontrado"))).toBeUndefined();
-    expect(claveErrorPregunta(error())).toBeUndefined();
-    expect(claveErrorPregunta(new TypeError("red"))).toBeUndefined();
+    expect(claveErrorEdicion(error("no_encontrado"))).toBeUndefined();
+    expect(claveErrorEliminacion(error())).toBeUndefined();
+    expect(claveErrorEdicion(new TypeError("red"))).toBeUndefined();
   });
 });
 
@@ -55,9 +61,8 @@ describe("claves i18n de estado y origen", () => {
   const claves = [
     ...ESTADOS_PREGUNTA.map(claveEstadoPregunta),
     ...ORIGENES_PREGUNTA.map(claveOrigenPregunta),
-    ...["estado_invalido", "clave_oficial"].map(
-      (code) => claveErrorPregunta(Object.assign(new Error("x"), { status: 422, code })) ?? "",
-    ),
+    claveErrorEdicion(Object.assign(new Error("x"), { code: "clave_oficial" })) ?? "",
+    claveErrorEliminacion(Object.assign(new Error("x"), { code: "estado_invalido" })) ?? "",
   ];
 
   it.each([
@@ -73,8 +78,8 @@ describe("claves i18n de estado y origen", () => {
     expect(faltan).toEqual([]);
   });
 
-  it("use kebab case for multi-word states", () => {
-    expect(claveEstadoPregunta("en_revision")).toBe("admin-preguntas-estado-en-revision");
+  it("live under serumsIa.estadosPregunta, owned by E3-02", () => {
+    expect(claveEstadoPregunta("en_revision")).toBe("serumsIa.estadosPregunta.en_revision");
   });
 });
 

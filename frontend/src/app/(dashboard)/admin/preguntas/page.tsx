@@ -33,7 +33,7 @@ import { type ColumnaExportable, descargarCsv, imprimirTabla } from "@/lib/expor
 import { POR_PAGINA_DEFECTO } from "@/lib/paginacion";
 import { type EstadoPregunta, type OrigenPregunta, Pregunta, questionsApi } from "@/lib/questions/api";
 import {
-  claveErrorPregunta,
+  claveErrorEliminacion,
   claveEstadoPregunta,
   claveOrigenPregunta,
   ESTADOS_FILTRABLES,
@@ -219,7 +219,7 @@ export default function PreguntasPage() {
       load();
     } catch (e: unknown) {
       const err = e as { message?: string };
-      const clave = claveErrorPregunta(e);
+      const clave = claveErrorEliminacion(e);
       toast.error(clave ? t(clave) : (err.message ?? t("comun-error-eliminar")));
       if (clave) {
         // El estado cambió mientras tanto: se cierra el diálogo y se muestra el actual.

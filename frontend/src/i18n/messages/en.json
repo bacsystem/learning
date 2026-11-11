@@ -568,8 +568,6 @@
     "admin-preguntas-import-fila": "Row {n}:",
     "admin-preguntas-eliminada": "Question deleted successfully.",
     "admin-preguntas-estado": "Status",
-    "admin-preguntas-estado-activo": "Active (legacy)",
-    "admin-preguntas-estado-eliminada": "Deleted",
     "admin-preguntas-reintentar": "Retry",
     "admin-preguntas-importar-csv": "Import CSV",
     "admin-preguntas-nueva": "New question",
@@ -1625,6 +1623,14 @@
           "cancelar": "Keep editing"
         },
         "eliminarAyuda": "Reject it first so you can delete it"
+      },
+      "estadosPregunta": {
+        "borrador": "Draft",
+        "en_revision": "In review",
+        "aprobada": "Approved",
+        "rechazada": "Rejected",
+        "activo": "Active (legacy)",
+        "eliminada": "Deleted"
       }
     },
     "sesion-servidor-no-disponible-titulo": "The server is not responding",
@@ -1691,10 +1697,6 @@
         "fallida": "Failed"
       }
     },
-    "admin-preguntas-estado-borrador": "Draft",
-    "admin-preguntas-estado-en-revision": "In review",
-    "admin-preguntas-estado-aprobada": "Approved",
-    "admin-preguntas-estado-rechazada": "Rejected",
     "admin-preguntas-origen": "Origin",
     "admin-preguntas-origen-manual": "Manual",
     "admin-preguntas-origen-balotario": "Question bank",

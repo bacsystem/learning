@@ -22,7 +22,7 @@ import { CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { Etiqueta, Pregunta, questionsApi, UpdatePreguntaPayload } from "@/lib/questions/api";
 import {
   cambiaElContenido,
-  claveErrorPregunta,
+  claveErrorEdicion,
   contenidoDePregunta,
   editarContenidoLaRetira,
 } from "@/lib/questions/estados";
@@ -252,7 +252,7 @@ export default function EditPreguntaPage() {
       router.push("/admin/preguntas");
     } catch (e: unknown) {
       const err = e as { message?: string; status?: number };
-      const clave = claveErrorPregunta(e);
+      const clave = claveErrorEdicion(e);
       if (clave) {
         setError(t(clave));
         setSubmitting(false);

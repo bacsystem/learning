@@ -24,7 +24,7 @@ export const ESTADOS_FILTRABLES = ESTADOS_PREGUNTA.filter(
 export const ORIGENES_PREGUNTA: readonly OrigenPregunta[] = ["manual", "balotario", "ia"];
 
 /** Claves i18n (`dashboard.*`) del nombre de un estado y de un origen. */
-export const claveEstadoPregunta = (estado: EstadoPregunta) => `admin-preguntas-estado-${estado.replace("_", "-")}`;
+export const claveEstadoPregunta = (estado: EstadoPregunta) => `serumsIa.estadosPregunta.${estado}`;
 export const claveOrigenPregunta = (origen: OrigenPregunta) => `admin-preguntas-origen-${origen}`;
 
 /** P2 (decisión del PO): `DELETE` solo desde estos estados; un borrador o una en revisión se rechazan primero. */
@@ -76,14 +76,17 @@ export function cambiaElContenido(guardado: ContenidoPregunta, editado: Contenid
   );
 }
 
-/** Claves i18n (`dashboard.*`) de los errores con código de E3-02 (§7) que llegan a estas pantallas. */
-const CLAVE_ERROR: Record<string, string> = {
-  estado_invalido: "serumsIa.avisosPregunta.eliminarAyuda",
-  clave_oficial: "serumsIa.errores.clave_oficial",
+/** Un mapa por operación: `estado_invalido` significa otra cosa al eliminar que al citar o cambiar de estado. */
+const CLAVES_EDICION: Record<string, string> = { clave_oficial: "serumsIa.errores.clave_oficial" };
+const CLAVES_ELIMINACION: Record<string, string> = { estado_invalido: "serumsIa.avisosPregunta.eliminarAyuda" };
+
+const claveDe = (claves: Record<string, string>, err: unknown): string | undefined => {
+  const codigo = apiErrorCode(err);
+  return codigo && Object.hasOwn(claves, codigo) ? claves[codigo] : undefined;
 };
 
-/** Clave i18n del error, si tiene una propia; si no, `undefined` y la pantalla usa su mensaje habitual. */
-export function claveErrorPregunta(err: unknown): string | undefined {
-  const codigo = apiErrorCode(err);
-  return codigo ? CLAVE_ERROR[codigo] : undefined;
-}
+/** Clave i18n del error de `PUT /preguntas/{id}`, si tiene una propia; si no, `undefined`. */
+export const claveErrorEdicion = (err: unknown) => claveDe(CLAVES_EDICION, err);
+
+/** Clave i18n del error de `DELETE /preguntas/{id}`, si tiene una propia; si no, `undefined`. */
+export const claveErrorEliminacion = (err: unknown) => claveDe(CLAVES_ELIMINACION, err);
