@@ -34,6 +34,9 @@ BACKEND_IMG  := $(DOCKER_USER)/learning-backend:$(DOCKER_TAG)
 # producción = vX.Y.Z; otro entorno = vX.Y.Z-<entorno> (docs/ops/railway.md §2).
 FRONTEND_ENV ?= prod
 FRONTEND_IMG := $(DOCKER_USER)/learning-frontend:$(DOCKER_TAG)$(if $(filter prod,$(FRONTEND_ENV)),,-$(FRONTEND_ENV))
+# OJO: no exportes esta variable desde make (`export NEXT_PUBLIC_API_URL`): el
+# target build la heredaría y, en silencio, incrustaría la URL de producción en el
+# build local. Solo se pasa como build-arg en docker/build/frontend.
 NEXT_PUBLIC_API_URL        ?= https://api-capacitate.bacsystemsolutions.com
 NEXT_PUBLIC_STORAGE_PREFIX ?=
 NEXT_PUBLIC_CONTACT_EMAIL  ?=
@@ -100,7 +103,9 @@ fmt: ## Formatea: go fmt y eslint --fix
 
 # Comprobación de paridad con el CI, no un artefacto de producción: producción
 # sale solo de docker/build (build-arg obligatorio). NEXT_PUBLIC_API_URL: la del
-# entorno o, como frontend.yml, http://localhost:8080.
+# entorno o, como frontend.yml, http://localhost:8080. Por eso la variable de make
+# del mismo nombre (arriba, con la URL de producción) NO debe exportarse: si se
+# exporta, este build incrusta la URL de producción sin avisar.
 build: ## Build como el CI: go build ./... + bin/server y next build
 	cd backend && go build ./...
 	cd backend && CGO_ENABLED=0 go build -o bin/server ./cmd/server

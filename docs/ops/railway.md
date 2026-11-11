@@ -161,6 +161,9 @@ En Railway se cargan como **variables de servicio**. Los secretos van
 | backend | `MIGRATE_LOCK_TIMEOUT` | `10m` |
 | backend | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | `45` |
 | backend | `LOG_LEVEL` | Vacío (queda en `info`) |
+| backend | `IA_PROVEEDOR` | **Vacío** hasta E6-02: IA deshabilitada. Nunca `doble` (con `ENV=production` el backend no arranca) |
+| backend | `IA_API_KEY` | Sellada, solo con el adaptador real (E6-02) |
+| backend | `IA_MODELO` | Solo con el adaptador real (E6-02) |
 | frontend | — | Los `NEXT_PUBLIC_*` van en la imagen, no en Railway (§2) |
 
 **Conexiones.** Cada backend abre hasta **25** conexiones
