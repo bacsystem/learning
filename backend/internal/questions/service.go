@@ -88,6 +88,20 @@ func (s *Service) UpdatePregunta(ctx context.Context, id int64, req UpdatePregun
 	return result, nil
 }
 
+// CambiarEstado moves a question through its life cycle (E3-07 §3). The body
+// rules that need no database run first; the state rules run under the row
+// lock, against the state read there.
+func (s *Service) CambiarEstado(ctx context.Context, id int64, req CambiarEstadoRequest, aud Auditor) (PreguntaResponse, error) {
+	if err := validarCuerpoEstado(req); err != nil {
+		return PreguntaResponse{}, err
+	}
+	decidir := func(b preguntaBloqueada) (cambioEstado, error) { return decidirCambioEstado(b, req) }
+	if err := s.repo.CambiarEstado(ctx, id, decidir, aud); err != nil {
+		return PreguntaResponse{}, err
+	}
+	return s.repo.GetPregunta(ctx, id)
+}
+
 // DeletePregunta soft-deletes a question.
 func (s *Service) DeletePregunta(ctx context.Context, id int64) error {
 	return s.repo.DeletePregunta(ctx, id)

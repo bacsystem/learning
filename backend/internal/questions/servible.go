@@ -17,7 +17,13 @@ const (
 	EstadoRechazada  = "rechazada"
 	EstadoActivo     = "activo" // the inherited bank, served like aprobada
 	EstadoEliminada  = "eliminada"
-	OrigenManual     = "manual"
+)
+
+// Origins of a question (preguntas.origen).
+const (
+	OrigenManual    = "manual"
+	OrigenBalotario = "balotario"
+	OrigenIA        = "ia"
 )
 
 // EstadosListables are the values of the estado filter of GET /preguntas:
@@ -26,4 +32,4 @@ var EstadosListables = map[string]bool{EstadoBorrador: true, EstadoEnRevision: t
 	EstadoRechazada: true, EstadoActivo: true}
 
 // Origenes are the values of preguntas.origen.
-var Origenes = map[string]bool{OrigenManual: true, "balotario": true, "ia": true}
+var Origenes = map[string]bool{OrigenManual: true, OrigenBalotario: true, OrigenIA: true}

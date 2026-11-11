@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/httpx"
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog/log"
@@ -16,12 +17,13 @@ var validate = validator.New()
 
 // Handler exposes the questions HTTP handlers.
 type Handler struct {
-	svc *Service
+	svc    *Service
+	audLog *audit.Logger
 }
 
 // NewHandler creates a new Handler.
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, audLog *audit.Logger) *Handler {
+	return &Handler{svc: svc, audLog: audLog}
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

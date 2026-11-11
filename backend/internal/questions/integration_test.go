@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cbaciliod/learning/internal/audit"
 	qt "github.com/cbaciliod/learning/internal/questions/questionstest"
 )
 
@@ -14,7 +15,7 @@ func newMux(t *testing.T, opts qt.Options) (*qt.Fixture, *http.ServeMux) {
 	db := qt.DB(t)
 	f := qt.Seed(t, db, opts)
 	mux := http.NewServeMux()
-	Mount(mux, NewService(NewRepository(db)), qt.JWTSecret, qt.AllowSession)
+	Mount(mux, NewService(NewRepository(db)), audit.New(db), qt.JWTSecret, qt.AllowSession)
 	return f, mux
 }
 

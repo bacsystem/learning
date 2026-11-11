@@ -308,6 +308,10 @@ func (f *Fixture) cleanup(t *testing.T) {
 		}
 	}
 	for _, u := range f.usuarios {
+		// The review endpoints audit their actor (SIA-E3-07).
+		if _, err := f.DB.ExecContext(ctx, `DELETE FROM audit_log WHERE usuario_id = $1`, u); err != nil {
+			t.Errorf("cleanup audit_log: %v", err)
+		}
 		if _, err := f.DB.ExecContext(ctx, `DELETE FROM usuarios WHERE id = $1`, u); err != nil {
 			t.Errorf("cleanup usuario: %v", err)
 		}
