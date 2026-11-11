@@ -1,5 +1,11 @@
 import type { RespuestaSaludApi } from "./api";
-import { normalizarSalud, RespuestaSaludInvalida, versionBackend, versionesDistintas } from "./reglas";
+import {
+  desglosarDuracion,
+  normalizarSalud,
+  RespuestaSaludInvalida,
+  versionBackend,
+  versionesDistintas,
+} from "./reglas";
 import { describe, expect, it } from "vitest";
 
 const respuesta = (cambio: Partial<RespuestaSaludApi> = {}): RespuestaSaludApi => ({
@@ -98,5 +104,17 @@ describe("versiones (PLT-03 regla 4)", () => {
     expect(versionesDistintas("1.4.0", "1.4.0")).toBe(false);
     expect(versionesDistintas("1.4.0", "1.5.0")).toBe(true);
     expect(versionesDistintas("1.4.0", null)).toBe(false);
+  });
+});
+
+describe("desglosarDuracion", () => {
+  it.each([
+    [0, { dias: 0, horas: 0, minutos: 0 }],
+    [59, { dias: 0, horas: 0, minutos: 0 }],
+    [3_660, { dias: 0, horas: 1, minutos: 1 }],
+    [93_784, { dias: 1, horas: 2, minutos: 3 }],
+    [-5, { dias: 0, horas: 0, minutos: 0 }],
+  ])("splits %i s", (segundos, esperado) => {
+    expect(desglosarDuracion(segundos)).toEqual(esperado);
   });
 });

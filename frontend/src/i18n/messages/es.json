@@ -1617,6 +1617,56 @@
       }
     },
     "sesion-servidor-no-disponible-titulo": "El servidor no responde",
-    "sesion-servidor-no-disponible-texto": "Tu sesión sigue abierta. Lo volvemos a intentar cada pocos segundos; en cuanto el servidor responda, verás la aplicación."
+    "sesion-servidor-no-disponible-texto": "Tu sesión sigue abierta. Lo volvemos a intentar cada pocos segundos; en cuanto el servidor responda, verás la aplicación.",
+    "saludServicios": {
+      "menu": "Salud de servicios",
+      "estadoGlobal": "Estado global",
+      "ultimaComprobacion": "Última comprobación: {fecha}",
+      "actualizar": "Actualizar",
+      "actualizando": "Actualizando…",
+      "desactualizado": "Desactualizado",
+      "ayuda": "Este panel muestra el estado al abrirlo. No envía alertas.",
+      "error": {
+        "titulo": "No se pudo consultar el estado de los servicios",
+        "conDatos": "Se muestran los datos de la última comprobación válida ({fecha}). Se vuelve a intentar en el próximo ciclo.",
+        "sinDatos": "Se vuelve a intentar automáticamente cada 30 segundos."
+      },
+      "estado": {
+        "operativo": "Operativo",
+        "degradado": "Degradado",
+        "caido": "Caído",
+        "no_configurado": "No configurado",
+        "desconocido": "Desconocido"
+      },
+      "estadoConCategoria": "{estado} — {categoria}",
+      "categoria": {
+        "sin_conexion": "Sin conexión",
+        "tiempo_agotado": "Tiempo agotado",
+        "error_interno": "Error interno",
+        "atrasado": "Atrasado",
+        "sin_datos": "Sin datos"
+      },
+      "servicio": {
+        "api": "API",
+        "base_datos": "Base de datos",
+        "correo": "Correo",
+        "frontend": "Frontend"
+      },
+      "dato": {
+        "version": "Versión",
+        "enMarcha": "En marcha",
+        "enMarchaValor": "{dias, number} d {horas, number} h {minutos, number} min",
+        "latencia": "Latencia",
+        "latenciaValor": "{valor, number} ms",
+        "sinEnviar": "Sin enviar",
+        "antiguedad": "Más antiguo sin enviar",
+        "antiguedadValor": "{valor, number} min",
+        "fallidos24h": "Fallidos definitivos en 24 h",
+        "ultimoEnviado": "Último enviado",
+        "nunca": "Nunca"
+      },
+      "frontendNota": "La versión que estás viendo. No tiene estado: si el frontend estuviera caído, no verías este panel.",
+      "versionesDistintas": "El frontend y el backend tienen versiones distintas."
+    }
   }
 }

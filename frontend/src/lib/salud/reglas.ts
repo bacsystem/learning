@@ -115,3 +115,17 @@ export function versionBackend(salud: Salud): string | null {
 export function versionesDistintas(frontend: string, backend: string | null): boolean {
   return backend !== null && backend !== frontend;
 }
+
+const SEGUNDOS_POR_MINUTO = 60;
+const SEGUNDOS_POR_HORA = 60 * SEGUNDOS_POR_MINUTO;
+const SEGUNDOS_POR_DIA = 24 * SEGUNDOS_POR_HORA;
+
+/** Tiempo en marcha del backend (`en_marcha_s`) en días, horas y minutos completos. */
+export function desglosarDuracion(segundos: number): { dias: number; horas: number; minutos: number } {
+  const total = Math.max(0, Math.floor(segundos));
+  return {
+    dias: Math.floor(total / SEGUNDOS_POR_DIA),
+    horas: Math.floor((total % SEGUNDOS_POR_DIA) / SEGUNDOS_POR_HORA),
+    minutos: Math.floor((total % SEGUNDOS_POR_HORA) / SEGUNDOS_POR_MINUTO),
+  };
+}
