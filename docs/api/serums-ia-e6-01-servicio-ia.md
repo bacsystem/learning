@@ -108,7 +108,7 @@ Se **rechaza**, no se enmascara: la entrada que coincida no sale del servidor.
 - **Un DNI no se distingue de otro número de 8 dígitos**, y no se intenta: todo número de 8 dígitos aislado se trata como posible DNI y se rechaza (la historia dice «un número de 8 dígitos aislado como DNI»). Que esté «aislado» significa que no forma parte de un número más largo ni de una palabra: `123456789`, `A12345678` y `12345678B` no coinciden. El precio es algún falso positivo, como una fecha `20261111`, y es aceptado (ADR 0006).
 - Se evalúa sobre `Instrucciones` y sobre cada `Bloque.Texto`.
 - El error **no** incluye el texto que coincidió: solo el tipo (`dni`, `email`, `telefono`) y el índice del bloque, para que el consumidor sepa qué revisar. Ni el log ni `ia_usos` guardan el texto.
-- **Riesgo conocido** (pregunta al PO, §7): los documentos oficiales (normas MINSA) traen teléfonos y correos de contacto. Pasar esos pasajes completos haría fallar la llamada.
+- **Documentos oficiales:** las normas MINSA traen teléfonos y correos de contacto, y pasar esos pasajes completos haría fallar la llamada. Decisión del PO (§7): el consumidor los enmascara antes de llamar.
 
 ## 5. Errores y mapeo HTTP para consumidores
 
@@ -162,11 +162,11 @@ DROP TABLE IF EXISTS ia_usos;
 - Es tabla nueva, sin efecto sobre los datos existentes. El Down la borra entera, perdiendo el historial de uso.
 - **Datos personales:** `actor_id` enlaza con `usuarios`, así que la exportación y el borrado de SIA-E9-07 la incluyen.
 
-## 7. Pregunta abierta al PO
+## 7. Decisión del PO
 
 | # | Pregunta | Decisión por defecto |
 |---|---|---|
-| Q-IA1 | Los pasajes de documentos oficiales traen teléfonos y correos de contacto, y la regla 3 rechaza toda la llamada. ¿Se mantiene el rechazo, o en E6-03 se enmascaran antes de enviar? | E6-01 rechaza, como dice la historia. La decisión de enmascarar se toma en E6-03, que es quien arma las entradas con pasajes |
+| Q-IA1 | Los pasajes de documentos oficiales traen teléfonos y correos de contacto, y la regla 3 rechaza toda la llamada. ¿Se mantiene el rechazo, o se enmascaran antes de enviar? | **Decidida por el PO:** E6-01 rechaza con `datos_personales` y **nunca** enmascara por su cuenta. Quien arma entradas con contenido de fuentes o de preguntas (E3-04, E6-03, E6-06, E6-08) **enmascara antes de llamar** los emails, teléfonos y números de 8 dígitos, reemplazándolos por un marcador. Nunca se envían datos de usuarios. El PO lo deja escrito como supuesto del README de historias. Para que todos enmascaren igual, `internal/ia` **exporta** una función pura `Enmascarar(texto) string` con los mismos patrones de §4, que esos consumidores usan; el servicio no la llama |
 
 ## 8. Doble determinista (regla 7)
 
@@ -179,7 +179,7 @@ DROP TABLE IF EXISTS ia_usos;
 | # | Tarea | h |
 |---|---|---|
 | A1 | `ia.go` y `proveedor.go`: tipos, errores y puerto; configuración en `config.Load` con la lista de `ENV` permitidos para el doble | 2 |
-| A2 | `redaccion.go` y el límite de 30 000, con tests de positivos y falsos positivos (8 dígitos dentro de un número mayor, un año, un correo) | 2 |
+| A2 | `redaccion.go` y el límite de 30 000, con tests de positivos y falsos positivos (8 dígitos dentro de un número mayor, un año, un correo). También `Enmascarar(texto)`, que es exportada, usa los mismos patrones y es idempotente | 2 |
 | A3 | `servicio.go`: timeout, reintentos transitorios, reintento por salida inválida, peor caso de 6 llamadas, y tiempos inyectables | 3 |
 | A4 | Migración 066 y `registro.go`, fuera de la transacción del consumidor; una fila por invocación con su resultado | 2 |
 | A5 | `doble.go` con sus modos de fallo, y un test por cada escenario de la historia | 3 |

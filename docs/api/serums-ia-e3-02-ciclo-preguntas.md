@@ -1,7 +1,8 @@
 # Contrato API — SERUMS IA, SIA-E3-02 Ciclo de vida y trazabilidad de preguntas
 
 - **Historia:** [SIA-E3-02](../stories/serums-ia/E3-02-borrador-y-trazabilidad.md)
-- **Estado:** borrador para revisión del tech-lead (2026-11-11). Hay preguntas abiertas al PO (§8) con decisión por defecto.
+- **Estado:** borrador para revisión del tech-lead (2026-11-11). Las preguntas P1–P4 al PO quedaron **decididas** (§8).
+- **Release:** E3-02 no sale en un release sin SIA-E3-07 «Revisión básica de preguntas» (decisión del PO): es la UI de admin que permite publicar.
 - **Convenciones:** [README.md](README.md). Los endpoints nuevos usan el formato de error 2. Los existentes de `internal/questions` conservan sus errores heredados, salvo lo que se indica.
 - **Depende de:** el retiro S5 del contrato E2, con `SuscriptorRetiro` (PR #138, aprobado y sin mergear). E3-02 no se mergea antes que el #138.
 - **Migración reservada:** **065**.
@@ -102,7 +103,8 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 | 5 | La transición está permitida (§3) | 409 `estado_invalido` (`detalle = {"estado_actual"}`) |
 | 6 | Solo para `aprobada`: ≥ 1 cita a un pasaje de una fuente en estado `activa`, de cualquier versión | **422 `falta_cita`** (escenario «Aprobar sin cita») |
 
-- **Origen `balotario`** (regla 3): su cita es a la propia fuente del balotario, que crea SIA-E3-01. El requisito es el mismo (≥ 1 cita a una fuente `activa`), así que no hay rama especial en el código.
+- **Origen `balotario`** (regla 3): su cita es a la propia fuente del balotario, que crea SIA-E3-01. El requisito es el mismo (≥ 1 cita a una fuente `activa`), así que no hay rama especial en el código. La excepción vale solo si la fuente del balotario está `activa` (P4).
+- **Revalidar** (`en_revision` → `aprobada`) exige lo mismo: ≥ 1 cita a una fuente `activa` (P4, decidida).
 - **Bloqueo, en orden fijo** (lo comparten aprobar, editar citas y el retiro):
   1. Leer los `fuente_id` de las citas de la pregunta.
   2. `SELECT … FROM fuentes WHERE id = ANY($1) ORDER BY id FOR SHARE`.
@@ -132,10 +134,11 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 
 | Endpoint | Cambio |
 |---|---|
-| `POST /preguntas`, `POST /preguntas/import` | Nacen `estado = 'borrador'`, `origen = 'manual'` (P1). El cuerpo **no** acepta `estado` ni `origen`: el origen `ia` lo fijan los generadores (E6) y `balotario` la importación de SIA-E3-01 |
+| `POST /preguntas`, `POST /preguntas/import` | Nacen `estado = 'borrador'`, `origen = 'manual'` (P1, decidida: **toda** pregunta nueva nace en `borrador`, cualquiera sea su origen). El cuerpo **no** acepta `estado` ni `origen`: el origen `ia` lo fijan los generadores (E6) y `balotario` la importación de SIA-E3-01 |
 | `GET /preguntas` | Filtros opcionales nuevos `estado` y `origen`. `estado` es un valor **exacto** entre `borrador`, `en_revision`, `aprobada`, `rechazada` y `activo`: `activo` (heredado) se filtra aparte de `aprobada`. Sin filtro se listan todas las no eliminadas, también los borradores, porque el admin tiene que verlos. Cada item del listado suma `estado`, `origen` y `citas_count` (número de citas), pero **no** el array `citas`, que va solo en `GET /preguntas/{id}` |
-| `GET /preguntas/{id}`, `PUT /preguntas/{id}` | La respuesta suma los campos de §4.4. Por defecto, `PUT` no cambia el estado (P3) |
-| `DELETE /preguntas/{id}` | Solo desde `aprobada`, `rechazada` o `activo`; si no, `409 estado_invalido` con el formato 2 (P2). Audita `pregunta.estado` con `estado_nuevo = "eliminada"` |
+| `GET /preguntas/{id}` | La respuesta suma los campos de §4.4 |
+| `PUT /preguntas/{id}` | La respuesta suma los campos de §4.4. Efecto sobre el estado (P3, decidida) en §4.5 |
+| `DELETE /preguntas/{id}` | Solo desde `aprobada`, `rechazada` o `activo`; si no, `409 estado_invalido` con el formato 2 (P2, decidida). Un `borrador` o una `en_revision` se rechazan primero. Audita `pregunta.estado` con `estado_nuevo = "eliminada"` |
 | `GET /preguntas/stats` y `preguntas_count` de temas (`temas/repository.go:48,277`) | Siguen contando las no eliminadas, borradores incluidos: son vistas de admin del banco completo. Si stats desglosa por estado, incluye los nuevos (backend-dev decide la forma). Lo «servible» solo lo cuenta `PreguntaServible` |
 
 ### 4.4 Objeto pregunta: campos nuevos
@@ -152,6 +155,20 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 ```
 
 `citas` va ordenado por `fuente_id, version, pasaje_id`. No incluye el texto del pasaje, que se resuelve con `ResolverCita` del puerto (ADR 0003).
+
+### 4.5 `PUT /preguntas/{id}`: efecto sobre el estado (P3, decidida por el PO)
+
+| Estado actual | Qué se edita | Resultado |
+|---|---|---|
+| `aprobada` o `activo` | **Contenido**: `enunciado`, `tipo`, alternativas (texto o cuál es correcta), retroalimentación o explicación | Se guarda y la pregunta pasa a **`en_revision`**, en la misma transacción. Se audita `pregunta.estado` con `motivo = "edición de contenido"` |
+| `aprobada` o `activo` | Solo **metadatos**: `asignatura_id`, `tema_id`, `etiqueta_ids`, `dificultad`, `grado_id`, `especialidad_id` | Se guarda y el estado no cambia |
+| `borrador`, `en_revision` o `rechazada` | Cualquier campo | El estado no cambia |
+| `eliminada` | — | `404 no_encontrado` (como hoy) |
+
+- **Qué es «contenido»:** se compara con lo guardado, no con lo enviado. Reenviar el mismo texto no cuenta como cambio: si el `PUT` trae el enunciado y las alternativas idénticas, el estado no cambia.
+- **Origen `balotario`:** la clave oficial no se puede cambiar. Si el `PUT` cambia cuál alternativa es correcta, responde **`422 clave_oficial`** y no guarda nada. El resto sigue la tabla.
+- **Riesgo aceptado por el PO:** corregir una errata en una `activo` heredada sin citas la saca de circulación hasta que se cite y se revalide (E3-07).
+- **Bloqueo:** el `PUT` ya bloquea la pregunta `FOR UPDATE` (`questions/repository.go:479`). No toca fuentes, así que no afecta el orden de §4.1.
 
 ## 5. Integración con fuentes (regla 8)
 
@@ -207,17 +224,20 @@ Implementaciones en `internal/questions`, registradas en `cmd/server/main.go` al
 | `estado_invalido` | 409 | §3, §4 |
 | `validacion`, `referencia_invalida` | 422 | §4 |
 | `falta_cita` | 422 | §4.1 |
+| `clave_oficial` | 422 | §4.5 (origen `balotario`) |
 
 Los códigos de esta tabla usan el **formato 2** (`{"error": "<codigo>", "message": "…", "detalle"?}`, README §3). También usa el formato 2 el `409 estado_invalido` del `DELETE` existente. El resto de los errores heredados de `internal/questions` no cambia.
 
-## 8. Preguntas abiertas al PO (con decisión por defecto)
+## 8. Decisiones del PO (2026-11-11)
 
-| # | Pregunta | Decisión por defecto |
+| # | Pregunta | Decisión |
 |---|---|---|
-| P1 | ¿El alta manual (`POST /preguntas`) y la importación Excel también nacen en `borrador`? La regla 2 dice «importada o generada», y el objetivo de la historia dice «ninguna pregunta nueva». **Consecuencia:** hasta SIA-E3-05 (UI de revisión) el admin solo puede publicar por API (`PATCH …/estado`), y siempre con una cita a una fuente activa | Sí, todas nacen en `borrador`. El tech-lead debería ordenar E3-05 cerca de E3-02 |
-| P2 | El diagrama no tiene `borrador → eliminada`, `en_revision → eliminada` ni `activo → eliminada`, pero hoy `DELETE` elimina en cualquier estado | Se permite desde `aprobada`, `rechazada` y `activo` (compatibilidad). `borrador` y `en_revision` se rechazan primero |
-| P3 | ¿Editar con `PUT` una pregunta `aprobada` o `activo` cambia su estado? | No cambia (como hoy). Recomendación del architect: que editar enunciado o respuestas de una `aprobada` la pase a `en_revision` |
-| P4 | Revalidar (`en_revision` → `aprobada`) cuando sus citas siguen apuntando a una fuente `retirada` | Se exige ≥ 1 cita a una fuente `activa` (la misma regla 6). Así una pregunta nunca se sirve citando solo una fuente retirada |
+| P1 | ¿El alta manual y la importación Excel también nacen en `borrador`? | **Sí.** Toda pregunta nueva nace en `borrador`: manual, Excel, balotario e IA. Si naciera aprobada, el alta manual saltaría la revisión. Para publicar, el PO crea **SIA-E3-07 «Revisión básica de preguntas»**, la UI de admin que usa `PATCH …/estado` y `PUT …/citas` de este contrato. E3-02 no sale en un release sin E3-07 |
+| P2 | ¿Desde qué estados se elimina? | Desde `aprobada`, `rechazada` y `activo`. Un `borrador` o una `en_revision` se rechazan primero |
+| P3 | ¿Editar una `aprobada` o `activo` cambia su estado? | Editar el **contenido** la pasa a `en_revision`; editar metadatos no. En origen `balotario` la clave no se cambia (`422 clave_oficial`). Detalle en §4.5 |
+| P4 | ¿Revalidar exige una cita a una fuente activa? | **Sí.** La excepción de `balotario` vale solo si su propia fuente está `activa` |
+
+**Para SIA-E3-07** (respuesta al PO): los endpoints para cambiar el estado (§4.1) y para poner o quitar citas (§4.2) **ya existen** en este contrato. Lo que falta, y va en el contrato de E3-07, es un endpoint para que el admin **elija un pasaje**. Hoy no hay ninguna ruta HTTP que liste los pasajes de una fuente: `ObtenerPasajes` y `BuscarPasajes` existen solo en el puerto (ADR 0003).
 
 ## 9. Partición en tareas (backend-dev, 1–3 h cada una; después del merge del #138)
 
@@ -229,5 +249,6 @@ Los códigos de esta tabla usan el **formato 2** (`{"error": "<codigo>", "messag
 | B4 | §4.1, `PATCH …/estado`: transiciones, motivo, `falta_cita`, orden de bloqueo y auditoría. Un test por fila de §3 | 3 |
 | B5 | §4.2, `PUT …/citas`, más la implementación de `Citantes` | 2 |
 | B6 | I9, `DELETE` según el estado | 1 |
+| B6b | §4.5: `PUT` con contenido → `en_revision` (comparando con lo guardado) y `422 clave_oficial` en `balotario` | 2 |
 | B7 | §5, `SuscriptorRetiro`: registro en `main` y tests de «Retirar fuente citada» (12 aprobadas y 3 en borrador), «Restaurar no reaprueba» y «todo o nada» con un fallo provocado | 3 |
 | F1 | frontend-dev: tipos de `questions/api.ts`, estado visible en el listado admin y claves i18n es/en de los 6 estados y del origen | 2 |

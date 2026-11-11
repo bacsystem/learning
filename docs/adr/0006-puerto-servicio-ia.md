@@ -33,6 +33,6 @@ Varias historias necesitan «el servicio de IA». El proveedor, el modelo y los 
   - Los datos personales quedan bloqueados en un único punto.
   - Los costos y el uso quedan auditados.
 - **Negativas:**
-  - Rechazar por patrón tiene falsos positivos, por ejemplo una fecha `20261111` (8 dígitos) o el teléfono de contacto de una norma. El consumidor tiene que limpiar sus entradas; enmascarar en lugar de rechazar se evalúa en E6-03 (pregunta al PO, contrato §7).
+  - Rechazar por patrón tiene falsos positivos, por ejemplo una fecha `20261111` (8 dígitos) o el teléfono de contacto de una norma. Decisión del PO (contrato §7): el servicio rechaza y nunca enmascara por su cuenta. Los consumidores que arman entradas con contenido de fuentes o preguntas enmascaran antes de llamar, con la función exportada `ia.Enmascarar`.
   - Cada consumidor necesita infraestructura asíncrona (job y estado), y eso aumenta el costo de E3-04 y E6-03.
   - Hasta E6-02, con `IA_PROVEEDOR` vacío, ninguna función de IA está disponible en producción.
