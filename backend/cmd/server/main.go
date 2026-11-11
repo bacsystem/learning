@@ -128,6 +128,8 @@ func run() int {
 	salud.Mount(mux, salud.NewService([]salud.Comprobacion{
 		salud.ComprobarAPI(version, arranque, time.Now),
 		salud.ComprobarBD(database),
+		// SMTP is only optional in development/test (config.Load).
+		salud.ComprobarCorreo(database, notifier.MaxRetries, cfg.SMTPHost != ""),
 	}, time.Now), cfg.JWTSecret, checkSession)
 	simulations.Mount(mux, simSvc, cfg.JWTSecret, checkSession)
 	notifications.Mount(mux, database, audLog, cfg.JWTSecret, checkSession)
