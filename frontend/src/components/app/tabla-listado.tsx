@@ -1,6 +1,6 @@
 "use client";
 
-import { useTextosTablaListado } from "./textos-khipu";
+import { useTextosTablaListado } from "./use-textos-khipu";
 import { useTranslations } from "next-intl";
 import type { ComponentProps } from "react";
 

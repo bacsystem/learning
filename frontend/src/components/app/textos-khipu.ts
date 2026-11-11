@@ -1,59 +1,44 @@
-"use client";
-
-import { useTranslations } from "next-intl";
-import { useMemo } from "react";
-
 import type { TextosTablaDatos } from "@/components/datos/tabla-datos";
 import type { TextosTablaListado } from "@/components/datos/tabla-listado";
 import type { TextosPieTabla } from "@/components/patrones/pie-tabla";
 
-/** Textos del pie de tabla de khipu (`PieTabla`), traducidos con next-intl. */
-export function useTextosPieTabla(): TextosPieTabla {
-  const t = useTranslations("dashboard");
-  return useMemo(
-    () => ({
-      mostrando: t("tabla-mostrando"),
-      de: t("tabla-de"),
-      anterior: t("tabla-anterior"),
-      siguiente: t("tabla-siguiente"),
-      filas: t("tabla-filas"),
-      filasPorPagina: t("tabla-filas-por-pagina"),
-    }),
-    [t],
-  );
+/**
+ * Textos de los componentes de khipu traducidos con las claves del namespace `dashboard`. Son funciones puras de `t`
+ * (el de `useTranslations("dashboard")`) para poder probar el mapeo; los hooks de `use-textos-khipu` las envuelven.
+ */
+export type Traductor = (clave: string, valores?: Record<string, string | number>) => string;
+
+export function textosPieTabla(t: Traductor): TextosPieTabla {
+  return {
+    mostrando: t("tabla-mostrando"),
+    de: t("tabla-de"),
+    anterior: t("tabla-anterior"),
+    siguiente: t("tabla-siguiente"),
+    filas: t("tabla-filas"),
+    filasPorPagina: t("tabla-filas-por-pagina"),
+  };
 }
 
-/** Textos de `TablaDatos` (pie y selección), traducidos con next-intl. */
-export function useTextosTablaDatos(): TextosTablaDatos {
-  const t = useTranslations("dashboard");
-  const pie = useTextosPieTabla();
-  return useMemo(
-    () => ({
-      ...pie,
-      accionesSeleccion: t("tabla-acciones-seleccion"),
-      quitarSeleccion: t("tabla-quitar-seleccion"),
-      seleccionarTodo: t("tabla-seleccionar-todo"),
-      seleccionarFila: (id: string) => t("tabla-seleccionar-fila", { id }),
-      seleccionados: (n: number) => (n === 1 ? t("tabla-seleccionado") : t("tabla-seleccionados")),
-    }),
-    [t, pie],
-  );
+export function textosTablaDatos(t: Traductor): TextosTablaDatos {
+  return {
+    ...textosPieTabla(t),
+    accionesSeleccion: t("tabla-acciones-seleccion"),
+    quitarSeleccion: t("tabla-quitar-seleccion"),
+    seleccionarTodo: t("tabla-seleccionar-todo"),
+    seleccionarFila: (id) => t("tabla-seleccionar-fila", { id }),
+    // Dos claves y no un plural ICU: `check-i18n` toma las ramas del plural como placeholders.
+    seleccionados: (n) => (n === 1 ? t("tabla-seleccionado") : t("tabla-seleccionados")),
+  };
 }
 
-/** Textos de `TablaListado`: los de su barra y, además, los de la tabla. */
-export function useTextosTablaListado(): TextosTablaListado & TextosTablaDatos {
-  const t = useTranslations("dashboard");
-  const tabla = useTextosTablaDatos();
-  return useMemo(
-    () => ({
-      ...tabla,
-      buscar: t("tabla-buscar"),
-      columnas: t("tabla-columnas"),
-      columnasVisibles: t("tabla-columnas-visibles"),
-      exportar: t("tabla-exportar"),
-      exportarCsv: t("tabla-exportar-csv"),
-      imprimir: t("tabla-imprimir"),
-    }),
-    [t, tabla],
-  );
+export function textosTablaListado(t: Traductor): TextosTablaListado & TextosTablaDatos {
+  return {
+    ...textosTablaDatos(t),
+    buscar: t("tabla-buscar"),
+    columnas: t("tabla-columnas"),
+    columnasVisibles: t("tabla-columnas-visibles"),
+    exportar: t("tabla-exportar"),
+    exportarCsv: t("tabla-exportar-csv"),
+    imprimir: t("tabla-imprimir"),
+  };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTextosPieTabla } from "./textos-khipu";
+import { useTextosPieTabla } from "./use-textos-khipu";
 import type { ComponentProps } from "react";
 
 import { PieTabla as PieTablaKhipu } from "@/components/patrones/pie-tabla";

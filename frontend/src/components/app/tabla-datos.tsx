@@ -1,6 +1,6 @@
 "use client";
 
-import { useTextosTablaDatos } from "./textos-khipu";
+import { useTextosTablaDatos } from "./use-textos-khipu";
 import type { ComponentProps } from "react";
 
 import { TablaDatos as TablaDatosKhipu } from "@/components/datos/tabla-datos";
