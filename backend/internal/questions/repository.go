@@ -946,24 +946,15 @@ func (r *Repository) GetGlobalStats(ctx context.Context) (StatsGlobalesResponse,
 	return stats, nil
 }
 
-// citaConTexto is a citation row with the raw passage text, which never leaves
-// the repository: only its excerpt does.
-type citaConTexto struct {
-	CitaResponse
-	Texto string `json:"texto"`
-}
-
-// decodificarCitas turns the JSON_AGG of GetPregunta into CitaResponse with
-// the excerpt of each passage (contract E3-07 §5).
+// decodificarCitas turns the JSON_AGG of GetPregunta into CitaResponse and
+// derives the excerpt of each passage (contract E3-07 §5).
 func decodificarCitas(raw []byte) ([]CitaResponse, error) {
-	var filas []citaConTexto
-	if err := json.Unmarshal(raw, &filas); err != nil {
+	citas := []CitaResponse{}
+	if err := json.Unmarshal(raw, &citas); err != nil {
 		return nil, err
 	}
-	citas := make([]CitaResponse, 0, len(filas))
-	for _, f := range filas {
-		f.Extracto = texto.Extracto(f.Texto)
-		citas = append(citas, f.CitaResponse)
+	for i := range citas {
+		citas[i].Extracto = texto.Extracto(citas[i].Texto)
 	}
 	return citas, nil
 }

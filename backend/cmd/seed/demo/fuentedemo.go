@@ -60,16 +60,29 @@ func (s *sembrador) fuenteDemo(ctx context.Context) ([]int64, error) {
 		estado = fuentes.EstadoProcesando
 		s.creado["fuentes"]++
 	}
-	switch estado {
-	case fuentes.EstadoProcesando:
+	if estado == fuentes.EstadoProcesando {
+		// A running server's worker can publish the same version meanwhile: then
+		// ours is refused, and the fuente being activa is all the seed needs.
 		if err := src.PublicarVersion(ctx, id, 1, pasajesDemo, nil); err != nil {
-			return nil, fmt.Errorf("publicar la fuente demo: %w", err)
+			if estado, rerr := s.estadoFuente(ctx, id); rerr != nil || estado != fuentes.EstadoActiva {
+				return nil, fmt.Errorf("publicar la fuente demo: %w", err)
+			}
 		}
-	case fuentes.EstadoActiva:
-	default:
-		return nil, fmt.Errorf("la fuente demo está %s; restáurala o bórrala para sembrar de nuevo", estado)
+	} else if estado != fuentes.EstadoActiva {
+		return nil, fmt.Errorf("la fuente demo está %s; bórrala o restáurala para sembrar de nuevo", estado)
 	}
 
+	return s.pasajesFuente(ctx, id)
+}
+
+func (s *sembrador) estadoFuente(ctx context.Context, id int64) (string, error) {
+	var estado string
+	err := s.db.QueryRowContext(ctx, `SELECT estado FROM fuentes WHERE id = $1`, id).Scan(&estado)
+	return estado, err
+}
+
+// pasajesFuente returns the passage ids of the fuente, by version and orden.
+func (s *sembrador) pasajesFuente(ctx context.Context, id int64) ([]int64, error) {
 	var pasajes []int64
 	if err := s.db.SelectContext(ctx, &pasajes, `SELECT pa.id FROM pasajes pa
 		JOIN fuente_versiones fv ON fv.id = pa.fuente_version_id

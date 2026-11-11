@@ -14,6 +14,7 @@ import (
 	"github.com/cbaciliod/learning/internal/auth"
 	"github.com/cbaciliod/learning/internal/catalogs"
 	"github.com/cbaciliod/learning/internal/db/dbtest"
+	"github.com/cbaciliod/learning/internal/fuentes"
 	"github.com/cbaciliod/learning/internal/perfiles"
 	"github.com/cbaciliod/learning/internal/questions"
 	"github.com/cbaciliod/learning/internal/simulations"
@@ -251,6 +252,33 @@ func TestSembrar_CompletaPreguntasAMedias(t *testing.T) {
 	}
 	if fmt.Sprint(estados) != "[aprobada:1 aprobada:1 rechazada:1]" {
 		t.Errorf("estado:citas = %v, want [aprobada:1 aprobada:1 rechazada:1]", estados)
+	}
+}
+
+// A fuente a failed run left in procesando (created, not yet published) is
+// published, not duplicated; a retired one stops the seed with a clear error.
+func TestSembrar_FuenteDemoAMedias(t *testing.T) {
+	db, cfg := preparar(t)
+	id, _, err := fuentes.NewPgSource(db).GuardarFuente(context.Background(), fuentes.NuevaFuente{Titulo: tituloFuenteDemo, Tipo: "guia",
+		NombreArchivo: nombreArchivoDemo, Contenido: contenidoFuenteDemo()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	correr(t, db, cfg)
+	var estado string
+	var cuantas int
+	if err := db.Get(&estado, `SELECT estado FROM fuentes WHERE id = $1`, id); err != nil || estado != "activa" {
+		t.Fatalf("fuente = %s (%v), want activa", estado, err)
+	}
+	if err := db.Get(&cuantas, `SELECT COUNT(*) FROM fuentes WHERE titulo = $1`, tituloFuenteDemo); err != nil || cuantas != 1 {
+		t.Errorf("fuentes demo = %d (%v), want 1", cuantas, err)
+	}
+	if _, err := db.Exec(`UPDATE fuentes SET estado = 'retirada', motivo_retiro = 'Prueba' WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	rawKey, _ := hex.DecodeString(cfg.EncryptionKey)
+	if _, err := sembrar(context.Background(), db, dbtest.GCM(t), rawKey, cfg); err == nil || !strings.Contains(err.Error(), "retirada") {
+		t.Errorf("con la fuente retirada: err = %v, want un error que diga retirada", err)
 	}
 }
 

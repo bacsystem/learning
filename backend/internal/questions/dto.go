@@ -107,7 +107,8 @@ type AsignaturaSetItem struct {
 // ── Response structs ───────────────────────────────────────────────────────────
 
 // CitaResponse is one citation of a question: the passage, the fuente
-// version it belongs to and a short excerpt (contracts E3-02 §4.4, E3-07 §5).
+// version it belongs to, a short excerpt and the full passage text (contracts
+// E3-02 §4.4, E3-07 §5). The text is the one of the cited version, immutable.
 type CitaResponse struct {
 	PasajeID     int64   `json:"pasaje_id"`
 	FuenteID     int64   `json:"fuente_id"`
@@ -118,6 +119,7 @@ type CitaResponse struct {
 	LineaInicio  int     `json:"linea_inicio"`
 	LineaFin     int     `json:"linea_fin"`
 	Extracto     string  `json:"extracto"`
+	Texto        string  `json:"texto"`
 }
 
 // RespuestaResponse is an answer in the admin detail view (includes es_correcta).

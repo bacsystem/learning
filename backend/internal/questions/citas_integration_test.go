@@ -218,7 +218,7 @@ func TestGetPregunta_CitasConExtracto(t *testing.T) {
 	if cita["seccion"] != "3.2 Definición de caso" || cita["linea_inicio"] != float64(120) || cita["linea_fin"] != float64(148) || cita["fuente_estado"] != "activa" {
 		t.Errorf("cita = %+v", cita)
 	}
-	if _, hay := cita["texto"]; hay {
-		t.Error("el texto completo no debe salir")
+	if cita["texto"] != largo {
+		t.Errorf("texto debe ser el pasaje completo, sin recortar: %q", cita["texto"])
 	}
 }
