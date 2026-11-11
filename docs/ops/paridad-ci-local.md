@@ -25,6 +25,7 @@ solo con tags `v*`) es lo mismo que corre un developer con `make lint`,
 | `npm ci` | — (lo corre el developer) | — |
 | `npx tsc --noEmit` | no estaba | `make lint` |
 | `npm run lint` | `make lint` | `make lint` |
+| `npm audit --omit=dev --audit-level=high` | no estaba | `make lint` |
 | `npm test` | `npm run test:coverage` (lo mismo, con cobertura) | `make test` (`npm test`). Para la cobertura, `cd frontend && npm run test:coverage` (se quitaron `test/backend` y `test/frontend`, que duplicaban `test`) |
 | `node scripts/check-i18n.mjs` | no estaba | `make lint` |
 | `npm run build` | `make build` | `make build` |
@@ -64,11 +65,9 @@ docker stop pg-test
   (`make docker/release DOCKER_TAG=vX.Y.Z`). Que el CI las construya y publique
   es una decisión de despliegue (registro, credenciales): va al ADR de
   despliegue y no se agrega aquí.
-- **`npm audit` no está en el pipeline.** Hoy falla: next 16.2.4 tiene una
-  vulnerabilidad crítica (RCE) y next-intl, postcss y sharp tienen avisos
-  altos o moderados. Se agrega como paso del workflow cuando el frontend suba
-  esas dependencias, porque si no, bloquearía todos los tags. Mientras tanto
-  está en el checklist de release como bloqueo manual.
+- **`npm audit`** está en el workflow y en `make lint` desde que el #102 subió
+  next a 16.4.6 y next-intl a 4.15.0: falla con hallazgos altos o críticos en
+  dependencias de producción. Las moderadas (hoy, una transitiva) no bloquean.
 - **Node local no lo fija make**: hay que usar `nvm use` (o equivalente) con
   `frontend/.nvmrc`.
 - **Node**: 22.23.4, el último parche de la 22 con imagen arm64 en Docker Hub. La
