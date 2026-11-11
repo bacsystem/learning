@@ -3,6 +3,7 @@
     "en": "English",
     "es": "Español",
     "menu-procesos": "Processes",
+    "menu-profesion": "My profession",
     "menu-admin": "Admin",
     "menu-admin-dashboard": "Panel",
     "menu-gestion": "Configuration",
@@ -1387,6 +1388,51 @@
           "limite_preguntas": "The total of questions exceeds 200.",
           "pesos_no_suman_100": "The weights do not sum 100 %.",
           "no_encontrado": "The process no longer exists. Reload the page."
+        }
+      },
+      "profesion": {
+        "sugerida": "We suggest this profession based on your details. Nothing is saved until you press «Save».",
+        "guardar": "Save profession",
+        "cambiar": "Change profession",
+        "guardada": "Profession saved: {especialidad}.",
+        "errorCargar": "Your profession could not be loaded.",
+        "inscripcionRevocada": "Your enrollment in the process of your profession is no longer approved. Choose a process where you are enrolled.",
+        "campo": {
+          "proceso": "SERUMS process",
+          "procesoElegir": "Choose a process",
+          "especialidad": "Profession",
+          "especialidadElegir": "Choose your profession",
+          "conEstimados": "{nombre} (estimated weights)"
+        },
+        "sinInscripcion": {
+          "titulo": "You need an approved enrollment",
+          "texto": "To choose your profession, first enroll in a SERUMS process and wait for your enrollment to be approved.",
+          "accion": "See processes"
+        },
+        "actual": {
+          "titulo": "Your profession",
+          "estimados": "There are no official weights for this profession yet: estimated weights are used, equal across areas.",
+          "areas": "Exam areas",
+          "area": "{nombre} · {peso, number} %",
+          "sinAreas": "There are no areas with questions for this profession yet."
+        },
+        "elegir": {
+          "titulo": "Choose your profession",
+          "tituloCambiar": "Change profession",
+          "ayuda": "The diagnosis, dashboard and plan use the areas and weights of the profession you choose. Your personal details do not change."
+        },
+        "confirmar": {
+          "titulo": "Change profession?",
+          "texto": "You will go from {actual} to {nueva}. Your mastery progress in the current profession is archived and the new one starts from zero. Your previous practices and mock exams are kept.",
+          "textoGenerico": "Your mastery progress in the current profession is archived and the new one starts from zero. Your previous practices and mock exams are kept.",
+          "boton": "Yes, change"
+        },
+        "errores": {
+          "inscripcion_requerida": "You need an approved enrollment in that process to choose this profession.",
+          "especialidad_invalida": "That profession is no longer available in the process. Reload and choose another.",
+          "estado_invalido": "Your profession changed in another tab. Reload the page.",
+          "validacion": "Check the chosen process and profession.",
+          "error_interno": "Internal server error. Please try again."
         }
       }
     }
