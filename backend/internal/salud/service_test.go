@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -308,5 +309,33 @@ func TestEstado_NormalizaLoQueDevuelveLaComprobacion(t *testing.T) {
 	got := svc.Estado(context.Background()).Servicios[0]
 	if got.ID != IDBaseDatos || got.Datos == nil {
 		t.Errorf("got %+v, want id base_datos and datos from SinResultado", got)
+	}
+}
+
+// Review H1 of #120: a check that answers after its deadline must still end,
+// so it never leaves a goroutine blocked on the result channel (buffer of 1).
+func TestEstado_ComprobacionTardiaNoDejaGoroutines(t *testing.T) {
+	liberar := make(chan struct{})
+	terminada := make(chan struct{})
+	r := &relojFijo{t: inicio}
+	svc := NewService([]Comprobacion{sonda(IDBaseDatos, nil, func(context.Context) Servicio {
+		defer close(terminada)
+		<-liberar // ignores ctx: answers only after the deadline
+		return Servicio{ID: IDBaseDatos, Estado: EstadoOperativo, Datos: map[string]any{}}
+	})}, r.ahora)
+	svc.tiempo = 50 * time.Millisecond
+
+	antes := runtime.NumGoroutine()
+	if got := svc.Estado(context.Background()).Servicios[0]; got.Estado != EstadoCaido {
+		t.Fatalf("got %+v, want caido/tiempo_agotado", got)
+	}
+	close(liberar)
+	<-terminada
+	limite := time.Now().Add(2 * time.Second)
+	for runtime.NumGoroutine() > antes && time.Now().Before(limite) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if n := runtime.NumGoroutine(); n > antes {
+		t.Errorf("%d goroutines, want back to %d: the late check stays blocked on the result channel", n, antes)
 	}
 }
