@@ -182,7 +182,18 @@ Catálogo de códigos usados por E1, E2 y E3:
 
 ## 8. i18n
 
-- La API responde solo en español (`message`). La UI traduce por código: clave `dashboard.serumsIa.errores.<codigo>` en `frontend/src/i18n/messages/es.json` y `en.json`. Toda clave existe en ambos archivos (CLAUDE.md y supuesto 8). Una clave por código, reutilizada en todas las pantallas.
+- La API responde solo en español (`message`). La UI traduce por código, en `frontend/src/i18n/messages/es.json` y `en.json`. Toda clave existe en ambos archivos (CLAUDE.md y supuesto 8).
+- **Dos niveles de clave** (decisión del architect, 2026-11-11):
+
+  | Nivel | Clave | Qué códigos |
+  |---|---|---|
+  | Recurso | `dashboard.serumsIa.<recurso>.errores.<codigo>` | Los **cuatro códigos comunes**, que cambian de sentido según el recurso: `estado_invalido`, `no_encontrado`, `validacion` y `referencia_invalida`. Cada pantalla define los que usa en su recurso: `temas`, `pesos`, `profesion`, `fuentes` y `preguntas` |
+  | Módulo | `dashboard.serumsIa.errores.<codigo>` | Los códigos con **un solo sentido** en todo el módulo, una clave por código reutilizada en todas las pantallas: los específicos (`tema_duplicado`, `falta_cita`, `fuente_no_activa`, `limite_citas`, `clave_oficial`…), los transversales (`error_interno`, `cuerpo_demasiado_grande`) y `generico`. Además, los cuatro códigos comunes con un **texto neutro**, válido para cualquier recurso (p. ej. `estado_invalido`: «Los datos cambiaron mientras tanto. Recarga y vuelve a intentarlo.») |
+
+  - **Resolución, en orden:** `<recurso>.errores.<codigo>` → `errores.<codigo>` → `errores.generico`. Es la misma función para todas las pantallas del módulo.
+  - **Por qué:** cambiar los códigos (p. ej. `pregunta_estado_invalido`) rompería el contrato estable de la API (§3: el código nunca cambia) y los clientes que ya existen. Un texto único para los cuatro códigos comunes pierde contexto («La fuente ya no existe» frente a «El tema ya no existe»). Además, `pesos`, `profesion` y `fuentes` ya usan claves por recurso (`es.json`, `serumsIa.pesos.errores`, `serumsIa.profesion.errores`, `serumsIa.fuentes.errores`): esta regla lo convierte en convención.
+  - **Migración (frontend-dev, ~1 h):** los textos de temas que hoy ocupan `serumsIa.errores.{estado_invalido,no_encontrado,validacion,referencia_invalida}` pasan a `serumsIa.temas.errores.*`, y en su lugar quedan los textos neutros. Los demás códigos de `serumsIa.errores` no cambian.
+  - **Preguntas (E3-08, E3-09, E3-10):** recurso `preguntas`, con claves `dashboard.serumsIa.preguntas.errores.<codigo>`. Por ejemplo, `estado_invalido`: «Esta pregunta cambió de estado; se actualizó la vista».
 - **Código sin clave** (decisión del PO, 2026-11-11, desde E3-08): la UI muestra el **texto genérico traducido** de la clave única del módulo `dashboard.serumsIa.errores.generico`, nunca `message`. `message` viene siempre en español y se vería en español con la UI en inglés. Solo se usa en la consola o los logs del cliente.
 - Las pantallas existentes de E1 y E2 que hoy muestran `message` se alinean cuando se vuelvan a tocar, sin una tarea aparte.
 - Los estados y enums (`activo`/`archivado`, `procesando`/`activa`/`fallida`/`retirada`, `completa`/`incompleta`, `tipo` de fuente y `motivo_fallo`) viajan como códigos y la UI los traduce con `dashboard.serumsIa.<dominio>.<enum>.<valor>`.

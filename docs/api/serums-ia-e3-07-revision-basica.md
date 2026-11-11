@@ -257,7 +257,7 @@ Lo que F1 adelanta **no se rehace**. Se acepta contra los criterios de la histor
 
 - Orden sugerido: F1 → F2 → F3 → F4 → F5, con F6 en cualquier hueco después de F1.
 - **Claves de error** (alineadas con las historias, 2026-11-11):
-  - Van en `dashboard.serumsIa.errores.<codigo>`, una por código; si la clave ya existe, se reutiliza (README §8).
+  - Van en `dashboard.serumsIa.errores.<codigo>`, una por código; si la clave ya existe, se reutiliza (README §8). **Excepción:** los cuatro códigos comunes (`estado_invalido`, `no_encontrado`, `validacion` y `referencia_invalida`) van en `dashboard.serumsIa.preguntas.errores.<codigo>`, porque su sentido depende del recurso (README §8, dos niveles).
   - Reparto: E3-08 tiene `fuente_no_activa`, `limite_citas` y `ultima_cita_activa`; E3-09, `falta_cita`, `verificacion_requerida`, `nota_obligatoria`, `conflicto_clave`, `revision_especializada` y `estado_invalido`; E3-10, `clave_oficial`.
   - Un código sin clave muestra `dashboard.serumsIa.errores.generico`, la clave única del módulo (README §8), nunca `message`.
   - Los textos que no son códigos van en `revision.acciones.*` y `avisosPregunta.*`: el aviso de recarga por un 409 y la ayuda de eliminar.
