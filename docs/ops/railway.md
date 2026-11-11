@@ -26,22 +26,22 @@ aprovisionamiento.
   ([config-as-code](https://docs.railway.com/reference/config-as-code),
   [infrastructure-as-code](https://docs.railway.com/infrastructure-as-code))
   - **Decisión:** no se agrega `railway.json`. La configuración va en el panel
-    y queda escrita en este documento (§3).
+    y queda escrita en este documento (§4).
   - Adoptar `.railway/railway.ts` sería una herramienta nueva: lo tiene que
     aprobar el tech-lead.
 - **El healthcheck solo se usa durante el despliegue.** Railway no vigila el
   endpoint una vez que el despliegue está activo.
   ([healthchecks](https://docs.railway.com/guides/healthchecks))
-  - Para tener alertas hace falta un monitor externo de `/health`. Elegirlo
-    agrega un servicio, así que lo aprueba el tech-lead.
-- **«Wait for CI» solo funciona con workflows `on: push: branches`.** Railway
-  despliega desde **una rama** conectada. No hay disparo por tag.
-  ([github-autodeploys](https://docs.railway.com/deployments/github-autodeploys))
-  - Nuestro CI corre solo con tags `v*`. Por eso, si el autodeploy queda activo
-    sobre `main`, el merge a `main` despliega **antes** del tag y de su CI.
-  - **Propuesta:** autodeploy **desactivado**. Se despliega a mano, con la
-    aprobación del usuario, cuando el CI del tag pasa (ver
-    [checklist-release.md](checklist-release.md) §5).
+  - Para tener alertas hace falta un monitor externo de `/health`. Es un
+    servicio nuevo: **pendiente de decisión del usuario**.
+- **Despliegue por imagen** (decisión del usuario). `backend` y `frontend`
+  usan como fuente una **imagen de Docker Hub**, no un build desde el repo. Con
+  una imagen como fuente, Railway se salta el build
+  ([deployments](https://docs.railway.com/reference/deployments)).
+  - Desplegar es cambiar el **tag de la imagen** en el servicio, con la
+    aprobación del usuario.
+  - Sin repo conectado no hay autodeploy, así que nada despliega solo al hacer
+    merge a `main`.
 - **Variables selladas.** Una variable sellada no se ve en el panel, no se lee
   por la API y no se puede «des-sellar».
   ([variables](https://docs.railway.com/guides/variables))
@@ -49,58 +49,85 @@ aprovisionamiento.
     `ANTIFRAUD_HMAC_KEY`, se guarda una copia en el gestor de secretos del
     equipo. Si no, perder el proyecto de Railway hace irrecuperables los datos
     cifrados.
+- **Las migraciones corren en el arranque del backend** (`entrypoint.sh`, con
+  advisory lock), **no** en el Pre-deploy Command de Railway. Lo fija la
+  Decisión 9 del ADR 0004: el despliegue funciona igual en `deploy/local` y en
+  cualquier otra nube.
+  - Consecuencia: si una migración falla, el despliegue nuevo no pasa el
+    healthcheck. Railway no lo activa y el anterior sigue sirviendo, porque
+    solo cambia de despliegue tras un 2xx en `/health`
+    ([healthchecks](https://docs.railway.com/guides/healthchecks)).
+  - **Ojo:** la migración que falla a medias pudo haber cambiado el esquema
+    que usa el despliegue anterior. Por eso las migraciones son aditivas
+    (expand/contract) y hay un backup antes de cada despliegue.
 
-## 2. Servicios del proyecto
+## 2. Imágenes y tags
+
+Repositorios **públicos** en Docker Hub (decisión del usuario):
+`cbaciliod/learning-backend` y `cbaciliod/learning-frontend`. Cualquiera
+puede bajarlas, así que **nunca llevan secretos**: ni en capas, ni en
+build-args, ni en `ENV`. Los `NEXT_PUBLIC_*` son públicos por definición y no
+llevan nada sensible. Antes de publicar se ejecuta la verificación de
+contenido ([checklist-release.md](checklist-release.md) §5).
+
+| Imagen | Tag | Cómo se construye |
+|---|---|---|
+| backend | `vX.Y.Z` | `make docker/release DOCKER_TAG=vX.Y.Z`. Una sola imagen para todos los entornos: la configuración entra por variables |
+| frontend, producción | `vX.Y.Z` | `make docker/release DOCKER_TAG=vX.Y.Z`, con `NEXT_PUBLIC_API_URL` = API de producción |
+| frontend, otro entorno | `vX.Y.Z-<entorno>` (p. ej. `v1.0.0-preprod`) | `make docker/build/frontend DOCKER_TAG=vX.Y.Z FRONTEND_ENV=<entorno> NEXT_PUBLIC_API_URL=<api del entorno>` |
+
+La imagen del frontend es **por entorno** porque `NEXT_PUBLIC_API_URL` se
+incrusta en el build. La alternativa sería que el frontend lea la URL en
+ejecución, lo que cambia el código de la app y se evalúa con el architect.
+Los tags publicados no se reescriben: si un tag necesita una corrección, sale
+uno nuevo.
+
+**Rollback**: volver a poner en el servicio el tag anterior. Las imágenes viven
+en Docker Hub, así que no depende de la retención de Railway (72/120 h).
+
+## 3. Servicios del proyecto
 
 Un proyecto, el entorno `production` y tres servicios:
 
-| Servicio | Origen | Root Directory | Build |
-|---|---|---|---|
-| `Postgres` | Plantilla **oficial** de PostgreSQL de Railway, **sin cambiar la imagen ni el start command**: si se cambian, Railway deja de gestionarla ([point-in-time-recovery](https://docs.railway.com/volumes/point-in-time-recovery)). La imagen es «SSL-enabled», basada en la oficial `postgres`, con un volumen | — | — |
-| `backend` | Repo GitHub `bacsystem/learning`, rama `main` | `/backend` | `backend/Dockerfile` |
-| `frontend` | Repo GitHub `bacsystem/learning`, rama `main` | `/frontend` | `frontend/Dockerfile` |
+| Servicio | Fuente |
+|---|---|
+| `Postgres` | Plantilla **oficial** de PostgreSQL de Railway, **sin cambiar la imagen ni el start command**: si se cambian, Railway deja de gestionarla ([point-in-time-recovery](https://docs.railway.com/volumes/point-in-time-recovery)). La imagen es «SSL-enabled», basada en la oficial `postgres`, con un volumen |
+| `backend` | Imagen `cbaciliod/learning-backend:vX.Y.Z` |
+| `frontend` | Imagen `cbaciliod/learning-frontend:vX.Y.Z` |
 
-- **Root Directory**: con él, Railway solo descarga ese directorio para cada
-  despliegue ([monorepo](https://docs.railway.com/guides/monorepo)).
-- **Dockerfile**: Railway usa el `Dockerfile` de la raíz del origen
-  ([dockerfiles](https://docs.railway.com/guides/dockerfiles)). Si con Root
-  Directory no lo detecta (sin confirmar), se usa la variable
-  `RAILWAY_DOCKERFILE_PATH`.
-- **Versión de Postgres**: la documentación no dice qué versión despliega la
-  plantilla. La guía de PITR usa `postgres-ssl:16` como ejemplo de tag
-  ([point-in-time-recovery](https://docs.railway.com/volumes/point-in-time-recovery)).
-  Al aprovisionar se comprueba con `SELECT version();`, que debe dar 16.x
-  (mínimo 15), y se anota aquí. Si no es 16, se avisa al architect para
-  alinear el CI.
-- **`pg_trgm`**: la documentación no lo menciona
-  ([postgresql](https://docs.railway.com/guides/postgresql)). La imagen se
-  basa en la oficial, que incluye `contrib`. Se comprueba al aprovisionar con
-  `CREATE EXTENSION IF NOT EXISTS pg_trgm;` antes del primer despliegue, porque
-  la migración 013 la necesita.
+- **Versión de Postgres**: la documentación de Railway no la dice. El README de
+  `railwayapp-templates/postgres-ssl` indica que `:latest` es 16 y que incluye
+  `contrib` (fuente: architect, ADR 0004). Al aprovisionar se comprueba con
+  `SELECT version();`, que debe dar 16.x (mínimo 15), y se anota aquí. Si no
+  es 16, se avisa al architect para alinear el CI.
+- **`pg_trgm`**: se comprueba al aprovisionar con
+  `CREATE EXTENSION IF NOT EXISTS pg_trgm;`, antes del primer despliegue,
+  porque la migración 013 la necesita.
 
-## 3. Configuración por servicio
+## 4. Configuración por servicio
 
 ### `backend`
 
 | Ajuste | Valor | Por qué / fuente |
 |---|---|---|
-| Pre-deploy Command | `./migrate -dir ./migrations -goose /usr/local/bin/goose up` | Corre entre el build y el deploy, en un contenedor aparte, con las variables del servicio y la red privada. Si falla, el despliegue no sigue y el anterior sigue sirviendo ([pre-deploy-command](https://docs.railway.com/guides/pre-deploy-command)). El advisory lock de `cmd/migrate` sigue protegiendo frente a arranques concurrentes |
-| Pre-deploy Timeout | `600` s (igual que `MIGRATE_LOCK_TIMEOUT=10m`) | Sin límite por defecto. Se acepta de 1 a 3600 s |
-| Start Command | **vacío** | Con un Start Command, Railway reemplaza el `ENTRYPOINT` de la imagen ([start-command](https://docs.railway.com/guides/start-command)). Vacío, usa el `entrypoint.sh` de la imagen, que vuelve a correr `migrate up`: como el pre-deploy ya migró, es un no-op (`no migrations to run`, comprobado en local) y después arranca `./server` |
-| Healthcheck Path | `/health` | Railway espera un 2xx antes de activar el despliegue nuevo. Timeout por defecto: 300 s. `/health` hace ping a la base |
+| Fuente | Imagen `cbaciliod/learning-backend:vX.Y.Z` | §2 |
+| Pre-deploy Command | **vacío** | Las migraciones las hace `entrypoint.sh` (§1) |
+| Start Command | **vacío** | Con un Start Command, Railway reemplaza el `ENTRYPOINT` de la imagen ([start-command](https://docs.railway.com/guides/start-command)), y se saltaría `entrypoint.sh` y la migración |
+| Healthcheck Path | `/health` | Railway espera un 2xx antes de activar el despliegue nuevo. `/health` hace ping a la base |
+| `RAILWAY_HEALTHCHECK_TIMEOUT_SEC` | `660` | Por defecto son 300 s. Tiene que cubrir la espera del lock (`MIGRATE_LOCK_TIMEOUT=10m`) más la migración y el arranque |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | `45` | Por defecto Railway manda SIGTERM y mata a los **0 s** ([deployments](https://docs.railway.com/reference/deployments)). El backend necesita hasta 40 s para cerrar HTTP y vaciar el worker de correo (`stop_grace_period: 45s` en compose) |
 | Restart policy | `ON_FAILURE` | — |
 | Public Networking | dominio generado o propio (CNAME + TXT; TLS automático) | ([public-networking](https://docs.railway.com/guides/public-networking)). El servidor escucha en `:$PORT`; Railway inyecta `PORT` |
-| Réplicas | 1 | Ver la nota de conexiones en §4 |
+| Réplicas | 1 | Ver la nota de conexiones en §5 |
 
 ### `frontend`
 
 | Ajuste | Valor | Por qué |
 |---|---|---|
+| Fuente | Imagen `cbaciliod/learning-frontend:vX.Y.Z` | Construida con el `NEXT_PUBLIC_API_URL` **público** de producción (§2). En el panel de Railway no se cargan `NEXT_PUBLIC_*`: no tendrían efecto |
 | Start Command | vacío (`CMD ["node","server.js"]` de la imagen) | — |
 | Healthcheck Path | `/` | — |
-| Variables de build | `NEXT_PUBLIC_API_URL` = URL **pública** del backend (`https://…`), y `NEXT_PUBLIC_STORAGE_PREFIX` y `NEXT_PUBLIC_CONTACT_EMAIL` si aplican | Railway pasa las variables al build solo si el Dockerfile las declara con `ARG`, y el nuestro ya lo hace ([dockerfiles](https://docs.railway.com/guides/dockerfiles)). La red privada **no existe durante el build**, y además la URL la usa el navegador, así que siempre es la pública. Si falta, el build falla (guardia del Dockerfile) |
-| `PORT` | lo inyecta Railway | La imagen fija `PORT=3000` y `HOSTNAME=0.0.0.0`. Railway inyecta `PORT` al ejecutar (sin confirmar que pise el `ENV` de la imagen). Comprobarlo en el primer despliegue |
+| `PORT` | lo inyecta Railway | La imagen fija `PORT=3000` y `HOSTNAME=0.0.0.0`. Hay que comprobar al aprovisionar que el `PORT` de Railway pisa el de la imagen (sin confirmar) |
 
 ### `Postgres`
 
@@ -113,9 +140,9 @@ Un proyecto, el entorno `production` y tres servicios:
   genera la propia imagen (ADR 0004, R5 «parcial»).
 - Sin TCP Proxy (acceso público) y sin pooler. Así `cmd/migrate` y su
   advisory lock de sesión funcionan sin cambios.
-- Backups y PITR: §5.
+- Backups y PITR: §6.
 
-## 4. Variables en Railway
+## 5. Variables en Railway
 
 Inventario completo: [variables-de-entorno.md](variables-de-entorno.md).
 
@@ -134,15 +161,15 @@ En Railway se cargan como **variables de servicio**. Los secretos van
 | backend | `MIGRATE_LOCK_TIMEOUT` | `10m` |
 | backend | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | `45` |
 | backend | `LOG_LEVEL` | Vacío (queda en `info`) |
-| frontend | `NEXT_PUBLIC_*` | Ver §3 |
+| frontend | — | Los `NEXT_PUBLIC_*` van en la imagen, no en Railway (§2) |
 
 **Conexiones.** Cada backend abre hasta **25** conexiones
 (`internal/db/db.go`: `SetMaxOpenConns(25)`). Durante el solapamiento de un
-despliegue conviven el viejo y el nuevo, y el pre-deploy abre una más. Por
+despliegue conviven el viejo y el nuevo, y `cmd/migrate` abre una más al arrancar. Por
 eso `max_connections` tiene que ser ≥ 2 × 25 × réplicas + margen. Se comprueba
 con `SHOW max_connections;` al aprovisionar.
 
-## 5. Backups y restauración en Railway
+## 6. Backups y restauración en Railway
 
 Según [backups](https://docs.railway.com/reference/backups) y
 [point-in-time-recovery](https://docs.railway.com/volumes/point-in-time-recovery).
@@ -180,7 +207,7 @@ En las dos se borra lo restaurado al terminar si contiene datos personales.
 Sigue abierto para el usuario (U4): si hace falta además una copia **fuera** de
 Railway, porque los backups viven en el mismo proyecto.
 
-## 6. Pendiente de confirmar al aprovisionar (con aprobación del usuario)
+## 7. Pendiente de confirmar al aprovisionar (con aprobación del usuario)
 
 - [ ] `SELECT version();` → 16.x
 - [ ] `CREATE EXTENSION IF NOT EXISTS pg_trgm;` funciona
@@ -191,8 +218,10 @@ Railway, porque los backups viven en el mismo proyecto.
 - [ ] Región y cifrado en reposo de los backups y del bucket de PITR
 - [ ] Cómo correr `cmd/seed/admin` y `cmd/rehash-emails` contra producción:
       las variables selladas no salen en `railway run`. Opción a confirmar:
-      un servicio o un pre-deploy de un solo uso con las mismas variables
-- [ ] El Root Directory `/backend` y `/frontend` detecta el `Dockerfile`
+      un servicio de un solo uso con la imagen del backend y las mismas
+      variables por referencia
+- [ ] El servicio acepta la imagen pública de Docker Hub como fuente y
+      `RAILWAY_HEALTHCHECK_TIMEOUT_SEC=660` se aplica
 - [ ] `PORT` inyectado frente al `ENV PORT=3000` de la imagen del frontend
 - [ ] El rango de IP del proxy de Railway, para `TRUSTED_PROXIES`
 - [ ] Qué plan incluye backups, PITR y HA (en el panel o con soporte)

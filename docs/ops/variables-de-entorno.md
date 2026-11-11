@@ -14,7 +14,7 @@ ejemplo, `SMTP_PORT` vale 0 en el código y 587 en compose.
 > [Hallazgos](#hallazgos-para-el-tech-lead)).
 
 En producción (Railway) cada variable se carga como variable de servicio, y
-los secretos van sellados. Ver [railway.md](railway.md) §4. Los secretos van **solo** en el gestor de secretos del entorno. Nunca en el
+los secretos van sellados. Ver [railway.md](railway.md) §5. Los secretos van **solo** en el gestor de secretos del entorno. Nunca en el
 repositorio, en la imagen, en `docker-compose.yml` ni en mensajes.
 
 ## Backend: servidor (`cmd/server`, `config.Load`)

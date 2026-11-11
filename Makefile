@@ -24,7 +24,10 @@ DOCKER_USER  ?= cbaciliod
 # Sin valor por defecto: la versión se pasa siempre (make docker/release DOCKER_TAG=v1.2.0).
 DOCKER_TAG   ?=
 BACKEND_IMG  := $(DOCKER_USER)/learning-backend:$(DOCKER_TAG)
-FRONTEND_IMG := $(DOCKER_USER)/learning-frontend:$(DOCKER_TAG)
+# La imagen del frontend es por entorno (NEXT_PUBLIC_API_URL se incrusta al construir):
+# producción = vX.Y.Z; otro entorno = vX.Y.Z-<entorno> (docs/ops/railway.md §2).
+FRONTEND_ENV ?= prod
+FRONTEND_IMG := $(DOCKER_USER)/learning-frontend:$(DOCKER_TAG)$(if $(filter prod,$(FRONTEND_ENV)),,-$(FRONTEND_ENV))
 
 # Frontend public vars (baked at build time)
 NEXT_PUBLIC_API_URL ?= https://api-capacitate.bacsystemsolutions.com
@@ -49,7 +52,7 @@ s          ?=
         lint fmt build check/test-db check/docker-tag \
         migrate/up migrate/down migrate/status migrate/create \
         fix-encrypt-personas \
-        docker/build docker/push docker/release \
+        docker/build docker/push docker/release docker/verify \
         docker/build/backend docker/build/frontend \
         compose/init compose/check-env compose/up compose/down compose/reset \
         compose/restart compose/rebuild compose/logs compose/ps compose/psql \
@@ -151,7 +154,12 @@ docker/build/frontend: check/docker-tag
 
 docker/build: docker/build/backend docker/build/frontend
 
-docker/push: check/docker-tag
+# Las imágenes son públicas: verifica archivos y secretos antes de publicar.
+docker/verify: check/docker-tag
+	deploy/verify-image.sh $(BACKEND_IMG)
+	deploy/verify-image.sh $(FRONTEND_IMG)
+
+docker/push: check/docker-tag docker/verify
 	docker push $(BACKEND_IMG)
 	docker push $(FRONTEND_IMG)
 

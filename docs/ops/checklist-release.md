@@ -18,7 +18,9 @@ esa aprobación explícita.
 - [ ] Changelog: lista de PRs desde el último tag. Si es el primer release, desde
       `1326a43`, la raíz pública de `main`:
       `git log --merges --oneline <último-tag>..HEAD`.
-- [ ] Versión: el número de `frontend/package.json` coincide con `X.Y.Z`. Cuando
+- [ ] Versión: alinear `frontend/package.json` a `X.Y.Z` en la rama
+      `release/X.Y.Z`. Ese cambio lo hace frontend-dev. Para v1.0.0, hoy dice
+      1.1.0 y hay que bajarlo a 1.0.0. Cuando
       entre H-6, la imagen del backend recibe `X.Y.Z` (sin la «v») y
       `GET /health` la devuelve.
 - [ ] **Orden de las migraciones** (sección 2).
@@ -101,28 +103,51 @@ y Postgres 16.
 - [ ] El CI del tag pasa (`backend` y `frontend`). Si falla, no se despliega.
 - [ ] Merge de vuelta `main → develop`, también con merge commit.
 
-## 5. Despliegue en Railway (lo aprueba el usuario)
+## 5. Imágenes y despliegue en Railway (lo aprueba el usuario)
 
-La configuración de cada servicio está en [railway.md](railway.md). El autodeploy
-está desactivado: el despliegue se lanza a mano cuando el CI del tag pasa.
+La configuración de cada servicio está en [railway.md](railway.md). Railway
+despliega **imágenes de Docker Hub** (repositorios públicos). Desplegar es
+cambiar el tag de la imagen en el servicio.
+
+**Construir y verificar las imágenes**, desde el tag, después de que su CI pase:
+
+- [ ] `git switch --detach vX.Y.Z` con el árbol limpio (`git status` vacío).
+- [ ] `make docker/build DOCKER_TAG=vX.Y.Z NEXT_PUBLIC_API_URL=<api de prod>`.
+      La imagen del frontend de otro entorno se construye aparte con
+      `FRONTEND_ENV=<entorno>` y queda con el tag `vX.Y.Z-<entorno>`
+      ([railway.md](railway.md) §2).
+- [ ] **`make docker/verify DOCKER_TAG=vX.Y.Z`**, que **se ejecuta**, no se lee.
+      Las imágenes son públicas, y el target falla si encuentra:
+  - `.env*`, `assets/`, `bin/`, `*_test.go`, `*.test`, `coverage*` o `.git`
+    en el sistema de archivos de la imagen (`docker export` + `tar -t`);
+  - un patrón de secreto (`SECRET`, `PASSWORD`, `KEY=`, `TOKEN`) en
+    `docker history --no-trunc` o en el `ENV` de la imagen. Las `NEXT_PUBLIC_*`
+    quedan dentro del bundle JS (no en el `ENV` de la imagen final): son
+    públicas por definición y no pueden llevar nada sensible.
+  - Probado con una imagen de prueba que tenía `bin/`, `assets/`, `*_test.go`
+    y `ENV JWT_SECRET`: el script la rechaza (exit 1). Las dos imágenes reales
+    pasan.
+- [ ] `backend/.dockerignore` y `frontend/.dockerignore` siguen excluyendo
+      `.env*`, `bin/`, `*.test` y `coverage*`. Lo confirma `make docker/verify`.
+- [ ] `make docker/push DOCKER_TAG=vX.Y.Z`. Los tags publicados no se
+      reescriben.
+
+**Desplegar**:
 
 - [ ] **Backup manual del volumen de Postgres** (pestaña Backups) justo antes
-      de desplegar, porque el pre-deploy del backend migra. Con PITR activo,
+      de desplegar, porque el backend migra al arrancar. Con PITR activo,
       anotar además la hora exacta: es el punto de restauración.
 - [ ] Variables nuevas del release ya cargadas en el servicio (selladas si
       son secretos) y con su copia en el gestor de secretos.
-- [ ] Railway construye desde `main`, desde su `Dockerfile`. Las imágenes de
-      Docker Hub (`make docker/release DOCKER_TAG=vX.Y.Z`) no se usan en
-      Railway: solo si el usuario las pide.
-- [ ] **Backend primero**: «Deploy» del commit del tag. El Pre-deploy Command
-      corre `cmd/migrate`. Si falla, el despliegue se detiene y el anterior
-      sigue sirviendo. Revisar los logs del pre-deploy.
-- [ ] La migración usa conexión **directa** por la red privada, sin pooler: el
-      advisory lock es de sesión.
-- [ ] Luego el frontend, con `NEXT_PUBLIC_API_URL` = el dominio público del
-      backend. Al terminar,
-      `GET /health` responde 200 y los logs no muestran errores de
-      `config load failed` ni de migración.
+- [ ] **Backend primero**: cambiar la imagen del servicio a
+      `cbaciliod/learning-backend:vX.Y.Z`. `entrypoint.sh` migra con el
+      advisory lock (conexión directa por la red privada, sin pooler) y
+      arranca el servidor. Si la migración falla, `/health` no responde y
+      Railway no activa el despliegue: el anterior sigue sirviendo. Revisar
+      los logs.
+- [ ] Luego el frontend: `cbaciliod/learning-frontend:vX.Y.Z`.
+- [ ] `GET /health` responde 200 con la versión `X.Y.Z` (cuando entre H-6), y
+      los logs no muestran `config load failed` ni errores de migración.
 - [ ] Prueba rápida: login, listado de un dominio y envío de un correo de
       prueba (SMTP).
 
@@ -130,9 +155,9 @@ está desactivado: el despliegue se lanza a mano cuando el CI del tag pasa.
 
 | Situación | Qué hacer |
 |---|---|
-| El release **no trae migraciones** | En Railway: **Rollback** al despliegue anterior. Restaura la imagen, la configuración y las variables, siempre que la imagen siga retenida: 72 h en Hobby, 120 h en Pro ([plans](https://docs.railway.com/pricing/plans)). Pasado ese plazo, redeploy del commit anterior |
+| El release **no trae migraciones** | Volver a poner en el servicio el **tag anterior** de la imagen (`vX.Y.(Z-1)`). No depende de la retención de Railway, porque las imágenes están en Docker Hub. Si el release cambió variables, restaurarlas también: van anotadas en el PR del release |
 | El release trae migraciones **aditivas** (tablas, columnas o índices nuevos) que el código anterior ignora | Volver a la imagen anterior **sin revertir la base**. Comprobado: con la base en la versión N y una imagen que solo llega a N−1, `goose up` responde `no migrations to run` y la imagen anterior arranca. Las migraciones se revierten después, si hace falta, con un hotfix |
-| La migración **cambia o borra datos o columnas** que usa el código anterior | **Corregir hacia adelante** con un `hotfix/*`. Si eso no es viable, restaurar el backup del paso 5 o hacer PITR a la hora anotada (crea un servicio hermano: hay que apuntar `DATABASE_URL` a él). Se pierde lo escrito desde entonces, y eso lo decide el usuario. Ver [railway.md](railway.md) §5 |
+| La migración **cambia o borra datos o columnas** que usa el código anterior | **Corregir hacia adelante** con un `hotfix/*`. Si eso no es viable, restaurar el backup del paso 5 o hacer PITR a la hora anotada (crea un servicio hermano: hay que apuntar `DATABASE_URL` a él). Se pierde lo escrito desde entonces, y eso lo decide el usuario. Ver [railway.md](railway.md) §6 |
 | Revertir el esquema a mano | Solo como último recurso y con la aprobación del usuario: `cmd/migrate` con `down-to <versión>` contra producción, después de otro backup. El `down-to 0` del CI prueba que los `Down` **ejecutan**, no que **conserven datos**. 039 y 051 no se revierten |
 
 Por eso cada migración se escribe de forma que la imagen anterior siga
