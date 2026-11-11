@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -62,8 +63,36 @@ func (p patronDatoPersonal) buscar(texto string) []coincidencia {
 	return res
 }
 
-// esDigitoASCII is the digit of \d in RE2. The boundary uses the same
-// definition: a non-ASCII digit beside the number must not hide it.
+// plegarDigitos replaces every Unicode decimal digit (Nd) with its ASCII
+// digit, so that full-width, Arabic-Indic or mathematical digits cannot hide
+// a number from the ASCII patterns. Standard library only (no NFKC).
+func plegarDigitos(texto string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 0x80 || !unicode.Is(unicode.Nd, r) {
+			return r
+		}
+		return '0' + valorDigito(r)
+	}, texto)
+}
+
+// valorDigito is the value of an Nd rune: its offset in the range of the
+// table, modulo 10 (every Nd range holds whole sets of ten digits).
+func valorDigito(r rune) rune {
+	for _, rg := range unicode.Nd.R16 {
+		if r >= rune(rg.Lo) && r <= rune(rg.Hi) {
+			return (r - rune(rg.Lo)) % 10
+		}
+	}
+	for _, rg := range unicode.Nd.R32 {
+		if r >= rune(rg.Lo) && r <= rune(rg.Hi) {
+			return (r - rune(rg.Lo)) % 10
+		}
+	}
+	return 0
+}
+
+// esDigitoASCII is the digit of \d in RE2; the text is folded before the
+// boundary is checked.
 func esDigitoASCII(r rune) bool { return r >= '0' && r <= '9' }
 
 func sinDigitosAlLado(texto string, ini, fin int) bool {
@@ -80,6 +109,7 @@ func sinDigitosAlLado(texto string, ini, fin int) bool {
 // by position, with the overlapping ones merged into the earliest and longest
 // (a DNI-looking local part inside an e-mail is one e-mail).
 func coincidenciasDatosPersonales(texto string) []coincidencia {
+	// texto must already be folded with plegarDigitos.
 	var todas []coincidencia
 	for _, p := range patronesDatosPersonales {
 		todas = append(todas, p.buscar(texto)...)
@@ -103,7 +133,9 @@ func coincidenciasDatosPersonales(texto string) []coincidencia {
 // Enmascarar replaces e-mails, phones and 8-digit numbers with a marker. It
 // uses the same detection as the service, which never calls it: consumers
 // mask the official-document passages before building their input.
+// The result is the text with its digits folded to ASCII.
 func Enmascarar(texto string) string {
+	texto = plegarDigitos(texto)
 	var sb strings.Builder
 	ultimo := 0
 	for _, c := range coincidenciasDatosPersonales(texto) {
@@ -131,7 +163,7 @@ func buscarDatosPersonales(s Solicitud) error {
 }
 
 func tipoDatoPersonal(texto string) (string, bool) {
-	if cs := coincidenciasDatosPersonales(texto); len(cs) > 0 {
+	if cs := coincidenciasDatosPersonales(plegarDigitos(texto)); len(cs) > 0 {
 		return cs[0].tipo, true
 	}
 	return "", false

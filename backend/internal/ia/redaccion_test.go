@@ -20,8 +20,13 @@ func TestTipoDatoPersonal(t *testing.T) {
 		{"Ref 12345678901 987654321", TipoTelefono},
 		{"987654321 987654322", TipoTelefono},
 		{"1987654321", ""},
-		{"٣12345678", TipoDNI}, // a non-ASCII digit does not hide the number
-		{"12345678٣", TipoDNI},
+		{"٣12345678", ""}, // 9 digits once folded
+		{"12345678٣", ""},
+		{"１２３４５６７８", TipoDNI},
+		{"٩٨٧٦٥٤٣٢١", TipoTelefono},
+		{"𝟗𝟖𝟕𝟔𝟓𝟒𝟑𝟐𝟏", TipoTelefono},
+		{"1２345678", TipoDNI},
+		{"１２３４５６７８９", ""},
 		{"9876543210", ""},
 		{"+51987654321", TipoTelefono},
 		{"51987654321", TipoTelefono},
@@ -59,6 +64,7 @@ func TestEnmascarar(t *testing.T) {
 		{"12345678@minsa.gob.pe", "[email]"},
 		{"+51 987 654 321", "[telefono]"},
 		{"sin datos 123456789", "sin datos 123456789"},
+		{"１２３４５６７８", "[dni]"},
 		{"ñandú 45678912 ñ", "ñandú [dni] ñ"},
 	}
 	for _, c := range cases {
