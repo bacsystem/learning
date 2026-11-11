@@ -12,15 +12,30 @@ export interface Seleccion {
  * Selección con la que abre el selector (regla 5 de SIA-E1-04 y F1 del contrato):
  * - la `preseleccion` del servidor (el perfil activo o la especialidad de persona). Si trae `proceso_id: null` y hay un
  *   solo proceso, se usa ese;
+ * - con varios procesos y `proceso_id: null`, la especialidad sugerida **no** entra al selector, porque sin proceso no
+ *   tiene opciones donde mostrarse (qa E1-04 H1): se muestra aparte (`especialidadSugerida`) y se aplica al elegir un
+ *   proceso que la tenga (`cambiarProceso`);
  * - sin preselección, si hay un solo proceso, se elige ese y la especialidad queda vacía (el servidor no lo sugiere);
  * - en otro caso, vacío.
  */
 export function seleccionInicial({ procesos, preseleccion }: OpcionesProfesion): Seleccion {
   const unico = procesos.length === 1 ? procesos[0].id : null;
-  if (preseleccion) {
-    return { procesoId: preseleccion.proceso_id ?? unico, especialidadId: preseleccion.especialidad_id };
+  const procesoId = preseleccion?.proceso_id ?? unico;
+  if (preseleccion && procesoId !== null) return { procesoId, especialidadId: preseleccion.especialidad_id };
+  return { procesoId, especialidadId: null };
+}
+
+/** Especialidad sugerida por el servidor, con su nombre, para mostrarla mientras no hay proceso elegido. */
+export function especialidadSugerida({
+  procesos,
+  preseleccion,
+}: OpcionesProfesion): { id: number; nombre: string } | null {
+  if (!preseleccion) return null;
+  for (const p of procesos) {
+    const e = p.especialidades.find((x) => x.id === preseleccion.especialidad_id);
+    if (e) return { id: e.id, nombre: e.nombre };
   }
-  return { procesoId: unico, especialidadId: null };
+  return null;
 }
 
 /** Especialidades del proceso elegido; sin proceso, ninguna. */
@@ -30,15 +45,21 @@ export function especialidadesDe(procesos: readonly ProcesoOpcion[], procesoId: 
 
 /**
  * Al cambiar de proceso, la especialidad se conserva solo si también existe en el nuevo (cada proceso tiene las de su
- * institución); si no, se vacía para no enviar un par inválido.
+ * institución); si no, se vacía para no enviar un par inválido. Sin especialidad elegida, se aplica la sugerida si el
+ * nuevo proceso la tiene.
  */
 export function cambiarProceso(
   procesos: readonly ProcesoOpcion[],
   actual: Seleccion,
   procesoId: number | null,
+  /** Sugerencia del servidor: se aplica si aún no hay especialidad elegida y el nuevo proceso la tiene. */
+  sugeridaId: number | null = null,
 ): Seleccion {
-  const sigue = especialidadesDe(procesos, procesoId).some((e) => e.id === actual.especialidadId);
-  return { procesoId, especialidadId: sigue ? actual.especialidadId : null };
+  const disponibles = especialidadesDe(procesos, procesoId);
+  if (disponibles.some((e) => e.id === actual.especialidadId))
+    return { procesoId, especialidadId: actual.especialidadId };
+  const sugerida = actual.especialidadId === null && disponibles.some((e) => e.id === sugeridaId);
+  return { procesoId, especialidadId: sugerida ? sugeridaId : null };
 }
 
 /** Se puede guardar con un par completo que no sea el perfil activo (guardar el mismo par no cambia nada). */
