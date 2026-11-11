@@ -85,3 +85,47 @@ func TestLogin_BDCaidaNoRegistraDatos(t *testing.T) {
 		t.Errorf("log %q: want the op only", out)
 	}
 }
+
+// A wrong password of an existing user keeps its 401 (contract: unchanged).
+func TestLogin_ContrasenaMalaSigue401(t *testing.T) {
+	f := newFixture(t)
+	_, username := f.activeUser("mala", "usuario")
+	req := jsonReq(http.MethodPost, "/auth/login", bytes.NewBufferString(`{"username":"`+username+`","password":"Otra-Clave-123!"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	f.mux().ServeHTTP(w, req)
+	if body := strings.TrimSpace(w.Body.String()); w.Code != http.StatusUnauthorized || body != `{"error":"Credenciales inválidas."}` {
+		t.Errorf("got %d %s, want 401 Credenciales inválidas.", w.Code, body)
+	}
+}
+
+// If storing the session fails, login is ErrServicioNoDisponible (503) with
+// no token, and the user's older sessions are not evicted (one transaction).
+func TestLogin_SesionNoGuardadaNoBorraLasAnteriores(t *testing.T) {
+	f := newFixture(t)
+	uid, username := f.activeUser("ses503", "usuario")
+	maxSes, err := f.repo.GetMaxSesiones(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range maxSes {
+		f.login(username)
+	}
+	contar := func() int {
+		var n int
+		if err := f.db.Get(&n, `SELECT COUNT(*) FROM sesiones WHERE usuario_id=$1`, uid); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	antes := contar()
+
+	// sesiones.ip is varchar(45): a longer value makes the INSERT fail.
+	resp, err := f.svc.Login(context.Background(), LoginRequest{Username: username, Password: "Password123!"}, strings.Repeat("9", 60), "test")
+	if resp != nil || !errors.Is(err, ErrServicioNoDisponible) {
+		t.Fatalf("got resp %v, err %v; want no token and ErrServicioNoDisponible", resp, err)
+	}
+	if despues := contar(); despues != antes {
+		t.Errorf("sessions %d → %d: an older session was evicted for a login that failed", antes, despues)
+	}
+}

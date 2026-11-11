@@ -418,20 +418,17 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua string) (*
 		return nil, err
 	}
 
-	// Enforce session limit: evict oldest sessions before creating new one
+	// Store the session (hash of the JWT) and enforce the session limit in
+	// one transaction. Without the session every request with this token
+	// would be rejected, so a failure fails the login and no token is
+	// returned; an older session is never evicted for a login that failed.
 	maxSes, err := s.repo.GetMaxSesiones(ctx)
 	if err != nil {
 		return nil, noDisponible("max sessions", err)
 	}
-	if err := s.repo.DeleteOldestSesiones(ctx, u.ID, maxSes-1); err != nil {
-		return nil, noDisponible("evict sessions", err)
-	}
-
-	// Store session (hash of JWT). Without it every request with this token
-	// would be rejected, so a failure here must fail the login.
 	tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(token)))
-	if err := s.repo.CreateSesion(ctx, u.ID, tokenHash, ip, ua, time.Unix(expiresAt, 0)); err != nil {
-		return nil, noDisponible("create session", err)
+	if err := s.repo.AbrirSesion(ctx, u.ID, maxSes, tokenHash, ip, ua, time.Unix(expiresAt, 0)); err != nil {
+		return nil, noDisponible("open session", err)
 	}
 
 	s.repo.WriteAudit(ctx, AuditEntry{UsuarioID: &u.ID, Accion: "login", Entidad: "usuarios", EntidadID: &u.ID, IP: ip})
