@@ -63,6 +63,10 @@ No se escriben criterios sobre datos que nadie produce.
 9. **Sin `audit_log`:** consultar la salud es una lectura sin efectos y no se audita. Es una excepción explícita a «toda acción de admin se audita», que aplica a acciones que cambian datos.
 10. **Frontend:** si el frontend está caído, el admin no puede ver el panel. Por eso la tarjeta del frontend muestra solo la **versión desplegada** del frontend que está viendo, sin estado operativo/caído. La comparación con la versión del backend es solo informativa. La versión es el `version` de `frontend/package.json`, la misma que se ve en «Acerca de».
 11. **Base de datos totalmente caída:** la autenticación consulta la base, así que con la base caída `GET /admin/salud` no puede responder con el detalle. La autenticación responde **503** (no 401), el frontend no cierra la sesión y la pantalla muestra «No se pudo consultar» (PLT-01 regla 9, PLT-02). Aprobado por el tech-lead.
+12. **«Degradado» mientras no hay ninguna copia** (observación O3 del informe de qa de PLT, 2026-11-11): con `copias_bd` sin filas, `copia_r2` queda `desconocido` / `sin_datos`, que cuenta como `degradado` (decisión 2). Así, un entorno recién creado muestra el estado global «Degradado» hasta que se registra la primera copia.
+    - **Se acepta así.** En producción es la señal correcta: si no hay ninguna copia, hay que mirarlo.
+    - En desarrollo o preproducción sin cron de copia, esa marca es ruido conocido y no indica una falla.
+    - No cambia el contrato (`docs/api/plataforma-salud.md`). Si el ruido molesta, se pide como historia aparte, por ejemplo `copia_r2` en `no_configurado` cuando el entorno no tiene cron de copia.
 
 ## Preguntas abiertas para el usuario
 
