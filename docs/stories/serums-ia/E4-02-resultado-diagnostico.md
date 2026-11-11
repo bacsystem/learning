@@ -4,7 +4,7 @@ titulo: Resultado del diagnóstico
 epica: E4
 fase: MVP
 prioridad: Alta
-estimacion: 3
+estimacion: 5
 roles: [usuario]
 depende_de: [SIA-E4-01, SIA-E4-03]
 ---
@@ -20,6 +20,17 @@ depende_de: [SIA-E4-01, SIA-E4-03]
 4. Áreas no medidas se listan aparte.
 5. El resultado solo lo ve su dueño; se conserva en el historial.
 6. Botón «Ir a mi dashboard» (SIA-E5-01).
+7. **Clave retenida por intento en curso** (corrección de auditoría, hallazgo E; regla compartida del módulo): en la revisión de un intento finalizado, la clave y la explicación de una pregunta no se envían al cliente mientras el mismo usuario tenga otro intento en curso (práctica, simulacro o diagnóstico) que contenga esa pregunta. En su lugar se muestra la respuesta del usuario y «La clave se mostrará cuando termines tu intento en curso». Al cerrarse ese intento (finalizado o por tiempo agotado) se muestran normalmente. El filtro se aplica en servidor y esta historia lo implementa también en las revisiones existentes de práctica y simulacro, para que en el MVP no quede ninguna vía de consulta; SIA-E6-08 y SIA-E9-02 lo reutilizan.
+8. Los aciertos por área (regla 1) sí se muestran: dicen cuántas acertó, no cuál es la clave.
+
+```mermaid
+flowchart TD
+  A[Usuario pide la revision de un intento finalizado] --> B[Para cada pregunta del intento]
+  B --> C{El usuario tiene otro intento en curso con esa pregunta}
+  C -- Si --> D[Envia la respuesta del usuario sin clave ni explicacion y el aviso de clave retenida]
+  C -- No --> E[Envia respuesta, clave y explicacion aprobada si existe]
+  D --> F[Al cerrarse el intento en curso la siguiente consulta muestra la clave]
+```
 
 ## Criterios de aceptación
 ```gherkin
@@ -37,6 +48,26 @@ Escenario: Revisión
   Dado un diagnóstico finalizado con una explicación aprobada en una pregunta
   Cuando el usuario abre la revisión
   Entonces ve cada pregunta con su respuesta, la clave y la explicación aprobada si existe
+
+Escenario: Clave retenida por una práctica en curso
+  Dado un diagnóstico finalizado con la pregunta P y una práctica en curso del mismo usuario que también contiene P
+  Cuando el usuario abre la revisión del diagnóstico
+  Entonces P muestra su respuesta y «La clave se mostrará cuando termines tu intento en curso», y la respuesta de la API no incluye la clave ni la explicación de P
+
+Escenario: Clave visible al cerrar el intento
+  Dado la clave de P retenida por una práctica en curso
+  Cuando el usuario finaliza esa práctica y vuelve a abrir la revisión del diagnóstico
+  Entonces P muestra la clave y la explicación aprobada si existe
+
+Escenario: Otras preguntas no se retienen
+  Dado un diagnóstico finalizado y una práctica en curso que solo comparte la pregunta P
+  Cuando el usuario abre la revisión del diagnóstico
+  Entonces todas las preguntas salvo P muestran su clave
+
+Escenario: Revisión existente de simulacro
+  Dado un simulacro finalizado con la pregunta P y un diagnóstico en curso del mismo usuario que contiene P
+  Cuando el usuario abre la revisión del simulacro
+  Entonces la API no incluye la clave ni la explicación de P hasta que el diagnóstico se cierre
 
 Escenario: Área no medida
   Dado un diagnóstico con un área omitida por falta de preguntas
@@ -66,10 +97,10 @@ Nota estimada con intervalo (SIA-E9-04).
 SIA-E4-01, SIA-E4-03.
 
 ## Seguridad y privacidad
-Autorización por dueño del intento.
+Autorización por dueño del intento. La retención de clave (regla 7) se decide en servidor: la clave no viaja al cliente, no basta con ocultarla en la UI.
 
 ## i18n
 Todos los textos y niveles en es/en.
 
 ## Definición de terminado
-`tsc`, `lint`, `build`; tests de umbrales (49,9 %, 50 %, 74,9 %, 75 %); review limpio.
+`tsc`, `lint`, `build`; tests de umbrales (49,9 %, 50 %, 74,9 %, 75 %) y de retención de clave en las revisiones de diagnóstico, práctica y simulacro; review limpio.

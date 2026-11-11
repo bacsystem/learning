@@ -6,7 +6,7 @@ fase: v2
 prioridad: Alta
 estimacion: 5
 roles: [admin, usuario]
-depende_de: [SIA-E6-05]
+depende_de: [SIA-E6-05, SIA-E4-02]
 ---
 
 # SIA-E6-08 Explicaciones con cita por respuesta
@@ -22,7 +22,8 @@ Extiende `pregunta_retroalimentacion` (retroalimentación existente). La explica
 3. Generación por admin: individual o por lote de máx. 20 preguntas; consume límites.
 4. Si la fuente citada se retira, la explicación pasa a `en_revision` y deja de mostrarse.
 5. En la revisión de práctica, simulacro o diagnóstico, el postulante ve la explicación solo si está aprobada y después de finalizar el intento.
-6. Las retroalimentaciones manuales existentes siguen mostrándose.
+6. Las retroalimentaciones manuales existentes siguen mostrándose, con la misma retención de la regla 7.
+7. Clave retenida por intento en curso (corrección de auditoría, hallazgo E; regla definida en SIA-E4-02): la clave, la explicación y la retroalimentación de una pregunta no se muestran en la revisión de un intento finalizado mientras el usuario tenga otro intento en curso (práctica, simulacro o diagnóstico) que contenga esa pregunta; se muestran al cerrarse ese intento.
 
 ## Criterios de aceptación
 ```gherkin
@@ -56,6 +57,16 @@ Escenario: Intento en curso
   Cuando el cliente pide los datos de una pregunta
   Entonces ninguna explicación se envía al cliente
 
+Escenario: Explicación retenida por otro intento en curso
+  Dado una práctica finalizada con la pregunta P que tiene explicación aprobada y un simulacro en curso del mismo usuario que contiene P
+  Cuando el usuario abre la revisión de la práctica
+  Entonces P no muestra clave, explicación ni citas, la respuesta de la API no las incluye y se ve «La clave se mostrará cuando termines tu intento en curso»
+
+Escenario: Explicación visible al cerrar el intento
+  Dado la explicación de P retenida por un simulacro en curso
+  Cuando el simulacro termina por tiempo agotado y el usuario vuelve a abrir la revisión de la práctica
+  Entonces P muestra clave, explicación y citas
+
 Escenario: Sin explicación aprobada
   Dado una pregunta sin explicación aprobada
   Cuando el usuario abre la revisión de un intento finalizado
@@ -71,10 +82,10 @@ Escenario: Fuente retirada
 Explicaciones conversacionales o chat tutor.
 
 ## Dependencias
-SIA-E6-05.
+SIA-E6-05; SIA-E4-02 (regla de clave retenida).
 
 ## Seguridad y privacidad
-La explicación nunca viaja al cliente antes de finalizar el intento; sin datos personales en prompts.
+La explicación nunca viaja al cliente antes de finalizar el intento ni mientras otro intento en curso contenga la pregunta; sin datos personales en prompts.
 
 ## i18n
 Rótulos «Explicación», «Fuente», «Por qué no» en es/en; el texto está en español.

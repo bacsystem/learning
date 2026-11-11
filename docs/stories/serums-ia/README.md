@@ -93,6 +93,7 @@ flowchart TD
   E6-05 --> E6-06
   E6-06 --> E6-07
   E6-05 --> E6-08
+  E4-02 --> E6-08
   E6-05 --> E6-09
   E4-03 --> E7-01
   E1-04 --> E7-01
@@ -111,6 +112,7 @@ flowchart TD
   E4-03 --> E8-05
   E4-04 --> E9-01
   E9-01 --> E9-02
+  E4-02 --> E9-02
   E4-04 --> E9-03
   E4-04 --> E9-04
   E9-05 --> E9-04
@@ -135,13 +137,17 @@ flowchart TD
 
 10. **Sin generación en vivo para el postulante:** el postulante nunca dispara una generación que llegue a él sin aprobación; solicita al equipo (SIA-E5-06 / SIA-E6-06) y recibe contenido solo tras aprobación de admin. La cuota de IA cuenta solo **acciones IA reales** (al menos una llamada al LLM): encolar una solicitud administrativa no descuenta cuota del postulante; la generación del admin descuenta de la cuota del admin (P3, SIA-E6-02).
 11. **Segundo revisor:** no es obligatorio en el MVP. Se gobierna con `revision.segundo_revisor_obligatorio` en `configuracion_sistema` (por defecto `false`, cambios auditados en `audit_log`). La verificación de cita y la nota para contenido incierto siguen obligatorias (P4, SIA-E6-05).
-12. **Fases:** MVP 32 historias / 133 pts, v2 16 historias / 56 pts, v3 5 historias / 20 pts (total 53 / 209 pts). Cambios por issue #65: SIA-E2-01 pasa de MVP a v3; SIA-E2-06, SIA-E3-05 y SIA-E7-01 suben de 3 a 5 pts.
+12. **Fases:** MVP 32 historias / 135 pts, v2 16 historias / 58 pts, v3 5 historias / 20 pts (total 53 / 213 pts). Cambios por issue #65: SIA-E2-01 pasa de MVP a v3; SIA-E2-06, SIA-E3-05 y SIA-E7-01 suben de 3 a 5 pts. Cambios por la auditoría: SIA-E4-02 y SIA-E6-09 suben de 3 a 5 pts.
 13. **Preferencias de notificación** (activar/desactivar alertas, recordatorios y reporte semanal) se definen en SIA-E8-02 y se reutilizan en E8-03 y E8-05.
 14. **Repositorio de fuentes:** MVP y v2 operan al 100 % sobre el `SourceRepository` propio en PostgreSQL; no se crea cuenta ni proyecto de NotebookLM ($0 USD). La búsqueda semántica (pgvector o NotebookLM) se reevalúa en v3 (P1, SIA-E2-01, SIA-E2-08).
 15. **Calendario oficial:** los hitos los carga un admin a mano con enlace obligatorio a una fuente `.gob.pe`; el cambio de fecha del hito `examen` se propaga automáticamente a los planes con fecha de origen `oficial`, no a los de origen `manual` (P5, SIA-E8-01, SIA-E7-01).
 16. **Pesos estimados:** mientras falte la configuración `completa` de pesos, diagnóstico, prácticas, simulacros dirigidos, dashboard y plan usan pesos iguales con `pesos_estimados: true`; el simulacro oficial (SIA-E9-05) y la nota estimada (SIA-E9-04) quedan bloqueados hasta completarla (P6).
 17. **Nota estimada:** solo nota estimada e intervalo, sin probabilidad de aprobar; la referencia de nota mínima, si se muestra, sale de `configuracion_examen.nota_minima` (P7, SIA-E9-04).
 18. **Contadores antifraude:** la cuota de IA (SIA-E6-02) y el cooldown del diagnóstico (SIA-E4-01) se guardan bajo `HMAC(usuario_id)` con secreto de servidor, sin otros datos personales, y sobreviven al borrado de datos de aprendizaje (SIA-E9-07) hasta que vence su periodo (P8).
+19. **Dominio y acierto:** el dominio es siempre el bayesiano de SIA-E4-03 (prior (1,1)); con confianza baja solo se marca «pocos datos», sin sustituirlo por un valor fijo (SIA-E5-03). En selección múltiple una respuesta cuenta como acierto solo si marca todas las correctas y ninguna incorrecta, igual que la calificación existente (SIA-E4-03).
+20. **Clave retenida:** la clave, la explicación y la retroalimentación de una pregunta no se muestran en ninguna revisión ni en el cuaderno de errores mientras el usuario tenga otro intento en curso (práctica, simulacro o diagnóstico) con esa pregunta (SIA-E4-02, reutilizada en SIA-E6-08 y SIA-E9-02).
+21. **Reportes de contenido:** los reportes nunca ocultan contenido aprobado por un admin; a los 3 reportes de usuarios distintos lo priorizan en la cola y avisan a los admins. Solo el contenido heredado sin aprobación registrada se oculta a los 3. Solo pueden reportar una pregunta quienes la respondieron en un intento finalizado (SIA-E6-09).
+22. **SSRF en URLs:** la IP se valida al conectar, sobre la IP efectiva del socket y con IPv4 mapeadas en IPv6 normalizadas, en cada redirección (SIA-E2-04).
 
 ## Límites (aplican donde se citan; los de IA, privacidad y cronograma aprobados en issue #65)
 
