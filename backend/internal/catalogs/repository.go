@@ -709,8 +709,9 @@ func sumPesoPorcentual(ctx context.Context, q sqlx.QueryerContext, procesoID int
 }
 
 // pesoValido reports whether a weight sum is 100 (±0.01, so that a three-way
-// 33.33 split is accepted).
-func pesoValido(sum float64) bool { return sum >= 99.99 && sum <= 100.01 }
+// 33.33 split is accepted). It compares whole hundredths, the same rule as
+// PE3 and the frontend (sumaCentesimasValida), so no float edge differs.
+func pesoValido(sum float64) bool { return sumaCentesimasValida(centesimas(sum)) }
 
 // lockProceso locks the proceso row for the rest of tx and returns its estado.
 func lockProceso(ctx context.Context, tx *sqlx.Tx, id int64) (string, error) {

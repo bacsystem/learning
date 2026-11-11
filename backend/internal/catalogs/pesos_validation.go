@@ -14,7 +14,7 @@ const (
 	maxPesoCentesimas     = 10000 // 100.00 %
 	maxCoeficienteCentes  = 99999 // 999.99
 	totalPesoCentesimas   = 10000
-	toleranciaCentesimas  = 1 // ± 0.01, the same as pesoValido
+	toleranciaCentesimas  = 1 // ± 0.01
 	coeficienteEstimado   = 1.0
 	reglaPesoRequerido    = "requerido"
 	reglaPesoMin          = "min"
@@ -125,11 +125,18 @@ func reglasDeConjunto(areas []AreaPesoRequest) error {
 		return &errorPesos{base: ErrLimitePreguntas, msg: msgLimitePreguntas,
 			detalle: map[string]any{"suma_preguntas": preguntas}}
 	}
-	if diff := pesos - totalPesoCentesimas; diff < -toleranciaCentesimas || diff > toleranciaCentesimas {
+	if !sumaCentesimasValida(pesos) {
 		return &errorPesos{base: ErrPesosNoSuman100, msg: msgPesosNoSuman100,
 			detalle: map[string]any{"suma_pesos": float64(pesos) / 100}}
 	}
 	return nil
+}
+
+// sumaCentesimasValida is the single 100 % rule: Σ round(peso*100) within
+// 10000 ± 1 hundredths (99.99–100.01), shared by PE3 and proceso activation.
+func sumaCentesimasValida(c int64) bool {
+	d := c - totalPesoCentesimas
+	return d >= -toleranciaCentesimas && d <= toleranciaCentesimas
 }
 
 // pesosIguales splits 100.00 % among the asignaturas (sorted by id): each gets

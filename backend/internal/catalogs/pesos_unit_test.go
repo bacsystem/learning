@@ -89,6 +89,8 @@ func TestReglasDeConjunto(t *testing.T) {
 	}{
 		{"suma 100", []AreaPesoRequest{area(1, 60, 50), area(2, 40, 50)}, nil, nil},
 		{"tres tercios 33,33 = 99,99 dentro de la tolerancia", []AreaPesoRequest{area(1, 33.33, 1), area(2, 33.33, 1), area(3, 33.33, 1)}, nil, nil},
+		{"33,33 × 2 + 33,34 = 100", []AreaPesoRequest{area(1, 33.33, 1), area(2, 33.33, 1), area(3, 33.34, 1)}, nil, nil},
+		{"99,99 dentro de la tolerancia", []AreaPesoRequest{area(1, 49.99, 1), area(2, 50, 1)}, nil, nil},
 		{"100,01 dentro de la tolerancia", []AreaPesoRequest{area(1, 50.01, 1), area(2, 50, 1)}, nil, nil},
 		{"99,98 fuera", []AreaPesoRequest{area(1, 49.98, 1), area(2, 50, 1)}, ErrPesosNoSuman100, map[string]any{"suma_pesos": 99.98}},
 		{"100,02 fuera", []AreaPesoRequest{area(1, 50.02, 1), area(2, 50, 1)}, ErrPesosNoSuman100, map[string]any{"suma_pesos": 100.02}},
@@ -204,5 +206,24 @@ func TestResponderErrorPesos(t *testing.T) {
 				t.Errorf("got %d %v, want %d %s", rr.Code, body, c.status, c.code)
 			}
 		})
+	}
+}
+
+// pesoValido (proceso activation) and PE3 share the same hundredths rule.
+func TestPesoValido(t *testing.T) {
+	cases := []struct {
+		sum  float64
+		want bool
+	}{
+		{100, true}, {99.99, true}, {100.01, true}, {99.98, false}, {100.02, false},
+		{33.33 + 33.33 + 33.33, true}, {33.33 + 33.33 + 33.34, true}, {0, false},
+	}
+	for _, c := range cases {
+		if got := pesoValido(c.sum); got != c.want {
+			t.Errorf("pesoValido(%v) = %v, want %v", c.sum, got, c.want)
+		}
+		if got := sumaCentesimasValida(centesimas(c.sum)); got != c.want {
+			t.Errorf("sumaCentesimasValida(%v) = %v, want %v", c.sum, got, c.want)
+		}
 	}
 }
