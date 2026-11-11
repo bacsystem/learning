@@ -14,9 +14,11 @@
 | SIA-E3-05 | Revisión humana de la clasificación y de la clave | MVP | 5 | #27 |
 | SIA-E3-06 | Deduplicación contra el banco existente | MVP | 5 | #28 |
 | SIA-E3-07 | Revisión básica de preguntas — API de citas y aprobación | MVP | 3 | por crear |
-| SIA-E3-08 | Revisión básica de preguntas — pantalla y avisos | MVP | 3 | por crear |
+| SIA-E3-08 | Revisión básica de preguntas — listado y detalle con citas | MVP | 3 | por crear |
+| SIA-E3-09 | Revisión básica de preguntas — acciones de revisión en pantalla | MVP | 3 | por crear |
+| SIA-E3-10 | Avisos del ciclo de vida en las pantallas existentes de preguntas | MVP | 2 | por crear |
 
-**Orden:** SIA-E3-07 y SIA-E3-08 van justo después de SIA-E3-02, y SIA-E3-02 no entra en un release sin ellas (README, supuesto 24).
+**Orden:** SIA-E3-07, E3-08, E3-09 y E3-10 van justo después de SIA-E3-02, y SIA-E3-02 no entra en un release sin ellas (README, supuesto 24). E3-10 solo depende de E3-02 y puede ir en paralelo con E3-07 a E3-09.
 
 **Dependencias:** E1 (taxonomía), E2 (fuentes), E6-01 (servicio de IA) para E3-04.
 **Decisión P2 (issue #65):** enfoque híbrido de revisión. Balotario de fuente «oficial verificada» (SIA-E2-06) y sin `conflicto_clave` (SIA-E3-06): basta revisar área/tema y consistencia estructural. Balotario no oficial, pregunta incierta o con conflicto de clave: verificación explícita de clave con nota (SIA-E3-05).

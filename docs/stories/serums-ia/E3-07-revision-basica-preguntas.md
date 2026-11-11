@@ -11,10 +11,10 @@ depende_de: [SIA-E3-02, SIA-E2-02]
 
 # SIA-E3-07 Revisión básica de preguntas — API de citas y aprobación
 
-**Como** admin, **quiero** buscar pasajes, añadir citas a una pregunta y aprobarla, rechazarla, reabrirla o revalidarla por API, **para** que exista una vía para publicar preguntas manuales ahora que todas nacen en `borrador` (SIA-E3-02). La pantalla es SIA-E3-08.
+**Como** admin, **quiero** buscar pasajes, añadir citas a una pregunta y aprobarla, rechazarla, reabrirla o revalidarla por API, **para** que exista una vía para publicar preguntas manuales ahora que todas nacen en `borrador` (SIA-E3-02). La pantalla son SIA-E3-08 (listado y citas) y SIA-E3-09 (acciones).
 
 ## Contexto
-Decisión del PO (P1 del contrato #152): toda pregunta nueva nace en `borrador`, incluidas el alta manual y la importación Excel (origen `manual`). Las colas especializadas no cubren el origen `manual`: SIA-E3-05 es solo para `balotario` y SIA-E6-05 solo para `ia`. Esta historia da la vía mínima y va justo después de SIA-E3-02. **SIA-E3-02 no entra en un release sin SIA-E3-07 y SIA-E3-08.**
+Decisión del PO (P1 del contrato #152): toda pregunta nueva nace en `borrador`, incluidas el alta manual y la importación Excel (origen `manual`). Las colas especializadas no cubren el origen `manual`: SIA-E3-05 es solo para `balotario` y SIA-E6-05 solo para `ia`. Esta historia da la vía mínima y va justo después de SIA-E3-02. **SIA-E3-02 no entra en un release sin SIA-E3-07, SIA-E3-08, SIA-E3-09 y SIA-E3-10.**
 
 El contrato de SIA-E3-02 (#152) ya trae `PATCH /preguntas/{id}/estado` (aprobar, rechazar, reabrir y revalidar) y `PUT /preguntas/{id}/citas` (reemplaza la lista, de 0 a 20 pasajes). Lo que **añade esta historia**:
 - la forma de que el admin **elija un pasaje**: búsqueda por HTTP para admin, porque hoy solo existe el puerto `BuscarPasajes` (SIA-E2-02);
@@ -119,7 +119,7 @@ Escenario: Acceso
 ```
 
 ## Fuera de alcance
-Pantalla (SIA-E3-08), aprobación masiva, colas especializadas (SIA-E3-05, SIA-E6-05) y segundo revisor.
+Pantalla (SIA-E3-08 y SIA-E3-09), avisos de las pantallas existentes (SIA-E3-10), aprobación masiva, colas especializadas (SIA-E3-05, SIA-E6-05) y segundo revisor.
 
 ## Dependencias
 SIA-E3-02 (estados, transiciones y citas) y SIA-E2-02 (puerto `BuscarPasajes`).
@@ -128,7 +128,7 @@ SIA-E3-02 (estados, transiciones y citas) y SIA-E2-02 (puerto `BuscarPasajes`).
 Solo admin, con 401/403 y `jsonError`. Guardas en el servidor. La búsqueda no expone rutas ni pasajes de fuentes no activas.
 
 ## i18n
-Sin texto visible; los códigos de error los traduce SIA-E3-08.
+Sin texto visible; los códigos de error de citas los traduce SIA-E3-08 y los de transición SIA-E3-09.
 
 ## Definición de terminado
 Tests de API de cada regla y escenario (búsqueda de pasajes, guardas por origen, nota, conflicto de clave, límite de citas, 403 y 409). Contrato en `docs/api/`. Review limpio.
