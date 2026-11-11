@@ -108,19 +108,26 @@ func analizar(contenido []byte) documento {
 	doc := documento{secciones: []*string{nil}}
 	enFence, pendiente := false, sepParrafo
 	for i, cruda := range lineas {
-		linea, esFence := limpiarLinea(cruda, enFence)
+		linea := colapsarEspacios(cruda)
+		// Fences and headings start at column 1: an indented "```" or "#" is text.
+		esFence := strings.HasPrefix(linea, marcaFence)
+		titulo := encabezado.FindStringSubmatch(linea)
+		if enFence || esFence {
+			titulo = nil
+		} else {
+			linea = vineta.ReplaceAllString(linea, "${1}"+vinetaNueva)
+		}
 		if esFence {
 			enFence = !enFence
 		}
+		linea = strings.TrimSpace(linea)
 		if linea == "" {
 			pendiente = sepParrafo
 			continue
 		}
-		if !enFence && !esFence {
-			if m := encabezado.FindStringSubmatch(linea); m != nil {
-				doc.secciones = append(doc.secciones, seccion(m[2]))
-				pendiente = sepParrafo
-			}
+		if titulo != nil {
+			doc.secciones = append(doc.secciones, seccionDeEncabezado(titulo[2]))
+			pendiente = sepParrafo
 		}
 		doc.agregarLinea(linea, i+1, pendiente)
 		pendiente = sepLinea
@@ -135,11 +142,11 @@ func analizar(contenido []byte) documento {
 	return doc
 }
 
-// limpiarLinea applies pasos 1–2 to one line: control characters out, tabs
-// and every run of white space to one space, bullets unified outside code
-// blocks, and the line trimmed. It also reports whether the line opens or
-// closes a code block.
-func limpiarLinea(linea string, enFence bool) (string, bool) {
+// colapsarEspacios applies paso 1 to one line: control characters are
+// dropped, and every run of white space (tabs, NBSP, and the white-space
+// controls \f, \v and U+0085, so no two words get glued) becomes one space.
+// Leading and trailing space is kept for the column-1 checks of the caller.
+func colapsarEspacios(linea string) string {
 	var b strings.Builder
 	espacio := false
 	for _, r := range linea {
@@ -156,17 +163,19 @@ func limpiarLinea(linea string, enFence bool) (string, bool) {
 			b.WriteRune(r)
 		}
 	}
-	limpia := b.String()
-	esFence := strings.HasPrefix(strings.TrimSpace(limpia), marcaFence)
-	if !enFence && !esFence {
-		limpia = vineta.ReplaceAllString(limpia, "${1}"+vinetaNueva)
+	if espacio {
+		b.WriteByte(' ')
 	}
-	return strings.TrimSpace(limpia), esFence
+	return b.String()
 }
 
-// seccion is the heading text, trimmed and cut to the column limit.
-func seccion(texto string) *string {
+// seccionDeEncabezado is the heading text, trimmed and cut to the column
+// limit; a heading without text has no section.
+func seccionDeEncabezado(texto string) *string {
 	s := strings.TrimSpace(texto)
+	if s == "" {
+		return nil
+	}
 	if r := []rune(s); len(r) > maxSeccion {
 		s = string(r[:maxSeccion])
 	}

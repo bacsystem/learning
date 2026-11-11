@@ -53,7 +53,7 @@ func conteos(ps []PasajeNuevo) []int {
 	return out
 }
 
-func ptr(s string) *string { return &s }
+func ptrTexto(s string) *string { return &s }
 
 // Pasos 1–4 on a short document (a single passage): the text shows the clean-up.
 func TestNormalizar_Limpieza(t *testing.T) {
@@ -75,6 +75,8 @@ func TestNormalizar_Limpieza(t *testing.T) {
 		{"code block keeps headings and bullets", "texto\n```\n# no es encabezado\n* no es viñeta\n```\n* sí", "texto\n```\n# no es encabezado\n* no es viñeta\n```\n- sí"},
 		{"unclosed code block runs to the end", "```\n* a\n# b", "```\n* a\n# b"},
 		{"heading opens a paragraph", "intro\n## Título\ncuerpo", "intro\n\n## Título\ncuerpo"},
+		{"indented heading and fence are text", "intro\n  ## no\n ```\n* sí", "intro\n## no\n```\n- sí"},
+		{"seven hashes or no space is not a heading", "intro\n####### no\n#no", "intro\n####### no\n#no"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -249,8 +251,8 @@ func TestNormalizar_LineasYSeccion(t *testing.T) {
 		seccion     *string
 	}{
 		{1, 1, nil},
-		{3, 6, ptr(larga[:maxSeccion])},
-		{8, 10, ptr("Dos")},
+		{3, 6, ptrTexto(larga[:maxSeccion])},
+		{8, 10, ptrTexto("Dos")},
 	}
 	if len(ps) != len(want) {
 		t.Fatalf("got %d pasajes (%v), want %d", len(ps), conteos(ps), len(want))
@@ -294,7 +296,13 @@ func generarDocumento(r *rand.Rand, n int) string {
 	salto := func() string { return saltos[r.IntN(len(saltos))] }
 	w := 0
 	for w < n {
-		switch r.IntN(10) {
+		switch r.IntN(12) {
+		case 10:
+			largo := []int{801, 900, 1700}[r.IntN(3)]
+			b.WriteString(palabras(w, largo) + salto() + salto()) // one sentence > 800
+			w += largo
+		case 11:
+			b.WriteString("## ---" + salto() + salto()) // heading without words
 		case 0:
 			fmt.Fprintf(&b, "%s Sección %d%s%s", strings.Repeat("#", 1+r.IntN(6)), w, salto(), salto())
 			w += 2
@@ -394,5 +402,13 @@ func TestNormalizar_Idempotencia(t *testing.T) {
 	b, errB := Normalizar(append([]byte(nil), in...))
 	if errA != nil || errB != nil || !reflect.DeepEqual(a, b) {
 		t.Fatalf("two runs differ (%v, %v)", errA, errB)
+	}
+}
+
+// A heading without text still cuts a block, but its passage has no section.
+func TestNormalizar_EncabezadoVacio(t *testing.T) {
+	ps := normalizarOK(t, "# A\n\n"+palabras(0, 300)+"\n\n## \n\n"+palabras(300, 300))
+	if len(ps) != 2 || ps[0].Seccion == nil || *ps[0].Seccion != "A" || ps[1].Seccion != nil {
+		t.Fatalf("got %d pasajes, secciones %v / %v", len(ps), ps[0].Seccion, ps[len(ps)-1].Seccion)
 	}
 }
