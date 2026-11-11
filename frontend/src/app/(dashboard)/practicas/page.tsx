@@ -4,13 +4,14 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
+import { PieTabla } from "@/components/app/pie-tabla";
 import { Alerta } from "@/components/feedback/alerta";
 import { SkeletonTabla } from "@/components/feedback/skeleton";
 import { Buscador } from "@/components/formularios/buscador";
 import { DialogoConfirmacion } from "@/components/navegacion/dialogo-confirmacion";
 import { MenuAcciones } from "@/components/navegacion/menu-acciones";
 import { Tabs } from "@/components/navegacion/tabs";
-import { CONTENEDOR_TABLA, FilaVacia, PieTabla } from "@/components/patrones/pie-tabla";
+import { CONTENEDOR_TABLA, FilaVacia } from "@/components/patrones/pie-tabla";
 import { PillEstado } from "@/components/patrones/pill-estado";
 import { Button } from "@/components/ui/button";
 import { Menu, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuTrigger } from "@/components/ui/menu";
@@ -538,6 +539,7 @@ export default function PracticasPage() {
         textoConfirmar={t("practicas-eliminar")}
         textoCancelar={t("practicas-cancelar")}
         textoPendiente={t("comun-procesando")}
+        etiquetaCerrar={t("comun-cerrar")}
         onConfirmar={handleBatchDelete}
       />
 
@@ -553,6 +555,7 @@ export default function PracticasPage() {
         textoConfirmar={t("practicas-eliminar")}
         textoCancelar={t("practicas-cancelar")}
         textoPendiente={t("comun-procesando")}
+        etiquetaCerrar={t("comun-cerrar")}
         onConfirmar={handleDelete}
       />
     </div>

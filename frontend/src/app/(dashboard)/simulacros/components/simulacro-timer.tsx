@@ -3,8 +3,9 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
+import { DialogContent } from "@/components/app/dialogo";
 import { CabeceraDialogo, PieDialogo } from "@/components/patrones/cabecera-dialogo";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { BOTON_DESTRUCTIVO } from "@/lib/estilos";
 import { PESO_ICONO } from "@/lib/iconos";
 import { cn } from "@/lib/utils";

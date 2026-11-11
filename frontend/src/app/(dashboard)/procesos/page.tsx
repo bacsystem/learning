@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
+import { DialogContent } from "@/components/app/dialogo";
 import { Alerta } from "@/components/feedback/alerta";
 import { EstadoVacio } from "@/components/feedback/estado-vacio";
 import { Skeleton } from "@/components/feedback/skeleton";
@@ -11,7 +12,7 @@ import { CabeceraDialogo, PieDialogo } from "@/components/patrones/cabecera-dial
 import type { Tono } from "@/components/patrones/metricas";
 import { Chip, PillEstado } from "@/components/patrones/pill-estado";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth/auth-context";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { Inscripcion, inscripcionesApi, Proceso } from "@/lib/inscripciones/api";

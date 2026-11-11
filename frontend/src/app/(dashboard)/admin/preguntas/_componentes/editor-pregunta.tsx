@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
+import { Campo } from "@/components/app/campo";
 import { Alerta } from "@/components/feedback/alerta";
-import { AreaTexto, Campo, Entrada } from "@/components/formularios/campo";
+import { AreaTexto, Entrada } from "@/components/formularios/campo";
 import { Casilla } from "@/components/formularios/casilla";
 import { type OpcionSelect, SelectCampo } from "@/components/formularios/select-campo";
 import { BotonAsync } from "@/components/patrones/boton-async";

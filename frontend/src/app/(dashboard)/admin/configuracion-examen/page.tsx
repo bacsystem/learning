@@ -11,11 +11,12 @@ import {
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Campo } from "@/components/app/campo";
 import { type ColumnaListado, TablaListado } from "@/components/app/tabla-listado";
 import { Alerta } from "@/components/feedback/alerta";
 import { Spinner } from "@/components/feedback/spinner";
 import { useToast } from "@/components/feedback/toast";
-import { AreaTexto, Campo, Entrada } from "@/components/formularios/campo";
+import { AreaTexto, Entrada } from "@/components/formularios/campo";
 import { Combobox } from "@/components/formularios/combobox";
 import { SelectCampo } from "@/components/formularios/select-campo";
 import { Chip } from "@/components/patrones/pill-estado";

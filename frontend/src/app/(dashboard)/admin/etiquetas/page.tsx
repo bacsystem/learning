@@ -12,10 +12,11 @@ import {
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Campo } from "@/components/app/campo";
 import { type ColumnaListado, TablaListado } from "@/components/app/tabla-listado";
 import { Alerta } from "@/components/feedback/alerta";
 import { useToast } from "@/components/feedback/toast";
-import { Campo, Entrada } from "@/components/formularios/campo";
+import { Entrada } from "@/components/formularios/campo";
 import { SelectCampo } from "@/components/formularios/select-campo";
 import { MenuAcciones } from "@/components/navegacion/menu-acciones";
 import { useAuth } from "@/lib/auth/auth-context";

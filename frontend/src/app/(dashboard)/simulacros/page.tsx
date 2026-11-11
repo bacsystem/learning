@@ -4,12 +4,13 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
+import { PieTabla } from "@/components/app/pie-tabla";
 import { Alerta } from "@/components/feedback/alerta";
 import { SkeletonTabla } from "@/components/feedback/skeleton";
 import { useToast } from "@/components/feedback/toast";
 import { MenuAcciones } from "@/components/navegacion/menu-acciones";
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
-import { CABECERA_TABLA, CONTENEDOR_TABLA, FilaVacia, PieTabla } from "@/components/patrones/pie-tabla";
+import { CABECERA_TABLA, CONTENEDOR_TABLA, FilaVacia } from "@/components/patrones/pie-tabla";
 import { PillEstado } from "@/components/patrones/pill-estado";
 import { Button } from "@/components/ui/button";
 import { Menu, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuTrigger } from "@/components/ui/menu";

@@ -24,6 +24,8 @@ export function StepperNumerico({
   paso = 1,
   disabled,
   variante = "campo",
+  etiquetaDisminuir = "Disminuir",
+  etiquetaAumentar = "Aumentar",
   className,
 }: {
   id?: string;
@@ -41,6 +43,9 @@ export function StepperNumerico({
   paso?: number | "any";
   disabled?: boolean;
   variante?: "filtro" | "campo";
+  /** Nombres de los botones − y + para el lector de pantalla, para traducirlos (por defecto «Disminuir» y «Aumentar»). */
+  etiquetaDisminuir?: string;
+  etiquetaAumentar?: string;
   className?: string;
 }) {
   const t = TAMANOS[variante];
@@ -62,7 +67,7 @@ export function StepperNumerico({
         )}
       >
         <NumberField.Decrement
-          aria-label="Disminuir"
+          aria-label={etiquetaDisminuir}
           className={cn(
             "text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:bg-secondary flex shrink-0 items-center justify-center transition-colors outline-none disabled:pointer-events-none disabled:opacity-40",
             t.boton,
@@ -72,7 +77,7 @@ export function StepperNumerico({
         </NumberField.Decrement>
         <NumberField.Input className="text-campo md:text-control text-foreground w-12 bg-transparent text-center font-semibold tabular-nums outline-none disabled:cursor-not-allowed disabled:opacity-60" />
         <NumberField.Increment
-          aria-label="Aumentar"
+          aria-label={etiquetaAumentar}
           className={cn(
             "text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:bg-secondary flex shrink-0 items-center justify-center transition-colors outline-none disabled:pointer-events-none disabled:opacity-40",
             t.boton,

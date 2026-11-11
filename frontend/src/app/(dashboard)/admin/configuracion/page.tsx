@@ -2,11 +2,12 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
+import { Campo } from "@/components/app/campo";
 import { Alerta } from "@/components/feedback/alerta";
 import { EstadoVacio } from "@/components/feedback/estado-vacio";
 import { Skeleton } from "@/components/feedback/skeleton";
 import { useToast } from "@/components/feedback/toast";
-import { Campo, Entrada } from "@/components/formularios/campo";
+import { Entrada } from "@/components/formularios/campo";
 import { Interruptor } from "@/components/formularios/casilla";
 import { Deslizador } from "@/components/formularios/deslizador";
 import { Tabs } from "@/components/navegacion/tabs";

@@ -41,10 +41,13 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  etiquetaCerrar = "Cerrar",
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: "top" | "right" | "bottom" | "left";
   showCloseButton?: boolean;
+  /** Nombre del botón de cerrar para el lector de pantalla, para traducirlo (por defecto «Cerrar»). */
+  etiquetaCerrar?: string;
 }) {
   return (
     <SheetPortal>
@@ -71,7 +74,7 @@ function SheetContent({
             }
           >
             <XIcon weight="bold" />
-            <span className="sr-only">Cerrar</span>
+            <span className="sr-only">{etiquetaCerrar}</span>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Popup>

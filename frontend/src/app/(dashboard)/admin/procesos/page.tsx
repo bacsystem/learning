@@ -2,12 +2,14 @@
 import { useTranslations } from "next-intl";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Campo } from "@/components/app/campo";
+import { DialogContent } from "@/components/app/dialogo";
 import { type ColumnaListado, TablaListado } from "@/components/app/tabla-listado";
 import { Alerta } from "@/components/feedback/alerta";
 import { ProgresoLineal } from "@/components/feedback/progreso";
 import { Skeleton } from "@/components/feedback/skeleton";
 import { useToast } from "@/components/feedback/toast";
-import { AreaTexto, Campo, Entrada } from "@/components/formularios/campo";
+import { AreaTexto, Entrada } from "@/components/formularios/campo";
 import { SelectCampo } from "@/components/formularios/select-campo";
 import { MenuAcciones } from "@/components/navegacion/menu-acciones";
 import { Tabs } from "@/components/navegacion/tabs";
@@ -15,7 +17,7 @@ import { BotonAsync } from "@/components/patrones/boton-async";
 import { Aviso, CabeceraDialogo, PieDialogo } from "@/components/patrones/cabecera-dialogo";
 import { FilaVacia } from "@/components/patrones/pie-tabla";
 import { Chip, PillEstado } from "@/components/patrones/pill-estado";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { excede, LIMITES } from "@/lib/admin/limites";
 import { useAuth } from "@/lib/auth/auth-context";
