@@ -2,13 +2,11 @@ package fuentes
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
-	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/texto"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -30,8 +28,11 @@ func NewPgSource(db *sqlx.DB) *PgSource {
 
 var _ SourceRepository = (*PgSource)(nil)
 
-// GuardarFuente creates the fuente and its version 1, both 'procesando'.
-func (s *PgSource) GuardarFuente(ctx context.Context, f NuevaFuente) (int64, int, error) {
+// GuardarFuente creates the fuente and its version 1, both 'procesando', and
+// writes fuente.crear in the same transaction. The duplicate by hash and the
+// fuentes limit are added by E2-03 inside this transaction; a 23505 on the
+// hash index still maps to ErrFuenteDuplicada.
+func (s *PgSource) GuardarFuente(ctx context.Context, f NuevaFuente, aud Auditor) (int64, int, error) {
 	const primera = 1
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -52,18 +53,71 @@ func (s *PgSource) GuardarFuente(ctx context.Context, f NuevaFuente) (int64, int
 			return 0, 0, fmt.Errorf("especialidades de la fuente %d: %w", id, err)
 		}
 	}
-	suma := sha256.Sum256(f.Contenido)
+	sha, tamano, lineas := Huella(f.Contenido)
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO fuente_versiones (fuente_id, numero, nombre_archivo, sha256, tamano_bytes, lineas, contenido, creado_por)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		id, primera, f.NombreArchivo, hex.EncodeToString(suma[:]), len(f.Contenido), ContarLineas(f.Contenido),
-		string(f.Contenido), f.CreadoPor); err != nil {
+		id, primera, f.NombreArchivo, sha, tamano, lineas, string(f.Contenido), f.CreadoPor); err != nil {
 		return 0, 0, mapearDuplicada(fmt.Errorf("crear versión 1 de la fuente %d: %w", id, err))
+	}
+	especialidades := f.EspecialidadIDs
+	if especialidades == nil {
+		especialidades = []int64{}
+	}
+	if err := auditar(ctx, tx, aud, Evento{Accion: AccionCrear, Entidad: EntidadFuente, EntidadID: id, Detalle: map[string]any{
+		"version": primera, "sha256": sha, "tamano_bytes": tamano, "tipo": f.Tipo,
+		"especialidad_ids": especialidades, "estado_nuevo": EstadoProcesando,
+	}}); err != nil {
+		return 0, 0, err
 	}
 	if err := tx.Commit(); err != nil {
 		return 0, 0, mapearDuplicada(fmt.Errorf("confirmar fuente: %w", err))
 	}
 	return id, primera, nil
+}
+
+// ListarFuentes returns one page of fuentes by updated_at then id, newest
+// first, with their especialidad ids and current version number.
+func (s *PgSource) ListarFuentes(ctx context.Context, f FiltroFuentes) (Pagina[FuenteResumen], error) {
+	page, perPage := NormalizarPagina(f.Page, f.PerPage)
+	const where = `
+		WHERE ($1::bigint = 0
+		       OR NOT EXISTS (SELECT 1 FROM fuente_especialidades fe WHERE fe.fuente_id = f.id)
+		       OR EXISTS (SELECT 1 FROM fuente_especialidades fe WHERE fe.fuente_id = f.id AND fe.especialidad_id = $1))
+		  AND ($2 = '' OR f.estado = $2) AND ($3 = '' OR f.tipo = $3)`
+	args := []any{f.EspecialidadID, f.Estado, f.Tipo}
+	res := Pagina[FuenteResumen]{Page: page, PerPage: perPage, Data: []FuenteResumen{}}
+	if err := sqlx.GetContext(ctx, s.db, &res.Total, `SELECT COUNT(*) FROM fuentes f`+where, args...); err != nil {
+		return Pagina[FuenteResumen]{}, fmt.Errorf("contar fuentes: %w", err)
+	}
+	var filas []struct {
+		ID              int64         `db:"id"`
+		Titulo          string        `db:"titulo"`
+		Tipo            string        `db:"tipo"`
+		Estado          string        `db:"estado"`
+		Anio            *int          `db:"anio"`
+		ProcesoID       *int64        `db:"proceso_id"`
+		VersionVigente  *int          `db:"version_vigente"`
+		EspecialidadIDs pq.Int64Array `db:"especialidad_ids"`
+		CreatedAt       time.Time     `db:"created_at"`
+		UpdatedAt       time.Time     `db:"updated_at"`
+	}
+	if err := sqlx.SelectContext(ctx, s.db, &filas, `
+		SELECT f.id, f.titulo, f.tipo, f.estado, f.anio, f.proceso_id, v.numero AS version_vigente,
+		       COALESCE((SELECT array_agg(fe.especialidad_id ORDER BY fe.especialidad_id)
+		                 FROM fuente_especialidades fe WHERE fe.fuente_id = f.id), '{}') AS especialidad_ids,
+		       f.created_at, f.updated_at
+		FROM fuentes f LEFT JOIN fuente_versiones v ON v.id = f.version_vigente_id`+where+`
+		ORDER BY f.updated_at DESC, f.id DESC LIMIT $4 OFFSET $5`,
+		append(args, perPage, (page-1)*perPage)...); err != nil {
+		return Pagina[FuenteResumen]{}, fmt.Errorf("listar fuentes: %w", err)
+	}
+	for _, r := range filas {
+		res.Data = append(res.Data, FuenteResumen{ID: r.ID, Titulo: r.Titulo, Tipo: r.Tipo, Estado: r.Estado,
+			Anio: r.Anio, ProcesoID: r.ProcesoID, EspecialidadIDs: []int64(r.EspecialidadIDs),
+			VersionVigente: r.VersionVigente, CreatedAt: r.CreatedAt.UTC(), UpdatedAt: r.UpdatedAt.UTC()})
+	}
+	return res, nil
 }
 
 // ObtenerPasajes returns one page of the passages of a version, by orden.
@@ -150,8 +204,8 @@ func (s *PgSource) ResolverCita(ctx context.Context, c Cita) (PasajeCitado, erro
 
 // PublicarVersion inserts every passage with its folded tsv, marks the
 // version 'lista', makes it the fuente's current version (a retired fuente
-// stays retired) and writes auditFn, all in one transaction.
-func (s *PgSource) PublicarVersion(ctx context.Context, fuenteID int64, version int, pasajes []PasajeNuevo, auditFn audit.TxFunc) error {
+// stays retired) and writes fuente.procesar, all in one transaction.
+func (s *PgSource) PublicarVersion(ctx context.Context, fuenteID int64, version int, pasajes []PasajeNuevo, aud Auditor) error {
 	if err := ValidarPasajes(pasajes); err != nil {
 		return err
 	}
@@ -172,21 +226,30 @@ func (s *PgSource) PublicarVersion(ctx context.Context, fuenteID int64, version 
 		versionID, len(pasajes)); err != nil {
 		return fmt.Errorf("marcar lista la versión %d: %w", versionID, err)
 	}
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE fuentes SET version_vigente_id = $2, updated_at = NOW(),
-		       estado = CASE WHEN estado = 'retirada' THEN 'retirada' ELSE 'activa' END
-		WHERE id = $1`, fuenteID, versionID); err != nil {
+	var cambio struct {
+		Anterior string `db:"anterior"`
+		Nuevo    string `db:"nuevo"`
+	}
+	if err := tx.GetContext(ctx, &cambio, `
+		UPDATE fuentes f SET version_vigente_id = $2, updated_at = NOW(),
+		       estado = CASE WHEN f.estado = 'retirada' THEN 'retirada' ELSE 'activa' END
+		FROM (SELECT estado FROM fuentes WHERE id = $1) AS antes
+		WHERE f.id = $1
+		RETURNING antes.estado AS anterior, f.estado AS nuevo`, fuenteID, versionID); err != nil {
 		return fmt.Errorf("publicar la versión %d de la fuente %d: %w", version, fuenteID, err)
 	}
-	if err := audit.RunTx(ctx, tx, auditFn); err != nil {
+	if err := auditar(ctx, tx, aud, Evento{Accion: AccionProcesar, Entidad: EntidadFuente, EntidadID: fuenteID, Detalle: map[string]any{
+		"version": version, "pasajes_count": len(pasajes), "estado_anterior": cambio.Anterior, "estado_nuevo": cambio.Nuevo,
+	}}); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-// MarcarVersionFallida marks a 'procesando' version failed. A fuente without
-// a current version becomes 'fallida'; one with a current version keeps it.
-func (s *PgSource) MarcarVersionFallida(ctx context.Context, fuenteID int64, version int, motivo string, auditFn audit.TxFunc) error {
+// MarcarVersionFallida marks a 'procesando' version failed and writes
+// fuente.fallar. A fuente without a current version becomes 'fallida'; one
+// with a current version keeps its state.
+func (s *PgSource) MarcarVersionFallida(ctx context.Context, fuenteID int64, version int, motivo string, aud Auditor) error {
 	if !MotivoValido(motivo) {
 		return ErrPublicacionInvalida
 	}
@@ -204,18 +267,38 @@ func (s *PgSource) MarcarVersionFallida(ctx context.Context, fuenteID int64, ver
 		versionID, motivo); err != nil {
 		return fmt.Errorf("marcar fallida la versión %d: %w", versionID, err)
 	}
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE fuentes SET estado = 'fallida', updated_at = NOW() WHERE id = $1 AND version_vigente_id IS NULL`,
-		fuenteID); err != nil {
+	var cambio struct {
+		Anterior string `db:"anterior"`
+		Nuevo    string `db:"nuevo"`
+	}
+	if err := tx.GetContext(ctx, &cambio, `
+		UPDATE fuentes f SET updated_at = NOW(),
+		       estado = CASE WHEN f.version_vigente_id IS NULL THEN 'fallida' ELSE f.estado END
+		FROM (SELECT estado FROM fuentes WHERE id = $1) AS antes
+		WHERE f.id = $1
+		RETURNING antes.estado AS anterior, f.estado AS nuevo`, fuenteID); err != nil {
 		return fmt.Errorf("marcar fallida la fuente %d: %w", fuenteID, err)
 	}
-	if err := audit.RunTx(ctx, tx, auditFn); err != nil {
+	if err := auditar(ctx, tx, aud, Evento{Accion: AccionFallar, Entidad: EntidadFuente, EntidadID: fuenteID, Detalle: map[string]any{
+		"version": version, "motivo_fallo": motivo, "estado_anterior": cambio.Anterior, "estado_nuevo": cambio.Nuevo,
+	}}); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// auditar calls aud when there is one (a nil Auditor audits nothing).
+func auditar(ctx context.Context, tx *sqlx.Tx, aud Auditor, ev Evento) error {
+	if aud == nil {
+		return nil
+	}
+	if err := aud(ctx, tx, ev); err != nil {
+		return fmt.Errorf("auditar %s de la fuente %d: %w", ev.Accion, ev.EntidadID, err)
+	}
+	return nil
+}
 
 const columnasPasaje = `v.fuente_id, v.numero, p.id, p.orden, p.linea_inicio, p.linea_fin, p.seccion, p.texto`
 

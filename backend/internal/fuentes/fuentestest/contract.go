@@ -12,14 +12,16 @@ import (
 	"github.com/cbaciliod/learning/internal/fuentes"
 )
 
-// Entorno is what the contract needs from an adapter: the port, two hooks for
-// the admin life cycle that is not in the port (retire, upload a new version,
-// as S5 and S2 will do in E2-06) and two existing especialidad ids.
+// Entorno is what the contract needs from an adapter (ADR 0003): the port,
+// two existing especialidad ids (Postgres needs them for the FKs; memory does
+// not check) and two hooks for the admin life cycle that is not in the port,
+// as S5 and S2 will do in E2-06: retire, and add the next version in process.
 type Entorno struct {
-	Repo           fuentes.SourceRepository
-	Retirar        func(ctx context.Context, fuenteID int64) error
-	NuevaVersion   func(ctx context.Context, fuenteID int64, contenido []byte) (int, error)
-	Especialidades [2]int64
+	Repo          fuentes.SourceRepository
+	EspecialidadA int64
+	EspecialidadB int64
+	Retirar       func(ctx context.Context, fuenteID int64) error
+	NuevaVersion  func(ctx context.Context, fuenteID int64, contenido []byte) (int, error)
 }
 
 var seq atomic.Int64
@@ -47,6 +49,7 @@ func RunContract(t *testing.T, nuevo func(t *testing.T) Entorno) {
 	t.Run("PublicarEnRetiradaNoLaReactiva", func(t *testing.T) { publicarEnRetirada(t, nuevo(t)) })
 	t.Run("ObtenerPasajesPaginado", func(t *testing.T) { obtenerPasajes(t, nuevo(t)) })
 	t.Run("HashDuplicado", func(t *testing.T) { hashDuplicado(t, nuevo(t)) })
+	t.Run("ListarFuentes", func(t *testing.T) { listarFuentes(t, nuevo(t)) })
 }
 
 // ── Seeding through the port ──────────────────────────────────────────────────
@@ -62,7 +65,7 @@ func guardar(t *testing.T, e Entorno, especialidades []int64) (int64, int) {
 	contenido := []byte("# Fuente de contrato " + marcador() + "\nTexto.\n")
 	id, v, err := e.Repo.GuardarFuente(context.Background(), fuentes.NuevaFuente{
 		Titulo: "Fuente contrato " + marcador(), Tipo: "guia", EspecialidadIDs: especialidades,
-		NombreArchivo: "fuente.md", Contenido: contenido})
+		NombreArchivo: "fuente.md", Contenido: contenido}, nil)
 	if err != nil {
 		t.Fatalf("GuardarFuente: %v", err)
 	}
@@ -128,8 +131,8 @@ func ids(ps []fuentes.PasajeEncontrado) []int64 {
 func buscarPorRelevancia(t *testing.T, e Entorno) {
 	mk := marcador()
 	a := activa(t, e, nil, mk+" vigilancia de brotes en la comunidad")
-	b := activa(t, e, []int64{e.Especialidades[0]}, "notificación "+mk+" y "+mk+" con "+mk+" diaria")
-	got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.Especialidades[0]})
+	b := activa(t, e, []int64{e.EspecialidadA}, "notificación "+mk+" y "+mk+" con "+mk+" diaria")
+	got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.EspecialidadA})
 	if fmt.Sprint(ids(got)) != fmt.Sprint([]int64{b.pasajes[0], a.pasajes[0]}) {
 		t.Fatalf("order = %v, want [%d %d] (denser first)", ids(got), b.pasajes[0], a.pasajes[0])
 	}
@@ -150,7 +153,7 @@ func limiteDeResultados(t *testing.T, e Entorno) {
 	}
 	s := activa(t, e, nil, textos...)
 	for _, c := range []struct{ limite, want int }{{0, 20}, {5, 5}, {20, 20}, {25, 20}, {-1, 20}} {
-		got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.Especialidades[0], Limite: c.limite})
+		got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.EspecialidadA, Limite: c.limite})
 		if len(got) != c.want || fmt.Sprint(ids(got)) != fmt.Sprint(s.pasajes[:c.want]) {
 			t.Errorf("limite %d: got %d hits %v, want the first %d by id", c.limite, len(got), ids(got), c.want)
 		}
@@ -161,16 +164,16 @@ func limiteDeResultados(t *testing.T, e Entorno) {
 // applies to all (E2-03 regla 2).
 func filtroPorEspecialidad(t *testing.T, e Entorno) {
 	mk := marcador()
-	deA := activa(t, e, []int64{e.Especialidades[0]}, mk+" de A")
-	deB := activa(t, e, []int64{e.Especialidades[1]}, mk+" de B")
+	deA := activa(t, e, []int64{e.EspecialidadA}, mk+" de A")
+	deB := activa(t, e, []int64{e.EspecialidadB}, mk+" de B")
 	todas := activa(t, e, nil, mk+" de todas")
-	ambas := activa(t, e, []int64{e.Especialidades[0], e.Especialidades[1]}, mk+" de ambas")
+	ambas := activa(t, e, []int64{e.EspecialidadA, e.EspecialidadB}, mk+" de ambas")
 	for _, c := range []struct {
 		esp  int64
 		want []int64
 	}{
-		{e.Especialidades[0], []int64{deA.pasajes[0], todas.pasajes[0], ambas.pasajes[0]}},
-		{e.Especialidades[1], []int64{deB.pasajes[0], todas.pasajes[0], ambas.pasajes[0]}},
+		{e.EspecialidadA, []int64{deA.pasajes[0], todas.pasajes[0], ambas.pasajes[0]}},
+		{e.EspecialidadB, []int64{deB.pasajes[0], todas.pasajes[0], ambas.pasajes[0]}},
 	} {
 		if got := ids(buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: c.esp})); fmt.Sprint(got) != fmt.Sprint(c.want) {
 			t.Errorf("especialidad %d: got %v, want %v", c.esp, got, c.want)
@@ -183,7 +186,7 @@ func filtroPorEspecialidad(t *testing.T, e Entorno) {
 func soloActivasYVigente(t *testing.T, e Entorno) {
 	ctx := context.Background()
 	mk := marcador()
-	esp := []int64{e.Especialidades[0]}
+	esp := []int64{e.EspecialidadA}
 
 	guardar(t, e, esp) // procesando: nothing published
 	fid, fv := guardar(t, e, esp)
@@ -213,14 +216,14 @@ func soloActivasYVigente(t *testing.T, e Entorno) {
 // same order with and without área and tema.
 func areaYTemaNoFiltran(t *testing.T, e Entorno) {
 	mk := marcador()
-	activa(t, e, []int64{e.Especialidades[0]}, mk+" uno", mk+" "+mk+" dos")
+	activa(t, e, []int64{e.EspecialidadA}, mk+" uno", mk+" "+mk+" dos")
 	activa(t, e, nil, mk+" tres")
 	area, tema := int64(999999), int64(888888)
-	base := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.Especialidades[0]})
+	base := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.EspecialidadA})
 	for _, b := range []fuentes.Busqueda{
-		{Consulta: mk, EspecialidadID: e.Especialidades[0], AsignaturaID: &area},
-		{Consulta: mk, EspecialidadID: e.Especialidades[0], TemaID: &tema},
-		{Consulta: mk, EspecialidadID: e.Especialidades[0], AsignaturaID: &area, TemaID: &tema},
+		{Consulta: mk, EspecialidadID: e.EspecialidadA, AsignaturaID: &area},
+		{Consulta: mk, EspecialidadID: e.EspecialidadA, TemaID: &tema},
+		{Consulta: mk, EspecialidadID: e.EspecialidadA, AsignaturaID: &area, TemaID: &tema},
 	} {
 		if got := buscar(t, e, b); fmt.Sprint(ids(got)) != fmt.Sprint(ids(base)) || len(base) != 3 {
 			t.Errorf("with área/tema got %v, want %v (3 hits)", ids(got), ids(base))
@@ -231,7 +234,7 @@ func areaYTemaNoFiltran(t *testing.T, e Entorno) {
 // Escenario «Consulta fuera de límite» (regla 3): 3–300 runes after trimming,
 // and a profession is required.
 func consultaFueraDeLimite(t *testing.T, e Entorno) {
-	esp := e.Especialidades[0]
+	esp := e.EspecialidadA
 	cases := []struct {
 		name string
 		b    fuentes.Busqueda
@@ -327,11 +330,11 @@ func publicacionAtomica(t *testing.T, e Entorno) {
 			t.Errorf("%s: err = %v, want ErrPublicacionInvalida", name, err)
 		}
 	}
-	if got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.Especialidades[0]}); len(got) != 0 {
+	if got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.EspecialidadA}); len(got) != 0 {
 		t.Fatalf("a rejected publication left %d searchable passages", len(got))
 	}
 	s := sembrada{fuenteID: id, version: v}.publicar(t, e, mk+" válido")
-	if got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.Especialidades[0]}); fmt.Sprint(ids(got)) != fmt.Sprint(s.pasajes) {
+	if got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.EspecialidadA}); fmt.Sprint(ids(got)) != fmt.Sprint(s.pasajes) {
 		t.Errorf("after a valid publication got %v, want %v", ids(got), s.pasajes)
 	}
 	if err := e.Repo.PublicarVersion(ctx, id, v, nuevos(mk+" otra vez"), nil); !errors.Is(err, fuentes.ErrNoEncontrado) {
@@ -354,7 +357,7 @@ func versionFallida(t *testing.T, e Entorno) {
 	if err := e.Repo.MarcarVersionFallida(ctx, s.fuenteID, n, fuentes.MotivoLimitePasajes, nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.Especialidades[0]}); fmt.Sprint(ids(got)) != fmt.Sprint(s.pasajes) {
+	if got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.EspecialidadA}); fmt.Sprint(ids(got)) != fmt.Sprint(s.pasajes) {
 		t.Errorf("after a failed new version got %v, want the current %v", ids(got), s.pasajes)
 	}
 	if err := e.Repo.MarcarVersionFallida(ctx, s.fuenteID, n, fuentes.MotivoErrorInterno, nil); !errors.Is(err, fuentes.ErrNoEncontrado) {
@@ -387,11 +390,11 @@ func hashDuplicado(t *testing.T, e Entorno) {
 	ctx := context.Background()
 	contenido := []byte("contenido único " + marcador())
 	nf := fuentes.NuevaFuente{Titulo: "Duplicada " + marcador(), Tipo: "norma", NombreArchivo: "a.md", Contenido: contenido}
-	id, _, err := e.Repo.GuardarFuente(ctx, nf)
+	id, _, err := e.Repo.GuardarFuente(ctx, nf, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := e.Repo.GuardarFuente(ctx, nf); !errors.Is(err, fuentes.ErrFuenteDuplicada) {
+	if _, _, err := e.Repo.GuardarFuente(ctx, nf, nil); !errors.Is(err, fuentes.ErrFuenteDuplicada) {
 		t.Errorf("same content again: err = %v, want ErrFuenteDuplicada", err)
 	}
 	if _, err := e.NuevaVersion(ctx, id, contenido); !errors.Is(err, fuentes.ErrFuenteDuplicada) {
@@ -414,11 +417,90 @@ func publicarEnRetirada(t *testing.T, e Entorno) {
 		t.Fatal(err)
 	}
 	nueva := sembrada{fuenteID: s.fuenteID, version: n}.publicar(t, e, mk+" después de retirar")
-	if got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.Especialidades[0]}); len(got) != 0 {
+	if got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.EspecialidadA}); len(got) != 0 {
 		t.Errorf("a retired fuente is searchable after publishing: %v", ids(got))
 	}
 	c, err := e.Repo.ResolverCita(ctx, fuentes.Cita{FuenteID: s.fuenteID, Version: n, PasajeID: nueva.pasajes[0]})
 	if err != nil || c.EstadoFuente != fuentes.EstadoRetirada {
 		t.Errorf("cita of the new version = %+v, %v; want estado retirada", c, err)
+	}
+}
+
+// ListarFuentes: newest change first (UpdatedAt DESC, ID DESC), filters with
+// zero = no filter, ids of especialidades ascending and the current version
+// number, and pagination normalised without error.
+func listarFuentes(t *testing.T, e Entorno) {
+	ctx := context.Background()
+	anio := 2025
+	guardarCon := func(tipo string, esp []int64) int64 {
+		t.Helper()
+		id, _, err := e.Repo.GuardarFuente(ctx, fuentes.NuevaFuente{Titulo: "Listado " + marcador(), Tipo: tipo, Anio: &anio,
+			EspecialidadIDs: esp, NombreArchivo: "l.md", Contenido: []byte("listado " + marcador())}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	deB := guardarCon("norma", []int64{e.EspecialidadB})
+	ambas := guardarCon("guia", []int64{e.EspecialidadB, e.EspecialidadA})
+	todas := guardarCon("balotario", nil)
+	// Publishing the first one makes it the most recently updated.
+	if err := e.Repo.PublicarVersion(ctx, deB, 1, nuevos("publicada "+marcador()), nil); err != nil {
+		t.Fatal(err)
+	}
+
+	listar := func(f fuentes.FiltroFuentes) fuentes.Pagina[fuentes.FuenteResumen] {
+		t.Helper()
+		p, err := e.Repo.ListarFuentes(ctx, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	idsDe := func(p fuentes.Pagina[fuentes.FuenteResumen]) []int64 {
+		var out []int64
+		for _, r := range p.Data {
+			out = append(out, r.ID)
+		}
+		return out
+	}
+	cases := []struct {
+		name string
+		f    fuentes.FiltroFuentes
+		want []int64
+	}{
+		{"sin filtro, la más reciente primero", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadB}, []int64{deB, todas, ambas}},
+		{"especialidad A: las suyas y las de todas", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadA}, []int64{todas, ambas}},
+		{"estado activa", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadB, Estado: fuentes.EstadoActiva}, []int64{deB}},
+		{"tipo guia", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadB, Tipo: "guia"}, []int64{ambas}},
+		{"página 2 de 2 en 2", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadB, Page: 2, PerPage: 2}, []int64{ambas}},
+	}
+	for _, c := range cases {
+		if got := idsDe(listar(c.f)); fmt.Sprint(got) != fmt.Sprint(c.want) {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
+
+	p := listar(fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadB, Page: 0, PerPage: 500})
+	if p.Page != 1 || p.PerPage != 100 || p.Total != 3 {
+		t.Errorf("normalised page = %d/%d total %d, want 1/100 total 3", p.Page, p.PerPage, p.Total)
+	}
+	for _, r := range p.Data {
+		switch r.ID {
+		case deB:
+			if r.Estado != fuentes.EstadoActiva || r.VersionVigente == nil || *r.VersionVigente != 1 || fmt.Sprint(r.EspecialidadIDs) != fmt.Sprint([]int64{e.EspecialidadB}) {
+				t.Errorf("published = %+v", r)
+			}
+		case ambas:
+			want := []int64{min(e.EspecialidadA, e.EspecialidadB), max(e.EspecialidadA, e.EspecialidadB)}
+			if r.VersionVigente != nil || r.Estado != fuentes.EstadoProcesando || fmt.Sprint(r.EspecialidadIDs) != fmt.Sprint(want) ||
+				r.Tipo != "guia" || r.Anio == nil || *r.Anio != 2025 || r.Titulo == "" || r.CreatedAt.IsZero() {
+				t.Errorf("in process = %+v", r)
+			}
+		case todas:
+			if len(r.EspecialidadIDs) != 0 || r.EspecialidadIDs == nil {
+				t.Errorf("for all = %+v, want an empty (non-nil) list", r.EspecialidadIDs)
+			}
+		}
 	}
 }

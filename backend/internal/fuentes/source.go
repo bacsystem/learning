@@ -6,11 +6,14 @@ package fuentes
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"strings"
+	"time"
 	"unicode/utf8"
 
-	"github.com/cbaciliod/learning/internal/audit"
+	"github.com/jmoiron/sqlx"
 )
 
 // Errors of the port (ADR 0003). Their text is the stable code.
@@ -66,7 +69,33 @@ type Busqueda struct {
 	Limite         int // 1..20; 0 (or less) = 20; > 20 is capped at 20
 }
 
+// Audit actions written by the adapter (contract E2 § Auditoría).
+const (
+	AccionCrear    = "fuente.crear"
+	AccionProcesar = "fuente.procesar"
+	AccionFallar   = "fuente.fallar"
+	EntidadFuente  = "fuente"
+)
+
+// Evento is an audit row that the adapter builds inside its transaction, once
+// it knows the fuente id (same pattern as temas.Evento). Detalle never holds
+// content or personal data (README §7).
+type Evento struct {
+	Accion    string
+	Entidad   string
+	EntidadID int64
+	Detalle   map[string]any
+}
+
+// Auditor writes ev in the mutation's transaction; its error rolls the
+// mutation back. The caller binds the actor, IP and user agent (actor nil =
+// system). A nil Auditor audits nothing (tests); the in-memory adapter never
+// calls it.
+type Auditor func(ctx context.Context, tx sqlx.ExecerContext, ev Evento) error
+
 // NuevaFuente is a fuente with its first version, created in 'procesando'.
+// The caller has already validated the metadata and sanitised NombreArchivo
+// (S1 of contract E2).
 type NuevaFuente struct {
 	Titulo          string
 	Tipo            string // balotario | guia | norma | otro
@@ -74,8 +103,33 @@ type NuevaFuente struct {
 	ProcesoID       *int64
 	EspecialidadIDs []int64 // empty = applies to every especialidad
 	NombreArchivo   string
-	Contenido       []byte // UTF-8 original; the adapter computes sha256, size and lines
-	CreadoPor       *int64
+	Contenido       []byte // UTF-8 original; the adapter computes sha256, size and lines with Huella
+	CreadoPor       *int64 // nil = system or test
+}
+
+// FiltroFuentes selects ListarFuentes. In EspecialidadID, Estado and Tipo the
+// zero value means no filter. Page and PerPage are normalised without error
+// (NormalizarPagina); the HTTP handler validates the query strictly.
+type FiltroFuentes struct {
+	EspecialidadID int64  // > 0: fuentes of that especialidad plus those for all
+	Estado         string // procesando | activa | fallida | retirada
+	Tipo           string // balotario | guia | norma | otro
+	Page, PerPage  int
+}
+
+// FuenteResumen is the minimum any adapter can give: ids, not catalog names.
+// The admin listing S3 (names, version_en_proceso…) is an admin query
+// outside the port (E2-07).
+type FuenteResumen struct {
+	ID              int64
+	Titulo, Tipo    string
+	Estado          string
+	Anio            *int
+	ProcesoID       *int64
+	EspecialidadIDs []int64 // empty = applies to every one; ascending
+	VersionVigente  *int    // version number; nil if there is none
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // PasajeNuevo is one passage to publish, produced by normalizar.go (E2-05).
@@ -88,8 +142,8 @@ type PasajeNuevo struct {
 	Palabras    int
 }
 
-// Pasaje is a published passage; it carries no user data (regla 4).
-type Pasaje struct {
+// PasajeEncontrado is a published passage; it carries no user data (regla 4).
+type PasajeEncontrado struct {
 	FuenteID    int64
 	Version     int
 	PasajeID    int64
@@ -100,8 +154,8 @@ type Pasaje struct {
 	Texto       string
 }
 
-// PasajeEncontrado is a search hit.
-type PasajeEncontrado = Pasaje
+// Pasaje has the same fields as PasajeEncontrado (ADR 0003).
+type Pasaje = PasajeEncontrado
 
 // PasajeCitado is a resolved citation, with the fuente data of that version.
 type PasajeCitado struct {
@@ -122,8 +176,14 @@ type Pagina[T any] struct {
 // SourceRepository is the port (ADR 0003). A v3 adapter (SIA-E2-08) would
 // only replace BuscarPasajes; citations always resolve on the own adapter.
 type SourceRepository interface {
-	// GuardarFuente creates the fuente and its version 1 in 'procesando'.
-	GuardarFuente(ctx context.Context, f NuevaFuente) (fuenteID int64, version int, err error)
+	// GuardarFuente creates the fuente and its version 1 in 'procesando' and
+	// calls aud with fuente.crear and the new id in the same transaction.
+	GuardarFuente(ctx context.Context, f NuevaFuente, aud Auditor) (fuenteID int64, version int, err error)
+	// ListarFuentes: UpdatedAt DESC, ID DESC.
+	ListarFuentes(ctx context.Context, f FiltroFuentes) (Pagina[FuenteResumen], error)
+	// ObtenerPasajes: by orden, whatever the fuente's state; ErrNoEncontrado
+	// if the fuente or version does not exist; empty Data for a version
+	// without passages.
 	ObtenerPasajes(ctx context.Context, fuenteID int64, version int, page, perPage int) (Pagina[Pasaje], error)
 	// BuscarPasajes returns ≤ 20 passages of the current version of active
 	// fuentes of the especialidad (or of every one), by relevance then id.
@@ -133,10 +193,11 @@ type SourceRepository interface {
 	ResolverCita(ctx context.Context, c Cita) (PasajeCitado, error)
 	// PublicarVersion publishes a 'procesando' version atomically: every
 	// passage, the version 'lista', the fuente's current version and state,
-	// and auditFn in the same transaction (the in-memory adapter ignores it).
-	PublicarVersion(ctx context.Context, fuenteID int64, version int, pasajes []PasajeNuevo, auditFn audit.TxFunc) error
-	// MarcarVersionFallida marks a 'procesando' version failed with motivo.
-	MarcarVersionFallida(ctx context.Context, fuenteID int64, version int, motivo string, auditFn audit.TxFunc) error
+	// and aud (fuente.procesar) in the same transaction.
+	PublicarVersion(ctx context.Context, fuenteID int64, version int, pasajes []PasajeNuevo, aud Auditor) error
+	// MarcarVersionFallida marks a 'procesando' version failed with motivo
+	// and calls aud (fuente.fallar) in the same transaction.
+	MarcarVersionFallida(ctx context.Context, fuenteID int64, version int, motivo string, aud Auditor) error
 }
 
 // NormalizarBusqueda validates a search and returns the trimmed query and the
@@ -181,7 +242,8 @@ func MotivoValido(motivo string) bool {
 	return motivo == MotivoSinContenido || motivo == MotivoLimitePasajes || motivo == MotivoErrorInterno
 }
 
-// NormalizarPagina applies the module's pagination defaults (README §5).
+// NormalizarPagina applies the port's pagination without error: page ≤ 0 → 1,
+// perPage ≤ 0 → 20, perPage > 100 → 100 (ADR 0003 § El puerto).
 func NormalizarPagina(page, perPage int) (int, int) {
 	if page < 1 {
 		page = 1
@@ -192,9 +254,17 @@ func NormalizarPagina(page, perPage int) (int, int) {
 	return page, min(perPage, perPageMax)
 }
 
-// ContarLineas counts the lines of the content: 0 when empty, and a final
+// Huella returns the hex sha256, the size in bytes and the lines of the
+// content. It is the single implementation: the adapters and E2-03 (duplicate
+// by hash) use it.
+func Huella(contenido []byte) (sha string, tamanoBytes, lineas int) {
+	suma := sha256.Sum256(contenido)
+	return hex.EncodeToString(suma[:]), len(contenido), contarLineas(contenido)
+}
+
+// contarLineas counts the lines of the content: 0 when empty, and a final
 // newline does not open an extra line.
-func ContarLineas(contenido []byte) int {
+func contarLineas(contenido []byte) int {
 	if len(contenido) == 0 {
 		return 0
 	}

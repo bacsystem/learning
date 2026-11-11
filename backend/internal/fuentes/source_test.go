@@ -63,14 +63,18 @@ func TestValidarPasajes(t *testing.T) {
 	}
 }
 
-func TestContarLineas(t *testing.T) {
+func TestHuella(t *testing.T) {
 	cases := []struct {
 		in   string
 		want int
 	}{{"", 0}, {"a", 1}, {"a\n", 1}, {"a\nb", 2}, {"a\nb\n", 2}, {"\n", 1}, {"\n\n", 2}}
 	for _, c := range cases {
-		if got := ContarLineas([]byte(c.in)); got != c.want {
-			t.Errorf("ContarLineas(%q) = %d, want %d", c.in, got, c.want)
+		sha, tamano, lineas := Huella([]byte(c.in))
+		if lineas != c.want || tamano != len(c.in) || len(sha) != 64 {
+			t.Errorf("Huella(%q) = %s %d %d, want %d lines", c.in, sha, tamano, lineas, c.want)
 		}
+	}
+	if sha, _, _ := Huella([]byte("abc")); sha != "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" {
+		t.Errorf("sha256(abc) = %s", sha)
 	}
 }

@@ -9,9 +9,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
-	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/fuentes"
 	"github.com/cbaciliod/learning/internal/texto"
 )
@@ -26,12 +26,18 @@ type Memoria struct {
 	sigPasaje int64
 	fuentes   map[int64]*fuenteMem
 	hashes    map[[sha256.Size]byte]bool
+	ultimo    time.Time
 }
 
 type fuenteMem struct {
 	id             int64
 	titulo         string
+	tipo           string
+	anio           *int
+	procesoID      *int64
 	estado         string
+	creada         time.Time
+	actualizada    time.Time
 	especialidades map[int64]bool
 	vigente        int // version number; 0 = none
 	versiones      map[int]*versionMem
@@ -50,20 +56,47 @@ func NuevaMemoria() *Memoria {
 
 var _ fuentes.SourceRepository = (*Memoria)(nil)
 
-func (m *Memoria) GuardarFuente(_ context.Context, f fuentes.NuevaFuente) (int64, int, error) {
+// GuardarFuente never calls aud: the in-memory adapter has no audit log.
+func (m *Memoria) GuardarFuente(_ context.Context, f fuentes.NuevaFuente, _ fuentes.Auditor) (int64, int, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if err := m.registrarHash(f.Contenido); err != nil {
 		return 0, 0, err
 	}
 	m.sigFuente++
-	fm := &fuenteMem{id: m.sigFuente, titulo: f.Titulo, estado: fuentes.EstadoProcesando,
+	ahora := m.ahora()
+	fm := &fuenteMem{id: m.sigFuente, titulo: f.Titulo, tipo: f.Tipo, anio: f.Anio, procesoID: f.ProcesoID,
+		estado: fuentes.EstadoProcesando, creada: ahora, actualizada: ahora,
 		especialidades: map[int64]bool{}, versiones: map[int]*versionMem{1: {numero: 1, estado: fuentes.EstadoProcesando}}}
 	for _, e := range f.EspecialidadIDs {
 		fm.especialidades[e] = true
 	}
 	m.fuentes[fm.id] = fm
 	return fm.id, 1, nil
+}
+
+func (m *Memoria) ListarFuentes(_ context.Context, fl fuentes.FiltroFuentes) (fuentes.Pagina[fuentes.FuenteResumen], error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	page, perPage := fuentes.NormalizarPagina(fl.Page, fl.PerPage)
+	var todas []fuentes.FuenteResumen
+	for _, f := range m.fuentes {
+		if (fl.EspecialidadID > 0 && !f.aplicaA(fl.EspecialidadID)) || (fl.Estado != "" && f.estado != fl.Estado) ||
+			(fl.Tipo != "" && f.tipo != fl.Tipo) {
+			continue
+		}
+		todas = append(todas, f.resumen())
+	}
+	sort.Slice(todas, func(i, j int) bool {
+		if !todas[i].UpdatedAt.Equal(todas[j].UpdatedAt) {
+			return todas[i].UpdatedAt.After(todas[j].UpdatedAt)
+		}
+		return todas[i].ID > todas[j].ID
+	})
+	res := fuentes.Pagina[fuentes.FuenteResumen]{Page: page, PerPage: perPage, Total: len(todas), Data: []fuentes.FuenteResumen{}}
+	desde := min((page-1)*perPage, len(todas))
+	res.Data = append(res.Data, todas[desde:min(desde+perPage, len(todas))]...)
+	return res, nil
 }
 
 func (m *Memoria) ObtenerPasajes(_ context.Context, fuenteID int64, version int, page, perPage int) (fuentes.Pagina[fuentes.Pasaje], error) {
@@ -135,7 +168,7 @@ func (m *Memoria) ResolverCita(_ context.Context, c fuentes.Cita) (fuentes.Pasaj
 	return fuentes.PasajeCitado{}, fuentes.ErrCitaInvalida
 }
 
-func (m *Memoria) PublicarVersion(_ context.Context, fuenteID int64, version int, pasajes []fuentes.PasajeNuevo, _ audit.TxFunc) error {
+func (m *Memoria) PublicarVersion(_ context.Context, fuenteID int64, version int, pasajes []fuentes.PasajeNuevo, _ fuentes.Auditor) error {
 	if err := fuentes.ValidarPasajes(pasajes); err != nil {
 		return err
 	}
@@ -155,13 +188,14 @@ func (m *Memoria) PublicarVersion(_ context.Context, fuenteID int64, version int
 	v.estado = fuentes.VersionLista
 	f := m.fuentes[fuenteID]
 	f.vigente = version
+	f.actualizada = m.ahora()
 	if f.estado != fuentes.EstadoRetirada {
 		f.estado = fuentes.EstadoActiva
 	}
 	return nil
 }
 
-func (m *Memoria) MarcarVersionFallida(_ context.Context, fuenteID int64, version int, motivo string, _ audit.TxFunc) error {
+func (m *Memoria) MarcarVersionFallida(_ context.Context, fuenteID int64, version int, motivo string, _ fuentes.Auditor) error {
 	if !fuentes.MotivoValido(motivo) {
 		return fuentes.ErrPublicacionInvalida
 	}
@@ -172,7 +206,9 @@ func (m *Memoria) MarcarVersionFallida(_ context.Context, fuenteID int64, versio
 		return err
 	}
 	v.estado = fuentes.EstadoFallida
-	if f := m.fuentes[fuenteID]; f.vigente == 0 {
+	f := m.fuentes[fuenteID]
+	f.actualizada = m.ahora()
+	if f.vigente == 0 {
 		f.estado = fuentes.EstadoFallida
 	}
 	return nil
@@ -209,6 +245,31 @@ func (m *Memoria) NuevaVersion(_ context.Context, fuenteID int64, contenido []by
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// ahora returns a strictly increasing time, so UpdatedAt orders mutations
+// even when the clock does not advance between them.
+func (m *Memoria) ahora() time.Time {
+	t := time.Now().UTC()
+	if !t.After(m.ultimo) {
+		t = m.ultimo.Add(time.Microsecond)
+	}
+	m.ultimo = t
+	return t
+}
+
+func (f *fuenteMem) resumen() fuentes.FuenteResumen {
+	r := fuentes.FuenteResumen{ID: f.id, Titulo: f.titulo, Tipo: f.tipo, Estado: f.estado, Anio: f.anio,
+		ProcesoID: f.procesoID, EspecialidadIDs: []int64{}, CreatedAt: f.creada, UpdatedAt: f.actualizada}
+	for e := range f.especialidades {
+		r.EspecialidadIDs = append(r.EspecialidadIDs, e)
+	}
+	sort.Slice(r.EspecialidadIDs, func(i, j int) bool { return r.EspecialidadIDs[i] < r.EspecialidadIDs[j] })
+	if f.vigente > 0 {
+		v := f.vigente
+		r.VersionVigente = &v
+	}
+	return r
+}
 
 // aplicaA: a fuente without professions applies to every one (E2-03 regla 2).
 func (f *fuenteMem) aplicaA(especialidadID int64) bool {

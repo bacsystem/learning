@@ -2,8 +2,7 @@ package fuentes_test
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -47,19 +46,19 @@ func entornoPg(t *testing.T) (fuentestest.Entorno, *sqlx.DB) {
 		return nil
 	}
 	nuevaVersion := func(ctx context.Context, fuenteID int64, contenido []byte) (int, error) {
-		suma := sha256.Sum256(contenido)
+		sha, tamano, lineas := fuentes.Huella(contenido)
 		var n int
 		err := db.GetContext(ctx, &n, `
 			INSERT INTO fuente_versiones (fuente_id, numero, nombre_archivo, sha256, tamano_bytes, lineas, contenido)
 			SELECT $1, COALESCE(MAX(numero), 0) + 1, 'nueva.md', $2, $3, $4, $5 FROM fuente_versiones WHERE fuente_id = $1
-			RETURNING numero`, fuenteID, hex.EncodeToString(suma[:]), len(contenido), fuentes.ContarLineas(contenido), string(contenido))
+			RETURNING numero`, fuenteID, sha, tamano, lineas, string(contenido))
 		if err != nil && strings.Contains(err.Error(), "uq_fuente_versiones_sha256") {
 			return 0, fuentes.ErrFuenteDuplicada
 		}
 		return n, err
 	}
-	return fuentestest.Entorno{Repo: fuentes.NewPgSource(db), Retirar: retirar, NuevaVersion: nuevaVersion,
-		Especialidades: [2]int64{cat.EspecialidadID, otra}}, db
+	return fuentestest.Entorno{Repo: fuentes.NewPgSource(db), EspecialidadA: cat.EspecialidadID, EspecialidadB: otra,
+		Retirar: retirar, NuevaVersion: nuevaVersion}, db
 }
 
 // limpiarFuentes removes the fuentes above desde; the current version is
@@ -88,11 +87,11 @@ func TestContrato_Postgres(t *testing.T) {
 }
 
 // publicar stores and publishes one fuente with the given passage texts.
-func publicar(t *testing.T, e fuentestest.Entorno, auditFn audit.TxFunc, textos ...string) (int64, error) {
+func publicar(t *testing.T, e fuentestest.Entorno, aud fuentes.Auditor, textos ...string) (int64, error) {
 	t.Helper()
 	ctx := context.Background()
 	id, v, err := e.Repo.GuardarFuente(ctx, fuentes.NuevaFuente{Titulo: "Fuente pg " + dbtest.Uniq(), Tipo: "guia",
-		NombreArchivo: "pg.md", Contenido: []byte("pg " + dbtest.Uniq())})
+		NombreArchivo: "pg.md", Contenido: []byte("pg " + dbtest.Uniq())}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +99,7 @@ func publicar(t *testing.T, e fuentestest.Entorno, auditFn audit.TxFunc, textos 
 	for i, tx := range textos {
 		ps[i] = fuentes.PasajeNuevo{Orden: i + 1, LineaInicio: 1, LineaFin: 1, Texto: tx, Palabras: len(strings.Fields(tx))}
 	}
-	return id, e.Repo.PublicarVersion(ctx, id, v, ps, auditFn)
+	return id, e.Repo.PublicarVersion(ctx, id, v, ps, aud)
 }
 
 // The Postgres search folds case and accents in Go (NFC and NFD), stems in
@@ -112,7 +111,7 @@ func TestBuscarPasajes_FTSPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	esp := e.Especialidades[0]
+	esp := e.EspecialidadA
 	cases := []struct {
 		name, consulta string
 		want           int
@@ -145,15 +144,58 @@ func TestBuscarPasajes_FTSPostgres(t *testing.T) {
 	}
 }
 
-// PublicarVersion and MarcarVersionFallida write the audit row in their
-// transaction: when it fails nothing is published or failed.
-func TestPublicacion_AuditoriaEnLaTransaccion(t *testing.T) {
+// The adapter builds the audit event inside its transaction (ADR 0003 §
+// Auditoría en el puerto): fuente.crear with the new id, fuente.procesar and
+// fuente.fallar. When the Auditor fails, nothing is created, published or
+// failed.
+func TestAuditoriaEnLaTransaccion(t *testing.T) {
 	e, db := entornoPg(t)
 	ctx := context.Background()
-	falla := func(context.Context, sqlx.ExecerContext) error { return errors.New("audit caído") }
+	falla := func(context.Context, sqlx.ExecerContext, fuentes.Evento) error { return errors.New("audit caído") }
+	aud := audit.New(db)
+	sistema := func(ctx context.Context, tx sqlx.ExecerContext, ev fuentes.Evento) error {
+		return aud.LogTx(ctx, tx, nil, ev.Accion, ev.Entidad, &ev.EntidadID, ev.Detalle, "", "")
+	}
+	nf := func() fuentes.NuevaFuente {
+		return fuentes.NuevaFuente{Titulo: "Auditada " + dbtest.Uniq(), Tipo: "norma", EspecialidadIDs: []int64{e.EspecialidadB, e.EspecialidadA},
+			NombreArchivo: "a.md", Contenido: []byte("auditada " + dbtest.Uniq())}
+	}
+	var desde int64
+	if err := db.Get(&desde, `SELECT COALESCE(MAX(id), 0) FROM audit_log`); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec(`DELETE FROM audit_log WHERE id > $1 AND entidad = 'fuente'`, desde) })
 
-	id, err := publicar(t, e, falla, "texto que no debe publicarse "+dbtest.Uniq())
-	if err == nil {
+	// GuardarFuente: a failing Auditor creates nothing.
+	var antes int
+	if err := db.Get(&antes, `SELECT COUNT(*) FROM fuentes`); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.Repo.GuardarFuente(ctx, nf(), falla); err == nil {
+		t.Fatal("creating with a failing audit must fail")
+	}
+	var despues int
+	if err := db.Get(&despues, `SELECT COUNT(*) FROM fuentes`); err != nil || despues != antes {
+		t.Fatalf("fuentes %d → %d after a failed audit", antes, despues)
+	}
+
+	// fuente.crear carries the new id and its detalle.
+	f := nf()
+	id, _, err := e.Repo.GuardarFuente(ctx, f, sistema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	detalle := detalleAudit(t, db, desde, fuentes.AccionCrear, id)
+	sha, tamano, _ := fuentes.Huella(f.Contenido)
+	esps := fmt.Sprint([]any{float64(f.EspecialidadIDs[0]), float64(f.EspecialidadIDs[1])})
+	if detalle["version"] != 1.0 || detalle["sha256"] != sha || detalle["tamano_bytes"] != float64(tamano) ||
+		detalle["tipo"] != "norma" || fmt.Sprint(detalle["especialidad_ids"]) != esps || detalle["estado_nuevo"] != "procesando" {
+		t.Errorf("fuente.crear detalle = %v", detalle)
+	}
+
+	// PublicarVersion: a failing Auditor publishes nothing.
+	ps := []fuentes.PasajeNuevo{{Orden: 1, LineaInicio: 1, LineaFin: 1, Texto: "publicado " + dbtest.Uniq(), Palabras: 2}}
+	if err := e.Repo.PublicarVersion(ctx, id, 1, ps, falla); err == nil {
 		t.Fatal("publishing with a failing audit must fail")
 	}
 	var estado string
@@ -163,29 +205,48 @@ func TestPublicacion_AuditoriaEnLaTransaccion(t *testing.T) {
 		t.Fatal(err)
 	}
 	if estado != fuentes.EstadoProcesando || pasajes != 0 {
-		t.Errorf("after a failed audit: version %s with %d passages, want procesando with 0", estado, pasajes)
+		t.Fatalf("after a failed audit: version %s with %d passages", estado, pasajes)
 	}
-	if err := e.Repo.MarcarVersionFallida(ctx, id, 1, fuentes.MotivoErrorInterno, falla); err == nil {
-		t.Error("failing a version with a failing audit must fail")
+	if err := e.Repo.PublicarVersion(ctx, id, 1, ps, sistema); err != nil {
+		t.Fatal(err)
+	}
+	detalle = detalleAudit(t, db, desde, fuentes.AccionProcesar, id)
+	if detalle["version"] != 1.0 || detalle["pasajes_count"] != 1.0 || detalle["estado_anterior"] != "procesando" || detalle["estado_nuevo"] != "activa" {
+		t.Errorf("fuente.procesar detalle = %v", detalle)
 	}
 
-	// A working audit (actor NULL = system, as the worker) is written.
-	aud := audit.New(db)
-	ok := func(ctx context.Context, tx sqlx.ExecerContext) error {
-		return aud.LogTx(ctx, tx, nil, "fuente.procesar", "fuente", &id, map[string]any{"version": 1}, "", "")
-	}
-	ps := []fuentes.PasajeNuevo{{Orden: 1, LineaInicio: 1, LineaFin: 1, Texto: "publicado " + dbtest.Uniq(), Palabras: 2}}
-	if err := e.Repo.PublicarVersion(ctx, id, 1, ps, ok); err != nil {
+	// MarcarVersionFallida on a new version: the fuente keeps 'activa'.
+	n, err := e.NuevaVersion(ctx, id, []byte("v2 "+dbtest.Uniq()))
+	if err != nil {
 		t.Fatal(err)
 	}
-	var auditados int
-	if err := db.Get(&auditados, `SELECT COUNT(*) FROM audit_log WHERE accion = 'fuente.procesar' AND entidad_id = $1 AND usuario_id IS NULL`, id); err != nil {
+	if err := e.Repo.MarcarVersionFallida(ctx, id, n, fuentes.MotivoErrorInterno, falla); err == nil {
+		t.Fatal("failing with a failing audit must fail")
+	}
+	if err := e.Repo.MarcarVersionFallida(ctx, id, n, fuentes.MotivoErrorInterno, sistema); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		_, _ = db.Exec(`DELETE FROM audit_log WHERE accion = 'fuente.procesar' AND entidad_id = $1`, id)
-	})
-	if auditados != 1 {
-		t.Errorf("%d audit rows, want 1", auditados)
+	detalle = detalleAudit(t, db, desde, fuentes.AccionFallar, id)
+	if detalle["version"] != float64(n) || detalle["motivo_fallo"] != "error_interno" || detalle["estado_anterior"] != "activa" || detalle["estado_nuevo"] != "activa" {
+		t.Errorf("fuente.fallar detalle = %v", detalle)
 	}
+}
+
+// detalleAudit returns the detalle of the only row of accion for the fuente
+// written after desde, by the system (usuario_id NULL).
+func detalleAudit(t *testing.T, db *sqlx.DB, desde int64, accion string, fuenteID int64) map[string]any {
+	t.Helper()
+	var raw [][]byte
+	if err := db.Select(&raw, `SELECT detalle FROM audit_log WHERE id > $1 AND accion = $2 AND entidad = 'fuente'
+		AND entidad_id = $3 AND usuario_id IS NULL`, desde, accion, fuenteID); err != nil {
+		t.Fatal(err)
+	}
+	if len(raw) != 1 {
+		t.Fatalf("%s: %d audit rows, want 1", accion, len(raw))
+	}
+	var d map[string]any
+	if err := json.Unmarshal(raw[0], &d); err != nil {
+		t.Fatal(err)
+	}
+	return d
 }
