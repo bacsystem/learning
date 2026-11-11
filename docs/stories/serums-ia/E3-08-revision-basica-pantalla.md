@@ -121,7 +121,8 @@ Guard de rol admin. La pantalla no muestra rutas de archivo ni códigos de error
 Todo en es/en. Esta historia es dueña de:
 - `dashboard.serumsIa.revision.listado.*`: filtros, origen, nº de citas y estados de UI;
 - `dashboard.serumsIa.revision.citas.*`: citas, buscador y «Sin resultados»;
-- `dashboard.serumsIa.revision.errores.*`: el texto genérico y los de `fuente_no_activa`, `limite_citas` y `ultima_cita_activa`. SIA-E3-09 añade aquí los de transición.
+- `dashboard.serumsIa.errores.<codigo>` para `fuente_no_activa`, `limite_citas` y `ultima_cita_activa`: una clave por código, compartida por todas las pantallas (convención de `docs/api/README.md` §8). Si la clave ya existe, se reutiliza y no se duplica;
+- `dashboard.serumsIa.revision.errores.generico`: el texto genérico para un código sin clave.
 
 Los nombres de estado van en `dashboard.serumsIa.estadosPregunta.*` (de SIA-E3-02). Cada clave existe en ambos archivos.
 
