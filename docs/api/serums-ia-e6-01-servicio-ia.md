@@ -110,6 +110,12 @@ Se **rechaza**, no se enmascara: la entrada que coincida no sale del servidor.
 - Go usa RE2, sin lookbehind, y `\b` falla cuando el número va pegado a `+` o a letras. Por eso los patrones **no** usan `\b`.
 - En su lugar, el código comprueba cada coincidencia: el rune **anterior** al inicio y el **posterior** al final no deben ser dígitos, o la coincidencia debe estar al principio o al final del texto.
 - Para el teléfono, se prueba primero con el prefijo `51` y después sin él, para que `51987654321` no se lea como un número de 11 dígitos.
+- **Búsqueda (corrección H5 del re-review):** **no** se usa `FindAll` descartando candidatos. Un candidato rechazado puede solaparse con el número real y taparlo: en `Ref 12345678901 987654321`, el primer candidato móvil es `901 987654`; se descarta porque lo precede un dígito, y `FindAll` seguiría **después** de él, perdiendo `987654321`. El algoritmo es, para cada patrón:
+  1. `loc := re.FindStringIndex(texto[pos:])`. Si no hay, termina.
+  2. Si `loc` cumple la frontera de dígito, es una detección: se registra (o se enmascara) y `pos` avanza al **final** de la coincidencia.
+  3. Si no la cumple, `pos` avanza **un rune** desde el **inicio** del candidato (`inicio + 1`) y se vuelve al paso 1.
+
+  Detectar y `Enmascarar` usan esta misma función. No se usa la alternativa de capturar la frontera dentro del patrón (`(?:^|\D)(…)(?:\D|$)`), porque consume el separador y perdería el segundo de dos números separados por un solo carácter, como `987654321 987654322`.
 
 | Entrada | ¿Se detecta? |
 |---|---|
@@ -118,6 +124,8 @@ Se **rechaza**, no se enmascara: la entrada que coincida no sale del servidor.
 | `12345678`, `DNI12345678`, `A12345678`, `12345678B` | sí (DNI: no hay dígitos al lado) |
 | `123456789`, `20261111` incluido en `202611110` | no (son 9 dígitos) |
 | `20261111` suelto | sí (falso positivo aceptado) |
+| `Ref 12345678901 987654321` | sí, `telefono` (`987654321`). Falla con una implementación ingenua de `FindAll` (H5) |
+| `987654321 987654322` | sí, los **dos** (`Enmascarar` reemplaza ambos) |
 
 - **Un DNI no se distingue de otro número de 8 dígitos**, y no se intenta: todo número de 8 dígitos aislado se trata como posible DNI y se rechaza (la historia dice «un número de 8 dígitos aislado como DNI»). Que esté «aislado» significa que **no tiene dígitos al lado**: `123456789` no coincide, pero `DNI12345678`, `A12345678` y `12345678B` sí, porque así suele escribirse un DNI junto a su etiqueta (corrección H3). El precio es algún falso positivo, como una fecha `20261111`, y es aceptado (ADR 0006).
 - Se evalúa sobre `Instrucciones` y sobre cada `Bloque.Texto`.
