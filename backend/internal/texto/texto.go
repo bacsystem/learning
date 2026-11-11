@@ -7,10 +7,10 @@ import "strings"
 
 // Combining marks of the decomposed (NFD) forms that Plegar folds.
 const (
-	agudo      = "́"
-	grave      = "̀"
-	dieresis   = "̈"
-	virgulilla = "̃"
+	agudo      = "\u0301"
+	grave      = "\u0300"
+	dieresis   = "\u0308"
+	virgulilla = "\u0303"
 )
 
 // tildes maps every accented vowel (and ü) to its plain form, whether it comes
