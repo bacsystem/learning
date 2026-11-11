@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/cbaciliod/learning/internal/crypto"
-	"github.com/cbaciliod/learning/internal/middleware"
+	"github.com/cbaciliod/learning/internal/netutil"
 )
 
 // MinJWTSecretBytes is the minimum JWT_SECRET length: HS256 needs a key of at
@@ -94,11 +94,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("ENCRYPTION_KEY is required")
 	}
 	// Same rule as crypto.NewCipher, checked before connecting to the
-	// database. The decode error is not wrapped: it quotes part of the key.
+	// database; its error is replaced by one that names the variable.
 	if _, err := crypto.NewCipher(cfg.EncryptionKey); err != nil {
 		return nil, fmt.Errorf("ENCRYPTION_KEY must be 64 hex characters (a 32-byte key)")
 	}
-	if _, err := middleware.ParseTrustedProxies(cfg.TrustedProxies); err != nil {
+	if _, err := netutil.ParseTrustedProxies(cfg.TrustedProxies); err != nil {
 		return nil, fmt.Errorf("TRUSTED_PROXIES: %w", err)
 	}
 	cfg.LogLevel = strings.ToLower(strings.TrimSpace(cfg.LogLevel))
