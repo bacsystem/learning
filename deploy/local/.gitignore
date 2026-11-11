@@ -1,0 +1,2 @@
+# Certificado autofirmado de Postgres: lo genera make local/certs.
+certs/

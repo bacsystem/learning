@@ -137,6 +137,8 @@ check/docker-tag:
 check/release-tree: check/docker-tag
 	@test -z "$$(git status --porcelain)" || (echo "ERROR: hay cambios sin commit o archivos sin seguimiento; construye desde un checkout limpio del tag" && exit 1)
 	@test "$$(git describe --exact-match --tags HEAD 2>/dev/null)" = "$(DOCKER_TAG)" || (echo "ERROR: HEAD no es el tag $(DOCKER_TAG) (git switch --detach $(DOCKER_TAG))" && exit 1)
+	@v=$$(sed -nE 's/^  "version": "([^"]+)".*/\1/p' frontend/package.json); \
+	  test "$$v" = "$(VERSION)" || (echo "ERROR: frontend/package.json dice $$v y el tag es $(DOCKER_TAG); alinéalo en release/$(VERSION)" && exit 1)
 
 docker/build/backend: check/release-tree ## Imagen del backend (linux/amd64) desde el tag DOCKER_TAG
 	docker build --platform linux/amd64 --no-cache --build-arg "VERSION=$(VERSION)" -t $(BACKEND_IMG) backend/
@@ -224,6 +226,72 @@ compose/seed/admin: compose/check-env ## Crea el admin (ADMIN_EMAIL=..., contras
 	cd backend && printf '%s\n' "$$pw" | DATABASE_URL="$(C_DB_URL)" ENCRYPTION_KEY="$(C_ENC_KEY)" \
 		ADMIN_EMAIL="$(ADMIN_EMAIL)" ADMIN_USERNAME="$(ADMIN_USERNAME)" ADMIN_REBIND="$(ADMIN_REBIND)" \
 		go run ./cmd/seed/admin
+
+# ── Preproducción local para qa (deploy/local/) ───────────────────────────────
+# Las MISMAS imágenes que van a Railway: TAG=vX.Y.Z usa las publicadas
+# (backend vX.Y.Z, frontend vX.Y.Z-preprod); BUILD=1 las construye con los
+# mismos Dockerfiles. Variables falsas en deploy/local/preprod.vars.
+# Uso: make local/up TAG=v1.0.0 | make local/up BUILD=1 → http://localhost:3110
+LOCAL_DIR  := deploy/local
+TAG        ?=
+BUILD      ?=
+local_var   = $(shell grep -E '^$(1)=' $(LOCAL_DIR)/preprod.vars | cut -d'=' -f2-)
+L_PG_USER  := $(call local_var,PREPROD_PG_USER)
+L_PG_PASS  := $(call local_var,PREPROD_PG_PASSWORD)
+L_PG_DB    := $(call local_var,PREPROD_PG_DB)
+L_ENC_KEY  := $(call local_var,PREPROD_ENCRYPTION_KEY)
+L_DEMO_ADM := $(call local_var,PREPROD_DEMO_ADMIN_PASSWORD)
+L_DEMO_USR := $(call local_var,PREPROD_DEMO_POSTULANTE_PASSWORD)
+L_BACKEND  := $(if $(BUILD),capacitate-preprod/backend:local,$(DOCKER_USER)/learning-backend:$(TAG))
+L_FRONTEND := $(if $(BUILD),capacitate-preprod/frontend:local,$(DOCKER_USER)/learning-frontend:$(TAG)-preprod)
+# Para los comandos que no arrancan servicios, compose igual exige las imágenes.
+L_IMAGES    = BACKEND_IMAGE="$(or $(1),unused)" FRONTEND_IMAGE="$(or $(2),unused)"
+LOCAL_COMPOSE := docker compose --env-file $(LOCAL_DIR)/preprod.vars -f $(LOCAL_DIR)/compose.yml \
+                 $(if $(BUILD),-f $(LOCAL_DIR)/compose.build.yml)
+
+.PHONY: local/up local/down local/reset local/seed local/logs local/ps local/psql \
+        local/certs check/local-images
+
+check/local-images:
+	@test -n "$(BUILD)" || echo "$(TAG)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' || \
+	  (echo "ERROR: set TAG=vX.Y.Z (imágenes publicadas) o BUILD=1 (build local)" && exit 1)
+
+local/certs:
+	@test -f $(LOCAL_DIR)/certs/server.crt || { mkdir -p $(LOCAL_DIR)/certs && \
+	  openssl req -x509 -newkey rsa:2048 -nodes -days 825 -subj "/CN=db" \
+	    -keyout $(LOCAL_DIR)/certs/server.key -out $(LOCAL_DIR)/certs/server.crt 2>/dev/null && \
+	  echo "✓ certificado autofirmado de Postgres en $(LOCAL_DIR)/certs/"; }
+
+local/up: check/local-images local/certs ## Levanta la preproducción (TAG=vX.Y.Z o BUILD=1): db TLS, mailpit, backend (migra), frontend
+	$(call L_IMAGES,$(L_BACKEND),$(L_FRONTEND)) $(LOCAL_COMPOSE) up -d --wait $(if $(BUILD),--build)
+	@$(call L_IMAGES) $(LOCAL_COMPOSE) ps
+
+local/down: ## Detiene la preproducción (conserva los datos)
+	$(call L_IMAGES) $(LOCAL_COMPOSE) down
+
+local/seed: ## Carga los datos sintéticos de qa (cmd/seed/demo)
+	@test -d backend/cmd/seed/demo || (echo "PENDIENTE: falta backend/cmd/seed/demo (backend-dev); crea catálogos, admin y usuarios sintéticos." && exit 1)
+	docker run --rm --network capacitate-preprod_default \
+	  -v "$(CURDIR)/backend:/src:ro" -v capacitate-preprod-gomod:/go/pkg/mod -w /src \
+	  -e GOFLAGS=-buildvcs=false -e ENV=preprod \
+	  -e DATABASE_URL="postgres://$(L_PG_USER):$(L_PG_PASS)@db:5432/$(L_PG_DB)?sslmode=require" \
+	  -e ENCRYPTION_KEY="$(L_ENC_KEY)" \
+	  -e DEMO_ADMIN_PASSWORD="$(L_DEMO_ADM)" -e DEMO_POSTULANTE_PASSWORD="$(L_DEMO_USR)" \
+	  golang:1.27.4-alpine3.23 go run ./cmd/seed/demo
+
+local/reset: check/local-images ## BORRA la base de preproducción, vuelve a levantar (migra) y siembra
+	$(call L_IMAGES) $(LOCAL_COMPOSE) down -v
+	$(MAKE) local/up TAG=$(TAG) BUILD=$(BUILD)
+	$(MAKE) local/seed
+
+local/logs: ## Logs en vivo de la preproducción (s=db|backend|frontend|mailpit)
+	$(call L_IMAGES) $(LOCAL_COMPOSE) logs -f --tail=100 $(s)
+
+local/ps: ## Estado de los contenedores de la preproducción
+	$(call L_IMAGES) $(LOCAL_COMPOSE) ps
+
+local/psql: ## Consola psql en la base de preproducción
+	$(call L_IMAGES) $(LOCAL_COMPOSE) exec db psql -U "$(L_PG_USER)" -d "$(L_PG_DB)"
 
 clean: ## Borra artefactos de build y cobertura
 	cd backend && rm -rf bin/ tmp/ coverage.out
