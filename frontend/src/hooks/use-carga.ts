@@ -21,6 +21,11 @@ export function useCarga<T>(clave: string | null, cargar: () => Promise<T>) {
     recargar();
   }, [recargar]);
 
+  const refrescar = useCallback(
+    () => (clave ? carga.refrescar(clave, () => cargarActual.current()) : Promise.resolve()),
+    [carga, clave],
+  );
+
   const reemplazar = useCallback(
     (datos: T) => {
       if (clave) carga.reemplazar(clave, datos);
@@ -28,5 +33,5 @@ export function useCarga<T>(clave: string | null, cargar: () => Promise<T>) {
     [carga, clave],
   );
 
-  return { ...vistaDeCarga(estado, clave), recargar, reemplazar };
+  return { ...vistaDeCarga(estado, clave), recargar, refrescar, reemplazar };
 }

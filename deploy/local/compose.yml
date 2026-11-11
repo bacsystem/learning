@@ -1,0 +1,89 @@
+# Preproducción local para qa: las MISMAS imágenes que van a Railway, con
+# configuración de producción (ENV=preprod) y datos 100 % sintéticos.
+# Guía: deploy/local/README.md · Uso: make local/up TAG=v1.0.0 (o BUILD=1).
+#
+#   frontend http://localhost:3110 · backend http://localhost:8180
+#   Postgres localhost:5441 (TLS)  · Mailpit http://localhost:8125
+#
+# Todo se publica solo en 127.0.0.1 y no choca con dev (5433) ni test (5434).
+# Variables: deploy/local/preprod.vars (valores falsos, NOT FOR PRODUCTION).
+name: capacitate-preprod
+
+services:
+  db:
+    image: postgres:16.14-alpine3.23
+    # El contenedor arranca como root: copia el certificado autofirmado (lo
+    # genera make local/certs), le da la propiedad a postgres y arranca con TLS.
+    command:
+      - sh
+      - -c
+      - >-
+        install -o postgres -g postgres -m 0600 /certs/server.key /var/lib/postgresql/server.key &&
+        install -o postgres -g postgres -m 0644 /certs/server.crt /var/lib/postgresql/server.crt &&
+        exec docker-entrypoint.sh postgres -c ssl=on
+        -c ssl_cert_file=/var/lib/postgresql/server.crt
+        -c ssl_key_file=/var/lib/postgresql/server.key
+    environment:
+      POSTGRES_USER: ${PREPROD_PG_USER:?usa make local/up}
+      POSTGRES_PASSWORD: ${PREPROD_PG_PASSWORD:?usa make local/up}
+      POSTGRES_DB: ${PREPROD_PG_DB:?usa make local/up}
+    ports:
+      - "127.0.0.1:5441:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./certs:/certs:ro
+      # Crea también capacitate_preprod_test (para make test) en el primer arranque.
+      - ./db/initdb:/docker-entrypoint-initdb.d:ro
+    # Por TCP (-h 127.0.0.1), no por socket: durante la inicialización la imagen
+    # oficial levanta un servidor temporal solo con socket Unix que dice «ready»
+    # y se apaga; por socket, el backend podía arrancar en esa ventana.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Captura todo el correo: nada sale a personas reales.
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    ports:
+      - "127.0.0.1:8125:8025"
+
+  backend:
+    image: ${BACKEND_IMAGE:?usa make local/up TAG=vX.Y.Z o BUILD=1}
+    restart: unless-stopped
+    stop_grace_period: 45s
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment:
+      # Distinto de development/test: la validación de config es la de producción.
+      ENV: preprod
+      PORT: 8080
+      DATABASE_URL: postgres://${PREPROD_PG_USER}:${PREPROD_PG_PASSWORD}@db:5432/${PREPROD_PG_DB}?sslmode=require
+      JWT_SECRET: ${PREPROD_JWT_SECRET:?usa make local/up}
+      ENCRYPTION_KEY: ${PREPROD_ENCRYPTION_KEY:?usa make local/up}
+      CORS_ORIGINS: http://localhost:3110
+      FRONTEND_BASE_URL: http://localhost:3110
+      TRUSTED_PROXIES: ""
+      LOG_LEVEL: info
+      MIGRATE_LOCK_TIMEOUT: 10m
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_FROM: no-reply@preprod.invalid
+    ports:
+      - "127.0.0.1:8180:8080"
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?usa make local/up TAG=vX.Y.Z o BUILD=1}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3110:3000"
+
+volumes:
+  pgdata:

@@ -7,7 +7,7 @@ Convenciones transversales para todos los endpoints del módulo «Aprendizaje as
 | [serums-ia-e1-taxonomia.md](serums-ia-e1-taxonomia.md) | E1-01, E1-02, E1-03, E1-04 (MVP) | vigente (2026-11-11) |
 | [serums-ia-e2-fuentes.md](serums-ia-e2-fuentes.md) | E2-02, E2-03, E2-05, E2-06, E2-07 (MVP) | aprobado, pendiente de implementación (2026-11-11) |
 
-ADRs: [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones).
+ADRs: [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones), [0005](../adr/0005-estado-operativo-panel-salud.md) estado operativo del panel de salud. Contrato de la épica de plataforma PLT-E1: [plataforma-salud.md](plataforma-salud.md).
 
 Un cambio a un contrato ya publicado se avisa directamente a backend-dev, frontend-dev y al tech-lead.
 
@@ -19,7 +19,9 @@ Un cambio a un contrato ya publicado se avisa directamente a backend-dev, fronte
 - **Montaje:** función `Mount(mux, svc, audLog *audit.Logger, jwtSecret, checkSession)`, con la misma firma que `inscripciones.Mount` (`cmd/server/main.go:124`). Se llama desde `cmd/server/main.go:123-131`. Los módulos nuevos reciben el `audLog` de `main` en vez de construir otro, que es la deuda anotada en `catalogs/routes.go:13-17` (H86).
 - **Rutas** con el `ServeMux` de Go 1.22+ (`"METHOD /ruta/{param}"`). Las rutas admin van bajo `/admin/…`. Las del postulante en el módulo van bajo `/serums-ia/…`. Las lecturas de catálogo para cualquier autenticado se quedan junto al recurso (p. ej. `GET /asignaturas/{id}/temas`, como `GET /asignaturas`, `catalogs/routes.go:44`).
 - **IDs de ruta:** enteros > 0. Si no, `400 parametro_invalido` (equivale a `pathID` de `catalogs/handler.go:85-89`).
-- **JSON:** `snake_case`. Las fechas y horas van en RFC 3339 UTC (`time.Time` serializado), p. ej. `"2026-11-11T15:04:05Z"`. Los decimales de peso y coeficiente van como número con ≤ 2 decimales (validación `dec2`, `catalogs/handler.go:21-36`). En `PUT`, los campos opcionales ausentes y `null` significan «sin valor», salvo que el endpoint diga otra cosa. Excepción vigente: `tema_id` en `PUT /preguntas/{id}`, donde ausente conserva el valor actual y `null` lo quita (E1 T8, como `etiqueta_ids`).
+- **JSON:** `snake_case`. Las fechas y horas van en RFC 3339 UTC (`time.Time` serializado), p. ej. `"2026-11-11T15:04:05Z"`. Los decimales de peso y coeficiente van como número con ≤ 2 decimales (validación `dec2`, `catalogs/handler.go:21-36`). En `PUT`, los campos opcionales ausentes y `null` significan «sin valor», salvo que el endpoint diga otra cosa. Excepciones vigentes:
+  - `tema_id` en `PUT /preguntas/{id}`: ausente conserva el valor actual y `null` lo quita (E1 T8, como `etiqueta_ids`).
+  - `especialidad_ids` en `PUT /admin/fuentes/{id}`: es obligatorio, y ausente o `null` da 422 `requerido`; `[]` significa «todas» (E2 S7).
 - Los handlers decodifican con `DisallowUnknownFields`: un campo desconocido da `400 cuerpo_invalido`.
 - **Plegado de texto:** las comparaciones sin mayúsculas ni tildes (nombre de tema, búsqueda de pasajes) usan una única función, `texto.Plegar` (`internal/texto/texto.go`). La creó SIA-E1-01 y la reutiliza SIA-E2-02. Pliega igual una tilde compuesta (NFC) que una descompuesta (NFD) y conserva la `ñ`. Las reglas están en la ADR 0003 § Plegado.
 
@@ -58,9 +60,10 @@ El repo tiene dos formatos:
 - **500:** siempre `{"error": "error_interno", "message": "Error interno del servidor."}`. La causa se registra con `op` y sin datos personales, como `httpx.InternalError` (`httpx.go:24-34`).
 - **Excepciones (respuestas que no salen del handler):**
   - `RequireAuth` y `RequireAdmin` responden `{"error": "No autenticado." | "Sesión revocada." | "Acceso denegado."}` (`auth/middleware.go:38,44,52,57,73`);
+  - `RequireAuth` responde `503 {"error": "Servicio no disponible."}` cuando la comprobación de la sesión falla por un error de la BD. El 401 queda solo para una sesión inexistente, expirada o revocada ([ADR 0005](../adr/0005-estado-operativo-panel-salud.md); cambio pendiente de implementar);
   - `MaxBodySize` responde `413 {"error": "El cuerpo de la solicitud es demasiado grande."}` (`middleware/bodylimit.go:42-44`) cuando el `Content-Length` declarado ya supera el límite.
 
-  El frontend trata esos tres status (401, 403 y 413 de middleware) **por status** y no por código. Si hay `message`, el código está en `error`; si no, `error` es texto.
+  El frontend trata esos status (401, 403, 413 y 503 de middleware) **por status** y no por código. Solo el 401 dispara `auth:expired`. Si hay `message`, el código está en `error`; si no, `error` es texto.
 - **Cuerpo demasiado grande en el handler (convención):** sin `Content-Length` (p. ej. `Transfer-Encoding: chunked`), el middleware no rechaza la petición: envuelve el cuerpo en `http.MaxBytesReader` (`bodylimit.go:46`). Pasado el límite, la lectura falla dentro del handler con `*http.MaxBytesError`.
   - **Regla:** todo handler del módulo que decodifica un cuerpo JSON comprueba `var mbe *http.MaxBytesError; errors.As(err, &mbe)` **antes** de responder `400 cuerpo_invalido`. Si es ese error, responde `413` con el formato 2: `{"error": "cuerpo_demasiado_grande", "message": "El cuerpo de la solicitud es demasiado grande."}`.
   - Precedente: hoy solo `auth` hace este mapeo (`internal/auth/handler.go:58-65`), con el formato heredado. Los handlers de temas responden 400 (`internal/temas/handler.go:255-264`, `decodificar`) y deben corregirse (tarea de backend-dev).

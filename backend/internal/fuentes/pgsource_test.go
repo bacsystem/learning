@@ -248,3 +248,76 @@ func detalleAudit(t *testing.T, db *sqlx.DB, desde int64, accion string, fuenteI
 	}
 	return d
 }
+
+// estado_anterior is the fuente's state when the worker's transaction gets
+// the fuente, not a snapshot taken before waiting for its lock: another
+// transaction holds the fuente, changes its state and commits while the
+// worker waits (READ COMMITTED would otherwise audit the stale state).
+func TestEstadoAnteriorTrasEsperarElBloqueo(t *testing.T) {
+	cases := []struct {
+		name   string
+		accion string
+		correr func(ctx context.Context, repo *fuentes.PgSource, id int64, n int, aud fuentes.Auditor) error
+	}{
+		{"publicar", fuentes.AccionProcesar, func(ctx context.Context, repo *fuentes.PgSource, id int64, n int, aud fuentes.Auditor) error {
+			ps := []fuentes.PasajeNuevo{{Orden: 1, LineaInicio: 1, LineaFin: 1, Texto: "tras el bloqueo " + dbtest.Uniq(), Palabras: 3}}
+			return repo.PublicarVersion(ctx, id, n, ps, aud)
+		}},
+		{"fallar", fuentes.AccionFallar, func(ctx context.Context, repo *fuentes.PgSource, id int64, n int, aud fuentes.Auditor) error {
+			return repo.MarcarVersionFallida(ctx, id, n, fuentes.MotivoErrorInterno, aud)
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			e, db := entornoPg(t)
+			ctx := context.Background()
+			aud := audit.New(db)
+			sistema := func(ctx context.Context, tx sqlx.ExecerContext, ev fuentes.Evento) error {
+				return aud.LogTx(ctx, tx, nil, ev.Accion, ev.Entidad, &ev.EntidadID, ev.Detalle, "", "")
+			}
+			var desde int64
+			if err := db.Get(&desde, `SELECT COALESCE(MAX(id), 0) FROM audit_log`); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _, _ = db.Exec(`DELETE FROM audit_log WHERE id > $1 AND entidad = 'fuente'`, desde) })
+			id, err := publicar(t, e, nil, "vigente "+dbtest.Uniq())
+			if err != nil {
+				t.Fatal(err)
+			}
+			n := e.NuevaVersion(t, id, []byte("en proceso "+dbtest.Uniq()))
+
+			otra, err := db.Beginx()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = otra.Rollback() }()
+			if _, err := otra.Exec(`SELECT 1 FROM fuentes WHERE id = $1 FOR UPDATE`, id); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := otra.Exec(`UPDATE fuentes SET estado = 'retirada', motivo_retiro = 'mientras espera' WHERE id = $1`, id); err != nil {
+				t.Fatal(err)
+			}
+			pid := dbtest.BackendPID(t, otra)
+			resultado := make(chan int, 1)
+			errs := make(chan error, 1)
+			go func() {
+				errs <- c.correr(ctx, e.Repo.(*fuentes.PgSource), id, n, sistema)
+				resultado <- 1
+			}()
+			if !dbtest.BlockedBy(t, db, pid, resultado) {
+				t.Fatal("the worker did not wait for the fuente's lock")
+			}
+			if err := otra.Commit(); err != nil {
+				t.Fatal(err)
+			}
+			<-resultado
+			if err := <-errs; err != nil {
+				t.Fatal(err)
+			}
+			d := detalleAudit(t, db, desde, c.accion, id)
+			if d["estado_anterior"] != fuentes.EstadoRetirada || d["estado_nuevo"] != fuentes.EstadoRetirada {
+				t.Errorf("%s detalle = %v, want retirada → retirada", c.accion, d)
+			}
+		})
+	}
+}

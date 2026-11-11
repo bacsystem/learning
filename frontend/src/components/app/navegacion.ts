@@ -2,6 +2,7 @@ import type { IconoComponente } from "@/lib/iconos";
 import {
   BellIcon,
   BookmarksIcon,
+  BooksIcon,
   BuildingsIcon,
   ChartLineIcon,
   ClipboardTextIcon,
@@ -9,6 +10,7 @@ import {
   CoinsIcon,
   GearSixIcon,
   GraduationCapIcon,
+  HeartbeatIcon,
   HouseIcon,
   ListChecksIcon,
   ListMagnifyingGlassIcon,
@@ -70,6 +72,7 @@ export const NAVEGACION: GrupoDestinos[] = [
       { href: "/admin/ingresos", etiqueta: "menu-admin-ingresos", icono: CoinsIcon },
       { href: "/admin/testimonios", etiqueta: "menu-admin-testimonios", icono: StarIcon },
       { href: "/admin/audit-log", etiqueta: "menu-admin-audit-log", icono: ListMagnifyingGlassIcon },
+      { href: "/admin/salud", etiqueta: "saludServicios.menu", icono: HeartbeatIcon },
     ],
   },
   {
@@ -82,6 +85,7 @@ export const NAVEGACION: GrupoDestinos[] = [
       { href: "/admin/asignaturas", etiqueta: "menu-admin-asignaturas", icono: ListChecksIcon },
       { href: "/admin/temas", etiqueta: "menu-admin-temas", icono: TreeStructureIcon },
       { href: "/admin/pesos", etiqueta: "menu-admin-pesos", icono: ScalesIcon },
+      { href: "/admin/fuentes", etiqueta: "menu-admin-fuentes", icono: BooksIcon },
       { href: "/admin/procesos", etiqueta: "menu-admin-procesos", icono: SignpostIcon },
       { href: "/admin/preguntas", etiqueta: "menu-admin-preguntas", icono: ShieldCheckIcon },
       { href: "/admin/etiquetas", etiqueta: "menu-admin-etiquetas", icono: TagIcon },
