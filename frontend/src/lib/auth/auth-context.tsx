@@ -4,7 +4,7 @@ import { authApi, type UserProfile } from "./auth-api";
 import { esRutaPublica } from "./rutas-publicas";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { escucharSesionExpirada } from "@/lib/http/sesion";
+import { escucharSesionExpirada, sesionExpirada } from "@/lib/http/sesion";
 
 const TOKEN_KEY = "auth_token";
 
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Only a 401 means the session is gone. A network error, 5xx or 429
         // keeps the token: the session stays open with `user` pending, and the
         // polling below retries /auth/me until it answers.
-        if (err?.status === 401) {
+        if (typeof err?.status === "number" && sesionExpirada(err.status)) {
           localStorage.removeItem(TOKEN_KEY);
           setState({ user: null, token: null, loading: false });
         } else {
