@@ -24,7 +24,7 @@ export const ESTADOS_FILTRABLES = ESTADOS_PREGUNTA.filter(
 export const ORIGENES_PREGUNTA: readonly OrigenPregunta[] = ["manual", "balotario", "ia"];
 
 /** Claves i18n (`dashboard.*`) del nombre de un estado y de un origen. */
-export const claveEstadoPregunta = (estado: EstadoPregunta) => `admin-preguntas-estado-${estado.replace("_", "-")}`;
+export const claveEstadoPregunta = (estado: EstadoPregunta) => `serumsIa.estadosPregunta.${estado}`;
 export const claveOrigenPregunta = (origen: OrigenPregunta) => `admin-preguntas-origen-${origen}`;
 
 /** P2 (decisión del PO): `DELETE` solo desde estos estados; un borrador o una en revisión se rechazan primero. */

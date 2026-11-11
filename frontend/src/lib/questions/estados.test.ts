@@ -62,11 +62,16 @@ describe("claves i18n de estado y origen", () => {
     ["es", es.dashboard],
     ["en", en.dashboard],
   ])("exist in %s", (_, mensajes) => {
-    const faltan = claves.filter((c) => !(c in mensajes));
+    const existe = (clave: string) =>
+      clave
+        .split(".")
+        .reduce<unknown>((nodo, parte) => (nodo as Record<string, unknown> | undefined)?.[parte], mensajes) !==
+      undefined;
+    const faltan = claves.filter((c) => !existe(c));
     expect(faltan).toEqual([]);
   });
 
-  it("use kebab case for multi-word states", () => {
-    expect(claveEstadoPregunta("en_revision")).toBe("admin-preguntas-estado-en-revision");
+  it("live under serumsIa.estadosPregunta, owned by E3-02", () => {
+    expect(claveEstadoPregunta("en_revision")).toBe("serumsIa.estadosPregunta.en_revision");
   });
 });
