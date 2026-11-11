@@ -1,4 +1,4 @@
-import { claveDeError, type ClavesDeError, mensajeDeError } from "@/lib/serums-ia/errores";
+import { type ClavesDeError, mensajeDeError } from "@/lib/serums-ia/errores";
 
 /** Códigos de error de F1–F3 con traducción propia (docs/api/serums-ia-e1-taxonomia.md §3). */
 const CLAVES_PROFESION: ClavesDeError = {
@@ -8,12 +8,8 @@ const CLAVES_PROFESION: ClavesDeError = {
   validacion: "serumsIa.profesion.errores.validacion",
   cuerpo_invalido: "serumsIa.profesion.errores.validacion",
   error_interno: "serumsIa.profesion.errores.error_interno",
+  cuerpo_demasiado_grande: "serumsIa.errores.cuerpo_demasiado_grande",
 };
-
-/** Código del error (o `null`): la pantalla trata aparte `profesion_no_definida`, `confirmacion_requerida` e `inscripcion_requerida`. */
-export function claveErrorProfesion(err: unknown): string | null {
-  return claveDeError(err, CLAVES_PROFESION);
-}
 
 export function mensajeErrorProfesion(err: unknown, t: (clave: string) => string, generico: string): string {
   return mensajeDeError(err, CLAVES_PROFESION, t, generico);

@@ -3,6 +3,7 @@
     "en": "English",
     "es": "Español",
     "menu-procesos": "Procesos",
+    "menu-profesion": "Mi profesión",
     "menu-admin": "Admin",
     "menu-admin-dashboard": "Panel",
     "menu-gestion": "Configuración",
@@ -1372,6 +1373,51 @@
           "limite_preguntas": "El total de preguntas pasa de 200.",
           "pesos_no_suman_100": "Los pesos no suman 100 %.",
           "no_encontrado": "El proceso ya no existe. Recarga la página."
+        }
+      },
+      "profesion": {
+        "sugerida": "Te sugerimos esta profesión a partir de tus datos. No se guarda hasta que pulses «Guardar».",
+        "guardar": "Guardar profesión",
+        "cambiar": "Cambiar profesión",
+        "guardada": "Profesión guardada: {especialidad}.",
+        "errorCargar": "No se pudo cargar tu profesión.",
+        "inscripcionRevocada": "Tu inscripción en el proceso de tu profesión ya no está aprobada. Elige un proceso donde estés inscrito.",
+        "campo": {
+          "proceso": "Proceso SERUMS",
+          "procesoElegir": "Elige un proceso",
+          "especialidad": "Profesión",
+          "especialidadElegir": "Elige tu profesión",
+          "conEstimados": "{nombre} (pesos estimados)"
+        },
+        "sinInscripcion": {
+          "titulo": "Necesitas una inscripción aprobada",
+          "texto": "Para elegir tu profesión, primero inscríbete en un proceso SERUMS y espera a que se apruebe tu inscripción.",
+          "accion": "Ver procesos"
+        },
+        "actual": {
+          "titulo": "Tu profesión",
+          "estimados": "Para esta profesión aún no hay pesos oficiales: se usan pesos estimados, iguales entre áreas.",
+          "areas": "Áreas del examen",
+          "area": "{nombre} · {peso, number} %",
+          "sinAreas": "Aún no hay áreas con preguntas para esta profesión."
+        },
+        "elegir": {
+          "titulo": "Elige tu profesión",
+          "tituloCambiar": "Cambiar de profesión",
+          "ayuda": "El diagnóstico, el dashboard y el plan usan las áreas y pesos de la profesión que elijas. Tus datos personales no cambian."
+        },
+        "confirmar": {
+          "titulo": "¿Cambiar de profesión?",
+          "texto": "Pasarás de {actual} a {nueva}. Tu progreso de dominio en la profesión actual se archiva y la nueva empieza de cero. Tus prácticas y simulacros anteriores se conservan.",
+          "textoGenerico": "Tu progreso de dominio en la profesión actual se archiva y la nueva empieza de cero. Tus prácticas y simulacros anteriores se conservan.",
+          "boton": "Sí, cambiar"
+        },
+        "errores": {
+          "inscripcion_requerida": "Necesitas una inscripción aprobada en ese proceso para elegir esta profesión.",
+          "especialidad_invalida": "Esa profesión ya no está disponible en el proceso. Recarga y elige otra.",
+          "estado_invalido": "Tu profesión cambió en otra pestaña. Recarga la página.",
+          "validacion": "Revisa el proceso y la profesión elegidos.",
+          "error_interno": "Error interno del servidor. Inténtalo de nuevo."
         }
       }
     }
