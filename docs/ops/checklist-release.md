@@ -81,6 +81,12 @@ La 062 está en el PR #92.
 
 ## 3. Verificación en local, sobre `release/X.Y.Z`
 
+- [ ] **qa valida completo** en la preproducción local, sobre la rama:
+      `make local/reset BUILD=1` (las mismas imágenes construidas en local con
+      los mismos Dockerfiles) y las historias del release con su regresión
+      ([deploy/local/README.md](../../deploy/local/README.md)). Sin esto no
+      se pide el tag.
+
 Con las mismas versiones que el CI (ver [paridad-ci-local.md](paridad-ci-local.md)):
 Go según `backend/go.mod` (toolchain go1.27.4), Node según `frontend/.nvmrc` (22.23.4)
 y Postgres 16.
@@ -109,8 +115,20 @@ La configuración de cada servicio está en [railway.md](railway.md). Railway
 despliega **imágenes de Docker Hub** (repositorios públicos). Desplegar es
 cambiar el tag de la imagen en el servicio.
 
-**Orden:** tag → CI del tag en verde → build, verificación y push **locales del
-usuario** → cambio del tag de la imagen en Railway. Las imágenes las construye
+**Orden** (ADR 0004, D9 y D10):
+
+1. qa valida **completo** en `deploy/local` sobre `release/X.Y.Z`, con las
+   imágenes construidas en local (§3).
+2. Tag.
+3. CI del tag en verde.
+4. Build, verificación y push **locales del usuario**: backend `vX.Y.Z`,
+   frontend `vX.Y.Z` y frontend `vX.Y.Z-preprod`.
+5. **Smoke** de qa con `make local/up TAG=vX.Y.Z` sobre las imágenes
+   publicadas, anotando el digest del backend.
+6. Cambio del tag (o del digest) de la imagen en Railway.
+
+Si el smoke falla, no se despliega y sale `vX.Y.(Z+1)`: los tags no se
+reescriben. Las imágenes las construye
 y publica **el usuario** con su cuenta `cbaciliod`. **Ningún agente hace
 `docker login` ni `docker push`.**
 
@@ -119,13 +137,20 @@ y publica **el usuario** con su cuenta `cbaciliod`. **Ningún agente hace
 - [ ] Checkout **limpio** del tag, nunca del árbol de trabajo:
       `git clone https://github.com/bacsystem/learning.git && cd learning && git switch --detach vX.Y.Z`.
       `make` falla (`check/release-tree`) si hay cambios sin commit, archivos
-      sin seguimiento o si HEAD no es el tag `DOCKER_TAG`.
+      sin seguimiento, si HEAD no es el tag `DOCKER_TAG` o si el `version` de
+      `frontend/package.json` no es el tag sin la «v».
 - [ ] `make docker/build DOCKER_TAG=vX.Y.Z NEXT_PUBLIC_API_URL=<api de prod>`.
       Construye para `linux/amd64` y con `--no-cache`, e inyecta `VERSION=X.Y.Z`
       en el backend. La imagen del frontend de otro entorno se construye aparte
       con `FRONTEND_ENV=<entorno>` y queda con el tag `vX.Y.Z-<entorno>`
       ([railway.md](railway.md) §2).
-- [ ] **`make docker/verify DOCKER_TAG=vX.Y.Z`**, que **se ejecuta**, no se lee.
+- [ ] Frontend de preproducción, **sin reconstruir el backend**:
+      `make docker/build/frontend DOCKER_TAG=vX.Y.Z FRONTEND_ENV=preprod NEXT_PUBLIC_API_URL=http://localhost:8180`.
+      No uses `docker/release` para esto: reconstruiría el backend con otro
+      digest bajo el mismo tag.
+- [ ] **`make docker/verify DOCKER_TAG=vX.Y.Z`** y
+      **`make docker/verify DOCKER_TAG=vX.Y.Z FRONTEND_ENV=preprod`**, que **se
+      ejecutan**, no se leen.
       Las imágenes son públicas, y el target falla si encuentra:
   - `.env*`, `assets/`, `bin/`, `*_test.go`, `*.test`, `coverage*` o `.git`
     en `/app` (`docker export` + `tar -t`);
@@ -136,9 +161,23 @@ y publica **el usuario** con su cuenta `cbaciliod`. **Ningún agente hace
     y `ENV JWT_SECRET`: el script la rechaza (exit 1).
 - [ ] `backend/.dockerignore` y `frontend/.dockerignore` siguen excluyendo
       `.env*`, `bin/`, `*.test` y `coverage*`.
-- [ ] `docker login` del usuario y luego `make docker/push DOCKER_TAG=vX.Y.Z`.
-      `docker/push` repite `check/release-tree` y `docker/verify` antes de
-      publicar. Los tags publicados no se reescriben.
+- [ ] `docker login` del usuario y luego `make docker/push DOCKER_TAG=vX.Y.Z` y
+      `make docker/push DOCKER_TAG=vX.Y.Z FRONTEND_ENV=preprod`. La segunda vuelve
+      a subir la misma imagen del backend (mismo digest: no reescribe nada) más
+      el frontend `-preprod`. `docker/push` repite `check/release-tree` y
+      `docker/verify` antes de publicar. Los tags publicados no se reescriben.
+
+**Smoke en preproducción** (qa, con las imágenes publicadas):
+
+- [ ] En un checkout del tag (el seed corre desde el código de ese checkout):
+      `make local/reset TAG=vX.Y.Z`. Levanta backend `vX.Y.Z` y frontend
+      `vX.Y.Z-preprod`, migra y siembra los datos sintéticos
+      ([deploy/local/README.md](../../deploy/local/README.md)).
+- [ ] Anotar el **digest del backend** validado:
+      `docker image inspect --format '{{index .RepoDigests 0}}' cbaciliod/learning-backend:vX.Y.Z`.
+      En Railway se despliega ese digest o el tag inmutable.
+- [ ] Smoke: `/health` con la versión `X.Y.Z`, login y una historia clave. Si
+      falla, no se despliega y sale `vX.Y.(Z+1)`.
 
 **Desplegar**:
 

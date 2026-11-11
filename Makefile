@@ -137,7 +137,9 @@ check/docker-tag:
 # La imagen sale del tag, nunca del árbol de trabajo.
 check/release-tree: check/docker-tag
 	@test -z "$$(git status --porcelain)" || (echo "ERROR: hay cambios sin commit o archivos sin seguimiento; construye desde un checkout limpio del tag" && exit 1)
-	@test "$$(git describe --exact-match --tags HEAD 2>/dev/null)" = "$(DOCKER_TAG)" || (echo "ERROR: HEAD no es el tag $(DOCKER_TAG) (git switch --detach $(DOCKER_TAG))" && exit 1)
+	@git tag --points-at HEAD | grep -qxF "$(DOCKER_TAG)" || (echo "ERROR: HEAD no es el tag $(DOCKER_TAG) (git switch --detach $(DOCKER_TAG))" && exit 1)
+	@v=$$(sed -nE 's/^  "version": "([^"]+)".*/\1/p' frontend/package.json); \
+	  test "$$v" = "$(VERSION)" || (echo "ERROR: frontend/package.json dice $$v y el tag es $(DOCKER_TAG); alinéalo en release/$(VERSION)" && exit 1)
 
 docker/build/backend: check/release-tree ## Imagen del backend (linux/amd64) desde el tag DOCKER_TAG
 	docker build --platform linux/amd64 --no-cache --build-arg "VERSION=$(VERSION)" -t $(BACKEND_IMG) backend/
@@ -225,6 +227,89 @@ compose/seed/admin: compose/check-env ## Crea el admin (ADMIN_EMAIL=..., contras
 	cd backend && printf '%s\n' "$$pw" | DATABASE_URL="$(C_DB_URL)" ENCRYPTION_KEY="$(C_ENC_KEY)" \
 		ADMIN_EMAIL="$(ADMIN_EMAIL)" ADMIN_USERNAME="$(ADMIN_USERNAME)" ADMIN_REBIND="$(ADMIN_REBIND)" \
 		go run ./cmd/seed/admin
+
+# ── Preproducción local para qa (deploy/local/) ───────────────────────────────
+# Las MISMAS imágenes que van a Railway: TAG=vX.Y.Z usa las publicadas
+# (backend vX.Y.Z, frontend vX.Y.Z-preprod); BUILD=1 las construye con los
+# mismos Dockerfiles. Variables falsas en deploy/local/preprod.vars.
+# Uso: make local/up TAG=v1.0.0 | make local/up BUILD=1 → http://localhost:3110
+LOCAL_DIR  := deploy/local
+TAG        ?=
+BUILD      ?=
+local_var   = $(shell grep -E '^$(1)=' $(LOCAL_DIR)/preprod.vars | cut -d'=' -f2-)
+L_PG_USER  := $(call local_var,PREPROD_PG_USER)
+L_PG_PASS  := $(call local_var,PREPROD_PG_PASSWORD)
+L_PG_DB    := $(call local_var,PREPROD_PG_DB)
+L_ENC_KEY  := $(call local_var,PREPROD_ENCRYPTION_KEY)
+L_DEMO_ADM := $(call local_var,PREPROD_DEMO_ADMIN_PASSWORD)
+L_DEMO_USR := $(call local_var,PREPROD_DEMO_POSTULANTE_PASSWORD)
+L_BACKEND  := $(if $(BUILD),capacitate-preprod/backend:local,$(DOCKER_USER)/learning-backend:$(TAG))
+L_FRONTEND := $(if $(BUILD),capacitate-preprod/frontend:local,$(DOCKER_USER)/learning-frontend:$(TAG)-preprod)
+# Para los comandos que no arrancan servicios, compose igual exige las imágenes.
+L_IMAGES    = BACKEND_IMAGE="$(or $(1),unused)" FRONTEND_IMAGE="$(or $(2),unused)"
+LOCAL_COMPOSE := docker compose --env-file $(LOCAL_DIR)/preprod.vars -f $(LOCAL_DIR)/compose.yml \
+                 $(if $(BUILD),-f $(LOCAL_DIR)/compose.build.yml)
+
+.PHONY: local/up local/down local/reset local/seed local/test local/logs local/ps local/psql \
+        local/certs check/local-images check/local-owner
+
+# Hay UNA sola preproducción por máquina (proyecto capacitate-preprod, puertos
+# fijos). Si ya corre desde OTRO checkout, up/down/reset/seed abortan: así nadie
+# pisa ni borra la de otro (qa, otro agente). Para usarla desde aquí, primero
+# `make local/down` en el checkout que la levantó (o ver deploy/local/README.md).
+L_MY_COMPOSE := $(CURDIR)/$(LOCAL_DIR)/compose.yml
+check/local-owner:
+	@cfg=$$(docker compose ls --all --filter name=capacitate-preprod 2>/dev/null | awk '$$1=="capacitate-preprod"{print $$NF}'); \
+	if [ -n "$$cfg" ] && ! echo "$$cfg" | tr ',' '\n' | grep -qxF "$(L_MY_COMPOSE)"; then \
+	  echo "ERROR: la preproducción ya corre desde otro checkout:"; echo "  $$cfg" | tr ',' '\n' | sed -n 1p; \
+	  echo "  Usa ese checkout, o pide a su dueño un 'make local/down' allí. No se tocó nada."; exit 1; fi
+
+check/local-images:
+	@test -n "$(BUILD)" || echo "$(TAG)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' || \
+	  (echo "ERROR: set TAG=vX.Y.Z (imágenes publicadas) o BUILD=1 (build local)" && exit 1)
+
+local/certs:
+	@test -f $(LOCAL_DIR)/certs/server.crt || { mkdir -p $(LOCAL_DIR)/certs && \
+	  openssl req -x509 -newkey rsa:2048 -nodes -days 825 -subj "/CN=db" \
+	    -keyout $(LOCAL_DIR)/certs/server.key -out $(LOCAL_DIR)/certs/server.crt 2>/dev/null && \
+	  echo "✓ certificado autofirmado de Postgres en $(LOCAL_DIR)/certs/"; }
+
+local/up: check/local-images check/local-owner local/certs ## Levanta la preproducción (TAG=vX.Y.Z o BUILD=1): db TLS, mailpit, backend (migra), frontend
+	$(call L_IMAGES,$(L_BACKEND),$(L_FRONTEND)) $(LOCAL_COMPOSE) up -d --wait $(if $(BUILD),--build)
+	@$(call L_IMAGES) $(LOCAL_COMPOSE) ps
+
+local/down: check/local-owner ## Detiene la preproducción (conserva los datos)
+	$(call L_IMAGES) $(LOCAL_COMPOSE) down
+
+local/seed: check/local-owner ## Carga los datos sintéticos de qa (cmd/seed/demo)
+	@test -d backend/cmd/seed/demo || (echo "PENDIENTE: falta backend/cmd/seed/demo (backend-dev); crea catálogos, admin y usuarios sintéticos." && exit 1)
+	docker run --rm --network capacitate-preprod_default \
+	  -v "$(CURDIR)/backend:/src:ro" -v capacitate-preprod-gomod:/go/pkg/mod -w /src \
+	  -e GOFLAGS=-buildvcs=false -e ENV=preprod \
+	  -e DATABASE_URL="postgres://$(L_PG_USER):$(L_PG_PASS)@db:5432/$(L_PG_DB)?sslmode=require" \
+	  -e ENCRYPTION_KEY="$(L_ENC_KEY)" \
+	  -e DEMO_ADMIN_PASSWORD="$(L_DEMO_ADM)" -e DEMO_POSTULANTE_PASSWORD="$(L_DEMO_USR)" \
+	  golang:1.27.4-alpine3.23 go run ./cmd/seed/demo
+
+# Pide confirmación (escribir «borrar»); sin terminal: CONFIRM=borrar.
+local/reset: check/local-images check/local-owner ## BORRA la base de preproducción (pide confirmación o CONFIRM=borrar), levanta, migra y siembra
+	@c="$(CONFIRM)"; if [ -z "$$c" ]; then printf "Se BORRAN los datos de la preproducción local. Escribe «borrar» para seguir: "; read -r c; fi; \
+	  [ "$$c" = borrar ] || { echo "Cancelado: no se borró nada."; exit 1; }
+	$(call L_IMAGES) $(LOCAL_COMPOSE) down -v
+	$(MAKE) local/up TAG=$(TAG) BUILD=$(BUILD)
+	$(MAKE) local/seed
+
+local/test: ## make test contra capacitate_preprod_test (con la preproducción levantada)
+	$(MAKE) test TEST_DATABASE_URL="postgres://$(L_PG_USER):$(L_PG_PASS)@localhost:5441/capacitate_preprod_test?sslmode=require"
+
+local/logs: ## Logs en vivo de la preproducción (s=db|backend|frontend|mailpit)
+	$(call L_IMAGES) $(LOCAL_COMPOSE) logs -f --tail=100 $(s)
+
+local/ps: ## Estado de los contenedores de la preproducción
+	$(call L_IMAGES) $(LOCAL_COMPOSE) ps
+
+local/psql: ## Consola psql en la base de preproducción
+	$(call L_IMAGES) $(LOCAL_COMPOSE) exec db psql -U "$(L_PG_USER)" -d "$(L_PG_DB)"
 
 clean: ## Borra artefactos de build y cobertura
 	cd backend && rm -rf bin/ tmp/ coverage.out

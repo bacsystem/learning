@@ -149,4 +149,11 @@ Todos son de código de la app, así que no se cambian en este PR:
   `var version = "dev"` y que el Dockerfile la inyecte con
   `-ldflags "-X main.version=$VERSION"` desde el tag. Requiere cambiar el
   código; el lado Docker lo hace devops. Decidido: `-X main.version=1.2.0`, sin
-  la «v» del tag; fuera de un release, `0.0.0-dev`. Asignado a backend-dev-2.
+  la «v» del tag; fuera de un release, `0.0.0-dev`. Asignado a backend-dev-2
+  (#100, ya en develop).
+  Valores de `/health` según cómo se construyó la imagen:
+  - release (`make docker/build DOCKER_TAG=vX.Y.Z`): `X.Y.Z`;
+  - preproducción local con `make local/up BUILD=1`: `0.0.0-preprod`, que
+    `deploy/local/compose.build.yml` pasa a propósito para distinguirla;
+  - cualquier otro build sin `VERSION` (`docker compose` de desarrollo, `go run`):
+    `0.0.0-dev`.
