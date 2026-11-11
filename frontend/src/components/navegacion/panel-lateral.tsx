@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { IconoSeccion } from "@/components/patrones/cabecera-seccion";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { OBJETIVO_TACTIL } from "@/lib/estilos";
 import type { IconoComponente } from "@/lib/iconos";
 import { cn } from "@/lib/utils";
 import { XIcon } from "@phosphor-icons/react";
@@ -52,7 +53,10 @@ export function PanelLateral({
           </div>
           <SheetClose
             aria-label="Cerrar"
-            className="text-texto-terciario hover:bg-secondary hover:text-foreground -mt-1 -mr-1 grid size-8 place-items-center rounded-full transition-colors"
+            className={cn(
+              OBJETIVO_TACTIL,
+              "text-texto-terciario hover:bg-secondary hover:text-foreground -mt-1 -mr-1 grid size-8 place-items-center rounded-full transition-colors",
+            )}
           >
             <XIcon weight="bold" className="size-4" />
           </SheetClose>

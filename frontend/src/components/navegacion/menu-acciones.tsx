@@ -1,6 +1,7 @@
 "use client";
 
 import { Menu, MenuContent, MenuItem, MenuLinkItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
+import { OBJETIVO_TACTIL } from "@/lib/estilos";
 import type { IconoComponente } from "@/lib/iconos";
 import { cn } from "@/lib/utils";
 import { DotsThreeIcon } from "@phosphor-icons/react";
@@ -33,6 +34,7 @@ export function MenuAcciones({
         aria-label={etiqueta}
         title={etiqueta}
         className={cn(
+          OBJETIVO_TACTIL,
           "size-control text-muted-foreground/70 hover:bg-secondary hover:text-foreground focus-visible:ring-ring/50 data-popup-open:bg-secondary data-popup-open:text-foreground flex items-center justify-center rounded-lg transition-colors outline-none focus-visible:ring-2",
           className,
         )}

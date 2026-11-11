@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { OBJETIVO_TACTIL } from "@/lib/estilos";
 import { cn } from "@/lib/utils";
 import { Toast as ToastPrimitive } from "@base-ui/react/toast";
 import { CheckCircleIcon, InfoIcon, WarningCircleIcon, WarningIcon, XIcon } from "@phosphor-icons/react";
@@ -49,7 +50,10 @@ function Lista() {
               </ToastPrimitive.Content>
               <ToastPrimitive.Close
                 aria-label="Cerrar"
-                className="text-muted-foreground/70 hover:bg-secondary hover:text-foreground rounded p-0.5 transition-colors"
+                className={cn(
+                  OBJETIVO_TACTIL,
+                  "text-muted-foreground/70 hover:bg-secondary hover:text-foreground rounded p-0.5 transition-colors",
+                )}
               >
                 <XIcon weight="bold" className="size-3.5" />
               </ToastPrimitive.Close>
