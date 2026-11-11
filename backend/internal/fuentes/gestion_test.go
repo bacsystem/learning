@@ -105,6 +105,23 @@ func (e *subidaEnv) fMarcada(t *testing.T, retirar bool) int64 {
 	return id
 }
 
+// mapaDe returns m[clave] as an object, failing the test (not panicking)
+// when it is missing or of another type.
+func mapaDe(t *testing.T, m map[string]any, clave string) map[string]any {
+	t.Helper()
+	v, ok := m[clave].(map[string]any)
+	if !ok {
+		t.Fatalf("%s is not an object: %v", clave, m)
+	}
+	return v
+}
+
+// detalleDe returns the detalle of an error answer.
+func detalleDe(t *testing.T, body map[string]any) map[string]any {
+	t.Helper()
+	return mapaDe(t, body, "detalle")
+}
+
 // auditoria returns the actor and detalle of the last row of accion on the fuente.
 func (e *subidaEnv) auditoria(t *testing.T, accion string, id int64) (int64, map[string]any) {
 	t.Helper()
@@ -574,8 +591,10 @@ func TestS7_Editar(t *testing.T) {
 		t.Run("especialidad_ids requerido: "+cuerpo, func(t *testing.T) {
 			id := e.fActiva(t, e.espA)
 			status, body := e.editar(t, id, cuerpo)
-			campos, _ := body["detalle"].(map[string]any)["campos"].(map[string]any)
-			if status != 422 || codigoDe(body) != "validacion" || campos["especialidad_ids"] != "requerido" {
+			if status != 422 || codigoDe(body) != "validacion" {
+				t.Fatalf("got %d %v, want 422 validacion", status, body)
+			}
+			if campos := mapaDe(t, detalleDe(t, body), "campos"); campos["especialidad_ids"] != "requerido" {
 				t.Errorf("got %d %v", status, body)
 			}
 		})
@@ -623,7 +642,7 @@ func TestS7_Limite(t *testing.T) {
 				t.Fatalf("got %d %v, want %d", status, body, c.status)
 			}
 			if c.status == 422 {
-				detalle := body["detalle"].(map[string]any)
+				detalle := detalleDe(t, body)
 				if codigoDe(body) != "limite_fuentes" || detalle["limite"] != 100.0 {
 					t.Errorf("body = %v", body)
 				}
