@@ -2,17 +2,19 @@
 import { useTranslations } from "next-intl";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Campo } from "@/components/app/campo";
+import { DialogContent } from "@/components/app/dialogo";
 import { type ColumnaListado, TablaListado } from "@/components/app/tabla-listado";
 import { Alerta } from "@/components/feedback/alerta";
 import { useToast } from "@/components/feedback/toast";
-import { AreaTexto, Campo, Entrada } from "@/components/formularios/campo";
+import { AreaTexto, Entrada } from "@/components/formularios/campo";
 import { SelectCampo } from "@/components/formularios/select-campo";
 import { MenuAcciones } from "@/components/navegacion/menu-acciones";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { CabeceraDialogo, PieDialogo } from "@/components/patrones/cabecera-dialogo";
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { Chip } from "@/components/patrones/pill-estado";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth/auth-context";
 import {
   ACCION_SECUNDARIA,

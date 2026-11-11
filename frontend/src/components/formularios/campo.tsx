@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 /**
  * Campo compuesto: etiqueta + control + ayuda (mono) o error (rojo). El control se pasa como `children` con el `id` indicado.
  * `<Campo id="serie" etiqueta="Serie" ayuda="4 caracteres"><Entrada id="serie" … /></Campo>`
+ * Con `opcional` añade «(opcional)» junto a la etiqueta; `textoOpcional` lo traduce.
  */
 export function Campo({
   id,
@@ -13,6 +14,7 @@ export function Campo({
   ayuda,
   error,
   opcional,
+  textoOpcional = "(opcional)",
   children,
   className,
 }: {
@@ -21,6 +23,8 @@ export function Campo({
   ayuda?: ReactNode;
   error?: ReactNode;
   opcional?: boolean;
+  /** Texto que acompaña a la etiqueta con `opcional`, para traducirlo (por defecto «(opcional)»). */
+  textoOpcional?: string;
   children: ReactNode;
   className?: string;
 }) {
@@ -28,7 +32,7 @@ export function Campo({
     <div className={cn("grid gap-1.5", className)}>
       <label htmlFor={id} className={cn(ETIQUETA_CAMPO, "flex items-center gap-1.5")}>
         {etiqueta}
-        {opcional ? <span className="text-etiqueta text-muted-foreground font-normal">(opcional)</span> : null}
+        {opcional ? <span className="text-etiqueta text-muted-foreground font-normal">{textoOpcional}</span> : null}
       </label>
       {children}
       {error ? (

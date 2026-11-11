@@ -6,8 +6,9 @@ import React, { useMemo, useState } from "react";
 import * as yup from "yup";
 
 import { ENLACE, TarjetaAuth } from "@/app/auth/tarjeta-auth";
+import { Campo } from "@/components/app/campo";
 import { Alerta } from "@/components/feedback/alerta";
-import { Campo, Entrada } from "@/components/formularios/campo";
+import { Entrada } from "@/components/formularios/campo";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { authApi } from "@/lib/auth/auth-api";
 import { claveErrorAuth } from "@/lib/auth/errores-auth";

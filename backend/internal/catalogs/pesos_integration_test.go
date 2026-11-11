@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/cbaciliod/learning/internal/db/dbtest"
+	"github.com/cbaciliod/learning/internal/middleware"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -47,9 +48,6 @@ func nuevoPesosEnv(t *testing.T) *pesosEnv {
 	e.admin = dbtest.RealBearer(t, db, admin.ID, "admin")
 	e.usuario = dbtest.RealBearer(t, db, usuario.ID, "usuario")
 	e.proceso = dbtest.SeedProceso(t, db, e.cat, 2030, "inactivo")
-	// The API always stores a descripcion; GetProceso cannot scan the NULL
-	// that SeedProceso leaves (pre-existing, reported apart).
-	e.exec(t, `UPDATE procesos SET descripcion = '' WHERE id = $1`, e.proceso)
 	e.medicina = e.cat.EspecialidadID
 	e.enfermeria = e.especialidad(t, e.cat.InstitucionID, "activo")
 	e.a1, e.a2, e.a3 = dbtest.SeedAsignatura(t, db), dbtest.SeedAsignatura(t, db), dbtest.SeedAsignatura(t, db)
@@ -605,5 +603,56 @@ func TestServicioPesos(t *testing.T) {
 				t.Errorf("modo %d area = %+v", modo, a)
 			}
 		}
+	}
+}
+
+// README §3 (R3): a PE3 body without Content-Length passes the middleware,
+// which wraps it in a MaxBytesReader; going past the limit while decoding
+// answers 413 cuerpo_demasiado_grande and saves nothing. With Content-Length
+// the middleware itself answers 413 with its legacy text.
+func TestGuardarPesos_CuerpoDemasiadoGrande(t *testing.T) {
+	e := nuevoPesosEnv(t)
+	const limite = 256
+	h := middleware.MaxBodySize(limite, limite)(e.mux)
+	areas := make([]AreaPesoRequest, 0, 50)
+	for i := range 50 {
+		areas = append(areas, area(e.a1+int64(i), 2, 1))
+	}
+	grande := cuerpo(areas...)
+	antes := e.filas(t)
+
+	cases := []struct {
+		name          string
+		contentLength bool
+		code          string
+	}{
+		{"chunked: lo detecta el handler", false, "cuerpo_demasiado_grande"},
+		{"con Content-Length: lo corta el middleware", true, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			req := httptest.NewRequest("PUT", e.pathPesos(e.medicina), strings.NewReader(grande))
+			if !c.contentLength {
+				req.ContentLength = -1
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", e.admin)
+			rr := httptest.NewRecorder()
+			h.ServeHTTP(rr, req)
+			var body map[string]any
+			_ = json.Unmarshal(rr.Body.Bytes(), &body)
+			if rr.Code != http.StatusRequestEntityTooLarge {
+				t.Fatalf("got %d %v, want 413", rr.Code, body)
+			}
+			if c.code != "" && (body["error"] != c.code || body["message"] == "") {
+				t.Errorf("body = %v, want error %s with message", body, c.code)
+			}
+			if c.code == "" && body["message"] != nil {
+				t.Errorf("middleware 413 = %v, want the legacy {error: text}", body)
+			}
+		})
+	}
+	if fmt.Sprint(e.filas(t)) != fmt.Sprint(antes) || len(e.auditorias(t)) != 0 {
+		t.Error("an oversized body saved or audited something")
 	}
 }

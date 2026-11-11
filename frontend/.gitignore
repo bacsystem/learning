@@ -45,3 +45,6 @@ next-env.d.ts
 
 .wrangler/
 .open-next/
+
+# Informes de cobertura de vitest (npm run test:coverage)
+coverage/

@@ -4,9 +4,10 @@ import pkg from "../../../package.json";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
+import { DialogContent } from "@/components/app/dialogo";
 import { Marca } from "@/components/app/marca";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 
 const CONTACTO = "bacsystem.sac@gmail.com";

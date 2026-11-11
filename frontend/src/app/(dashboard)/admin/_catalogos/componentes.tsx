@@ -9,12 +9,13 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useState } from "react";
 
+import { DialogContent } from "@/components/app/dialogo";
 import { Formulario } from "@/components/formularios/campo";
 import { Tabs } from "@/components/navegacion/tabs";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { Aviso, CabeceraDialogo, PieDialogo, type TonoDialogo } from "@/components/patrones/cabecera-dialogo";
 import { Chip, PillEstado } from "@/components/patrones/pill-estado";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { BOTON_DESTRUCTIVO, BOTON_PRIMARIO, BOTON_SECUNDARIO } from "@/lib/estilos";
 import type { IconoComponente } from "@/lib/iconos";
 import { cn } from "@/lib/utils";

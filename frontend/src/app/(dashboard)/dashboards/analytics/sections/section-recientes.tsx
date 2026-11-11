@@ -3,7 +3,8 @@
 import { EnlaceVerTodos, Seccion, VacioSeccion } from "./seccion";
 import { useTranslations } from "next-intl";
 
-import { type Columna, TablaDatos } from "@/components/datos/tabla-datos";
+import { TablaDatos } from "@/components/app/tabla-datos";
+import { type Columna } from "@/components/datos/tabla-datos";
 import { Skeleton } from "@/components/feedback/skeleton";
 import { PillEstado } from "@/components/patrones/pill-estado";
 import { formatearFechaHora } from "@/lib/formato";

@@ -3,12 +3,13 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { PieTabla } from "@/components/app/pie-tabla";
 import { Alerta } from "@/components/feedback/alerta";
 import { SkeletonTabla } from "@/components/feedback/skeleton";
 import { Buscador } from "@/components/formularios/buscador";
 import { EntradaFecha } from "@/components/formularios/entrada-fecha";
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
-import { CABECERA_TABLA, CONTENEDOR_TABLA, CONTROL_FILTRO, FilaVacia, PieTabla } from "@/components/patrones/pie-tabla";
+import { CABECERA_TABLA, CONTENEDOR_TABLA, CONTROL_FILTRO, FilaVacia } from "@/components/patrones/pie-tabla";
 import { Chip } from "@/components/patrones/pill-estado";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

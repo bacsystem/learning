@@ -23,6 +23,7 @@ import (
 	internalmw "github.com/cbaciliod/learning/internal/middleware"
 	"github.com/cbaciliod/learning/internal/notifications"
 	"github.com/cbaciliod/learning/internal/notifier"
+	"github.com/cbaciliod/learning/internal/perfiles"
 	"github.com/cbaciliod/learning/internal/practices"
 	"github.com/cbaciliod/learning/internal/questions"
 	"github.com/cbaciliod/learning/internal/simulations"
@@ -127,6 +128,7 @@ func run() int {
 	catalogs.Mount(mux, catSvc, cfg.JWTSecret, checkSession)
 	questions.Mount(mux, qSvc, cfg.JWTSecret, checkSession)
 	temas.Mount(mux, temas.NewService(temas.NewRepository(database)), audLog, cfg.JWTSecret, checkSession)
+	perfiles.Mount(mux, perfiles.NewService(perfiles.NewRepository(database), catSvc), cfg.JWTSecret, checkSession)
 	practices.Mount(mux, pSvc, cfg.JWTSecret, checkSession)
 	simulations.Mount(mux, simSvc, cfg.JWTSecret, checkSession)
 	notifications.Mount(mux, database, audLog, cfg.JWTSecret, checkSession)
