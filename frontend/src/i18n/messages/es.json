@@ -1436,6 +1436,8 @@
           "error_interno": "Error interno del servidor. Inténtalo de nuevo."
         }
       }
-    }
+    },
+    "sesion-servidor-no-disponible-titulo": "El servidor no responde",
+    "sesion-servidor-no-disponible-texto": "Tu sesión sigue abierta. Lo volvemos a intentar cada pocos segundos; en cuanto el servidor responda, verás la aplicación."
   }
 }
