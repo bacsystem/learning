@@ -21,6 +21,32 @@ func JSONError(w http.ResponseWriter, status int, msg string) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
+// CodeInternal is the stable code of every coded 500 (docs/api/README.md §3).
+const CodeInternal = "error_interno"
+
+// codedError is the error body of the SERUMS IA endpoints: a stable code, a
+// Spanish fallback message and an optional detail without personal data.
+type codedError struct {
+	Error   string         `json:"error"`
+	Message string         `json:"message"`
+	Detalle map[string]any `json:"detalle,omitempty"`
+}
+
+// JSONErrorCode writes {"error": code, "message": msg, "detalle": detalle}
+// with the given status; detalle is omitted when nil or empty.
+func JSONErrorCode(w http.ResponseWriter, status int, code, msg string, detalle map[string]any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(codedError{Error: code, Message: msg, Detalle: detalle})
+}
+
+// InternalErrorCode is InternalError for endpoints that use the coded format:
+// it logs the cause under op (never PII) and answers error_interno.
+func InternalErrorCode(w http.ResponseWriter, op string, err error) {
+	log.Error().Err(err).Str("op", op).Msg("internal error")
+	JSONErrorCode(w, http.StatusInternalServerError, CodeInternal, GenericInternalMsg, nil)
+}
+
 // InternalError logs the cause under op (e.g. "admin.dashboard"; never PII)
 // and answers a generic 500.
 func InternalError(w http.ResponseWriter, op string, err error) {
