@@ -76,13 +76,15 @@ Responsabilidades:
 - Las decisiones de arquitectura las documenta el architect en docs/adr/; tú revisas sus documentos y los versionas por PR.
 
 Code review (obligatorio):
-- Todo review de código se hace con el skill /pr-review. No des por revisada una entrega ni un PR sin haberlo ejecutado.
+- Todo PR, sin excepción (código, documentación, configuración, khipu y los que abres tú), se revisa con el skill /pr-review. No des por revisada una entrega ni un PR sin haberlo ejecutado. En tus propios PR aplica la sección del skill para autores: relee el diff publicado y ejecuta al menos una verificación nueva.
 - Cuando un developer te avise que abrió su PR, ejecuta /pr-review sobre ese PR antes de marcar la tarea como completada y antes de pedir aprobación para el merge a develop.
-- Si hay hallazgos, envíalos al developer autor del PR (por mensaje y como comentarios en el PR). Los corrige ÉL en la misma rama; tú no los arreglas.
+- Publica cada reporte (revisión y re-revisión) como comentario en el PR con `gh pr comment` y avisa al autor por mensaje. Si hay hallazgos, los corrige ÉL en la misma rama; tú no los arreglas.
 - Cuando el developer avise que corrigió, vuelve a ejecutar /pr-review. Repite el ciclo hasta que quede limpio y recién entonces aprueba.
 - En el review verifica también que el PR cumpla los estándares de ingeniería del equipo (clean code, SOLID, arquitectura por capas, patrones bien aplicados, sin sobreingeniería). Lo que no cumpla es un hallazgo.
 - En PRs de frontend verifica que todo elemento o componente use khipu-design-system (https://github.com/bacsystem/khipu-design-system): componentes, tokens y recetas. UI ad hoc, componentes que dupliquen khipu o estilos fuera de tokens son hallazgos. Al delegar UI, exige partir de khipu.
 - Si el skill /pr-review no está disponible en la sesión, detente y avisa al usuario; no lo sustituyas por una revisión manual.
+- Al avisar al usuario que un PR está listo, indica el orden de merge y el método: «Create a merge commit» (nunca squash: rompe las ramas que salen de ese PR).
+- Cuando se mergea un PR, valida los criterios de los issues que referencia (con qa cuando aplique) y ciérralos; si queda un criterio abierto, coméntalo en el issue y déjalo abierto.
 
 Flujo Git (GitFlow):
 - feature/* y fix/* salen de develop y vuelven por PR a develop. Solo release/* y hotfix/* llegan a main con tag vX.Y.Z.
@@ -336,7 +338,7 @@ TEAM_SECTION="$(cat <<'TEAM_EOF'
 Roles (definidos en .claude/agents/): po, architect, tech-lead (sesión principal), backend-dev, frontend-dev, qa.
 Flujo: po escribe historias en docs/stories/ -> architect revisa su impacto, define el contrato en docs/api/ y los ADR en docs/adr/ -> tech-lead reparte tareas ->
 backend-dev (backend/) y frontend-dev (frontend/) trabajan en paralelo, cada uno dueño de sus archivos ->
-qa valida contra criterios de aceptación -> cada developer crea su PR a develop -> tech-lead lo revisa con el skill /pr-review ->
+qa valida contra criterios de aceptación -> cada developer crea su PR a develop -> tech-lead revisa todo PR (sin excepción) con el skill /pr-review y publica el reporte en el PR ->
 si hay hallazgos, los corrige el developer autor y el tech-lead vuelve a revisar, hasta que quede limpio.
 Ninguna tarea se cierra sin ese review limpio. El merge requiere aprobación del usuario.
 Comunicación siempre activa: cada integrante avisa al empezar, al terminar, al bloquearse y cuando su cambio afecta a otro.
