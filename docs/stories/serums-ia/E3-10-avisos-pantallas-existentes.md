@@ -34,7 +34,7 @@ La tarea de frontend F1 de SIA-E3-02 (rama `feature/sia-e3-02-estados-preguntas`
 4. **Edición, clave oficial:** si el servidor responde 422 `clave_oficial` (origen `balotario`), se muestra un texto traducido, nunca el código crudo.
 5. **Eliminar:**
    - En `borrador` y `en_revision`, la acción está deshabilitada, con la ayuda «Recházala primero para poder eliminarla».
-   - Si aun así el servidor responde 409 `estado_invalido` (p. ej. el estado cambió mientras tanto), se muestra el mismo texto traducido y se recarga la pregunta.
+   - Si aun así el servidor responde 409 `estado_invalido` (p. ej. el estado cambió mientras tanto), se muestra el texto traducido de `estado_invalido` para preguntas y se recarga la pregunta. Con el estado recargado, «Eliminar» queda deshabilitado con su ayuda.
 6. En `borrador`, `en_revision` y `rechazada`, editar no muestra el aviso de la regla 3, porque el estado no cambia.
 
 ## Criterios de aceptación
@@ -104,7 +104,9 @@ SIA-E3-02 (estados y guardas de editar y eliminar). Si khipu no tiene el diálog
 Las guardas viven en el servidor; el cliente solo avisa. No se muestran códigos de error crudos.
 
 ## i18n
-Todo en es/en. Esta historia es dueña de `dashboard.serumsIa.avisosPregunta.*`: alta, Excel (con plural), confirmación de edición y la ayuda de eliminar, que también se muestra ante el 409 al eliminar. El error `clave_oficial` va en `dashboard.serumsIa.errores.clave_oficial`, con la convención de `docs/api/README.md` §8 (una clave por código, compartida). Si la clave ya existe, se reutiliza y no se duplica. Para un código sin clave se usa el genérico del módulo, `dashboard.serumsIa.errores.generico`, nunca el `message` de la API. Cada clave existe en ambos archivos.
+Todo en es/en. Esta historia es dueña de `dashboard.serumsIa.avisosPregunta.*`: alta, Excel (con plural), confirmación de edición y la ayuda de eliminar. Los errores siguen la convención de `docs/api/README.md` §8:
+- `clave_oficial` va en `dashboard.serumsIa.errores.clave_oficial` (una clave por código, compartida);
+- el 409 `estado_invalido` al eliminar es un código común traducido por recurso: va en `dashboard.serumsIa.preguntas.errores.estado_invalido`, compartida con SIA-E3-09. Si la clave ya existe, se reutiliza y no se duplica. Para un código sin clave se usa el genérico del módulo, `dashboard.serumsIa.errores.generico`, nunca el `message` de la API. Cada clave existe en ambos archivos.
 
 ## Definición de terminado
 - `tsc`, `lint` y `build` en verde.
