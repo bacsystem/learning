@@ -88,19 +88,3 @@ func datosCopia(m medidasCopia) map[string]any {
 		"ultima_ejecucion_en": fechaUTC(m.UltimaEjecucionEn),
 	}
 }
-
-// fechaUTC is t in RFC 3339 UTC to the second, or nil.
-func fechaUTC(t *time.Time) any {
-	if t == nil {
-		return nil
-	}
-	return t.UTC().Truncate(time.Second)
-}
-
-// valor dereferences p, or nil (a JSON null).
-func valor[T any](p *T) any {
-	if p == nil {
-		return nil
-	}
-	return *p
-}

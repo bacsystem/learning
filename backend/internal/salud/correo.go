@@ -93,5 +93,3 @@ func datosCorreo(m medidasCorreo) map[string]any {
 	return map[string]any{"sin_enviar": m.SinEnviar, "antiguedad_max_min": valor(m.AntiguedadMaxMin),
 		"fallidos_24h": m.Fallidos24h, "ultimo_enviado_en": fechaUTC(m.UltimoEnviadoEn)}
 }
-
-func ptrCategoria(c string) *string { return &c }
