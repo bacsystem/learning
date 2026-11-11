@@ -56,7 +56,7 @@ func Mount(mux *http.ServeMux, svc *Service, jwtSecret string, checkSession auth
 
 	// ── Proceso-Asignaturas ───────────────────────────────────────────────────
 	mux.Handle("GET /procesos/{id}/asignaturas", authn(http.HandlerFunc(h.ListProcesoAsignaturas)))
-	mux.Handle("GET /admin/procesos/{id}/asignaturas", authn(admin(http.HandlerFunc(h.ListProcesoAsignaturas))))
+	mux.Handle("GET /admin/procesos/{id}/asignaturas", authn(admin(http.HandlerFunc(h.ListProcesoAsignaturasAdmin))))
 	mux.Handle("POST /admin/procesos/{id}/asignaturas", authn(admin(http.HandlerFunc(h.AsignarAsignatura))))
 	mux.Handle("PUT /admin/procesos/{id}/asignaturas/{asignaturaId}", authn(admin(http.HandlerFunc(h.UpdateProcesoAsignatura))))
 	mux.Handle("DELETE /admin/procesos/{id}/asignaturas/{asignaturaId}", authn(admin(http.HandlerFunc(h.DeleteProcesoAsignatura))))

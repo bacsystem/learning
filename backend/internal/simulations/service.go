@@ -105,7 +105,7 @@ func (s *Service) CreateSimulacro(ctx context.Context, req CreateSimulacroReques
 		return SimulacroEnCursoResponse{}, ErrNoConfig
 	}
 
-	all, err := s.repo.GetProcesoAsignaturas(ctx, req.ProcesoID)
+	all, err := s.repo.GetProcesoAsignaturas(ctx, req.ProcesoID, especialidadID)
 	if err != nil {
 		return SimulacroEnCursoResponse{}, err
 	}

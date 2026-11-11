@@ -594,7 +594,7 @@ func (r *Repository) GetProceso(ctx context.Context, id int64) (*ProcesoDetailRe
 	}
 
 	// Load asignaturas
-	asigs, err := r.ListProcesoAsignaturas(ctx, id, 0, 0)
+	asigs, err := r.ListProcesoAsignaturasCompatibilidad(ctx, id, 0, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -693,7 +693,9 @@ func (r *Repository) UpdateProcesoEstado(ctx context.Context, id int64, estado s
 	return tx.Commit()
 }
 
-// SumPesoPorcentual returns the sum of peso_porcentual for all asignaturas in a proceso.
+// SumPesoPorcentual returns the sum of peso_porcentual of the compatibility
+// rows (no especialidad) of a proceso: they are the general configuration that
+// activation requires at 100% (ADR 0001, L1).
 func (r *Repository) SumPesoPorcentual(ctx context.Context, procesoID int64) (float64, error) {
 	return sumPesoPorcentual(ctx, r.db, procesoID)
 }
@@ -701,7 +703,7 @@ func (r *Repository) SumPesoPorcentual(ctx context.Context, procesoID int64) (fl
 func sumPesoPorcentual(ctx context.Context, q sqlx.QueryerContext, procesoID int64) (float64, error) {
 	var sum float64
 	err := q.QueryRowxContext(ctx,
-		`SELECT COALESCE(SUM(peso_porcentual), 0) FROM proceso_asignaturas WHERE proceso_id=$1`, procesoID,
+		`SELECT COALESCE(SUM(peso_porcentual), 0) FROM proceso_asignaturas WHERE proceso_id=$1 AND especialidad_id IS NULL`, procesoID,
 	).Scan(&sum)
 	return sum, err
 }
@@ -740,7 +742,22 @@ func checkPesoActivo(ctx context.Context, tx *sqlx.Tx, procesoID int64, estado s
 
 // ── Proceso-Asignaturas ───────────────────────────────────────────────────────
 
+// ListProcesoAsignaturas lists the set of asignaturas that applies to the
+// user's especialidad (ADR 0001, L2): its own set if the proceso has one,
+// otherwise the compatibility rows. Counts are filtered by grado/especialidad.
 func (r *Repository) ListProcesoAsignaturas(ctx context.Context, procesoID, gradoID, especialidadID int64) ([]ProcesoAsignaturaItem, error) {
+	return r.listProcesoAsignaturas(ctx, ConjuntoDePesos("pa", 1, 3), procesoID, gradoID, especialidadID)
+}
+
+// ListProcesoAsignaturasCompatibilidad lists only the compatibility rows: the
+// admin catalog view. Especialidad sets have their own endpoints (PE1–PE3).
+func (r *Repository) ListProcesoAsignaturasCompatibilidad(ctx context.Context, procesoID, gradoID, especialidadID int64) ([]ProcesoAsignaturaItem, error) {
+	return r.listProcesoAsignaturas(ctx, filtroCompatibilidad("pa", 1), procesoID, gradoID, especialidadID)
+}
+
+// listProcesoAsignaturas runs the listing with filtro selecting the rows; $1 is
+// the proceso, $2 the grado and $3 the especialidad used to count questions.
+func (r *Repository) listProcesoAsignaturas(ctx context.Context, filtro string, procesoID, gradoID, especialidadID int64) ([]ProcesoAsignaturaItem, error) {
 	rows, err := r.db.QueryxContext(ctx, `
 		SELECT pa.asignatura_id, a.nombre, a.codigo, pa.numero_preguntas, pa.peso_porcentual, pa.coeficiente,
 		       (SELECT COUNT(*) FROM preguntas p
@@ -748,10 +765,10 @@ func (r *Repository) ListProcesoAsignaturas(ctx context.Context, procesoID, grad
 		          AND p.asignatura_id = pa.asignatura_id
 		          AND p.estado = 'activo'
 		          AND ($2 = 0 OR p.grado_id = $2 OR p.grado_id IS NULL)
-		          AND ($3 = 0 OR p.especialidad_id = $3 OR p.especialidad_id IS NULL)) AS preguntas_disponibles
+		          AND ($3::bigint = 0 OR p.especialidad_id = $3 OR p.especialidad_id IS NULL)) AS preguntas_disponibles
 		FROM proceso_asignaturas pa
 		JOIN asignaturas a ON a.id = pa.asignatura_id
-		WHERE pa.proceso_id = $1
+		WHERE `+filtro+`
 		ORDER BY a.nombre ASC`, procesoID, gradoID, especialidadID)
 	if err != nil {
 		return nil, err
@@ -770,9 +787,9 @@ func (r *Repository) ListProcesoAsignaturas(ctx context.Context, procesoID, grad
 	return result, rows.Err()
 }
 
-// AsignarAsignatura adds an asignatura to a proceso. ErrNotFound: unknown
-// proceso; ErrConflict: already assigned or would break an active proceso's
-// 100% weights; FK error (→ ErrInvalidRef in the service): unknown asignatura.
+// AsignarAsignatura adds a compatibility row (no especialidad) to a proceso.
+// ErrNotFound: unknown proceso; ErrPesoDuplicado: already assigned;
+// ErrConflict: would break an active proceso's 100% weights; FK error (→ ErrInvalidRef in the service): unknown asignatura.
 // auditFn writes the audit row in the same transaction.
 func (r *Repository) AsignarAsignatura(ctx context.Context, procesoID int64, req AsignarAsignaturaRequest, auditFn audit.TxFunc) (*ProcesoAsignaturaItem, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -788,12 +805,14 @@ func (r *Repository) AsignarAsignatura(ctx context.Context, procesoID int64, req
 	err = tx.QueryRowContext(ctx,
 		`INSERT INTO proceso_asignaturas (proceso_id, asignatura_id, numero_preguntas, peso_porcentual, coeficiente)
 		 VALUES ($1, $2, $3, $4, $5)
-		 ON CONFLICT (proceso_id, asignatura_id) DO NOTHING
+		 ON CONFLICT (proceso_id, especialidad_id, asignatura_id) DO NOTHING
 		 RETURNING asignatura_id, numero_preguntas, peso_porcentual, coeficiente`,
 		procesoID, req.AsignaturaID, req.NumeroPreguntas, req.PesoPorcentual, req.Coeficiente,
 	).Scan(&item.AsignaturaID, &item.NumeroPreguntas, &item.PesoPorcentual, &item.Coeficiente)
+	// No especialidad_id: a compatibility row. The NULLS NOT DISTINCT
+	// constraint is the arbiter, so a second one is skipped (ADR 0001, L3).
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("%w: Esta asignatura ya está asignada al proceso.", ErrConflict)
+		return nil, ErrPesoDuplicado
 	}
 	if err != nil {
 		return nil, err
@@ -814,21 +833,23 @@ func (r *Repository) AsignarAsignatura(ctx context.Context, procesoID int64, req
 	return &item, nil
 }
 
-// UpdateProcesoAsignatura changes an assignment; see checkPesoActivo.
+// UpdateProcesoAsignatura changes a compatibility row (ADR 0001, L4); see
+// checkPesoActivo.
 func (r *Repository) UpdateProcesoAsignatura(ctx context.Context, procesoID, asignaturaID int64, req UpdateProcesoAsignaturaRequest, auditFn audit.TxFunc) error {
 	return r.mutateAsignacion(ctx, procesoID, auditFn, func(tx *sqlx.Tx) (sql.Result, error) {
 		return tx.ExecContext(ctx,
 			`UPDATE proceso_asignaturas SET numero_preguntas=$1, peso_porcentual=$2, coeficiente=$3
-			 WHERE proceso_id=$4 AND asignatura_id=$5`,
+			 WHERE proceso_id=$4 AND asignatura_id=$5 AND especialidad_id IS NULL`,
 			req.NumeroPreguntas, req.PesoPorcentual, req.Coeficiente, procesoID, asignaturaID)
 	})
 }
 
-// DeleteProcesoAsignatura removes an assignment; see checkPesoActivo.
+// DeleteProcesoAsignatura removes a compatibility row (ADR 0001, L5); see
+// checkPesoActivo.
 func (r *Repository) DeleteProcesoAsignatura(ctx context.Context, procesoID, asignaturaID int64, auditFn audit.TxFunc) error {
 	return r.mutateAsignacion(ctx, procesoID, auditFn, func(tx *sqlx.Tx) (sql.Result, error) {
 		return tx.ExecContext(ctx,
-			`DELETE FROM proceso_asignaturas WHERE proceso_id=$1 AND asignatura_id=$2`,
+			`DELETE FROM proceso_asignaturas WHERE proceso_id=$1 AND asignatura_id=$2 AND especialidad_id IS NULL`,
 			procesoID, asignaturaID)
 	})
 }

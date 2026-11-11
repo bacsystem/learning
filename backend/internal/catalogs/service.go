@@ -257,15 +257,21 @@ func (s *Service) UpdateProcesoEstado(ctx context.Context, id int64, estado stri
 
 // ── Proceso-Asignaturas ───────────────────────────────────────────────────────
 
+// ListProcesoAsignaturas lists the set that applies to the user's especialidad.
 func (s *Service) ListProcesoAsignaturas(ctx context.Context, procesoID, gradoID, especialidadID int64) ([]ProcesoAsignaturaItem, error) {
 	return s.repo.ListProcesoAsignaturas(ctx, procesoID, gradoID, especialidadID)
+}
+
+// ListProcesoAsignaturasCompatibilidad lists only the compatibility rows.
+func (s *Service) ListProcesoAsignaturasCompatibilidad(ctx context.Context, procesoID, gradoID, especialidadID int64) ([]ProcesoAsignaturaItem, error) {
+	return s.repo.ListProcesoAsignaturasCompatibilidad(ctx, procesoID, gradoID, especialidadID)
 }
 
 func (s *Service) AsignarAsignatura(ctx context.Context, procesoID int64, req AsignarAsignaturaRequest, auditFn audit.TxFunc) (*ProcesoAsignaturaItem, error) {
 	result, err := s.repo.AsignarAsignatura(ctx, procesoID, req, auditFn)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return nil, fmt.Errorf("%w: Esta asignatura ya está asignada al proceso.", ErrConflict)
+			return nil, ErrPesoDuplicado
 		}
 		if isFKViolation(err) {
 			return nil, invalidRef("la asignatura indicada no existe.")
