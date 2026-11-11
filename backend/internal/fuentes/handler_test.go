@@ -216,6 +216,8 @@ func TestListado_Parametros(t *testing.T) {
 		{"oficial no booleano", "?oficial=si", 400, FiltroListado{}},
 		{"página cero", "?page=0", 400, FiltroListado{}},
 		{"per_page negativo", "?per_page=-1", 400, FiltroListado{}},
+		{"q con NUL", "?q=a%00b", 400, FiltroListado{}},
+		{"q con UTF-8 inválido", "?q=%ff%fe", 400, FiltroListado{}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
