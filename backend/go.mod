@@ -2,7 +2,7 @@ module github.com/cbaciliod/learning
 
 go 1.27.0
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/go-playground/validator/v10 v10.30.6
