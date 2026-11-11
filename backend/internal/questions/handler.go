@@ -186,8 +186,17 @@ func (h *Handler) UpdatePregunta(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	result, err := h.svc.UpdatePregunta(r.Context(), id, req)
+	aud, ok := h.auditor(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.svc.UpdatePregunta(r.Context(), id, req, aud)
 	if err != nil {
+		var re *ReglaError
+		if errors.As(err, &re) { // clave_oficial uses the coded format (E3-02 §4.5)
+			responderRegla(w, "questions.update", err)
+			return
+		}
 		mapErr(w, err)
 		return
 	}

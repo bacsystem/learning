@@ -38,6 +38,7 @@ var reglasHTTP = map[string]respuestaRegla{
 	CodigoLimiteCitas:           {http.StatusUnprocessableEntity, "Se superó el máximo de citas por pregunta."},
 	CodigoFuenteNoActiva:        {http.StatusUnprocessableEntity, "Alguna cita nueva es de una fuente que no está activa."},
 	CodigoReferenciaInvalida:    {http.StatusUnprocessableEntity, "Algún pasaje no existe."},
+	CodigoClaveOficial:          {http.StatusUnprocessableEntity, "La clave de una pregunta de balotario oficial no se puede cambiar."},
 }
 
 // CambiarEstado handles PATCH /preguntas/{id}/estado (E3-07 §3).

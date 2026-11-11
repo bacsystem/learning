@@ -22,6 +22,7 @@ const (
 	CodigoUltimaCitaActiva      = "ultima_cita_activa"
 	CodigoReferenciaInvalida    = "referencia_invalida"
 	CodigoValidacion            = "validacion"
+	CodigoClaveOficial          = "clave_oficial"
 )
 
 // Limits of the review rules (contract E3-07 §3.2, §4.2).
@@ -212,4 +213,50 @@ func nilSiVacio(s string) any {
 		return nil
 	}
 	return s
+}
+
+// motivoEdicion is the audit motive when editing content sends a question to review.
+const motivoEdicion = "edición de contenido"
+
+// retroGuardada is the stored feedback of a question.
+type retroGuardada struct {
+	Explicacion string
+	Referencia  *string
+}
+
+// contenidoGuardado is what a PUT is compared with (E3-02 §4.5): what is
+// stored, not what the client sent before.
+type contenidoGuardado struct {
+	Estado, Origen, Enunciado, Tipo string
+	Retro                           *retroGuardada // nil: no feedback stored
+}
+
+// requiereRevision: editing the content of an approved or inherited question
+// sends it back to review.
+func (c contenidoGuardado) requiereRevision() bool {
+	return c.Estado == EstadoAprobada || c.Estado == EstadoActivo
+}
+
+// cambiaContenido reports whether req changes the content: statement, type,
+// alternatives (already compared by the caller) or feedback. Metadata
+// (asignatura, tema, etiquetas, dificultad, grado, especialidad) is not content.
+func (c contenidoGuardado) cambiaContenido(req UpdatePreguntaRequest, cambioRespuestas bool) bool {
+	return c.Enunciado != req.Enunciado || c.Tipo != req.Tipo || cambioRespuestas || c.cambiaRetro(req.Retroalimentacion)
+}
+
+func (c contenidoGuardado) cambiaRetro(nueva *CreateRetroRequest) bool {
+	switch {
+	case c.Retro == nil && nueva == nil:
+		return false
+	case c.Retro == nil || nueva == nil:
+		return true
+	}
+	return c.Retro.Explicacion != nueva.Explicacion || valorODefecto(c.Retro.Referencia) != valorODefecto(nueva.Referencia)
+}
+
+func valorODefecto(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

@@ -494,7 +494,7 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 
 // UpdatePregunta updates a question within a transaction.
 // Returns ErrValidation if proceso_id differs from the stored value.
-func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePreguntaRequest) (PreguntaResponse, error) {
+func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePreguntaRequest, aud Auditor) (PreguntaResponse, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return PreguntaResponse{}, err
@@ -505,9 +505,11 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 	// etiquetas check below (H19). FOR UPDATE keeps the row stable meanwhile.
 	var storedProcesoID, storedAsignaturaID int64
 	var storedTemaID *int64
+	var guardada contenidoGuardado
 	err = tx.QueryRowContext(ctx,
-		`SELECT proceso_id, asignatura_id, tema_id FROM preguntas WHERE id = $1 AND estado != 'eliminada' FOR UPDATE`, id,
-	).Scan(&storedProcesoID, &storedAsignaturaID, &storedTemaID)
+		`SELECT proceso_id, asignatura_id, tema_id, estado, origen, enunciado, tipo
+		 FROM preguntas WHERE id = $1 AND estado != 'eliminada' FOR UPDATE`, id,
+	).Scan(&storedProcesoID, &storedAsignaturaID, &storedTemaID, &guardada.Estado, &guardada.Origen, &guardada.Enunciado, &guardada.Tipo)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PreguntaResponse{}, ErrNotFound
 	}
@@ -552,7 +554,11 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 		return PreguntaResponse{}, ErrNotFound
 	}
 
-	if err := syncRespuestas(ctx, tx, id, req.Respuestas); err != nil {
+	cambioRespuestas, err := syncRespuestas(ctx, tx, id, req.Respuestas, guardada.Origen == OrigenBalotario)
+	if err != nil {
+		return PreguntaResponse{}, err
+	}
+	if guardada.Retro, err = leerRetro(ctx, tx, id); err != nil {
 		return PreguntaResponse{}, err
 	}
 
@@ -588,6 +594,12 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 	} else {
 		// Remove retro if body has no retroalimentacion
 		if _, err = tx.ExecContext(ctx, `DELETE FROM pregunta_retroalimentacion WHERE pregunta_id = $1`, id); err != nil {
+			return PreguntaResponse{}, err
+		}
+	}
+
+	if guardada.cambiaContenido(req, cambioRespuestas) && guardada.requiereRevision() {
+		if err := pasarARevision(ctx, tx, aud, id, guardada.Estado); err != nil {
 			return PreguntaResponse{}, err
 		}
 	}

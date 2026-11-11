@@ -267,3 +267,29 @@ func (r *Repository) EliminarPregunta(ctx context.Context, id int64, aud Auditor
 		return auditarEstado(ctx, tx, aud, id, cambioEstado{Desde: b.Estado, Hacia: EstadoEliminada})
 	})
 }
+
+// leerRetro reads the stored feedback of a pregunta; nil when it has none.
+func leerRetro(ctx context.Context, tx *sqlx.Tx, id int64) (*retroGuardada, error) {
+	var retro retroGuardada
+	err := tx.QueryRowContext(ctx,
+		`SELECT explicacion, referencia FROM pregunta_retroalimentacion WHERE pregunta_id = $1`, id,
+	).Scan(&retro.Explicacion, &retro.Referencia)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &retro, nil
+}
+
+// pasarARevision moves an edited pregunta to en_revision and audits it in the
+// caller's transaction.
+func pasarARevision(ctx context.Context, tx *sqlx.Tx, aud Auditor, id int64, desde string) error {
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE preguntas SET estado = 'en_revision', updated_at = NOW() WHERE id = $1`, id); err != nil {
+		return err
+	}
+	return auditarEstado(ctx, tx, aud, id, cambioEstado{Desde: desde, Hacia: EstadoEnRevision,
+		Detalle: map[string]any{"motivo": motivoEdicion}})
+}

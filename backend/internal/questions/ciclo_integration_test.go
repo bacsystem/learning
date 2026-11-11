@@ -247,3 +247,12 @@ func TestDelete_SegunEstado(t *testing.T) {
 		})
 	}
 }
+
+func jsonString(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}

@@ -64,12 +64,12 @@ func (s *Service) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaListR
 }
 
 // UpdatePregunta validates and updates a question.
-func (s *Service) UpdatePregunta(ctx context.Context, id int64, req UpdatePreguntaRequest) (PreguntaResponse, error) {
+func (s *Service) UpdatePregunta(ctx context.Context, id int64, req UpdatePreguntaRequest, aud Auditor) (PreguntaResponse, error) {
 	if err := ValidateRespuestas(req.Tipo, req.Respuestas); err != nil {
 		return PreguntaResponse{}, err
 	}
 
-	result, err := s.repo.UpdatePregunta(ctx, id, req)
+	result, err := s.repo.UpdatePregunta(ctx, id, req, aud)
 	if err != nil {
 		if isAlternativaConIntentos(err) {
 			return PreguntaResponse{}, fmt.Errorf("%w: %s", ErrConflict, msgAlternativaConIntentos)
