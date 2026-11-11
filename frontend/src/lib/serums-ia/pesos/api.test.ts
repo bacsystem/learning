@@ -65,6 +65,9 @@ describe("mensajeErrorPesos", () => {
     );
     expect(mensajeErrorPesos(err(404, "x", "no_encontrado"), t, "gen")).toBe("t:serumsIa.pesos.errores.no_encontrado");
     expect(mensajeErrorPesos(err(500, "x", "error_interno"), t, "gen")).toBe("t:serumsIa.errores.error_interno");
+    expect(mensajeErrorPesos(err(413, "x", "cuerpo_demasiado_grande"), t, "gen")).toBe(
+      "t:serumsIa.errores.cuerpo_demasiado_grande",
+    );
   });
 
   it("falls back to the server message, and to the generic text without a response", () => {

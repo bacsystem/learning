@@ -1109,6 +1109,7 @@
     "simulacros-revision-sr-incorrecta": "Incorrecta",
     "simulacros-vacio": "Todavía no hay simulacros. Empieza uno con «{accion}».",
     "comun-reintentar": "Reintentar",
+    "comun-reintentando": "Reintentando...",
     "barra-recursos": "Recursos",
     "notif-hace-ahora": "Ahora",
     "notif-hace-min": "Hace {n} min",
@@ -1268,14 +1269,13 @@
           "especialidadesAyuda": "Sin selección, el tema aplica a todas las profesiones.",
           "sinEspecialidades": "No hay especialidades activas.",
           "especialidadInactiva": "{nombre} (inactiva)",
-          "especialidadInactivaAyuda": "Ya no está activa: desmárcala para guardar."
+          "especialidadInactivaAyuda": "Ya no está activa: puedes conservarla. Si la quitas y guardas, no se podrá volver a agregar."
         },
         "validacion": {
           "nombreRequerido": "El nombre es obligatorio.",
           "nombreLongitud": "El nombre debe tener entre {min} y {max} caracteres.",
           "descripcionLongitud": "La descripción admite hasta {max} caracteres.",
-          "especialidadesMax": "Elige como máximo {max} especialidades.",
-          "especialidadInactiva": "Desmarca las especialidades inactivas para guardar."
+          "especialidadesMax": "Elige como máximo {max} especialidades."
         },
         "reordenar": {
           "boton": "Reordenar",
@@ -1303,7 +1303,8 @@
         "orden_desactualizado": "Los temas cambiaron mientras ordenabas. Recarga la lista y vuelve a ordenar.",
         "estado_invalido": "El tema ya está en ese estado. Recarga la lista.",
         "no_encontrado": "El tema ya no existe. Recarga la lista.",
-        "error_interno": "Error interno del servidor. Inténtalo de nuevo."
+        "error_interno": "Error interno del servidor. Inténtalo de nuevo.",
+        "cuerpo_demasiado_grande": "Los datos enviados son demasiado grandes. Reduce el texto e inténtalo de nuevo."
       },
       "pesos": {
         "titulo": "Pesos de {especialidad}",

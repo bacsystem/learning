@@ -28,14 +28,9 @@ export interface MensajesValidacion {
   nombreLongitud: string;
   descripcionLongitud: string;
   especialidadesMax: string;
-  especialidadInactiva: string;
 }
 
-/**
- * `inactivas`: ids asociados al tema cuya especialidad ya no está activa. El servidor los rechaza (422
- * `referencia_invalida`), así que el formulario no se envía mientras alguno siga marcado.
- */
-export function esquemaTema(m: MensajesValidacion, inactivas: readonly number[] = []) {
+export function esquemaTema(m: MensajesValidacion) {
   return yup.object({
     nombre: yup
       .string()
@@ -45,11 +40,7 @@ export function esquemaTema(m: MensajesValidacion, inactivas: readonly number[] 
         return n >= NOMBRE_MIN && n <= NOMBRE_MAX;
       }),
     descripcion: yup.string().test("longitud", m.descripcionLongitud, (v) => longitud(v ?? "") <= DESCRIPCION_MAX),
-    especialidad_ids: yup
-      .array(yup.number().required())
-      .max(ESPECIALIDADES_MAX, m.especialidadesMax)
-      .test("inactivas", m.especialidadInactiva, (ids) => !ids?.some((id) => inactivas.includes(id)))
-      .required(),
+    especialidad_ids: yup.array(yup.number().required()).max(ESPECIALIDADES_MAX, m.especialidadesMax).required(),
   });
 }
 

@@ -4,6 +4,7 @@ import { FormularioPesos } from "./formulario-pesos";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { BotonReintentar } from "@/components/app/boton-reintentar";
 import { Alerta } from "@/components/feedback/alerta";
 import { EstadoVacio } from "@/components/feedback/estado-vacio";
 import { SkeletonTabla } from "@/components/feedback/skeleton";
@@ -14,7 +15,7 @@ import { PillEstado } from "@/components/patrones/pill-estado";
 import { useCarga } from "@/hooks/use-carga";
 import { useAuth } from "@/lib/auth/auth-context";
 import { type Asignatura, catalogsApi, type Proceso } from "@/lib/catalogs/api";
-import { ACCION_SECUNDARIA, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
+import { CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { type AreaPesoPayload, type EstadoPesos, pesosApi } from "@/lib/serums-ia/pesos/api";
 import { mensajeErrorPesos } from "@/lib/serums-ia/pesos/errores";
 import { cn } from "@/lib/utils";
@@ -84,17 +85,12 @@ export default function PesosPage() {
     resumen.recargar();
   }
 
-  const reintentar = (onClick: () => void) => (
-    <button type="button" onClick={onClick} className={ACCION_SECUNDARIA}>
-      {t("comun-reintentar")}
-    </button>
-  );
   const config = configuracion.datos;
 
   return (
     <div className={CONTENEDOR_PAGINA}>
       {errorCatalogos ? (
-        <Alerta tono="error" accion={reintentar(cargarCatalogos)}>
+        <Alerta tono="error" accion={<BotonReintentar onReintentar={cargarCatalogos} />}>
           {t("serumsIa.pesos.errorCatalogos")}
         </Alerta>
       ) : null}
@@ -127,7 +123,7 @@ export default function PesosPage() {
           {t("serumsIa.pesos.sinProceso.texto")}
         </EstadoVacio>
       ) : resumen.error ? (
-        <Alerta tono="error" accion={reintentar(resumen.recargar)}>
+        <Alerta tono="error" accion={<BotonReintentar onReintentar={resumen.recargar} />}>
           {mensajeErrorPesos(resumen.error, t, t("serumsIa.pesos.errorCargar"))}
         </Alerta>
       ) : resumen.cargando && !resumen.datos ? (
@@ -141,7 +137,7 @@ export default function PesosPage() {
           {t("serumsIa.pesos.sinEspecialidad.texto")}
         </EstadoVacio>
       ) : configuracion.error ? (
-        <Alerta tono="error" accion={reintentar(configuracion.recargar)}>
+        <Alerta tono="error" accion={<BotonReintentar onReintentar={configuracion.recargar} />}>
           {mensajeErrorPesos(configuracion.error, t, t("serumsIa.pesos.errorCargar"))}
         </Alerta>
       ) : !config ? (
