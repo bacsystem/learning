@@ -18,6 +18,7 @@ import (
 	"github.com/cbaciliod/learning/internal/config"
 	"github.com/cbaciliod/learning/internal/crypto"
 	"github.com/cbaciliod/learning/internal/db"
+	"github.com/cbaciliod/learning/internal/fuentes"
 	"github.com/cbaciliod/learning/internal/inscripciones"
 	"github.com/cbaciliod/learning/internal/logger"
 	internalmw "github.com/cbaciliod/learning/internal/middleware"
@@ -158,6 +159,15 @@ func run() int {
 	go func() {
 		defer workers.Done()
 		emailWorker.Run(ctx)
+	}()
+
+	// Ingest worker (ADR 0003 § Worker de ingesta): normalises and publishes
+	// the 'procesando' versions of the fuentes, auditing as the system.
+	ingestaWorker := fuentes.NewIngestaWorker(fuentes.NewPgCola(database), fuentes.NewPgSource(database), fuentes.AuditorSistema(audLog))
+	workers.Add(1)
+	go func() {
+		defer workers.Done()
+		ingestaWorker.Run(ctx)
 	}()
 
 	srv := &http.Server{
