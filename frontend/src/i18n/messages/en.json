@@ -16,6 +16,7 @@
     "menu-admin-asignaturas": "Subjects",
     "menu-admin-temas": "Topics",
     "menu-admin-pesos": "Weights by profession",
+    "menu-admin-fuentes": "Sources",
     "menu-admin-procesos": "Processes (Admin)",
     "menu-admin-preguntas": "Questions",
     "menu-admin-etiquetas": "Tags",
@@ -1387,6 +1388,184 @@
           "limite_preguntas": "The total of questions exceeds 200.",
           "pesos_no_suman_100": "The weights do not sum 100 %.",
           "no_encontrado": "The process no longer exists. Reload the page."
+        }
+      },
+      "fuentes": {
+        "unidad": "sources",
+        "buscar": "Search by title…",
+        "todasProfesiones": "All professions",
+        "subiendo": "Uploading…",
+        "errorCargar": "Sources could not be loaded.",
+        "errorCargarDetalle": "The source could not be loaded.",
+        "vacio": {
+          "titulo": "There are no sources yet",
+          "texto": "Upload a question bank, guide or regulation in .md format to start building the repository."
+        },
+        "vacioFiltros": "No sources match the filters.",
+        "estado": {
+          "procesando": "Processing",
+          "activa": "Active",
+          "fallida": "Failed",
+          "retirada": "Retired"
+        },
+        "tipo": {
+          "balotario": "Question bank",
+          "guia": "Guide",
+          "norma": "Regulation",
+          "otro": "Other"
+        },
+        "motivos": {
+          "sin_contenido": "The file has no usable text.",
+          "limite_pasajes": "The file exceeds the maximum number of passages.",
+          "error_interno": "Processing failed due to an internal error. Retry."
+        },
+        "versionEstado": {
+          "procesando": "processing",
+          "lista": "ready",
+          "fallida": "failed",
+          "archivada": "archived"
+        },
+        "versionEnProceso": {
+          "procesando": "Version {numero, number} processing",
+          "fallida": "Version {numero, number} failed"
+        },
+        "oficial": {
+          "insignia": "Officially verified"
+        },
+        "col": {
+          "titulo": "Title",
+          "tipo": "Type",
+          "profesiones": "Professions",
+          "version": "Version",
+          "pasajes": "Passages",
+          "estado": "Status",
+          "actualizada": "Updated"
+        },
+        "filtro": {
+          "estado": "Status",
+          "tipo": "Type",
+          "profesion": "Profession",
+          "oficial": "Officially verified",
+          "todos": "All",
+          "todas": "All",
+          "oficialSi": "Yes",
+          "oficialNo": "No"
+        },
+        "campo": {
+          "titulo": "Title",
+          "tipo": "Type",
+          "tipoElegir": "Choose the type",
+          "anio": "Year",
+          "proceso": "Process",
+          "procesoNinguno": "None",
+          "profesiones": "Professions",
+          "profesionesAyuda": "With none selected, the source applies to all professions.",
+          "profesionInactiva": "{nombre} (inactive)",
+          "archivoTitulo": "Drag the .md file or click to choose it",
+          "archivoAyuda": "Only .md, up to {mb, number} MB.",
+          "archivoQuitar": "Remove file",
+          "motivo": "Reason",
+          "entidad": "Issuing body",
+          "nota": "Verification note"
+        },
+        "validacion": {
+          "titulo": "The title must have between {min, number} and {max, number} characters.",
+          "tipo": "Choose a type.",
+          "anio": "The year goes from {min} to {max}.",
+          "especialidadesMax": "Choose at most {max, number} professions.",
+          "archivoRequerido": "Choose a .md file.",
+          "archivoExtension": "Only .md files are accepted.",
+          "archivoTamano": "The file exceeds {mb, number} MB.",
+          "motivo": "The reason must have between {min, number} and {max, number} characters.",
+          "entidad": "The issuing body must have between {min, number} and {max, number} characters.",
+          "nota": "The note must have between {min, number} and {max, number} characters."
+        },
+        "subir": {
+          "titulo": "Upload source",
+          "boton": "Upload",
+          "ok": "Source «{titulo}» uploaded: it is being processed.",
+          "avisoDatos": "Do not upload documents with personal data. The source is not marked as officially verified when uploaded."
+        },
+        "version": {
+          "titulo": "New version",
+          "boton": "Upload version",
+          "ayuda": "The current version stays in use until the new one finishes processing. The new version does not inherit the official mark.",
+          "ok": "Version uploaded: it is being processed."
+        },
+        "editar": {
+          "titulo": "Edit source",
+          "ayuda": "Change the title and professions without creating a new version.",
+          "ok": "Source updated."
+        },
+        "acciones": {
+          "nuevaVersion": "New version",
+          "editar": "Edit",
+          "retirar": "Retire",
+          "restaurar": "Restore",
+          "reintentar": "Retry",
+          "marcarOficial": "Mark as officially verified",
+          "desmarcarOficial": "Remove official mark"
+        },
+        "retirar": {
+          "titulo": "Retire source",
+          "citantes": "{n, plural, =0 {No content cites this source.} one {# content that cites it will be marked «under review».} other {# contents that cite it will be marked «under review».}}",
+          "ok": "Source retired. {n, plural, =0 {No content marked.} one {# content marked «under review».} other {# contents marked «under review».}}"
+        },
+        "restaurar": {
+          "titulo": "Restore source",
+          "efecto": "The source becomes active again. Content marked «under review» is not re-approved automatically.",
+          "ok": "Source restored."
+        },
+        "reintentar": {
+          "titulo": "Retry processing",
+          "efecto": "The last failed version is processed again.",
+          "ok": "Processing retried."
+        },
+        "marcar": {
+          "titulo": "Mark as officially verified",
+          "boton": "Mark",
+          "efecto": "Pending questions from this question bank without key conflicts will be approved by reviewing only their classification and structure. Only mark sources you verified against the official source.",
+          "ok": "Source marked as officially verified."
+        },
+        "desmarcar": {
+          "titulo": "Remove official mark",
+          "efecto": "From now on, pending questions from this source will require key verification.",
+          "ok": "Official mark removed."
+        },
+        "duplicada": {
+          "titulo": "This source already exists",
+          "texto": "The file is identical to «{titulo}».",
+          "ver": "See the existing source"
+        },
+        "detalle": {
+          "volver": "Back to sources",
+          "version": "Version {numero, number}",
+          "versionDatos": "{pasajes, number} passages · {lineas, number} lines · {kb, number} KB",
+          "versionOficial": "Officially verified by {entidad}",
+          "citantes": "Contents citing it",
+          "oficialEntidad": "Verified by {entidad}",
+          "fallida": "Processing failed",
+          "procesando": "A version is being processed. This page updates itself.",
+          "retirada": "Source retired",
+          "versiones": "Version history"
+        },
+        "errores": {
+          "archivo_demasiado_grande": "The file exceeds 2 MB.",
+          "archivo_invalido": {
+            "extension": "Only .md files are accepted.",
+            "tipo": "The file is not Markdown text.",
+            "codificacion": "The file is not UTF-8 or contains invalid characters.",
+            "lineas": "The file exceeds 20,000 lines."
+          },
+          "limite_fuentes": {
+            "especialidad": "A profession already has {limite, number} active or processing sources.",
+            "total": "The maximum of {limite, number} active or processing sources was reached."
+          },
+          "limite_versiones": "The source already has 20 versions and none can be archived.",
+          "estado_invalido": "The source changed state. Reload the page.",
+          "validacion": "Check the form data.",
+          "referencia_invalida": "A profession or the process is no longer active. Reload and try again.",
+          "no_encontrado": "The source no longer exists."
         }
       }
     }
