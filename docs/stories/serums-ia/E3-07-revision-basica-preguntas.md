@@ -27,18 +27,19 @@ Todas se validan en el servidor, en la transición o en la operación, sea cual 
 
 1. **Búsqueda de pasajes (admin):** por texto, solo en fuentes `activa`, por relevancia, con máx. 20 resultados. Cada resultado trae ids de fuente, versión y pasaje, título de la fuente, nº de versión y un extracto. Nunca trae rutas de archivo.
 2. **Citas:**
-   - Las citas de una pregunta se ponen o se quitan reemplazando la lista (`PUT …/citas` del #152), en cualquier estado salvo `eliminada`. Máx. 20 citas por pregunta (tabla de Límites); más dan 422 `limite_citas`, o el código que fije el contrato.
+   - Las citas de una pregunta se ponen o se quitan reemplazando la lista (`PUT …/citas` del #152), en cualquier estado salvo `eliminada`. Máx. 20 citas por pregunta (tabla de Límites); con más, 422 `limite_citas`.
    - Solo se puede añadir una cita a un pasaje de una fuente `activa`: 422 `fuente_no_activa`.
+   - En una pregunta `aprobada` siempre se pueden añadir citas. Solo se pueden quitar si queda al menos una cita a una fuente `activa`; si no, 409 `ultima_cita_activa`. Así una aprobada nunca se queda sin cita. El origen `balotario` sigue la excepción de SIA-E3-02, regla 3.
    - Añadir o quitar citas no cambia el estado. Cada cambio se audita.
 3. **Aprobar** (`borrador` → `aprobada`) por esta vía: **solo origen `manual`**.
    - Para origen `balotario` u `ia` responde 409 `revision_especializada`: se aprueban en SIA-E3-05 o SIA-E6-05, con sus exigencias (ruta de verificación, nota para lo incierto).
    - Exige ≥1 cita a una fuente `activa` (SIA-E3-02, regla 3), en cualquier proceso, SERUMS o no: 422 `falta_cita`.
-   - Exige área asignada, regla nueva de esta historia, igual que SIA-E3-05 regla 10: 422 `falta_area`.
    - Exige la confirmación «verificado» enviada por el cliente, validada en el servidor: 422 `verificacion_requerida`.
 4. **Revalidar** (`en_revision` → `aprobada`) por esta vía: cualquier origen, porque una pregunta llega a `en_revision` por fuente retirada, reportes o edición, y no existe otra pantalla para revalidarla en el MVP.
-   - Exige lo mismo que aprobar (cita activa, área y confirmación).
+   - Exige lo mismo que aprobar: cita activa y confirmación.
    - Para origen `balotario` o `ia` exige además una **nota de 10–500 caracteres**: 422 `nota_obligatoria`.
-   - Si la pregunta tiene `conflicto_clave` sin resolver (SIA-E3-06), responde 409 `conflicto_clave` por cualquier vía.
+   - Si la pregunta tiene `conflicto_clave` sin resolver (SIA-E3-06), responde 409 `conflicto_clave` por cualquier vía. Ese dato lo crean SIA-E3-01/E3-03; hasta entonces la regla no se activa, sin columna nueva ahora.
+   - El área siempre existe (`asignatura_id` es obligatoria) y el tema es opcional en el MVP, así que aprobar y revalidar no exigen tema.
 5. **Rechazar** (`borrador` o `en_revision` → `rechazada`): cualquier origen, con motivo de 5–500 caracteres.
 6. **Reabrir** (`rechazada` → `borrador`): cualquier origen.
 7. Una transición inválida o concurrente responde 409 `estado_invalido`.
@@ -47,7 +48,7 @@ Todas se validan en el servidor, en la transición o en la operación, sea cual 
 ## Criterios de aceptación
 ```gherkin
 Escenario: Aprobar una pregunta manual con cita
-  Dado una pregunta "borrador" de origen "manual" con área y una cita a una fuente activa
+  Dado una pregunta "borrador" de origen "manual" con una cita a una fuente activa
   Cuando el admin la aprueba con la confirmación
   Entonces pasa a "aprobada", se sirve en prácticas nuevas y audit_log registra la aprobación
 
@@ -85,6 +86,11 @@ Escenario: Cita a fuente retirada
   Dado un pasaje de una fuente retirada
   Cuando el admin intenta añadirlo como cita
   Entonces recibe 422 "fuente_no_activa"
+
+Escenario: Quitar la última cita de una aprobada
+  Dado una pregunta manual "aprobada" con una única cita a una fuente activa
+  Cuando el admin intenta quitarla
+  Entonces recibe 409 "ultima_cita_activa" y la cita se mantiene; si antes añade otra cita activa, sí puede quitar la primera
 
 Escenario: Límite de citas
   Dado una pregunta con 20 citas

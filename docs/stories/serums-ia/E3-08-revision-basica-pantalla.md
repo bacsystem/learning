@@ -36,13 +36,13 @@ Esta historia es dueña de esos avisos. Las pantallas usan componentes y tokens 
    - **Alta y Excel:** después de guardar, «Guardada como borrador. Añade una cita y apruébala para que la vean los postulantes.» En el Excel: «N preguntas importadas como borrador».
    - **Edición de una `aprobada` o `activo`:** si el cambio toca enunciado, alternativas, clave o explicación, antes de guardar se muestra la confirmación «Al guardar, la pregunta pasará a En revisión y dejará de mostrarse hasta revalidarla con una cita.» Si el cambio es solo de clasificación, no hay aviso.
    - **Eliminar:** en `borrador` y `en_revision` la acción está deshabilitada, con la ayuda «Recházala primero para poder eliminarla».
-4. Los errores de la API (`falta_cita`, `falta_area`, `verificacion_requerida`, `nota_obligatoria`, `conflicto_clave`, `revision_especializada`, `fuente_no_activa`, `limite_citas`, `estado_invalido`) se muestran con un texto traducido, nunca con el código crudo. Ante un 409 la pantalla recarga el estado actual.
+4. Los errores de la API (`falta_cita`, `verificacion_requerida`, `nota_obligatoria`, `conflicto_clave`, `revision_especializada`, `fuente_no_activa`, `limite_citas`, `ultima_cita_activa`, `estado_invalido`) se muestran con un texto traducido, nunca con el código crudo. Ante un 409 la pantalla recarga el estado actual.
 5. Estados de UI: carga, vacío («No hay preguntas con ese filtro») y error.
 
 ## Criterios de aceptación
 ```gherkin
 Escenario: Aprobar desde la pantalla
-  Dado una pregunta "borrador" manual con área
+  Dado una pregunta "borrador" manual
   Cuando el admin busca "hipertensión", añade un pasaje, marca la casilla y pulsa Aprobar
   Entonces la insignia pasa a «Aprobada» y la cita aparece en el detalle
 
