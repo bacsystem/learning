@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/lib/auth/auth-context";
 import { type Pregunta, questionsApi } from "@/lib/questions/api";
-import { claveErrorRevision } from "@/lib/serums-ia/revision/errores";
 import { idsTrasAnadir, idsTrasQuitar } from "@/lib/serums-ia/revision/reglas";
 
 type Carga = "cargando" | "lista" | "error" | "no_encontrada";
@@ -18,8 +17,8 @@ export function useCitasPregunta(preguntaId: number) {
   const [pregunta, setPregunta] = useState<Pregunta | null>(null);
   const [carga, setCarga] = useState<Carga>("cargando");
   const [guardando, setGuardando] = useState(false);
-  /** Clave i18n del último error de una operación sobre las citas. */
-  const [claveError, setClaveError] = useState<string | null>(null);
+  /** Último error de una operación sobre las citas; la pantalla lo traduce. */
+  const [error, setError] = useState<unknown>(null);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -39,11 +38,11 @@ export function useCitasPregunta(preguntaId: number) {
     async (ids: number[]) => {
       if (!token) return;
       setGuardando(true);
-      setClaveError(null);
+      setError(null);
       try {
         setPregunta(await questionsApi.reemplazarCitas(token, preguntaId, ids));
       } catch (e: unknown) {
-        setClaveError(claveErrorRevision(e));
+        setError(e);
         await cargar();
       } finally {
         setGuardando(false);
@@ -61,5 +60,5 @@ export function useCitasPregunta(preguntaId: number) {
     [pregunta, cambiarCitas],
   );
 
-  return { pregunta, carga, guardando, claveError, cargar, anadir, quitar };
+  return { pregunta, carga, guardando, error, cargar, anadir, quitar };
 }

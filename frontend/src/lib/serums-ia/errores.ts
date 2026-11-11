@@ -9,6 +9,22 @@ export function claveDeError(err: unknown, claves: ClavesDeError): string | null
   return code && Object.hasOwn(claves, code) ? claves[code] : null;
 }
 
+/** Códigos que cambian de sentido según el recurso: tienen texto propio de cada recurso y uno neutro del módulo. */
+const CODIGOS_COMUNES = new Set(["estado_invalido", "no_encontrado", "validacion", "referencia_invalida"]);
+
+/**
+ * Clave i18n de un error del módulo SERUMS IA (docs/api/README.md §8). Orden: `serumsIa.<recurso>.errores.<codigo>`
+ * (solo los códigos comunes), `serumsIa.errores.<codigo>` y, si no hay ninguna, `serumsIa.errores.generico`.
+ * Nunca el `message` del servidor, que viene siempre en español.
+ */
+export function claveErrorModulo(err: unknown, recurso: string, tiene: (clave: string) => boolean): string {
+  const code = apiErrorCode(err);
+  const candidatas = code
+    ? [...(CODIGOS_COMUNES.has(code) ? [`serumsIa.${recurso}.errores.${code}`] : []), `serumsIa.errores.${code}`]
+    : [];
+  return candidatas.find(tiene) ?? "serumsIa.errores.generico";
+}
+
 /**
  * Texto a mostrar para un error de la API. Orden: traducción del código, mensaje del servidor y, si no hubo respuesta
  * del servidor (fallo de red: sin `status`), el texto genérico.

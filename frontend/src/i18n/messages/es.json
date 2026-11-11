@@ -1305,17 +1305,23 @@
           "sinActivos": "No hay temas activos para ordenar.",
           "minimo": "Se necesitan al menos 2 temas activos.",
           "mover": "Mover"
+        },
+        "errores": {
+          "validacion": "Revisa los datos del formulario.",
+          "referencia_invalida": "Una de las especialidades o la asignatura ya no está activa. Recarga y vuelve a intentarlo.",
+          "estado_invalido": "El tema ya está en ese estado. Recarga la lista.",
+          "no_encontrado": "El tema ya no existe. Recarga la lista."
         }
       },
       "errores": {
-        "validacion": "Revisa los datos del formulario.",
-        "referencia_invalida": "Una de las especialidades o la asignatura ya no está activa. Recarga y vuelve a intentarlo.",
+        "validacion": "Revisa los datos e inténtalo de nuevo.",
+        "referencia_invalida": "Un dato relacionado ya no es válido. Recarga y vuelve a intentarlo.",
         "tema_duplicado": "Ya existe un tema con ese nombre en esta asignatura (puede estar archivado: reactívalo).",
         "limite_temas": "Esta asignatura ya tiene 60 temas activos. Archiva uno para liberar cupo.",
         "orden_invalido": "La lista de orden no es válida.",
         "orden_desactualizado": "Los temas cambiaron mientras ordenabas. Recarga la lista y vuelve a ordenar.",
-        "estado_invalido": "El tema ya está en ese estado. Recarga la lista.",
-        "no_encontrado": "El tema ya no existe. Recarga la lista.",
+        "estado_invalido": "Los datos cambiaron mientras tanto. Recarga y vuelve a intentarlo.",
+        "no_encontrado": "El elemento ya no existe. Recarga la lista.",
         "error_interno": "Error interno del servidor. Inténtalo de nuevo.",
         "cuerpo_demasiado_grande": "Los datos enviados son demasiado grandes. Reduce el texto e inténtalo de nuevo.",
         "clave_oficial": "La clave oficial de una pregunta de balotario no se puede cambiar.",
@@ -1687,6 +1693,14 @@
             "yaCitado": "Ya citado",
             "limiteAlcanzado": "Se alcanzó el máximo de citas."
           }
+        }
+      },
+      "preguntas": {
+        "errores": {
+          "estado_invalido": "Esta pregunta cambió de estado; se actualizó la vista.",
+          "no_encontrado": "La pregunta ya no existe o fue eliminada.",
+          "validacion": "Revisa los datos enviados: un pasaje puede estar repetido.",
+          "referencia_invalida": "Uno de los pasajes ya no existe. Se actualizó la lista de citas."
         }
       }
     },

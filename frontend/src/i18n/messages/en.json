@@ -1305,17 +1305,23 @@
           "sinActivos": "There are no active topics to order.",
           "minimo": "At least 2 active topics are needed.",
           "mover": "Move"
+        },
+        "errores": {
+          "validacion": "Check the form data.",
+          "referencia_invalida": "One of the specialties or the subject is no longer active. Reload and try again.",
+          "estado_invalido": "The topic is already in that state. Reload the list.",
+          "no_encontrado": "The topic no longer exists. Reload the list."
         }
       },
       "errores": {
-        "validacion": "Check the form data.",
-        "referencia_invalida": "One of the specialties or the subject is no longer active. Reload and try again.",
+        "validacion": "Check the data and try again.",
+        "referencia_invalida": "A related item is no longer valid. Reload and try again.",
         "tema_duplicado": "A topic with that name already exists in this subject (it may be archived: reactivate it).",
         "limite_temas": "This subject already has 60 active topics. Archive one to free a slot.",
         "orden_invalido": "The order list is not valid.",
         "orden_desactualizado": "The topics changed while you were ordering. Reload the list and order again.",
-        "estado_invalido": "The topic is already in that state. Reload the list.",
-        "no_encontrado": "The topic no longer exists. Reload the list.",
+        "estado_invalido": "The data changed in the meantime. Reload and try again.",
+        "no_encontrado": "The item no longer exists. Reload the list.",
         "error_interno": "Internal server error. Please try again.",
         "cuerpo_demasiado_grande": "The data sent is too large. Shorten the text and try again.",
         "clave_oficial": "The official answer key of a past-exam question cannot be changed.",
@@ -1687,6 +1693,14 @@
             "yaCitado": "Already cited",
             "limiteAlcanzado": "The maximum number of citations was reached."
           }
+        }
+      },
+      "preguntas": {
+        "errores": {
+          "estado_invalido": "This question changed state; the view was refreshed.",
+          "no_encontrado": "The question no longer exists or was deleted.",
+          "validacion": "Check the submitted data: a passage may be repeated.",
+          "referencia_invalida": "One of the passages no longer exists. The citation list was refreshed."
         }
       }
     },

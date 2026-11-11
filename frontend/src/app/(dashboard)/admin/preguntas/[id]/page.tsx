@@ -15,6 +15,7 @@ import { CabeceraPagina, EnlaceVolver } from "@/components/patrones/cabecera-pag
 import { Chip } from "@/components/patrones/pill-estado";
 import { CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { claveOrigenPregunta } from "@/lib/questions/estados";
+import { claveErrorPregunta } from "@/lib/serums-ia/revision/errores";
 import { idsDeCitas, MAX_CITAS } from "@/lib/serums-ia/revision/reglas";
 
 /** Detalle de una pregunta para revisarla: citas actuales y buscador de pasajes (SIA-E3-08). */
@@ -22,7 +23,7 @@ export default function DetallePreguntaPage() {
   const t = useTranslations("dashboard");
   const params = useParams<{ id: string }>();
   const preguntaId = Number(params.id);
-  const { pregunta, carga, guardando, claveError, cargar, anadir, quitar } = useCitasPregunta(preguntaId);
+  const { pregunta, carga, guardando, error, cargar, anadir, quitar } = useCitasPregunta(preguntaId);
   const citas = useMemo(() => pregunta?.citas ?? [], [pregunta]);
   const citados = useMemo(() => new Set(idsDeCitas(citas)), [citas]);
 
@@ -64,7 +65,7 @@ export default function DetallePreguntaPage() {
         <p className="text-cuerpo text-foreground whitespace-pre-wrap">{pregunta.enunciado}</p>
       </section>
 
-      {claveError ? <Alerta tono="error">{t(claveError, { maximo: MAX_CITAS })}</Alerta> : null}
+      {error ? <Alerta tono="error">{t(claveErrorPregunta(error, t.has), { maximo: MAX_CITAS })}</Alerta> : null}
 
       <CitasPregunta citas={citas} ocupado={guardando} onQuitar={quitar} />
       <BuscadorPasajes citados={citados} llena={citas.length >= MAX_CITAS} ocupado={guardando} onAnadir={anadir} />
