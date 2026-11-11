@@ -342,9 +342,18 @@ func (s *Service) VerifyEmail(ctx context.Context, req VerifyEmailRequest, ip, u
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 
+// noDisponible marks a database error of Login as ErrServicioNoDisponible (503)
+// and keeps the cause for the log; it must never read as bad credentials.
+func noDisponible(op string, err error) error {
+	return fmt.Errorf("%w: login %s: %w", ErrServicioNoDisponible, op, err)
+}
+
 func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua string) (*LoginResponse, error) {
 	u, err := s.repo.FindByUsername(ctx, req.Username)
-	if err != nil || u == nil {
+	if err != nil {
+		return nil, noDisponible("find user", err)
+	}
+	if u == nil {
 		return nil, ErrInvalidCredentials
 	}
 
@@ -357,7 +366,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua string) (*
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password)); err != nil {
 		_, locked, err := s.repo.RegisterFailedLogin(ctx, u.ID, maxLoginAttempts, lockoutDuration)
 		if err != nil {
-			return nil, err
+			return nil, noDisponible("register failed login", err)
 		}
 		if locked {
 			s.repo.WriteAudit(ctx, AuditEntry{UsuarioID: &u.ID, Accion: "lockout", Entidad: "usuarios", EntidadID: &u.ID, IP: ip})
@@ -379,13 +388,13 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua string) (*
 
 	// Reset brute-force counter
 	if err := s.repo.ResetLoginIntentos(ctx, u.ID); err != nil {
-		return nil, err
+		return nil, noDisponible("reset login attempts", err)
 	}
 
 	// Fetch profile for claims
 	profile, err := s.repo.GetUserProfileByID(ctx, u.ID)
 	if err != nil {
-		return nil, err
+		return nil, noDisponible("load profile", err)
 	}
 
 	// Raw IDs and nivel from grados for JWT claims
@@ -401,7 +410,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua string) (*
 		 JOIN usuarios u ON u.persona_id=p.id
 		 JOIN grados g ON g.id=p.grado_id
 		 WHERE u.id=$1`, u.ID); err != nil {
-		return nil, fmt.Errorf("load claims: %w", err)
+		return nil, noDisponible("load claims", err)
 	}
 
 	token, expiresAt, err := jwtpkg.Issue(s.jwtSecret, u.ID, u.Rol, rawIDs.Nivel, rawIDs.GradoID, rawIDs.EspecialidadID, rawIDs.InstitucionID)
@@ -412,17 +421,17 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, ua string) (*
 	// Enforce session limit: evict oldest sessions before creating new one
 	maxSes, err := s.repo.GetMaxSesiones(ctx)
 	if err != nil {
-		return nil, err
+		return nil, noDisponible("max sessions", err)
 	}
 	if err := s.repo.DeleteOldestSesiones(ctx, u.ID, maxSes-1); err != nil {
-		return nil, err
+		return nil, noDisponible("evict sessions", err)
 	}
 
 	// Store session (hash of JWT). Without it every request with this token
 	// would be rejected, so a failure here must fail the login.
 	tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(token)))
 	if err := s.repo.CreateSesion(ctx, u.ID, tokenHash, ip, ua, time.Unix(expiresAt, 0)); err != nil {
-		return nil, fmt.Errorf("create session: %w", err)
+		return nil, noDisponible("create session", err)
 	}
 
 	s.repo.WriteAudit(ctx, AuditEntry{UsuarioID: &u.ID, Accion: "login", Entidad: "usuarios", EntidadID: &u.ID, IP: ip})

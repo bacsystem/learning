@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cbaciliod/learning/internal/httpx"
 	internalmw "github.com/cbaciliod/learning/internal/middleware"
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog/log"
@@ -437,8 +438,14 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, ErrAccountRejected), errors.Is(err, ErrAccountInactive):
 			jsonError(w, http.StatusForbidden, err.Error())
-		default:
+		case errors.Is(err, ErrInvalidCredentials):
 			jsonError(w, http.StatusUnauthorized, ErrInvalidCredentials.Error())
+		case errors.Is(err, ErrServicioNoDisponible):
+			// The driver error may carry connection details: log the op only.
+			log.Error().Str("op", "auth.login").Msg("login unavailable: database error")
+			jsonError(w, http.StatusServiceUnavailable, ErrServicioNoDisponible.Error())
+		default:
+			httpx.InternalError(w, "auth.login", err)
 		}
 		return
 	}
