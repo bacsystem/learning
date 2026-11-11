@@ -1,6 +1,6 @@
 # ADR 0002: secreto del HMAC de los contadores antifraude
 
-- **Estado:** propuesto (pendiente de revisión del tech-lead)
+- **Estado:** aceptado (2026-11-11)
 - **Fecha:** 2026-11-11
 - **Historias:** SIA-E4-01 (cooldown del diagnóstico), SIA-E6-02 (cuota de IA), SIA-E9-07 (borrado de datos de aprendizaje)
 - **Decisión de producto de origen:** P8 (issue #65), supuesto 18 de `docs/stories/serums-ia/README.md:146`

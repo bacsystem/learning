@@ -1,7 +1,7 @@
 # Contrato API — SERUMS IA, épica E1 Taxonomía (MVP)
 
 - **Historias:** SIA-E1-01 (#11), SIA-E1-02 (#12), SIA-E1-03 (#13), SIA-E1-04 (#14)
-- **Estado:** borrador para revisión del tech-lead (2026-11-11). Revisión del 2026-11-11 (seguimiento de los PRs #72–#75): T8 documenta lo implementado en el PR #74 y T4 acepta las especialidades inactivas ya asociadas (cambio de contrato: tarea de backend-dev y frontend-dev).
+- **Estado:** vigente (2026-11-11). Revisión del 2026-11-11 (seguimiento de los PRs #72–#75): T8 documenta lo implementado en el PR #74 y T4 acepta las especialidades inactivas ya asociadas (cambio de contrato: tarea de backend-dev y frontend-dev).
 - **Convenciones transversales:** [README.md](README.md) (errores, auth, paginación, límites, auditoría e i18n). Aquí solo se documenta lo propio de E1.
 - **ADR relacionado:** [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) (unicidad y resolución de `proceso_asignaturas`).
 

@@ -4,8 +4,8 @@ Convenciones transversales para todos los endpoints del módulo «Aprendizaje as
 
 | Documento | Alcance | Estado |
 |---|---|---|
-| [serums-ia-e1-taxonomia.md](serums-ia-e1-taxonomia.md) | E1-01, E1-02, E1-03, E1-04 (MVP) | borrador para revisión |
-| [serums-ia-e2-fuentes.md](serums-ia-e2-fuentes.md) | E2-02, E2-03, E2-05, E2-06, E2-07 (MVP) | borrador para revisión |
+| [serums-ia-e1-taxonomia.md](serums-ia-e1-taxonomia.md) | E1-01, E1-02, E1-03, E1-04 (MVP) | vigente (2026-11-11) |
+| [serums-ia-e2-fuentes.md](serums-ia-e2-fuentes.md) | E2-02, E2-03, E2-05, E2-06, E2-07 (MVP) | aprobado, pendiente de implementación (2026-11-11) |
 
 ADRs: [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`.
 

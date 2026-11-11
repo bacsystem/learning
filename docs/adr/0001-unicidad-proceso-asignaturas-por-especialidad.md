@@ -1,6 +1,6 @@
 # ADR 0001: unicidad de `proceso_asignaturas` con `especialidad_id` nulo
 
-- **Estado:** propuesto (pendiente de revisión del tech-lead). Decisiones de producto confirmadas por el PO el 2026-11-11. Revisado el 2026-11-11: la versión de Postgres de producción pasa de supuesto a decisión (Postgres 16).
+- **Estado:** aceptado (2026-11-11). Decisiones de producto confirmadas por el PO el 2026-11-11. Revisado el 2026-11-11: la versión de Postgres de producción pasa de supuesto a decisión (Postgres 16).
 - **Fecha:** 2026-11-11
 - **Historias:** SIA-E1-03 (#13); la consumen SIA-E1-04, E4-01, E5-04, E5-05, E7-02 y E9-05
 - **Decisión de producto de origen:** P6 (issue #65), supuesto 1 de `docs/stories/serums-ia/README.md:128`
@@ -149,7 +149,7 @@ Los flujos nuevos del módulo SERUMS IA usan la especialidad del perfil del post
 Tests obligatorios:
 
 - unicidad de los dos tipos de fila (violación 23505 en `uq_proceso_asignaturas_proceso_esp_asig` → 409 `peso_duplicado`);
-- una fila de compatibilidad duplicada (con `especialidad_id` `NULL`) por `AsignarAsignatura`. El `ON CONFLICT (proceso_id, especialidad_id, asignatura_id) DO NOTHING` debe usar la restricción `NULLS NOT DISTINCT` como árbitro y devolver 409, no insertar una segunda fila. Este comportamiento no se ejecutó al escribir el ADR: el test es la verificación;
+- una fila de compatibilidad duplicada (con `especialidad_id` `NULL`) por `AsignarAsignatura`. El `ON CONFLICT (proceso_id, especialidad_id, asignatura_id) DO NOTHING` debe usar la restricción `NULLS NOT DISTINCT` como árbitro y devolver 409, no insertar una segunda fila. Verificado en SIA-E1-03 (PR #78): con `especialidad_id` `NULL` no se inserta la segunda fila (comprobado en psql y cubierto por un test);
 - resolución por conjunto: una especialidad con conjunto propio no hereda filas de compatibilidad;
 - creación de simulacro con conjunto de especialidad y sin él;
 - un proceso sin filas con especialidad se comporta igual que hoy (escenario «Compatibilidad» de E1-03).

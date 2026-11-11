@@ -1,6 +1,6 @@
 # ADR 0003: puerto `SourceRepository` y adaptador propio sobre PostgreSQL
 
-- **Estado:** propuesto (pendiente de revisión del tech-lead). Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD).
+- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD).
 - **Fecha:** 2026-11-11
 - **Historias:** SIA-E2-02 (#16); la usan SIA-E2-03, E2-05, E2-06, E2-07 y, más adelante, E3-01, E6-03, E6-04 y E6-08
 - **Decisión de producto de origen:** P1 (issue #65). MVP y v2 usan el 100 % del `SourceRepository` propio en PostgreSQL, a $0 USD. La búsqueda semántica (pgvector o NotebookLM) se reevalúa en v3 (SIA-E2-01, SIA-E2-08).
