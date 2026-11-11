@@ -1,6 +1,6 @@
 # ADR 0003: puerto `SourceRepository` y adaptador propio sobre PostgreSQL
 
-- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD); «El puerto» define los tipos que faltaban (`NuevaFuente`, `FiltroFuentes`, `Pagina`, `FuenteResumen`, `Pasaje`), reemplaza `audit.TxFunc` por un `Auditor` que recibe el `Evento` con el id de la fuente (también en `GuardarFuente`), fija la normalización de `Page` y `PerPage` y el error de `EspecialidadID ≤ 0`; la suite de contrato recibe los ganchos de prueba `Retirar` y `NuevaVersion`, y se fija el `detalle` de `fuente.procesar` y `fuente.fallar`.
+- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD); «El puerto» define los tipos que faltaban (`NuevaFuente`, `FiltroFuentes`, `Pagina`, `FuenteResumen`, `Pasaje`), reemplaza `audit.TxFunc` por un `Auditor` que recibe el `Evento` con el id de la fuente (también en `GuardarFuente`), fija la normalización de `Page` y `PerPage` y el error de `EspecialidadID ≤ 0`; la suite de contrato recibe los ganchos de prueba `Retirar` y `NuevaVersion`, y se fija el `detalle` de `fuente.procesar` y `fuente.fallar`. Revisión posterior (PR #92): errores `ErrFuenteDuplicada` y `ErrPublicacionInvalida`.
 - **Fecha:** 2026-11-11
 - **Historias:** SIA-E2-02 (#16); la usan SIA-E2-03, E2-05, E2-06, E2-07 y, más adelante, E3-01, E6-03, E6-04 y E6-08
 - **Decisión de producto de origen:** P1 (issue #65). MVP y v2 usan el 100 % del `SourceRepository` propio en PostgreSQL, a $0 USD. La búsqueda semántica (pgvector o NotebookLM) se reevalúa en v3 (SIA-E2-01, SIA-E2-08).
@@ -155,8 +155,19 @@ var (
     ErrConsultaInvalida = errors.New("consulta_invalida")
     ErrCitaInvalida     = errors.New("cita_invalida")    // no existe o (fuente, versión, pasaje) no coinciden
     ErrNoEncontrado     = errors.New("no_encontrado")
+    ErrFuenteDuplicada     = errors.New("fuente_duplicada")     // GuardarFuente: el sha256 ya existe en alguna versión
+    ErrPublicacionInvalida = errors.New("publicacion_invalida") // PublicarVersion / MarcarVersionFallida: entrada que rompe una invariante
 )
 ```
+
+- **`ErrFuenteDuplicada`:** el adaptador Postgres mapea la violación 23505 de `uq_fuente_versiones_sha256` a este error dentro de `GuardarFuente` (PR #92), para que el puerto no deje pasar errores de Postgres. El adaptador en memoria devuelve lo mismo y la suite de contrato fija el caso.
+  - Es un sentinel sin detalle. E2-03 hace antes, bajo el advisory lock, su propia comprobación con detalle (`fuente_id`, `titulo`, `estado`, `version`). Este error queda como red ante carreras.
+  - Si salta, E2-03 responde igual `409 fuente_duplicada` y consulta el detalle después del rollback.
+- **`ErrPublicacionInvalida`:** antes de abrir la transacción, una sola función de validación en Go, compartida por los dos adaptadores, comprueba las invariantes de la migración 062. Así no se publica nada y los dos adaptadores responden igual.
+  - En `PublicarVersion`: lista vacía o de más de 5 000 pasajes, `orden` repetido o fuera de 1..5 000, `linea_fin < linea_inicio`, `palabras < 1`, texto en blanco, `seccion` de más de 300 caracteres.
+  - En `MarcarVersionFallida`: un `motivo` fuera de `sin_contenido | limite_pasajes | error_interno`.
+  - Es un error de programación: `normalizar.go` resuelve antes la lista vacía como `sin_contenido` y la de más de 5 000 como `limite_pasajes`. El worker (E2-05) lo trata como fallo y marca la versión `fallida` con el motivo existente `error_interno`, sin motivo nuevo. En el log van solo `op`, `fuente_id` y `version`, nunca el contenido.
+- Ninguno de estos errores es un código HTTP por sí mismo: igual que `consulta_invalida`, quien consume el puerto decide la respuesta.
 
 - `PasajeEncontrado` y `PasajeCitado` llevan: `FuenteID`, `Version`, `PasajeID`, `Orden`, `LineaInicio`, `LineaFin`, `Seccion`, `Texto` y, en `PasajeCitado`, además `TituloFuente`, `EstadoFuente` y `OficialVerificada` de esa versión. No llevan ningún dato de usuario (regla 4).
 - `ResolverCita` **no** filtra por estado de la fuente: una cita histórica a la versión 1 devuelve el texto exacto de la versión 1 aunque la fuente vaya por la 3 o esté `retirada` (escenario «Resolver cita histórica»). El consumidor decide qué hacer con `EstadoFuente`.
@@ -171,7 +182,7 @@ var (
   | `fuente.fallar` | `{"version", "motivo_fallo", "estado_anterior", "estado_nuevo"}` |
 
   `estado_anterior` y `estado_nuevo` son los de la **fuente**, no los de la versión (E2-06, escenario «Auditoría»). Al publicar la versión 2 de una fuente `activa` quedan `activa → activa`, y `version` distingue el caso. Quien llama solo aporta el actor, la IP y el user agent a través del `Auditor`, igual que `temas.Auditor` (`internal/temas/service.go:19-21`, usado en `temas/repository.go:197`). Un `audit.TxFunc` no basta, porque la closure se arma antes de conocer el id. Si el `Auditor` devuelve error, la mutación se revierte (README §7).
-- **`GuardarFuente`** recibe el `Auditor` para escribir `fuente.crear` en la misma transacción (README §7). El adaptador en memoria no lo llama. Calcula `sha256`, `tamano_bytes` y `lineas` con `Huella`. E2-02 no valida ni el duplicado por hash ni el límite de fuentes. Los agrega E2-03 dentro de esa misma transacción, bajo el advisory lock del contrato E2 (S1, «Límite de fuentes»), y mapea la violación 23505 de `uq_fuente_versiones_sha256` a `fuente_duplicada`.
+- **`GuardarFuente`** recibe el `Auditor` para escribir `fuente.crear` en la misma transacción (README §7). El adaptador en memoria no lo llama. Calcula `sha256`, `tamano_bytes` y `lineas` con `Huella`. En E2-02 ya mapea la violación 23505 de `uq_fuente_versiones_sha256` a `ErrFuenteDuplicada` (ver arriba). E2-03 agrega, dentro de esa misma transacción y bajo el advisory lock del contrato E2 (S1, «Límite de fuentes»), la comprobación previa de duplicado con detalle y el límite de fuentes.
 
 ### Recuperación de pasajes (adaptador Postgres)
 

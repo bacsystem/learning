@@ -284,7 +284,7 @@ El hash duplicado se comporta distinto en las capturas de URL (E2-04 regla 11, c
 
 ## Puerto `SourceRepository` (SIA-E2-02)
 
-Interfaz y tipos (`NuevaFuente`, `FiltroFuentes`, `Pagina`, `FuenteResumen`, `Pasaje`), errores (`consulta_invalida`, `cita_invalida`), consulta SQL, suite de contrato y adaptador en memoria: ver la [ADR 0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) § El puerto. El `FuenteResumen` del puerto es mínimo (ids de especialidad, sin nombres). El objeto `FuenteResumen` de S3, más completo, lo arma el repositorio admin fuera del puerto (E2-07). No tiene ruta HTTP en el MVP: lo consumen E3-01, E6-03, E6-04 y E6-08 dentro del backend. La regla 5 de SIA-E2-03 (el contenido se trata como datos al enviarlo a la IA) la aplica E6-01/E6-03 al armar los prompts.
+Interfaz y tipos (`NuevaFuente`, `FiltroFuentes`, `Pagina`, `FuenteResumen`, `Pasaje`), errores (`consulta_invalida`, `cita_invalida`, `fuente_duplicada`, `publicacion_invalida`), consulta SQL, suite de contrato y adaptador en memoria: ver la [ADR 0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) § El puerto. El `FuenteResumen` del puerto es mínimo (ids de especialidad, sin nombres). El objeto `FuenteResumen` de S3, más completo, lo arma el repositorio admin fuera del puerto (E2-07). No tiene ruta HTTP en el MVP: lo consumen E3-01, E6-03, E6-04 y E6-08 dentro del backend. La regla 5 de SIA-E2-03 (el contenido se trata como datos al enviarlo a la IA) la aplica E6-01/E6-03 al armar los prompts.
 
 ---
 
