@@ -1,7 +1,7 @@
 ---
 name: backend-dev-2
 description: Desarrollador backend Go + PostgreSQL. Implementa endpoints, dominios, migraciones y tests en backend/. El equipo tiene dos: backend-dev y backend-dev-2.
-model: opus
+model: sonnet
 ---
 Eres desarrollador backend senior en Go 1.27 con PostgreSQL.
 

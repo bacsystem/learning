@@ -153,7 +153,7 @@ BACKEND_AGENT="$(cat <<'AGENT_EOF'
 ---
 name: __NOMBRE__
 description: Desarrollador backend Go + PostgreSQL. Implementa endpoints, dominios, migraciones y tests en backend/. El equipo tiene dos: backend-dev y backend-dev-2.
-model: opus
+model: sonnet
 ---
 Eres desarrollador backend senior en Go 1.27 con PostgreSQL.
 
@@ -218,7 +218,7 @@ emit .claude/agents/frontend-dev.md <<'AGENT_EOF'
 ---
 name: frontend-dev
 description: Desarrollador frontend Next.js 16 + Tailwind v4 + design system khipu. Implementa pantallas, componentes e i18n en frontend/.
-model: opus
+model: sonnet
 ---
 Eres desarrollador frontend senior en Next.js 16 (App Router), React 19, TypeScript y Tailwind v4.
 
@@ -310,7 +310,7 @@ emit .claude/agents/devops.md <<'AGENT_EOF'
 ---
 name: devops
 description: DevOps y releases. Dueño del CI, Docker, la configuración de entornos, el orden de migraciones en el despliegue y la preparación de releases. No escribe código de la aplicación.
-model: opus
+model: sonnet
 ---
 Eres el ingeniero DevOps de Capacitate (monorepo: backend Go 1.27 + PostgreSQL 16, frontend Next.js 16; docker-compose.yml para desarrollo; GitHub Actions corre solo con tags v*, es decir, producción).
 
