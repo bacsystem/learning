@@ -15,7 +15,6 @@ import (
 
 // Stable error codes of the tema endpoints (docs/api/README.md §4).
 const (
-	codigoCuerpoInvalido      = "cuerpo_invalido"
 	codigoParametroInvalido   = "parametro_invalido"
 	codigoNoEncontrado        = "no_encontrado"
 	codigoValidacion          = "validacion"
@@ -173,7 +172,7 @@ func (h *Handler) Reordenar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.TemaIDs == nil {
-		httpx.JSONErrorCode(w, http.StatusBadRequest, codigoCuerpoInvalido, msgCuerpoInvalido, nil)
+		httpx.JSONErrorCode(w, http.StatusBadRequest, httpx.CodeInvalidBody, msgCuerpoInvalido, nil)
 		return
 	}
 	posiciones, err := h.svc.Reordenar(r.Context(), asignaturaID, *req.TemaIDs, aud)
@@ -252,15 +251,10 @@ func responderError(w http.ResponseWriter, op string, err error) {
 	}
 }
 
-// decodificar reads a JSON body, rejecting unknown fields (400 cuerpo_invalido).
+// decodificar reads a JSON body, rejecting unknown fields (400
+// cuerpo_invalido) and an oversized one (413 cuerpo_demasiado_grande).
 func decodificar(w http.ResponseWriter, r *http.Request, v any) bool {
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
-		httpx.JSONErrorCode(w, http.StatusBadRequest, codigoCuerpoInvalido, msgCuerpoInvalido, nil)
-		return false
-	}
-	return true
+	return httpx.DecodeJSONStrict(w, r, v)
 }
 
 // parseFiltro reads the T1 query in strict mode: asignatura_id is required and

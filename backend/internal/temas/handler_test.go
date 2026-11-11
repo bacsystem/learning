@@ -12,6 +12,7 @@ import (
 
 	"github.com/cbaciliod/learning/internal/auth"
 	jwtpkg "github.com/cbaciliod/learning/internal/jwt"
+	"github.com/cbaciliod/learning/internal/middleware"
 )
 
 // fakeServicio answers every call with err (and records the filter and ids it
@@ -204,5 +205,41 @@ func TestHandler_SinClaimsNoAudita(t *testing.T) {
 	h.Crear(rr, httptest.NewRequest("POST", "/admin/temas", strings.NewReader(`{}`)))
 	if rr.Code != http.StatusUnauthorized {
 		t.Errorf("got %d, want 401", rr.Code)
+	}
+}
+
+// R3 (docs/api/README.md §3): a JSON body without Content-Length passes the
+// middleware, which wraps it in a MaxBytesReader; going past the limit while
+// decoding answers 413 cuerpo_demasiado_grande, not 400.
+func TestHandler_CuerpoDemasiadoGrande(t *testing.T) {
+	const limite = 64
+	h := middleware.MaxBodySize(limite, limite)(adminMux(&fakeServicio{}))
+	grande := `{"asignatura_id":7,"nombre":"` + strings.Repeat("a", 2*limite) + `"}`
+	cases := []struct {
+		method, path string
+	}{
+		{"POST", "/admin/temas"},
+		{"PUT", "/admin/temas/3"},
+		{"PATCH", "/admin/temas/3/estado"},
+		{"PUT", "/admin/asignaturas/7/temas/orden"},
+	}
+	for _, c := range cases {
+		t.Run(c.method+" "+c.path, func(t *testing.T) {
+			req := httptest.NewRequest(c.method, c.path, strings.NewReader(grande))
+			req.ContentLength = -1 // chunked: only the reader can enforce the limit
+			req.Header.Set("Content-Type", "application/json")
+			tok, _, err := jwtpkg.Issue("unit-secret-32-bytes-exactly-ok!!", 1, "admin", "", 0, 0, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header.Set("Authorization", "Bearer "+tok)
+			rr := httptest.NewRecorder()
+			h.ServeHTTP(rr, req)
+			var body map[string]any
+			_ = json.Unmarshal(rr.Body.Bytes(), &body)
+			if rr.Code != http.StatusRequestEntityTooLarge || body["error"] != "cuerpo_demasiado_grande" {
+				t.Errorf("got %d %v, want 413 cuerpo_demasiado_grande", rr.Code, body)
+			}
+		})
 	}
 }

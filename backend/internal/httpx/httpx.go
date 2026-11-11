@@ -21,8 +21,36 @@ func JSONError(w http.ResponseWriter, status int, msg string) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
-// CodeInternal is the stable code of every coded 500 (docs/api/README.md §3).
-const CodeInternal = "error_interno"
+// Stable codes shared by the coded endpoints (docs/api/README.md §3, §4).
+const (
+	CodeInternal     = "error_interno"
+	CodeInvalidBody  = "cuerpo_invalido"
+	CodeBodyTooLarge = "cuerpo_demasiado_grande"
+
+	msgInvalidBody  = "Cuerpo de solicitud inválido."
+	msgBodyTooLarge = "El cuerpo de la solicitud es demasiado grande."
+)
+
+// DecodeJSONStrict decodes the JSON body into v rejecting unknown fields. On
+// failure it writes the coded error and returns false: 413
+// cuerpo_demasiado_grande when the body went past the http.MaxBytesReader
+// limit while reading (no Content-Length, docs/api/README.md §3), 400
+// cuerpo_invalido otherwise.
+func DecodeJSONStrict(w http.ResponseWriter, r *http.Request, v any) bool {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(v)
+	if err == nil {
+		return true
+	}
+	var mbe *http.MaxBytesError
+	if errors.As(err, &mbe) {
+		JSONErrorCode(w, http.StatusRequestEntityTooLarge, CodeBodyTooLarge, msgBodyTooLarge, nil)
+	} else {
+		JSONErrorCode(w, http.StatusBadRequest, CodeInvalidBody, msgInvalidBody, nil)
+	}
+	return false
+}
 
 // codedError is the error body of the SERUMS IA endpoints: a stable code, a
 // Spanish fallback message and an optional detail without personal data.
