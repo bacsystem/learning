@@ -33,47 +33,60 @@ var _ SourceRepository = (*PgSource)(nil)
 // fuentes limit are added by E2-03 inside this transaction; a 23505 on the
 // hash index still maps to ErrFuenteDuplicada.
 func (s *PgSource) GuardarFuente(ctx context.Context, f NuevaFuente, aud Auditor) (int64, int, error) {
-	const primera = 1
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return 0, 0, fmt.Errorf("iniciar transacción: %w", err)
 	}
 	defer tx.Rollback()
+	id, err := insertarFuente(ctx, tx, f, aud)
+	if err != nil {
+		return 0, 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, 0, mapearDuplicada(fmt.Errorf("confirmar fuente: %w", err))
+	}
+	return id, primeraVersion, nil
+}
 
+// primeraVersion is the number of the version a new fuente is created with.
+const primeraVersion = 1
+
+// insertarFuente writes, inside tx, the fuente, its especialidades and its
+// version 1 in 'procesando', and the fuente.crear event. GuardarFuente and the
+// admin upload S1 (repository.go), which adds its checks under the advisory
+// lock in the same transaction, share it.
+func insertarFuente(ctx context.Context, tx *sqlx.Tx, f NuevaFuente, aud Auditor) (int64, error) {
 	var id int64
 	if err := tx.GetContext(ctx, &id, `
 		INSERT INTO fuentes (titulo, tipo, anio, proceso_id, creado_por) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
 		f.Titulo, f.Tipo, f.Anio, f.ProcesoID, f.CreadoPor); err != nil {
-		return 0, 0, fmt.Errorf("crear fuente: %w", err)
+		return 0, fmt.Errorf("crear fuente: %w", err)
 	}
 	if len(f.EspecialidadIDs) > 0 {
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO fuente_especialidades (fuente_id, especialidad_id) SELECT $1, unnest($2::bigint[])`,
 			id, pq.Array(f.EspecialidadIDs)); err != nil {
-			return 0, 0, fmt.Errorf("especialidades de la fuente %d: %w", id, err)
+			return 0, fmt.Errorf("especialidades de la fuente %d: %w", id, err)
 		}
 	}
 	sha, tamano, lineas := Huella(f.Contenido)
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO fuente_versiones (fuente_id, numero, nombre_archivo, sha256, tamano_bytes, lineas, contenido, creado_por)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		id, primera, f.NombreArchivo, sha, tamano, lineas, string(f.Contenido), f.CreadoPor); err != nil {
-		return 0, 0, mapearDuplicada(fmt.Errorf("crear versión 1 de la fuente %d: %w", id, err))
+		id, primeraVersion, f.NombreArchivo, sha, tamano, lineas, string(f.Contenido), f.CreadoPor); err != nil {
+		return 0, mapearDuplicada(fmt.Errorf("crear versión 1 de la fuente %d: %w", id, err))
 	}
 	especialidades := f.EspecialidadIDs
 	if especialidades == nil {
 		especialidades = []int64{}
 	}
 	if err := auditar(ctx, tx, aud, Evento{Accion: AccionCrear, Entidad: EntidadFuente, EntidadID: id, Detalle: map[string]any{
-		"version": primera, "sha256": sha, "tamano_bytes": tamano, "tipo": f.Tipo,
+		"version": primeraVersion, "sha256": sha, "tamano_bytes": tamano, "tipo": f.Tipo,
 		"especialidad_ids": especialidades, "estado_nuevo": EstadoProcesando,
 	}}); err != nil {
-		return 0, 0, err
+		return 0, err
 	}
-	if err := tx.Commit(); err != nil {
-		return 0, 0, mapearDuplicada(fmt.Errorf("confirmar fuente: %w", err))
-	}
-	return id, primera, nil
+	return id, nil
 }
 
 // ListarFuentes returns one page of fuentes by updated_at then id, newest
