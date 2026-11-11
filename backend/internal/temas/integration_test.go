@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/db/dbtest"
@@ -320,7 +319,7 @@ func TestLimite_EsperaElBloqueoDeLaAsignatura(t *testing.T) {
 				resultado <- rr.Code
 			}()
 
-			bloqueada := e.esperarBloqueadoPor(t, pid, resultado)
+			bloqueada := dbtest.BlockedBy(t, e.db, pid, resultado)
 			if err := otra.Commit(); err != nil {
 				t.Fatal(err)
 			}
@@ -345,10 +344,7 @@ func (e *entorno) bloquearConTemaPendiente(t *testing.T, asig int64) (*sqlx.Tx, 
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = tx.Rollback() })
-	var pid int
-	if err := tx.Get(&pid, `SELECT pg_backend_pid()`); err != nil {
-		t.Fatal(err)
-	}
+	pid := dbtest.BackendPID(t, tx)
 	if _, err := tx.Exec(`SELECT 1 FROM asignaturas WHERE id = $1 FOR NO KEY UPDATE`, asig); err != nil {
 		t.Fatal(err)
 	}
@@ -357,32 +353,6 @@ func (e *entorno) bloquearConTemaPendiente(t *testing.T, asig int64) (*sqlx.Tx, 
 		t.Fatal(err)
 	}
 	return tx, pid
-}
-
-// esperarBloqueadoPor reports whether some backend ends up blocked by pid
-// before the request answers on its own (bounded by a timeout). If the request
-// answers first, its status is put back on the channel for the caller.
-func (e *entorno) esperarBloqueadoPor(t *testing.T, pid int, resultado chan int) bool {
-	t.Helper()
-	limite := time.After(5 * time.Second)
-	for {
-		var bloqueado bool
-		if err := e.db.Get(&bloqueado,
-			`SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)))`, pid); err != nil {
-			t.Fatal(err)
-		}
-		if bloqueado {
-			return true
-		}
-		select {
-		case status := <-resultado:
-			resultado <- status
-			return false
-		case <-limite:
-			return false
-		case <-time.After(20 * time.Millisecond):
-		}
-	}
 }
 
 // ── T4 ────────────────────────────────────────────────────────────────────────

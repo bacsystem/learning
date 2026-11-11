@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/cbaciliod/learning/internal/catalogs"
 	"github.com/cbaciliod/learning/internal/examen"
 	"github.com/cbaciliod/learning/internal/grading"
 	"github.com/jmoiron/sqlx"
@@ -273,11 +274,11 @@ func (r *Repository) GetConfiguracionDetalle(ctx context.Context, procesoID, gra
 		          AND p.asignatura_id = pa.asignatura_id
 		          AND p.estado = 'activo'
 		          AND ($2 = 0 OR p.grado_id = $2 OR p.grado_id IS NULL)
-		          AND ($3 = 0 OR p.especialidad_id = $3 OR p.especialidad_id IS NULL)
+		          AND ($3::bigint = 0 OR p.especialidad_id = $3 OR p.especialidad_id IS NULL)
 		       ) AS preguntas_disponibles
 		FROM proceso_asignaturas pa
 		JOIN asignaturas a ON a.id = pa.asignatura_id
-		WHERE pa.proceso_id = $1
+		WHERE `+catalogs.ConjuntoDePesos("pa", 1, 3)+`
 		ORDER BY a.nombre ASC`, procesoID, gradoID, especialidadID,
 	)
 	if err != nil {
@@ -320,14 +321,16 @@ func (r *Repository) ListConfiguraciones(ctx context.Context) ([]ConfiguracionRe
 
 // ── GetProcesoAsignaturas ─────────────────────────────────────────────────────
 
-// GetProcesoAsignaturas returns the asignaturas and their configuration for a proceso.
-func (r *Repository) GetProcesoAsignaturas(ctx context.Context, procesoID int64) ([]simulacroAsignaturaRow, error) {
+// GetProcesoAsignaturas returns the asignaturas of the set that applies to
+// the proceso and especialidad (0 = none): the especialidad's own set or the
+// compatibility rows, never mixed, so each asignatura appears once (ADR 0001, L7).
+func (r *Repository) GetProcesoAsignaturas(ctx context.Context, procesoID, especialidadID int64) ([]simulacroAsignaturaRow, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT pa.asignatura_id, a.nombre, pa.numero_preguntas, pa.peso_porcentual, pa.coeficiente
 		 FROM proceso_asignaturas pa
 		 JOIN asignaturas a ON a.id = pa.asignatura_id
-		 WHERE pa.proceso_id = $1
-		 ORDER BY pa.asignatura_id`, procesoID,
+		 WHERE `+catalogs.ConjuntoDePesos("pa", 1, 2)+`
+		 ORDER BY pa.asignatura_id`, procesoID, especialidadID,
 	)
 	if err != nil {
 		return nil, err

@@ -92,6 +92,9 @@ func pathID(r *http.Request, segment string) (int64, bool) {
 // with the operation name and answered with a generic 500.
 func mapErr(w http.ResponseWriter, op string, err error) {
 	switch {
+	case errors.Is(err, ErrPesoDuplicado):
+		// The one coded answer of the legacy catalog endpoints (contract PE5).
+		httpx.JSONErrorCode(w, http.StatusConflict, codigoPesoDuplicado, err.Error(), nil)
 	case errors.Is(err, ErrNotFound):
 		jsonError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, ErrConflict):
@@ -644,7 +647,20 @@ func (h *Handler) UpdateProcesoEstado(w http.ResponseWriter, r *http.Request) {
 
 // ── Proceso-Asignaturas ───────────────────────────────────────────────────────
 
+// ListProcesoAsignaturas handles GET /procesos/{id}/asignaturas: the set of
+// the user's especialidad (ADR 0001, L2).
 func (h *Handler) ListProcesoAsignaturas(w http.ResponseWriter, r *http.Request) {
+	h.listProcesoAsignaturas(w, r, h.svc.ListProcesoAsignaturas)
+}
+
+// ListProcesoAsignaturasAdmin handles GET /admin/procesos/{id}/asignaturas:
+// only the compatibility rows, whatever the admin's own especialidad.
+func (h *Handler) ListProcesoAsignaturasAdmin(w http.ResponseWriter, r *http.Request) {
+	h.listProcesoAsignaturas(w, r, h.svc.ListProcesoAsignaturasCompatibilidad)
+}
+
+func (h *Handler) listProcesoAsignaturas(w http.ResponseWriter, r *http.Request,
+	listar func(ctx context.Context, procesoID, gradoID, especialidadID int64) ([]ProcesoAsignaturaItem, error)) {
 	id, ok := pathID(r, "id")
 	if !ok {
 		jsonError(w, http.StatusBadRequest, "ID inválido.")
@@ -655,7 +671,7 @@ func (h *Handler) ListProcesoAsignaturas(w http.ResponseWriter, r *http.Request)
 		gradoID = claims.GradoID
 		especialidadID = claims.EspecialidadID
 	}
-	list, err := h.svc.ListProcesoAsignaturas(r.Context(), id, gradoID, especialidadID)
+	list, err := listar(r.Context(), id, gradoID, especialidadID)
 	if err != nil {
 		mapErr(w, "list_proceso_asignaturas", err)
 		return
