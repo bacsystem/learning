@@ -568,6 +568,18 @@ func TestS7_Editar(t *testing.T) {
 			}
 		})
 	}
+	// especialidad_ids is required: absent or null never means «todas» (a
+	// precision of the contract, an exception to README §1).
+	for _, cuerpo := range []string{`{"titulo":"Balotario nuevo"}`, `{"titulo":"Balotario nuevo","especialidad_ids":null}`} {
+		t.Run("especialidad_ids requerido: "+cuerpo, func(t *testing.T) {
+			id := e.fActiva(t, e.espA)
+			status, body := e.editar(t, id, cuerpo)
+			campos, _ := body["detalle"].(map[string]any)["campos"].(map[string]any)
+			if status != 422 || codigoDe(body) != "validacion" || campos["especialidad_ids"] != "requerido" {
+				t.Errorf("got %d %v", status, body)
+			}
+		})
+	}
 	t.Run("la marca y la versión no cambian", func(t *testing.T) {
 		id := e.fMarcada(t, false)
 		_, d := e.editar(t, id, `{"titulo":"Balotario editado","especialidad_ids":[]}`)

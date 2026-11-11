@@ -265,7 +265,7 @@ func (r *Repository) Editar(ctx context.Context, id int64, titulo string, especi
 }
 
 // comprobarEspecialidadesEditables: each one exists and is active, or the
-// fuente already had it (contract S7 regla 2, as temas.Editar).
+// fuente already had it (contract S7 regla 3, as temas.Editar).
 func comprobarEspecialidadesEditables(ctx context.Context, tx *sqlx.Tx, especialidades, actuales []int64) error {
 	if len(especialidades) == 0 {
 		return nil
