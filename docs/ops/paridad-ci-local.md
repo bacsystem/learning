@@ -25,7 +25,7 @@ solo con tags `v*`) es lo mismo que corre un developer con `make lint`,
 | `npm ci` | — (lo corre el developer) | — |
 | `npx tsc --noEmit` | no estaba | `make lint` |
 | `npm run lint` | `make lint` | `make lint` |
-| `npm test` | `npm run test:coverage` (lo mismo, con cobertura) | `make test` (`npm test`). La cobertura sigue en `make test/frontend` |
+| `npm test` | `npm run test:coverage` (lo mismo, con cobertura) | `make test` (`npm test`). Para la cobertura, `cd frontend && npm run test:coverage` (se quitaron `test/backend` y `test/frontend`, que duplicaban `test`) |
 | `node scripts/check-i18n.mjs` | no estaba | `make lint` |
 | `npm run build` | `make build` | `make build` |
 
@@ -34,7 +34,7 @@ solo con tags `v*`) es lo mismo que corre un developer con `make lint`,
 | Herramienta | CI | Local (`make`) | Docker |
 |---|---|---|---|
 | Go | `go-version-file: backend/go.mod` → toolchain go1.27.4 | `GOTOOLCHAIN=auto` (por defecto) descarga go1.27.4 según `go.mod` | `golang:1.27.4-alpine3.23` |
-| Node | `frontend/.nvmrc` = 22.14.0 | `nvm use` en `frontend/` (no lo fija make) | `node:22.14.0-alpine3.21` (antes `node:22-alpine`, flotante) |
+| Node | `frontend/.nvmrc` = 22.23.5 (PR #102) | `nvm use` en `frontend/` (no lo fija make) | `node:22.23.5-alpine3.23` (antes `node:22-alpine`, flotante) |
 | Postgres | `postgres:16-alpine` | la base de `TEST_DATABASE_URL` (Postgres 16) | `postgres:16-alpine` (compose) |
 | goose | v3.21.1 | v3.21.1 (`GOOSE_VERSION` del Makefile) | v3.21.1 (`ARG GOOSE_VERSION`) |
 | govulncheck | v1.9.0 | v1.9.0 | — |
@@ -71,10 +71,8 @@ docker stop pg-test
   está en el checklist de release como bloqueo manual.
 - **Node local no lo fija make**: hay que usar `nvm use` (o equivalente) con
   `frontend/.nvmrc`.
-- **Node 22.14.0** es de febrero de 2025, y producción lo usaría como runtime.
-  Se fijó a la versión de `.nvmrc` para que haya paridad con el CI. Subir
-  `.nvmrc` y las tres líneas `FROM` juntas al último parche de la 22 queda como
-  **hallazgo de release** para el tech-lead, porque `.nvmrc` es del frontend.
+- **Node**: 22.23.5, el último parche de la 22 (de seguridad). `.nvmrc` sube en el
+  PR #102 y el Dockerfile en este PR: se fusionan juntos.
 - **`make migrate/create`** usaba la marca de tiempo de goose. Ahora numera en
   secuencia (`-s`, renombrado a 3 dígitos). Comprobado sobre una copia de
   `migrations/`: crea `062_probe.sql`.

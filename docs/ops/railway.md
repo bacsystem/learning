@@ -83,7 +83,7 @@ Los tags publicados no se reescriben: si un tag necesita una corrección, sale
 uno nuevo.
 
 **Rollback**: volver a poner en el servicio el tag anterior. Las imágenes viven
-en Docker Hub, así que no depende de la retención de Railway (72/120 h).
+en Docker Hub, así que no depende de la retención de Railway (120 h en Pro).
 
 ## 3. Servicios del proyecto
 
@@ -169,59 +169,92 @@ despliegue conviven el viejo y el nuevo, y `cmd/migrate` abre una más al arranc
 eso `max_connections` tiene que ser ≥ 2 × 25 × réplicas + margen. Se comprueba
 con `SHOW max_connections;` al aprovisionar.
 
-## 6. Backups y restauración en Railway
+## 6. Backups, restauración y objetivos
+
+**Objetivos (decisión del usuario):**
+
+- **RPO 5 min con PITR.** Si solo queda la copia de R2, el RPO es de 24 h.
+- **RTO 2 h.**
+- **Retención en R2: 30 días.**
+
+Plan **Pro** de Railway. La verificación de estas condiciones antes del
+lanzamiento se registra en
+[condiciones-lanzamiento.md](condiciones-lanzamiento.md) (C1–C13 del
+ADR 0004).
 
 Según [backups](https://docs.railway.com/reference/backups) y
-[point-in-time-recovery](https://docs.railway.com/volumes/point-in-time-recovery).
-Configuración (ADR 0004):
+[point-in-time-recovery](https://docs.railway.com/volumes/point-in-time-recovery):
 
 - **PITR activado** (pgBackRest con archivado de WAL a un bucket de Railway).
   La ventana es de unas 4 semanas. Restaurar a un instante crea un **servicio
   nuevo** sin tocar el original. Con PITR no se puede fijar una versión menor;
   se mantiene el tag mayor (16).
-- **Backups de volumen diario y semanal.** Los diarios se guardan 6 días y los
-  semanales 27. Los manuales se limitan al 50 % del tamaño del volumen.
+- **Backups de volumen: solo diario y semanal.** Los diarios se guardan 6 días
+  y los semanales 27.
+  - **El mensual NO se activa**: guarda 89 días, y ninguna copia debe pasar de
+    unos 30 días.
+  - Los backups manuales se limitan al 50 % del tamaño del volumen.
   - Restaurar uno crea un volumen nuevo, montado en la misma ruta, **dentro del
     mismo proyecto y entorno**. No se puede restaurar en otro entorno.
   - **Borrar un volumen borra sus backups.**
-- **Planes:** la documentación no dice qué plan incluye backups, PITR o HA. La
-  imagen para hacer rollback se conserva 72 h en Hobby y 120 h en Pro
-  ([plans](https://docs.railway.com/pricing/plans)).
+- **Copia diaria fuera de Railway, en Cloudflare R2** (ADR 0004, D11). La crea
+  un cron con `pg_dump` 16, cifrada con age, y el bucket lleva ciclo de vida y
+  bucket lock de **30 días**.
+  - El bucket, el token y las reglas los crea el usuario cuando el diseño esté
+    aprobado. La implementación va en un PR aparte (`deploy/backup/`).
+  - La jurisdicción del bucket la decide el usuario (C12).
+- **Plan Pro:** la documentación no dice si backups, PITR, HA y cron jobs
+  dependen del plan. **A confirmar en el panel** (C1).
+  - La imagen para hacer rollback se conserva **120 h** en Pro
+    ([plans](https://docs.railway.com/pricing/plans)), aunque el rollback
+    principal es volver al tag anterior de la imagen (§2).
 
-**Dos restauraciones de prueba antes del lanzamiento** (con aprobación del
-usuario; cada una se mide y se anota aquí):
+**Restauraciones de prueba antes del lanzamiento** (con aprobación del
+usuario). Cada una se cronometra y el resultado se anota en
+[condiciones-lanzamiento.md](condiciones-lanzamiento.md):
 
-1. **PITR a un servicio nuevo**, a un instante reciente.
-   - Comprobar la versión de goose y el conteo de filas de las tablas
-     principales.
-   - Medir el **RPO real**: diferencia entre el instante pedido y la última
-     escritura recuperada.
-2. **Backup de volumen**, restaurado en el mismo entorno `production`, porque
-   Railway no restaura en otro.
-   - Se hace **antes** de abrir a usuarios, cuando la base todavía no tiene
-     datos reales.
-   - Después, el backend tiene que arrancar y `GET /health` responder 200.
+| Prueba | Procedimiento | Criterio de éxito |
+|---|---|---|
+| PITR a un servicio nuevo | 1. Anotar la hora T0. 2. Escribir una fila marcador. 3. Restaurar a T0 + 1 min, lo que crea un servicio nuevo. 4. Apuntar a él un backend temporal. 5. Comprobar la versión de goose, el conteo de filas, `GET /health` y un login que descifre | **RPO medido ≤ 5 min** (la diferencia entre el último commit y el punto restaurado) y **tiempo total ≤ 2 h** (C5, C6) |
+| Backup de volumen | Restaurarlo en el mismo entorno `production`, **antes** de abrir a usuarios, cuando la base todavía no tiene datos reales. Después, el backend arranca y `GET /health` responde 200 | Arranca y responde 200 |
+| Copia de R2 | Bajar con curl, descifrar con `age -d -i <clave>` (la clave privada se carga solo durante la prueba) y hacer `pg_restore` en un Postgres 16 efímero y aislado, **no** en `deploy/`, que se destruye al terminar | **Tiempo total ≤ 2 h** (C6, C7) |
 
-En las dos se borra lo restaurado al terminar si contiene datos personales.
+En todas se borra lo restaurado al terminar si contiene datos personales. La
+prueba de R2 se repite **cada mes**.
 
-Sigue abierto para el usuario (U4): si hace falta además una copia **fuera** de
-Railway, porque los backups viven en el mismo proyecto.
+## 7. Monitoreo y alertas (plan Pro, sin servicio externo)
 
-## 7. Pendiente de confirmar al aprovisionar (con aprobación del usuario)
+El usuario decidió habilitar lo que ofrece Railway, sin servicios externos.
 
-- [ ] `SELECT version();` → 16.x
-- [ ] `CREATE EXTENSION IF NOT EXISTS pg_trgm;` funciona
-- [ ] `SHOW max_connections;` ≥ 2 × 25 × réplicas + margen
-- [ ] `sslmode=require` funciona por la URL privada, y cómo se agrega el
-      parámetro a la variable de referencia
-- [ ] Qué hace el pooling de Railway, si lo hay, con `DATABASE_URL`
-- [ ] Región y cifrado en reposo de los backups y del bucket de PITR
-- [ ] Cómo correr `cmd/seed/admin` y `cmd/rehash-emails` contra producción:
-      las variables selladas no salen en `railway run`. Opción a confirmar:
-      un servicio de un solo uso con la imagen del backend y las mismas
-      variables por referencia
+| Qué | Cómo | Fuente |
+|---|---|---|
+| CPU, RAM, disco y salida de red | **Monitors** en el Observability Dashboard: umbral por encima o por debajo y aviso por email, in-app o webhook. Son de Pro y se agregan por entorno | [observability](https://docs.railway.com/guides/observability) |
+| Caída del proceso | Restart policy `ON_FAILURE`. Al agotar los reintentos el deploy pasa a `Crashed` y Railway avisa por email a los miembros del proyecto y por webhook | [deployment-actions](https://docs.railway.com/guides/deployment-actions), [restart-policy](https://docs.railway.com/deployments/restart-policy) |
+| Deploy fallido y volumen casi lleno | Webhooks del proyecto (Settings → Webhooks), con formato nativo para Slack y Discord. No van firmados: se protegen con una cabecera secreta | [webhooks](https://docs.railway.com/observability/webhooks) |
+
+**Qué no cubre** (el usuario lo sabe):
+
+- No hay chequeo HTTP continuo: `/health` solo se consulta al desplegar
+  ([healthchecks](https://docs.railway.com/guides/healthchecks)).
+- Si el proceso está vivo pero `/health` responde 503 (por ejemplo, con la
+  base caída), el deploy sigue `Active` y **no salta ninguna alerta**.
+- Railway no recoge latencia ni tasa de errores HTTP
+  ([metrics](https://docs.railway.com/reference/metrics)).
+- No está documentado si una ejecución fallida de un cron avisa. Railway no
+  corta un cron colgado
+  ([cron-jobs](https://docs.railway.com/reference/cron-jobs)).
+
+Por eso el cron de R2 lleva su propio `timeout` y su propio aviso (C13). Las
+alternativas para el hueco de `/health` (la plantilla de Uptime Kuma dentro del
+proyecto, o que el backend salga con error si pierde la base) están
+pendientes de decisión del usuario.
+
+## 8. Pendiente de confirmar al aprovisionar (con aprobación del usuario)
+
+Se registra en [condiciones-lanzamiento.md](condiciones-lanzamiento.md). Además
+de C1–C13:
+
 - [ ] El servicio acepta la imagen pública de Docker Hub como fuente y
       `RAILWAY_HEALTHCHECK_TIMEOUT_SEC=660` se aplica
 - [ ] `PORT` inyectado frente al `ENV PORT=3000` de la imagen del frontend
 - [ ] El rango de IP del proxy de Railway, para `TRUSTED_PROXIES`
-- [ ] Qué plan incluye backups, PITR y HA (en el panel o con soporte)

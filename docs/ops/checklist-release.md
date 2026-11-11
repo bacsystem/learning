@@ -82,7 +82,7 @@ La 062 está en el PR #92.
 ## 3. Verificación en local, sobre `release/X.Y.Z`
 
 Con las mismas versiones que el CI (ver [paridad-ci-local.md](paridad-ci-local.md)):
-Go según `backend/go.mod` (toolchain go1.27.4), Node 22.14.0 (`frontend/.nvmrc`)
+Go según `backend/go.mod` (toolchain go1.27.4), Node según `frontend/.nvmrc` (22.23.5)
 y Postgres 16.
 
 - [ ] `make lint`
@@ -109,28 +109,36 @@ La configuración de cada servicio está en [railway.md](railway.md). Railway
 despliega **imágenes de Docker Hub** (repositorios públicos). Desplegar es
 cambiar el tag de la imagen en el servicio.
 
-**Construir y verificar las imágenes**, desde el tag, después de que su CI pase:
+**Orden:** tag → CI del tag en verde → build, verificación y push **locales del
+usuario** → cambio del tag de la imagen en Railway. Las imágenes las construye
+y publica **el usuario** con su cuenta `cbaciliod`. **Ningún agente hace
+`docker login` ni `docker push`.**
 
-- [ ] `git switch --detach vX.Y.Z` con el árbol limpio (`git status` vacío).
+**Construir, verificar y publicar** (lo hace el usuario):
+
+- [ ] Checkout **limpio** del tag, nunca del árbol de trabajo:
+      `git clone https://github.com/bacsystem/learning.git && cd learning && git switch --detach vX.Y.Z`.
+      `make` falla (`check/release-tree`) si hay cambios sin commit, archivos
+      sin seguimiento o si HEAD no es el tag `DOCKER_TAG`.
 - [ ] `make docker/build DOCKER_TAG=vX.Y.Z NEXT_PUBLIC_API_URL=<api de prod>`.
-      La imagen del frontend de otro entorno se construye aparte con
-      `FRONTEND_ENV=<entorno>` y queda con el tag `vX.Y.Z-<entorno>`
+      Construye para `linux/amd64` y con `--no-cache`, e inyecta `VERSION=X.Y.Z`
+      en el backend. La imagen del frontend de otro entorno se construye aparte
+      con `FRONTEND_ENV=<entorno>` y queda con el tag `vX.Y.Z-<entorno>`
       ([railway.md](railway.md) §2).
 - [ ] **`make docker/verify DOCKER_TAG=vX.Y.Z`**, que **se ejecuta**, no se lee.
       Las imágenes son públicas, y el target falla si encuentra:
   - `.env*`, `assets/`, `bin/`, `*_test.go`, `*.test`, `coverage*` o `.git`
-    en el sistema de archivos de la imagen (`docker export` + `tar -t`);
-  - un patrón de secreto (`SECRET`, `PASSWORD`, `KEY=`, `TOKEN`) en
-    `docker history --no-trunc` o en el `ENV` de la imagen. Las `NEXT_PUBLIC_*`
-    quedan dentro del bundle JS (no en el `ENV` de la imagen final): son
-    públicas por definición y no pueden llevar nada sensible.
+    en `/app` (`docker export` + `tar -t`);
+  - un patrón de secreto en `docker history --no-trunc` o en el `ENV` de la
+    imagen. Las `NEXT_PUBLIC_*` quedan dentro del bundle JS: son públicas por
+    definición y no pueden llevar nada sensible.
   - Probado con una imagen de prueba que tenía `bin/`, `assets/`, `*_test.go`
-    y `ENV JWT_SECRET`: el script la rechaza (exit 1). Las dos imágenes reales
-    pasan.
+    y `ENV JWT_SECRET`: el script la rechaza (exit 1).
 - [ ] `backend/.dockerignore` y `frontend/.dockerignore` siguen excluyendo
-      `.env*`, `bin/`, `*.test` y `coverage*`. Lo confirma `make docker/verify`.
-- [ ] `make docker/push DOCKER_TAG=vX.Y.Z`. Los tags publicados no se
-      reescriben.
+      `.env*`, `bin/`, `*.test` y `coverage*`.
+- [ ] `docker login` del usuario y luego `make docker/push DOCKER_TAG=vX.Y.Z`.
+      `docker/push` repite `check/release-tree` y `docker/verify` antes de
+      publicar. Los tags publicados no se reescriben.
 
 **Desplegar**:
 
@@ -139,6 +147,12 @@ cambiar el tag de la imagen en el servicio.
       anotar además la hora exacta: es el punto de restauración.
 - [ ] Variables nuevas del release ya cargadas en el servicio (selladas si
       son secretos) y con su copia en el gestor de secretos.
+- [ ] **Ningún valor de `deploy/local/preprod.vars` se usa en Railway.** Para
+      cada variable no sellada: `grep -F` de su valor de Railway sobre
+      `preprod.vars` no da resultados. Para cada variable sellada: no se puede
+      leer, así que se comprueba al generarla y se anota en el PR del release
+      (generada con `openssl rand`, nunca copiada). Los valores de preprod
+      llevan `NOT-FOR-PRODUCTION` donde el formato lo permite.
 - [ ] **Backend primero**: cambiar la imagen del servicio a
       `cbaciliod/learning-backend:vX.Y.Z`. `entrypoint.sh` migra con el
       advisory lock (conexión directa por la red privada, sin pooler) y

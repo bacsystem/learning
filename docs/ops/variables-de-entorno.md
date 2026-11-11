@@ -19,6 +19,22 @@ repositorio, en la imagen, en `docker-compose.yml` ni en mensajes.
 
 ## Backend: servidor (`cmd/server`, `config.Load`)
 
+> **Cambios en camino** (fix/backend-config-validation, backend-dev-2; aplican
+> cuando se fusione):
+> - **H-2:** `ENCRYPTION_KEY` que no sea de 64 hex falla en `config.Load`, antes
+>   de conectar, con `ENCRYPTION_KEY must be 64 hex characters (a 32-byte key)`.
+> - **H-3:** un `LOG_LEVEL` fuera de `trace|debug|info|warn|error` (sin
+>   distinguir mayúsculas; vacío = valor por defecto) no arranca. Un
+>   `TRUSTED_PROXIES` con una entrada que no sea IP ni CIDR tampoco. Vacío o con
+>   una coma al final se acepta.
+> - **H-5:** fuera de `development`/`test`, el arranque falla si el `sslmode`
+>   efectivo (el del DSN, o `PGSSLMODE` si el DSN no lo trae) no es `require`,
+>   `verify-ca` o `verify-full`. El compose (`sslmode=disable`) solo arranca con
+>   `ENV=development`/`test`. En Railway: `${{Postgres.DATABASE_URL}}?sslmode=require`.
+> - **H-6:** `var version = "0.0.0-dev"` (`main.version`). El Dockerfile la
+>   inyecta con `-X main.version=$VERSION` (este PR), y `make docker/build` pasa
+>   el tag sin la «v».
+
 `config.Load` lee el entorno y, si existe, un archivo `.env` del directorio de
 trabajo (viper). En la imagen no hay `.env`: `backend/.dockerignore` lo excluye.
 
@@ -61,7 +77,6 @@ Las migraciones corren **en cada arranque** del contenedor, antes del servidor
 | `ADMIN_EMAIL` | `cmd/seed/admin` (obligatoria) | No (dato personal: no va en logs ni en mensajes) | Error y salida |
 | `ADMIN_USERNAME`, `ADMIN_DNI`, `ADMIN_REBIND`, `ADMIN_INSTITUCION_ID`, `ADMIN_GRADO_ID`, `ADMIN_ESPECIALIDAD_ID` | `cmd/seed/admin` (opcionales) | No | Valores por defecto documentados en la cabecera de `cmd/seed/admin/main.go` |
 | `ADMIN_PASSWORD` | `cmd/seed/admin` (opcional) | **Sí** | Si está vacía, se lee una línea de stdin. Es lo recomendado: `make compose/seed/admin` la pide por teclado |
-| `PROD_DATABASE_URL` | `Makefile` (`DB=prod` en `migrate/*` y `fix-encrypt-personas`) | **Sí** | Con `DB=prod` y la variable vacía, goose falla al conectar |
 
 ## Backend: tests
 
@@ -101,15 +116,16 @@ solo en `127.0.0.1`.
 Todos son de código de la app, así que no se cambian en este PR:
 
 - **H-1. `.env.example` sin verificar.** El rol devops no puede leerlo por una
-  regla de denegación, aunque es el dueño de la plantilla. Hace falta permitir
+  regla de denegación, aunque es el dueño de la plantilla. El usuario aprobó
+  la lectura; el tech-lead cambia el permiso y entonces se cruza. Hace falta permitir
   la lectura de `.env.example` en `.claude/settings.json` (vía
   `setup-team.sh`), o que otro rol cruce este inventario con la plantilla.
-- **H-2. `ENCRYPTION_KEY` se valida tarde.** `config.Load` solo comprueba que
+- **H-2 (en curso, backend-dev-2). `ENCRYPTION_KEY` se valida tarde.** `config.Load` solo comprueba que
   no esté vacía. Que sean 64 caracteres hex se comprueba después de conectar a
   la base, y el error no nombra la variable
   (`encryption key must be 32 bytes…`). Propuesta: validarla en `config.Load`
   con un mensaje que diga `ENCRYPTION_KEY`.
-- **H-3. Valores inválidos que se ignoran sin avisar.** `TRUSTED_PROXIES` con
+- **H-3 (en curso, backend-dev-2). Valores inválidos que se ignoran sin avisar.** `TRUSTED_PROXIES` con
   una entrada inválida la descarta, y `LOG_LEVEL` inválido cae al nivel por
   defecto. Propuesta: fallar en `config.Load` con un error que nombre la
   variable. En producción, un `TRUSTED_PROXIES` mal escrito deja el rate limit
@@ -118,7 +134,7 @@ Todos son de código de la app, así que no se cambian en este PR:
   no cubre la cadena vacía. El Dockerfile ya lo impide en este PR, pero
   `npm run build` fuera de Docker con la variable vacía repite el problema.
   Propuesta: usar `||` o fallar en el build si falta en producción.
-- **H-5. `DATABASE_URL` sin política de `sslmode`.** `lib/pq` v1.12.3 usa
+- **H-5 (en curso, backend-dev-2). `DATABASE_URL` sin política de `sslmode`.** `lib/pq` v1.12.3 usa
   `require` por defecto: cifra, pero no verifica el certificado (comprobado en
   `connector.go`). Con `sslrootcert=system` pasa a `verify-full`. `lib/pq`
   también lee las variables `PG*` estándar (`PGSSLMODE`, `PGHOST`…), que no
@@ -127,7 +143,7 @@ Todos son de código de la app, así que no se cambian en este PR:
   Ver [plan-base-produccion.md](plan-base-produccion.md). Decidido en el ADR 0004:
   en producción, `sslmode=require` explícito, y el backend lo exigirá
   (backend-dev-2).
-- **H-6. La versión de `/health` está fija.** `GET /health` devuelve
+- **H-6 (en curso, backend-dev-2; Docker hecho en este PR). La versión de `/health` está fija.** `GET /health` devuelve
   `"version":"1.0.0"` desde `const version` en `cmd/server/main.go`, mientras
   que `frontend/package.json` dice 1.1.0 y todavía no hay tags. Propuesta:
   `var version = "dev"` y que el Dockerfile la inyecte con

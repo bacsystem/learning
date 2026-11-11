@@ -1,11 +1,8 @@
-# learning/Makefile
-DB_LOCAL := $(shell grep -E '^DATABASE_URL=' backend/.env 2>/dev/null | cut -d'=' -f2-)
-DB_PROD  ?= $(PROD_DATABASE_URL)
-DB       ?= local
-DATABASE_URL := $(if $(filter prod,$(DB)),$(DB_PROD),$(DB_LOCAL))
-
-ENC_KEY_LOCAL := $(shell grep -E '^ENCRYPTION_KEY=' backend/.env 2>/dev/null | cut -d'=' -f2-)
-ENCRYPTION_KEY ?= $(ENC_KEY_LOCAL)
+# learning/Makefile — `make help` lista los targets.
+#
+# Grupos: dev/ (desarrollo), test · lint · fmt · build (= CI), migrate/ (base de
+# backend/.env), docker/ (imágenes de release), compose/ (stack local), clean.
+.DEFAULT_GOAL := help
 
 # ── Versiones de herramientas: las mismas que .github/workflows/ ──────────────
 # Si cambias una, cámbiala también en el workflow (docs/ops/paridad-ci-local.md).
@@ -14,26 +11,32 @@ GOVULNCHECK_VERSION   := v1.9.0
 GOLANGCI_LINT_VERSION := v2.15.0
 GOOSE := go run github.com/pressly/goose/v3/cmd/goose@$(GOOSE_VERSION)
 
+# Base de desarrollo de backend/.env (migrate/* y fix-encrypt-personas).
+# Producción (Railway) no se toca desde aquí: su base no tiene acceso público.
+DATABASE_URL   ?= $(shell grep -E '^DATABASE_URL=' backend/.env 2>/dev/null | cut -d'=' -f2-)
+ENCRYPTION_KEY ?= $(shell grep -E '^ENCRYPTION_KEY=' backend/.env 2>/dev/null | cut -d'=' -f2-)
+
 # Base de tests de integración (la misma que usa el CI). `make test` la exige:
 # sin ella los tests de integración se saltan y el resultado no es el del CI.
 # OJO: `make test` hace `down-to 0` sobre esta base; usa una base desechable.
 TEST_DATABASE_URL ?=
 
-# ── Docker Hub ────────────────────────────────────────────────────────────────
+# ── Imágenes de release (Docker Hub, repos públicos) ──────────────────────────
+# Las construye y publica el usuario desde un checkout limpio del tag
+# (docs/ops/checklist-release.md §5). Ningún agente hace docker login/push.
 DOCKER_USER  ?= cbaciliod
-# Sin valor por defecto: la versión se pasa siempre (make docker/release DOCKER_TAG=v1.2.0).
+# Sin valor por defecto: siempre el tag del release (DOCKER_TAG=v1.0.0).
 DOCKER_TAG   ?=
+# Versión que reporta el backend (/health): el tag sin la «v».
+VERSION      := $(DOCKER_TAG:v%=%)
 BACKEND_IMG  := $(DOCKER_USER)/learning-backend:$(DOCKER_TAG)
 # La imagen del frontend es por entorno (NEXT_PUBLIC_API_URL se incrusta al construir):
 # producción = vX.Y.Z; otro entorno = vX.Y.Z-<entorno> (docs/ops/railway.md §2).
 FRONTEND_ENV ?= prod
 FRONTEND_IMG := $(DOCKER_USER)/learning-frontend:$(DOCKER_TAG)$(if $(filter prod,$(FRONTEND_ENV)),,-$(FRONTEND_ENV))
-
-# Frontend public vars (baked at build time)
-NEXT_PUBLIC_API_URL ?= https://api-capacitate.bacsystemsolutions.com
-# Sin valor por defecto: se toman del entorno o de la línea de make (H117).
-NEXT_PUBLIC_STORAGE_PREFIX    ?=
-NEXT_PUBLIC_CONTACT_EMAIL     ?=
+NEXT_PUBLIC_API_URL        ?= https://api-capacitate.bacsystemsolutions.com
+NEXT_PUBLIC_STORAGE_PREFIX ?=
+NEXT_PUBLIC_CONTACT_EMAIL  ?=
 
 # ── Docker Compose (local) ────────────────────────────────────────────────────
 # Lee la configuración del .env de la raíz (ver .env.example).
@@ -47,36 +50,34 @@ C_DB_URL   := postgres://$(C_PG_USER):$(C_PG_PASS)@localhost:$(C_DB_PORT)/$(C_PG
 C_ENC_KEY  := $(call root_env,ENCRYPTION_KEY)
 s          ?=
 
-.PHONY: dev dev/backend dev/frontend \
-        test test/backend test/frontend \
-        lint fmt build check/test-db check/docker-tag \
-        migrate/up migrate/down migrate/status migrate/create \
-        fix-encrypt-personas \
-        docker/build docker/push docker/release docker/verify \
-        docker/build/backend docker/build/frontend \
-        compose/init compose/check-env compose/up compose/down compose/reset \
-        compose/restart compose/rebuild compose/logs compose/ps compose/psql \
-        compose/migrate/status compose/seed/admin \
-        clean
+.PHONY: help dev dev/backend dev/frontend test lint fmt build \
+        migrate/up migrate/down migrate/status migrate/create fix-encrypt-personas \
+        docker/build docker/build/backend docker/build/frontend docker/verify \
+        docker/push docker/release \
+        compose/init compose/up compose/down compose/reset compose/restart \
+        compose/rebuild compose/logs compose/ps compose/psql \
+        compose/migrate/status compose/seed/admin clean \
+        check/test-db check/docker-tag check/release-tree compose/check-env
+
+help: ## Lista los targets
+	@awk 'BEGIN{FS=":.*## "} /^[a-z][a-zA-Z0-9_\/-]+:.*## /{printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # ── Desarrollo ────────────────────────────────────────────────────────────────
-dev:
+dev: ## Backend (air) y frontend (next dev) en paralelo
 	@$(MAKE) -j2 dev/backend dev/frontend
 
-dev/backend:
+dev/backend: ## Backend con recarga en caliente (air, backend/.air.toml)
 	cd backend && air
 
-dev/frontend:
+dev/frontend: ## Frontend en http://localhost:3000 (next dev)
 	cd frontend && npm run dev
 
-# ── Tests (= jobs test de backend.yml y check de frontend.yml) ────────────────
-# Uso: make test TEST_DATABASE_URL=postgres://...@localhost:5432/learning_test?sslmode=disable
-# (o exportada en el entorno). El nombre de la base debe terminar en _test o _test_<n>.
+# ── Verificación (= .github/workflows/) ───────────────────────────────────────
 check/test-db:
 	@test -n "$(TEST_DATABASE_URL)" || (echo "ERROR: set TEST_DATABASE_URL=postgres://... (base desechable: se hace down-to 0)" && exit 1)
 	@echo "$(TEST_DATABASE_URL)" | grep -qE '/[^/?]+_test(_[0-9]+)?([?]|$$)' || (echo "ERROR: el nombre de la base de TEST_DATABASE_URL debe terminar en _test o _test_<n> (make test hace down-to 0)" && exit 1)
 
-test: check/test-db
+test: check/test-db ## Tests como el CI (exige TEST_DATABASE_URL a una base *_test o *_test_<n>)
 	cd backend && go mod tidy && git diff --exit-code -- go.mod go.sum
 	cd backend && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
 	cd backend && $(GOOSE) -dir migrations postgres "$(TEST_DATABASE_URL)" up
@@ -85,98 +86,89 @@ test: check/test-db
 	cd backend && TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -race -count=1 ./...
 	cd frontend && npm test
 
-test/backend:
-	cd backend && go test ./... -v -race -coverprofile=coverage.out
-
-test/frontend:
-	cd frontend && npm run test:coverage
-
-# ── Lint (= job lint de backend.yml y check de frontend.yml) ──────────────────
-# No reescribe archivos; para formatear usa `make fmt`.
-lint:
+lint: ## Lint como el CI: go vet, golangci-lint, tsc, eslint, i18n (no reescribe)
 	cd backend && go vet ./...
 	cd backend && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --timeout=5m ./...
 	cd frontend && npx tsc --noEmit
 	cd frontend && npm run lint
 	cd frontend && node scripts/check-i18n.mjs
 
-fmt:
+fmt: ## Formatea: go fmt y eslint --fix
 	cd backend && go fmt ./...
 	cd frontend && npm run lint:fix
 
-# ── Build (= pasos Build de backend.yml y frontend.yml) ───────────────────────
-build:
+build: ## Build como el CI: go build ./... + bin/server y next build
 	cd backend && go build ./...
 	cd backend && CGO_ENABLED=0 go build -o bin/server ./cmd/server
 	cd frontend && npm run build
 
-# ── Migraciones (DB de backend/.env, o DB=prod con PROD_DATABASE_URL) ────────
-migrate/up:
+# ── Migraciones (base de backend/.env o DATABASE_URL=...) ─────────────────────
+migrate/up: ## Aplica las migraciones pendientes
 	cd backend && $(GOOSE) -dir migrations postgres "$(DATABASE_URL)" up
 
-migrate/down:
+migrate/down: ## Revierte la última migración
 	cd backend && $(GOOSE) -dir migrations postgres "$(DATABASE_URL)" down
 
-migrate/status:
+migrate/status: ## Estado de las migraciones
 	cd backend && $(GOOSE) -dir migrations postgres "$(DATABASE_URL)" status
 
-# Uso: make migrate/create name=add_algo
 # Numeración secuencial (-s) de 3 dígitos como las existentes (001…). Sin -s,
 # goose usa una marca de tiempo y, una vez aplicada, toda migración numerada
 # posterior quedaría fuera de orden.
-migrate/create:
+migrate/create: ## Crea la siguiente migración numerada (name=add_algo)
 	@test -n "$(name)" || (echo "ERROR: set name=nombre_de_la_migracion" && exit 1)
 	cd backend && $(GOOSE) -dir migrations -s create $(name) sql \
 	  && f=$$(ls migrations/00[0-9][0-9][0-9]_$(name).sql) \
 	  && mv "$$f" "migrations/$$(basename "$$f" | cut -c3-)" \
 	  && echo "→ migrations/$$(basename "$$f" | cut -c3-)"
 
-# Genera los UPDATE para cifrar personas con DNI en texto plano. Uso: make fix-encrypt-personas [DB=prod]
-fix-encrypt-personas:
+fix-encrypt-personas: ## Genera el SQL para cifrar personas en texto plano (bases antiguas, puesta-en-marcha §5)
 	@test -n "$(ENCRYPTION_KEY)" || (echo "ERROR: ENCRYPTION_KEY vacío (backend/.env o ENCRYPTION_KEY=...)" && exit 1)
-	@echo "==> Generando SQL para cifrar personas con DNI en texto plano (DB=$(DB))..."
 	@cd backend && DATABASE_URL="$(DATABASE_URL)" ENCRYPTION_KEY="$(ENCRYPTION_KEY)" go run ./cmd/fix-encrypt-personas/
 
-# ── Docker (imágenes para Docker Hub) ─────────────────────────────────────────
+# ── Imágenes de release ───────────────────────────────────────────────────────
 check/docker-tag:
 	@echo "$(DOCKER_TAG)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' || (echo "ERROR: set DOCKER_TAG=vX.Y.Z (el tag del release)" && exit 1)
 
-docker/build/backend: check/docker-tag
-	docker build --platform linux/amd64 --no-cache -t $(BACKEND_IMG) backend/
+# La imagen sale del tag, nunca del árbol de trabajo.
+check/release-tree: check/docker-tag
+	@test -z "$$(git status --porcelain)" || (echo "ERROR: hay cambios sin commit o archivos sin seguimiento; construye desde un checkout limpio del tag" && exit 1)
+	@test "$$(git describe --exact-match --tags HEAD 2>/dev/null)" = "$(DOCKER_TAG)" || (echo "ERROR: HEAD no es el tag $(DOCKER_TAG) (git switch --detach $(DOCKER_TAG))" && exit 1)
 
-docker/build/frontend: check/docker-tag
+docker/build/backend: check/release-tree ## Imagen del backend (linux/amd64) desde el tag DOCKER_TAG
+	docker build --platform linux/amd64 --no-cache --build-arg "VERSION=$(VERSION)" -t $(BACKEND_IMG) backend/
+
+docker/build/frontend: check/release-tree ## Imagen del frontend para FRONTEND_ENV (prod por defecto) con NEXT_PUBLIC_API_URL
 	@test -n "$(NEXT_PUBLIC_API_URL)" || (echo "ERROR: set NEXT_PUBLIC_API_URL" && exit 1)
-	docker build --platform linux/amd64 \
+	docker build --platform linux/amd64 --no-cache \
 		--build-arg "NEXT_PUBLIC_API_URL=$(NEXT_PUBLIC_API_URL)" \
 		--build-arg "NEXT_PUBLIC_STORAGE_PREFIX=$(NEXT_PUBLIC_STORAGE_PREFIX)" \
 		--build-arg "NEXT_PUBLIC_CONTACT_EMAIL=$(NEXT_PUBLIC_CONTACT_EMAIL)" \
 		-t $(FRONTEND_IMG) frontend/
 
-docker/build: docker/build/backend docker/build/frontend
+docker/build: docker/build/backend docker/build/frontend ## Las dos imágenes desde el tag DOCKER_TAG
 
-# Las imágenes son públicas: verifica archivos y secretos antes de publicar.
-docker/verify: check/docker-tag
+docker/verify: check/docker-tag ## Las imágenes no llevan .env*, assets/, bin/, tests ni secretos (repos públicos)
 	deploy/verify-image.sh $(BACKEND_IMG)
 	deploy/verify-image.sh $(FRONTEND_IMG)
 
-docker/push: check/docker-tag docker/verify
+docker/push: check/release-tree docker/verify ## Publica en Docker Hub (solo el usuario, con su sesión)
 	docker push $(BACKEND_IMG)
 	docker push $(FRONTEND_IMG)
 
-# build + push en un solo paso
-docker/release: docker/build docker/push
+docker/release: docker/build docker/push ## build + verify + push (solo el usuario)
 	@echo "✓ $(BACKEND_IMG) y $(FRONTEND_IMG) publicados en Docker Hub"
 
 # ── Docker Compose (local) ────────────────────────────────────────────────────
-## Uso: make compose/init → make compose/up → http://localhost:3000
-## s=<servicio> limita logs/restart/rebuild a db | backend | frontend
+# Uso: make compose/init → make compose/up → http://localhost:3000
+# s=<servicio> limita logs/restart/rebuild a db | backend | frontend
 
 # Crea .env desde .env.example: JWT_SECRET y POSTGRES_PASSWORD aleatorios y ENCRYPTION_KEY
 # de backend/.env (si es válida, para que los datos cifrados sean compatibles) o aleatoria.
 # No pisa un .env existente. ENV_EXAMPLE/ENV_OUT permiten probarlo sobre otros archivos.
 ENV_EXAMPLE ?= .env.example
 ENV_OUT     ?= .env
-compose/init:
+compose/init: ## Crea .env desde .env.example con secretos aleatorios (no pisa uno existente)
 	@if [ -f "$(ENV_OUT)" ]; then echo "$(ENV_OUT) ya existe — no se modifica"; exit 0; fi; \
 	key=$$(grep -E '^ENCRYPTION_KEY=[0-9a-fA-F]{64}$$' backend/.env 2>/dev/null | cut -d= -f2-); src="backend/.env"; \
 	[ -n "$$key" ] || { key=$$(openssl rand -hex 32); src="generada"; }; \
@@ -190,45 +182,39 @@ compose/check-env:
 	@test -f .env || (echo "ERROR: falta .env — ejecuta: make compose/init" && exit 1)
 	@test -n "$(C_PG_PASS)" || (echo "ERROR: POSTGRES_PASSWORD vacío en .env (genera uno con: openssl rand -hex 24)" && exit 1)
 
-# Construye (si hace falta) y levanta db + backend (corre migraciones) + frontend
-compose/up: compose/check-env
+compose/up: compose/check-env ## Levanta db + backend (migra) + frontend
 	$(COMPOSE) up -d --build
 	@$(COMPOSE) ps
 
-# Detiene y elimina los contenedores (conserva los datos de Postgres)
-compose/down:
+compose/down: ## Detiene el stack (conserva los datos)
 	$(COMPOSE) down
 
-# Detiene todo y BORRA el volumen de Postgres (base de datos vacía al volver a levantar)
-compose/reset:
+compose/reset: ## Detiene el stack y BORRA el volumen de Postgres
 	$(COMPOSE) down -v
 
-compose/restart:
+compose/restart: ## Reinicia servicios (s=<servicio>)
 	$(COMPOSE) restart $(s)
 
-# Reconstruye sin caché; necesario si cambian las NEXT_PUBLIC_* del .env (s=frontend)
-compose/rebuild: compose/check-env
+compose/rebuild: compose/check-env ## Reconstruye sin caché (necesario si cambian las NEXT_PUBLIC_*; s=frontend)
 	$(COMPOSE) build --no-cache $(s)
 	$(COMPOSE) up -d $(s)
 
-compose/logs:
+compose/logs: ## Logs en vivo (s=<servicio>)
 	$(COMPOSE) logs -f --tail=100 $(s)
 
-compose/ps:
+compose/ps: ## Estado de los contenedores
 	$(COMPOSE) ps
 
-# Consola psql interactiva dentro del contenedor de Postgres
-compose/psql:
+compose/psql: ## Consola psql dentro del contenedor de Postgres
 	$(COMPOSE) exec db sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
 
-compose/migrate/status:
+compose/migrate/status: ## Estado de las migraciones dentro del backend
 	$(COMPOSE) exec backend sh -c 'goose -dir ./migrations postgres "$$DATABASE_URL" status'
 
 # Crea el usuario admin con una persona dedicada (no una persona real del padrón).
 # La contraseña (12-72 bytes) se pide por teclado y se pasa por stdin: no queda
 # en el historial ni en `ps`. ADMIN_REBIND=1 re-liga un admin existente.
-# Uso: make compose/seed/admin ADMIN_EMAIL=admin@tu-dominio [ADMIN_USERNAME=admin] [ADMIN_REBIND=1]
-compose/seed/admin: compose/check-env
+compose/seed/admin: compose/check-env ## Crea el admin (ADMIN_EMAIL=..., contraseña por teclado)
 	@test -n "$(ADMIN_EMAIL)" || (echo "ERROR: set ADMIN_EMAIL=..." && exit 1)
 	@test -n "$(C_ENC_KEY)" || (echo "ERROR: ENCRYPTION_KEY vacío en .env" && exit 1)
 	@printf "Contraseña del admin: "; stty -echo; read -r pw; stty echo; echo; \
@@ -236,7 +222,6 @@ compose/seed/admin: compose/check-env
 		ADMIN_EMAIL="$(ADMIN_EMAIL)" ADMIN_USERNAME="$(ADMIN_USERNAME)" ADMIN_REBIND="$(ADMIN_REBIND)" \
 		go run ./cmd/seed/admin
 
-# ── Limpieza ──────────────────────────────────────────────────────────────────
-clean:
+clean: ## Borra artefactos de build y cobertura
 	cd backend && rm -rf bin/ tmp/ coverage.out
 	cd frontend && rm -rf .next/ coverage/
