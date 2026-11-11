@@ -161,6 +161,12 @@ func TestPutCitas_ActivoHeredadoSinGuarda(t *testing.T) {
 	_, a := fuenteDePrueba(t, c.f.DB)
 	c.citar(t, a)
 	c.esperar(t, c.put(`{"pasaje_ids":[]}`), http.StatusOK, "")
+	if got := c.citas(t); len(got) != 0 {
+		t.Errorf("citas = %v, want ninguna", got)
+	}
+	if e, _ := c.estado(t); e != EstadoActivo {
+		t.Errorf("quitar la única cita no cambia el estado: %s", e)
+	}
 }
 
 // Aprobar y quitar la última cita a la vez no pueden dejar una aprobada sin cita.
