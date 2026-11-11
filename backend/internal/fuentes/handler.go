@@ -8,6 +8,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/auth"
@@ -207,10 +209,14 @@ func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 }
 
 // parsearListado reads the S3 query strictly: an unknown estado or tipo, a
-// non-positive id, an oficial other than true/false or a bad page is false.
+// non-positive id, an oficial other than true/false, a bad page or a q that
+// PostgreSQL cannot take as text (invalid UTF-8 or a NUL byte) is false.
 func parsearListado(r *http.Request) (FiltroListado, bool) {
 	q := r.URL.Query()
 	f := FiltroListado{Estado: q.Get("estado"), Tipo: q.Get("tipo"), Q: q.Get("q")}
+	if !utf8.ValidString(f.Q) || strings.ContainsRune(f.Q, 0) {
+		return FiltroListado{}, false
+	}
 	if (f.Estado != "" && !estadosFuente[f.Estado]) || (f.Tipo != "" && !tiposFuente[f.Tipo]) {
 		return FiltroListado{}, false
 	}

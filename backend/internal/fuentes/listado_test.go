@@ -174,6 +174,20 @@ func TestS3_Filtros(t *testing.T) {
 		})
 	}
 
+	t.Run("mismo updated_at: primero el id mayor, sin repetir entre páginas", func(t *testing.T) {
+		// A moment after every fixture row, so these two lead the listing.
+		e.exec(t, `UPDATE fuentes SET updated_at = '2100-01-01T00:00:00Z' WHERE id IN ($1, $2)`, s.oficial, s.ret)
+		mayor, menor := max(s.oficial, s.ret), min(s.oficial, s.ret)
+		var paginas []int64
+		for pagina := 1; pagina <= 2; pagina++ {
+			_, body := e.get(t, fmt.Sprintf("/admin/fuentes?per_page=1&page=%d", pagina)+q, e.admin)
+			paginas = append(paginas, idsDe(t, body)...)
+		}
+		if fmt.Sprint(paginas) != fmt.Sprint([]int64{mayor, menor}) {
+			t.Errorf("pages = %v, want [%d %d]", paginas, mayor, menor)
+		}
+	})
+
 	t.Run("orden updated_at DESC, id DESC", func(t *testing.T) {
 		_, body := e.get(t, "/admin/fuentes?per_page=100"+q, e.admin)
 		var claves []string
