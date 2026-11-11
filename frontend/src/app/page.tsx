@@ -480,7 +480,8 @@ export default function Home() {
 
           {/* Bottom bar */}
           <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-t py-5">
-            <p className="text-etiqueta text-texto-terciario">
+            {/* El año sale del reloj del servidor y del navegador: en el cambio de año (UTC frente a Lima) pueden diferir. */}
+            <p className="text-etiqueta text-texto-terciario" suppressHydrationWarning>
               {t("landing-copyright", { anio: new Date().getFullYear() })}
             </p>
             <Link href="/auth/sign-in" className={cn(ENLACE_PIE, "text-etiqueta inline-flex items-center gap-1")}>
