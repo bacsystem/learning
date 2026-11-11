@@ -1,6 +1,6 @@
 # ADR 0003: puerto `SourceRepository` y adaptador propio sobre PostgreSQL
 
-- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD); «El puerto» define los tipos que faltaban (`NuevaFuente`, `FiltroFuentes`, `Pagina`, `FuenteResumen`, `Pasaje`), reemplaza `audit.TxFunc` por un `Auditor` que recibe el `Evento` con el id de la fuente (también en `GuardarFuente`), fija la normalización de `Page` y `PerPage` y el error de `EspecialidadID ≤ 0`; la suite de contrato recibe los ganchos de prueba `Retirar` y `NuevaVersion`, y se fija el `detalle` de `fuente.procesar` y `fuente.fallar`.
+- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD); «El puerto» define los tipos que faltaban (`NuevaFuente`, `FiltroFuentes`, `Pagina`, `FuenteResumen`, `Pasaje`), reemplaza `audit.TxFunc` por un `Auditor` que recibe el `Evento` con el id de la fuente (también en `GuardarFuente`), fija la normalización de `Page` y `PerPage` y el error de `EspecialidadID ≤ 0`; la suite de contrato recibe los ganchos de prueba `Retirar` y `NuevaVersion`, y se fija el `detalle` de `fuente.procesar` y `fuente.fallar`. Revisión posterior (PR #92): errores `ErrFuenteDuplicada` y `ErrPublicacionInvalida`.
 - **Fecha:** 2026-11-11
 - **Historias:** SIA-E2-02 (#16); la usan SIA-E2-03, E2-05, E2-06, E2-07 y, más adelante, E3-01, E6-03, E6-04 y E6-08
 - **Decisión de producto de origen:** P1 (issue #65). MVP y v2 usan el 100 % del `SourceRepository` propio en PostgreSQL, a $0 USD. La búsqueda semántica (pgvector o NotebookLM) se reevalúa en v3 (SIA-E2-01, SIA-E2-08).
@@ -155,8 +155,19 @@ var (
     ErrConsultaInvalida = errors.New("consulta_invalida")
     ErrCitaInvalida     = errors.New("cita_invalida")    // no existe o (fuente, versión, pasaje) no coinciden
     ErrNoEncontrado     = errors.New("no_encontrado")
+    ErrFuenteDuplicada     = errors.New("fuente_duplicada")     // GuardarFuente: el sha256 ya existe en alguna versión
+    ErrPublicacionInvalida = errors.New("publicacion_invalida") // PublicarVersion / MarcarVersionFallida: entrada que rompe una invariante
 )
 ```
+
+- **`ErrFuenteDuplicada`:** el adaptador Postgres mapea la violación 23505 de `uq_fuente_versiones_sha256` a este error dentro de `GuardarFuente` (PR #92), para que el puerto no deje pasar errores de Postgres. El adaptador en memoria devuelve lo mismo y la suite de contrato fija el caso.
+  - Es un sentinel sin detalle. E2-03 hace antes, bajo el advisory lock, su propia comprobación con detalle (`fuente_id`, `titulo`, `estado`, `version`). Este error queda como red ante carreras.
+  - Si salta, E2-03 responde igual `409 fuente_duplicada` y consulta el detalle después del rollback.
+- **`ErrPublicacionInvalida`:** antes de abrir la transacción, una sola función de validación en Go, compartida por los dos adaptadores, comprueba las invariantes de la migración 062. Así no se publica nada y los dos adaptadores responden igual.
+  - En `PublicarVersion`: lista vacía o de más de 5 000 pasajes, `orden` repetido o fuera de 1..5 000, `linea_fin < linea_inicio`, `palabras < 1`, texto en blanco, `seccion` de más de 300 caracteres.
+  - En `MarcarVersionFallida`: un `motivo` fuera de `sin_contenido | limite_pasajes | error_interno`.
+  - Es un error de programación: `normalizar.go` resuelve antes la lista vacía como `sin_contenido` y la de más de 5 000 como `limite_pasajes`. El worker (E2-05) lo trata como fallo y marca la versión `fallida` con el motivo existente `error_interno`, sin motivo nuevo. En el log van solo `op`, `fuente_id` y `version`, nunca el contenido.
+- Ninguno de estos errores es un código HTTP por sí mismo: igual que `consulta_invalida`, quien consume el puerto decide la respuesta.
 
 - `PasajeEncontrado` y `PasajeCitado` llevan: `FuenteID`, `Version`, `PasajeID`, `Orden`, `LineaInicio`, `LineaFin`, `Seccion`, `Texto` y, en `PasajeCitado`, además `TituloFuente`, `EstadoFuente` y `OficialVerificada` de esa versión. No llevan ningún dato de usuario (regla 4).
 - `ResolverCita` **no** filtra por estado de la fuente: una cita histórica a la versión 1 devuelve el texto exacto de la versión 1 aunque la fuente vaya por la 3 o esté `retirada` (escenario «Resolver cita histórica»). El consumidor decide qué hacer con `EstadoFuente`.
@@ -171,7 +182,16 @@ var (
   | `fuente.fallar` | `{"version", "motivo_fallo", "estado_anterior", "estado_nuevo"}` |
 
   `estado_anterior` y `estado_nuevo` son los de la **fuente**, no los de la versión (E2-06, escenario «Auditoría»). Al publicar la versión 2 de una fuente `activa` quedan `activa → activa`, y `version` distingue el caso. Quien llama solo aporta el actor, la IP y el user agent a través del `Auditor`, igual que `temas.Auditor` (`internal/temas/service.go:19-21`, usado en `temas/repository.go:197`). Un `audit.TxFunc` no basta, porque la closure se arma antes de conocer el id. Si el `Auditor` devuelve error, la mutación se revierte (README §7).
-- **`GuardarFuente`** recibe el `Auditor` para escribir `fuente.crear` en la misma transacción (README §7). El adaptador en memoria no lo llama. Calcula `sha256`, `tamano_bytes` y `lineas` con `Huella`. E2-02 no valida ni el duplicado por hash ni el límite de fuentes. Los agrega E2-03 dentro de esa misma transacción, bajo el advisory lock del contrato E2 (S1, «Límite de fuentes»), y mapea la violación 23505 de `uq_fuente_versiones_sha256` a `fuente_duplicada`.
+- **`GuardarFuente`** recibe el `Auditor` para escribir `fuente.crear` en la misma transacción (README §7). El adaptador en memoria no lo llama. Calcula `sha256`, `tamano_bytes` y `lineas` con `Huella`. En E2-02 ya mapea la violación 23505 de `uq_fuente_versiones_sha256` a `ErrFuenteDuplicada` (ver arriba). E2-03 (S1 y S2) no cambia el método del puerto. El **repositorio admin** (`repository.go`, fuera del puerto) abre **una sola transacción** con estos pasos:
+  1. `pg_advisory_xact_lock` con la clave constante del módulo (contrato E2, S1, «Límite de fuentes»);
+  2. la comprobación previa del duplicado, con detalle (`fuente_id`, `titulo`, `estado`, `version`);
+  3. el límite de fuentes;
+  4. los mismos INSERT y el mismo evento `fuente.crear` de `GuardarFuente`, sacados a una función interna compartida;
+  5. commit.
+
+  Así el alta admin y el puerto escriben igual, y `GuardarFuente` queda para la suite de contrato y los consumidores internos. Mapeo de las violaciones 23505 que pasen a pesar del lock (red ante carreras):
+  - `uq_fuente_versiones_sha256` → `409 fuente_duplicada`;
+  - `uq_fuente_versiones_una_procesando` → `409 estado_invalido`.
 
 ### Recuperación de pasajes (adaptador Postgres)
 
@@ -270,20 +290,61 @@ RETURNING …;
 
 ### Normalización y segmentación (SIA-E2-05)
 
-Es determinista e idempotente: mismo contenido y misma `normalizador_version` dan los mismos pasajes en el mismo orden.
+Es determinista e idempotente: mismo contenido y misma `normalizador_version` dan los mismos pasajes en el mismo orden. Precisada el 2026-11-11 con las consultas de backend-dev-2 al empezar E2-05.
 
-1. Se quita el BOM UTF-8. Los saltos `\r\n` y `\r` pasan a `\n`. Se eliminan los caracteres de control salvo `\n` y `\t`, y `\t` pasa a espacio. Se colapsan los espacios repetidos dentro de cada línea.
-2. Viñetas unificadas: `•`, `▪`, `◦`, `*` y `+` al inicio de línea pasan a `- `.
-3. Las marcas `<mark>` y `</mark>` se conservan literalmente. No se interpreta ningún otro HTML: el texto es dato, no instrucción.
-4. **Segmentación:**
-   - los bloques se cortan en encabezados (`#`…`######`) y se agrupan por párrafos;
-   - un fragmento de menos de 150 palabras (sección corta o resto final) se une al pasaje **anterior**, o al **siguiente** si es el primero (SIA-E2-05 regla 2). Como la dirección es fija, el resultado es determinista;
-   - si al unirse el conjunto pasa de 800 palabras, se divide en partes de 150–800 por límites de párrafo y, si un solo párrafo pasa de 800, por límites de oración;
-   - un bloque de más de 800 palabras se divide de la misma forma;
-   - cada pasaje guarda `orden`, `linea_inicio`, `linea_fin` (líneas del archivo original, base 1), `seccion` y `palabras`. `seccion` es el encabezado del primer bloque del pasaje, con ≤ 300 caracteres;
-   - la unión no se aplica a los pasajes de balotario, que van uno por pregunta (SIA-E3-01).
-5. Excepción (decisión del PO): un documento entero de 1 a 149 palabras se publica como un único pasaje (escenario «Documento corto»). Si no tiene texto, la versión queda `fallida` con `sin_contenido`. Con más de 5 000 pasajes, `fallida` con `limite_pasajes`.
-6. Los balotarios se segmentan por pregunta en SIA-E3-01. Hasta entonces usan esta segmentación genérica. `normalizador_version` (`SMALLINT`, hoy 1) distingue los pasajes generados por cada algoritmo, y una versión nueva del algoritmo no reescribe pasajes ya citados.
+**Interfaz.** `func Normalizar(contenido []byte) ([]PasajeNuevo, error)` en `internal/fuentes/normalizar.go`. Es pura, sin E/S y sin IA.
+
+- Errores: `ErrSinContenido` y `ErrLimitePasajes`. El worker los registra con `MarcarVersionFallida` como `sin_contenido` y `limite_pasajes`.
+- `const NormalizadorVersion = 1`.
+
+**Líneas (regla única).** `\r\n` cuenta como **un** salto; `\r` suelto y `\n`, como un salto cada uno.
+
+- Un salto al final no agrega una línea vacía, y el contenido vacío tiene 0 líneas. Ejemplos: `"a\r\nb"` → 2 líneas, `"a\r\rb"` → 3, `"a\n"` → 1.
+- La implementa **una sola** función, `fuentes.DividirLineas(contenido []byte) []string` (PR #92). `fuentes.ContarLineas` es `len(DividirLineas(…))`.
+  - `ContarLineas` la usan `Huella` (`fuente_versiones.lineas`) y la validación de ≤ 20 000 líneas de S1.
+  - `Normalizar` corta el contenido con `DividirLineas`.
+- Así `linea_inicio` y `linea_fin` (base 1) siempre caen en `1..lineas` de su versión.
+
+**Palabras.** Antes de contar se quitan `<mark>` y `</mark>`. Después cuenta cada token de `strings.Fields` que tenga al menos una letra o un dígito (`unicode.IsLetter` o `unicode.IsDigit`).
+
+- Viñetas (`-`), marcas de encabezado (`#`), `|` y `—` sueltos no cuentan.
+- Esta definición vale para todos los umbrales (150 y 800) y para `pasajes.palabras`.
+
+1. **Limpieza.**
+   - Se quita el BOM UTF-8.
+   - Los bytes que no son UTF-8 válido se reemplazan por U+FFFD (`strings.ToValidUTF8`). Es solo defensivo: S1 ya rechaza el archivo que no es UTF-8.
+   - Los saltos pasan a `\n` según la regla de líneas.
+   - Se eliminan los caracteres de control salvo `\n` y `\t`, y `\t` pasa a espacio.
+   - Los de control que **también** son espacio (`unicode.IsSpace`: `\f`, `\v`, U+0085) pasan a espacio en vez de eliminarse, para no pegar palabras: «fin\finicio» → «fin inicio». `\f` es habitual en texto extraído de PDF.
+   - Dentro de cada línea, toda racha de espacios Unicode (`unicode.IsSpace`, incluidos NBSP y los `\t` ya convertidos) pasa a un solo espacio, y la línea se recorta al inicio y al final. La viñeta con sangría opcional (paso 2) se detecta **antes** de recortar.
+   - Se pierde la sangría, también dentro de los bloques de código. Se acepta porque el contenido es académico, no código. `linea_inicio` y `linea_fin` siguen siendo las líneas del original.
+2. **Viñetas unificadas.** Al inicio de línea, con sangría opcional, `*`, `+`, `•`, `▪` o `◦` seguidos de **al menos un espacio** pasan a `- `. Sin el espacio no es viñeta: «**negrita**» queda igual.
+3. **Marcas.** `<mark>` y `</mark>` se conservan literalmente. No se interpreta ningún otro HTML: el texto es dato, no instrucción.
+4. **Bloques de código** (entre líneas que empiezan con ` ``` ` en la **columna 1**; con sangría es texto). Dentro no se detectan encabezados ni se unifican viñetas; sí se aplica la limpieza del paso 1. Las líneas en blanco separan párrafos igual que fuera del bloque. Un bloque sin cerrar llega hasta el final del documento.
+5. **Estructura.**
+   - Encabezado: línea que empieza en la **columna 1** con `#`…`######` seguido de un espacio, fuera de un bloque de código. `  ## x`, con sangría, es texto. La detección se hace sobre la línea original, antes del recorte del paso 1.
+   - Un encabezado sin texto (`## `) también corta bloque, pero su `seccion` vale `nil`.
+   - Párrafo: líneas consecutivas separadas por una o más líneas en blanco. Varias líneas en blanco seguidas cuentan como **un** solo corte (`\n\n` en el texto del pasaje).
+   - Un encabezado **siempre** abre párrafo y bloque nuevos, aunque la línea anterior no esté en blanco: en el texto va precedido de `\n\n`. El texto pegado debajo del encabezado, sin línea en blanco, es su primer párrafo (`## T\ntexto`).
+   - Texto del pasaje: las líneas normalizadas unidas con `\n` y los párrafos con `\n\n`. Incluye la línea del encabezado.
+   - `seccion`: texto del encabezado del primer bloque del pasaje, sin los `#`, con `TrimSpace` y ≤ 300 runes. Vale `nil` para el texto anterior al primer encabezado.
+6. **Segmentación** (SIA-E2-05 regla 2).
+   - Los bloques se cortan en encabezados.
+   - Unidades de corte, en este orden de preferencia: párrafo; si un párrafo pasa de 800 palabras, sus oraciones (cortes tras `.`, `?` o `!` seguidos de espacio o fin); si una oración pasa de 800, **partes equilibradas por palabras**. Esas partes son k = ⌈n/800⌉ trozos de ⌊n/k⌋ o ⌈n/k⌉ palabras, los mayores primero; con n > 800, cada trozo tiene al menos 400 (p. ej. n = 801 → 401 y 400).
+   - Greedy: se acumulan unidades mientras el pasaje no pase de 800.
+   - Un fragmento de menos de 150 palabras (sección corta o resto final) se une al pasaje **anterior**, o al **siguiente** si es el primero. Como la dirección es fija, el resultado es determinista.
+   - Si al unirse el conjunto pasa de 800 (queda entre 801 y 949), se parte en **dos**:
+     - por el límite de párrafo más cercano a la mitad, si los dos lados quedan con ≥ 150 palabras;
+     - si no, por el límite de oración más cercano a la mitad, con la misma condición;
+     - si no, por palabras a la mitad.
+
+     Siempre cierra, porque cada mitad queda con al menos 400 palabras (≥ 150).
+   - Cada pasaje guarda `orden`, `linea_inicio`, `linea_fin`, `seccion` y `palabras`.
+   - La unión no se aplica a los pasajes de balotario, que van uno por pregunta (SIA-E3-01).
+   - Test de propiedad obligatorio: en todo documento de 150 palabras o más, cada pasaje tiene entre 150 y 800.
+7. **Excepción** (decisión del PO): un documento entero de 1 a 149 palabras se publica como un único pasaje (escenario «Documento corto»). Si no tiene ninguna palabra, `ErrSinContenido` (`fallida` con `sin_contenido`). Con más de 5 000 pasajes, `ErrLimitePasajes` (`fallida` con `limite_pasajes`).
+8. **Alternativas pegadas** («a) … b) … c) …» en una línea): **no** se separan en el MVP. La regla 1 de SIA-E2-05 no lo pide y la heurística da falsos positivos (p. ej. «vitamina b) …»). La DoD las cubre como caso de test: el texto se conserva igual y el resultado es determinista. La separación por pregunta y alternativa de los balotarios llega con SIA-E3-01.
+9. Los balotarios se segmentan por pregunta en SIA-E3-01. Hasta entonces usan esta segmentación genérica. `normalizador_version` (`SMALLINT`, hoy 1) distingue los pasajes generados por cada algoritmo. Una versión nueva del algoritmo no reescribe pasajes ya citados.
 
 ## Consecuencias
 
