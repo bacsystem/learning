@@ -134,7 +134,13 @@ Se **rechaza**, no se enmascara: la entrada que coincida no sale del servidor.
 | `ErrTimeout` | `ia_timeout` | 504 | `timeout` |
 | `ErrSalidaInvalida` | `salida_invalida` | 502 | `salida_invalida` |
 | `ErrProveedor` (no transitorio, o transitorio agotado) | `ia_error` | 502 | `error_proveedor` |
+| `ErrCancelado`, que envuelve `context.Canceled`: el **consumidor** canceló su ctx | — (el consumidor lo provocó; no se mapea a HTTP) | — | `cancelado` |
+| `ErrActorInvalido`: admin o usuario sin ID, sistema con ID, o rol desconocido. Es un error de programación | `error_interno` | 500 | **no** se registra, y no se llama al proveedor |
 | — (correcto) | — | — | `ok` |
+
+- **Cancelación frente a timeout:** si vence el timeout propio de 60 s, se devuelve `ErrTimeout` (`timeout`). Si el ctx del consumidor se cancela, se devuelve `ErrCancelado` (`cancelado`). En los dos casos la fila de uso se escribe con un ctx desacoplado (`context.WithoutCancel`), con los tokens consumidos hasta ese momento.
+- **Actor inválido:** se valida al entrar, antes de cualquier otra regla. Un `actor_id` con forma válida pero inexistente solo hace fallar la FK del registro: se loguea el `op` y no invalida la salida (paso 7).
+- **El mapeo es código, no solo contrato:** `internal/ia` exporta `Codigo(err error) (codigo string, http int)` con esta tabla, para que E3-04, E6-03 y los demás no la dupliquen. Devuelve `("", 0)` para `nil` y para `ErrCancelado`.
 
 Cuando un consumidor trabaja en un job asíncrono, guarda el código en el estado del job en lugar de responder con ese HTTP.
 
@@ -156,7 +162,7 @@ CREATE TABLE ia_usos (
     duracion_ms     INT           NOT NULL CHECK (duracion_ms >= 0),
     intentos        SMALLINT      NOT NULL DEFAULT 0 CHECK (intentos BETWEEN 0 AND 6),
     resultado       VARCHAR(30)   NOT NULL CHECK (resultado IN ('ok', 'no_disponible',
-                    'entrada_demasiado_grande', 'datos_personales', 'timeout', 'salida_invalida', 'error_proveedor')),
+                    'entrada_demasiado_grande', 'datos_personales', 'timeout', 'cancelado', 'salida_invalida', 'error_proveedor')),
     desde_cache     BOOLEAN       NOT NULL DEFAULT false,
     created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_ia_usos_actor CHECK ((actor_rol = 'sistema') = (actor_id IS NULL))
