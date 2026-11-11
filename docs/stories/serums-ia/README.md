@@ -171,8 +171,8 @@ flowchart TD
     - (b) **P2.** Se elimina solo desde `aprobada`, `rechazada` o `activo`. Un `borrador` o una `en_revision` se rechazan primero.
     - (c) **P3.** Editar el enunciado, las alternativas, la clave o la explicación de una pregunta `aprobada` o `activo` la pasa a `en_revision`. Editar la clasificación (área, tema, etiquetas o dificultad) no cambia el estado. La clave del origen `balotario` no se edita (422 `clave_oficial`). Corregir una pregunta heredada sin citas la saca de circulación hasta que se revalide con cita.
     - (d) **P4.** Aprobar y revalidar exigen ≥1 cita a una fuente **activa**. El origen `balotario` vale solo si su propia fuente está activa.
-    - (e) **Q-IA1. Enmascarar antes de llamar a la IA.** SIA-E6-01 rechaza con `datos_personales` toda entrada con emails, teléfonos o números de 8 dígitos y nunca enmascara por su cuenta. Las historias que arman entradas con contenido de fuentes o de preguntas (SIA-E3-04, E6-03, E6-06 y E6-08) **enmascaran antes de llamar** esos datos de contacto (p. ej. los teléfonos y correos institucionales de una norma del MINSA) con un marcador como `[contacto]`. El enmascarado se aplica solo a la copia que se envía: el pasaje guardado no cambia, y la validación de citas (SIA-E6-04) tolera el marcador. Nunca se envían datos de usuarios.
-    - (f) **Pendiente del usuario, con defecto:** exigir cita a una fuente del repositorio para aprobar vale para todos los procesos, también los de ascenso que no son SERUMS. Defecto: sí, para que todo el banco quede trazable. Se lo lleva el tech-lead.
+    - (e) **Q-IA1. Enmascarar antes de llamar a la IA.** SIA-E6-01 rechaza con `datos_personales` toda entrada con emails, teléfonos o números de 8 dígitos y nunca enmascara por su cuenta. Las historias que arman entradas con contenido de fuentes o de preguntas (SIA-E3-04, E6-03, E6-06 y E6-08) **enmascaran antes de llamar** esos datos de contacto (p. ej. los teléfonos y correos institucionales de una norma del MINSA) con un marcador como `[contacto]`, usando la función común que exporta el servicio de IA (`ia.Enmascarar`, con los mismos patrones que la regla de rechazo), para que todos enmascaren igual. El enmascarado se aplica solo a la copia que se envía: el pasaje guardado no cambia, y la validación de citas (SIA-E6-04) tolera el marcador. Nunca se envían datos de usuarios.
+    - (f) **Decidido por el usuario:** exigir cita a una fuente activa para aprobar y revalidar vale para **todos los procesos**, también los de ascenso que no son SERUMS. Así todo el banco queda trazable.
     - (g) **Aviso al usuario:** como no hay aprobación masiva para el origen `manual`, un Excel de cientos de preguntas se aprueba una a una, con cita. Si eso es un problema, la aprobación masiva de `manual` sería una historia aparte.
 
 ## Límites (aplican donde se citan; los de IA, privacidad y cronograma aprobados en issue #65)
@@ -198,7 +198,7 @@ flowchart TD
 | Preguntas por práctica/simulacro dirigido | 5–100 |
 | Plan de estudio | horas por día 0,5–12 en pasos de 0,5; fecha de examen entre mañana y 730 días |
 | Texto libre (notas, motivos) | máx. 500 caracteres |
-| Citas por pregunta | máx. 10 (SIA-E3-07) |
+| Citas por pregunta | máx. 20 (contrato de SIA-E3-02, #152) |
 | Búsqueda de pasajes (admin) | máx. 20 resultados, solo fuentes `activa` (SIA-E3-07) |
 | Listados | paginación máx. 100 por página, 20 por defecto |
 

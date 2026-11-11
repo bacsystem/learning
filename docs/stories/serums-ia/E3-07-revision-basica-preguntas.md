@@ -16,19 +16,23 @@ depende_de: [SIA-E3-02, SIA-E2-02]
 ## Contexto
 Decisión del PO (P1 del contrato #152): toda pregunta nueva nace en `borrador`, incluidas el alta manual y la importación Excel (origen `manual`). Las colas especializadas no cubren el origen `manual`: SIA-E3-05 es solo para `balotario` y SIA-E6-05 solo para `ia`. Esta historia da la vía mínima y va justo después de SIA-E3-02. **SIA-E3-02 no entra en un release sin SIA-E3-07 y SIA-E3-08.**
 
-Las transiciones de estado son las del contrato de SIA-E3-02 (#152). Esta historia añade sus guardas, las citas y la búsqueda de pasajes para admin, que hoy existe solo como puerto `BuscarPasajes` (SIA-E2-02) y no por HTTP. El architect define el contrato.
+El contrato de SIA-E3-02 (#152) ya trae `PATCH /preguntas/{id}/estado` (aprobar, rechazar, reabrir y revalidar) y `PUT /preguntas/{id}/citas` (reemplaza la lista, de 0 a 20 pasajes). Lo que **añade esta historia**:
+- la forma de que el admin **elija un pasaje**: búsqueda por HTTP para admin, porque hoy solo existe el puerto `BuscarPasajes` (SIA-E2-02);
+- las guardas de aprobación por origen de la regla 3 y la regla 4, si el #152 no las trae ya.
+
+El architect define el contrato.
 
 ## Reglas de negocio
 Todas se validan en el servidor, en la transición o en la operación, sea cual sea la pantalla o el cliente.
 
 1. **Búsqueda de pasajes (admin):** por texto, solo en fuentes `activa`, por relevancia, con máx. 20 resultados. Cada resultado trae ids de fuente, versión y pasaje, título de la fuente, nº de versión y un extracto. Nunca trae rutas de archivo.
 2. **Citas:**
-   - Añadir o quitar citas a una pregunta en cualquier estado salvo `eliminada`. Máx. 10 citas por pregunta (tabla de Límites): 422 `limite_citas`.
+   - Las citas de una pregunta se ponen o se quitan reemplazando la lista (`PUT …/citas` del #152), en cualquier estado salvo `eliminada`. Máx. 20 citas por pregunta (tabla de Límites); más dan 422 `limite_citas`, o el código que fije el contrato.
    - Solo se puede añadir una cita a un pasaje de una fuente `activa`: 422 `fuente_no_activa`.
    - Añadir o quitar citas no cambia el estado. Cada cambio se audita.
 3. **Aprobar** (`borrador` → `aprobada`) por esta vía: **solo origen `manual`**.
    - Para origen `balotario` u `ia` responde 409 `revision_especializada`: se aprueban en SIA-E3-05 o SIA-E6-05, con sus exigencias (ruta de verificación, nota para lo incierto).
-   - Exige ≥1 cita a una fuente `activa` (SIA-E3-02, regla 3): 422 `falta_cita`.
+   - Exige ≥1 cita a una fuente `activa` (SIA-E3-02, regla 3), en cualquier proceso, SERUMS o no: 422 `falta_cita`.
    - Exige área asignada, regla nueva de esta historia, igual que SIA-E3-05 regla 10: 422 `falta_area`.
    - Exige la confirmación «verificado» enviada por el cliente, validada en el servidor: 422 `verificacion_requerida`.
 4. **Revalidar** (`en_revision` → `aprobada`) por esta vía: cualquier origen, porque una pregunta llega a `en_revision` por fuente retirada, reportes o edición, y no existe otra pantalla para revalidarla en el MVP.
@@ -83,7 +87,7 @@ Escenario: Cita a fuente retirada
   Entonces recibe 422 "fuente_no_activa"
 
 Escenario: Límite de citas
-  Dado una pregunta con 10 citas
+  Dado una pregunta con 20 citas
   Cuando el admin añade otra
   Entonces recibe 422 "limite_citas"
 
@@ -121,4 +125,4 @@ Solo admin, con 401/403 y `jsonError`. Guardas en el servidor. La búsqueda no e
 Sin texto visible; los códigos de error los traduce SIA-E3-08.
 
 ## Definición de terminado
-Tests de API de cada regla y escenario (guardas por origen, nota, conflicto de clave, límites de citas, 403 y 409). Contrato en `docs/api/`. Review limpio.
+Tests de API de cada regla y escenario (búsqueda de pasajes, guardas por origen, nota, conflicto de clave, límite de citas, 403 y 409). Contrato en `docs/api/`. Review limpio.
