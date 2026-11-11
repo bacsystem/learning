@@ -67,7 +67,11 @@ func TestHuella(t *testing.T) {
 	cases := []struct {
 		in   string
 		want int
-	}{{"", 0}, {"a", 1}, {"a\n", 1}, {"a\nb", 2}, {"a\nb\n", 2}, {"\n", 1}, {"\n\n", 2}}
+	}{
+		{"", 0}, {"a", 1}, {"a\n", 1}, {"a\nb", 2}, {"a\nb\n", 2}, {"\n", 1}, {"\n\n", 2},
+		{"a\r\nb", 2}, {"a\r\nb\r\n", 2}, {"a\rb", 2}, {"a\r", 1}, {"\r\n", 1}, {"\r\r", 2},
+		{"a\r\n\r\nb", 3}, {"a\n\rb", 3}, {"a\r\rb\n", 3},
+	}
 	for _, c := range cases {
 		sha, tamano, lineas := Huella([]byte(c.in))
 		if lineas != c.want || tamano != len(c.in) || len(sha) != 64 {

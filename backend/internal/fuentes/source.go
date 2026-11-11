@@ -259,18 +259,32 @@ func NormalizarPagina(page, perPage int) (int, int) {
 // by hash) use it.
 func Huella(contenido []byte) (sha string, tamanoBytes, lineas int) {
 	suma := sha256.Sum256(contenido)
-	return hex.EncodeToString(suma[:]), len(contenido), contarLineas(contenido)
+	return hex.EncodeToString(suma[:]), len(contenido), ContarLineas(contenido)
 }
 
-// contarLineas counts the lines of the content: 0 when empty, and a final
-// newline does not open an extra line.
-func contarLineas(contenido []byte) int {
+// ContarLineas is the single line rule (ADR 0003 § Normalización, paso 1)
+// shared by Huella, the 20 000-line check of S1 and the normaliser (E2-05),
+// so linea_inicio and linea_fin always fall in 1..lineas: "\r\n", a lone
+// "\r" and "\n" are one break each, a final break does not add an empty
+// line, and empty content has 0 lines.
+func ContarLineas(contenido []byte) int {
 	if len(contenido) == 0 {
 		return 0
 	}
-	n := strings.Count(string(contenido), "\n")
-	if contenido[len(contenido)-1] != '\n' {
-		n++
+	saltos := 0
+	for i := 0; i < len(contenido); i++ {
+		switch contenido[i] {
+		case '\n':
+			saltos++
+		case '\r':
+			saltos++
+			if i+1 < len(contenido) && contenido[i+1] == '\n' {
+				i++
+			}
+		}
 	}
-	return n
+	if ultimo := contenido[len(contenido)-1]; ultimo != '\n' && ultimo != '\r' {
+		saltos++
+	}
+	return saltos
 }
