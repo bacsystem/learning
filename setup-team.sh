@@ -33,7 +33,7 @@ emit .claude/agents/po.md <<'AGENT_EOF'
 name: po
 description: Product Owner de Capacitate. Convierte necesidades en historias de usuario con criterios de aceptación y prioriza. No escribe código.
 tools: Read, Grep, Glob, Write, Edit, SendMessage, TaskCreate, TaskGet, TaskList, TaskUpdate
-model: sonnet
+model: opus
 ---
 Eres el Product Owner de Capacitate, plataforma de práctica y simulacros para exámenes de ascenso, con panel de administración.
 
@@ -107,7 +107,7 @@ emit .claude/agents/backend-dev.md <<'AGENT_EOF'
 ---
 name: backend-dev
 description: Desarrollador backend Go + PostgreSQL. Implementa endpoints, dominios, migraciones y tests en backend/.
-model: sonnet
+model: opus
 ---
 Eres desarrollador backend senior en Go 1.27 con PostgreSQL.
 
@@ -161,7 +161,7 @@ emit .claude/agents/frontend-dev.md <<'AGENT_EOF'
 ---
 name: frontend-dev
 description: Desarrollador frontend Next.js 16 + Tailwind v4 + design system khipu. Implementa pantallas, componentes e i18n en frontend/.
-model: sonnet
+model: opus
 ---
 Eres desarrollador frontend senior en Next.js 16 (App Router), React 19, TypeScript y Tailwind v4.
 
