@@ -7,9 +7,10 @@ Convenciones transversales para todos los endpoints del módulo «Aprendizaje as
 | [serums-ia-e1-taxonomia.md](serums-ia-e1-taxonomia.md) | E1-01, E1-02, E1-03, E1-04 (MVP) | vigente (2026-11-11) |
 | [serums-ia-e2-fuentes.md](serums-ia-e2-fuentes.md) | E2-02, E2-03, E2-05, E2-06, E2-07 (MVP) | aprobado, pendiente de implementación (2026-11-11) |
 | [serums-ia-e3-02-ciclo-preguntas.md](serums-ia-e3-02-ciclo-preguntas.md) | E3-02 (MVP) | borrador para revisión (2026-11-11) |
+| [serums-ia-e3-07-revision-basica.md](serums-ia-e3-07-revision-basica.md) | E3-07 (MVP); extiende E3-02 | borrador para revisión (2026-11-11); ADR [0007](../adr/0007-busqueda-pasajes-admin-fuera-del-puerto.md) |
 | [serums-ia-e6-01-servicio-ia.md](serums-ia-e6-01-servicio-ia.md) | E6-01 (MVP), contrato interno Go | borrador para revisión (2026-11-11); ADR [0006](../adr/0006-puerto-servicio-ia.md) |
 
-ADRs: [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones), [0005](../adr/0005-estado-operativo-panel-salud.md) estado operativo del panel de salud. Contrato de la épica de plataforma PLT-E1: [plataforma-salud.md](plataforma-salud.md).
+ADRs: [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones), [0005](../adr/0005-estado-operativo-panel-salud.md) estado operativo del panel de salud, [0006](../adr/0006-puerto-servicio-ia.md) puerto del servicio de IA, [0007](../adr/0007-busqueda-pasajes-admin-fuera-del-puerto.md) búsqueda de pasajes para el admin. Contrato de la épica de plataforma PLT-E1: [plataforma-salud.md](plataforma-salud.md).
 
 Un cambio a un contrato ya publicado se avisa directamente a backend-dev, frontend-dev y al tech-lead.
 
@@ -114,7 +115,7 @@ El repo tiene dos formatos:
 - Los handlers existentes mezclan 400 y 422 para la validación (`catalogs/handler.go:100,190`). En el módulo, **toda** validación de reglas da 422 y 400 queda solo para errores de sintaxis.
 - Las validaciones se evalúan en el orden que fija cada endpoint y se devuelve el primer error.
 
-Catálogo de códigos usados por E1 y E2:
+Catálogo de códigos usados por E1, E2 y E3:
 
 | Código | HTTP | Épica |
 |---|---|---|
@@ -135,7 +136,11 @@ Catálogo de códigos usados por E1 y E2:
 | `pesos_no_suman_100`, `limite_preguntas` | 422 | E1-03 |
 | `especialidad_invalida` | 422 | E1-04 |
 | `archivo_invalido`, `limite_fuentes`, `limite_versiones` | 422 | E2-03, E2-06, E2-07 |
-| `consulta_invalida`, `cita_invalida` | — (errores del puerto Go, sin HTTP en MVP) | E2-02 |
+| `consulta_invalida` | 422 en `GET /admin/pasajes` (E3-07 §2); en el puerto Go, error sin HTTP | E2-02, E3-07 |
+| `cita_invalida` | — (error del puerto Go, sin HTTP en MVP) | E2-02 |
+| `falta_cita`, `clave_oficial` | 422 | E3-02 |
+| `verificacion_requerida`, `nota_obligatoria`, `limite_citas`, `fuente_no_activa` | 422 | E3-07 |
+| `revision_especializada`, `ultima_cita_activa`, `conflicto_clave` (reservado, E3-01/E3-03) | 409 | E3-07 |
 | `error_interno` | 500 | todas |
 
 ## 5. Paginación
