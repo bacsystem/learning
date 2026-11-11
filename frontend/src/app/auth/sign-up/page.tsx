@@ -7,9 +7,10 @@ import * as yup from "yup";
 
 import { AvisoLegal } from "@/app/auth/aviso-legal";
 import { ENLACE, TarjetaAuth } from "@/app/auth/tarjeta-auth";
+import { Campo } from "@/components/app/campo";
 import { Alerta } from "@/components/feedback/alerta";
 import { Spinner } from "@/components/feedback/spinner";
-import { Campo, Entrada } from "@/components/formularios/campo";
+import { Entrada } from "@/components/formularios/campo";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { Chip } from "@/components/patrones/pill-estado";
 import { authApi, type CheckDNIResult } from "@/lib/auth/auth-api";

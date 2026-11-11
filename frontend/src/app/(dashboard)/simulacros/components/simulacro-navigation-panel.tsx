@@ -3,10 +3,12 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { DialogContent } from "@/components/app/dialogo";
+import { SheetContent } from "@/components/app/dialogo";
 import { CabeceraDialogo, PieDialogo } from "@/components/patrones/cabecera-dialogo";
 import { IconoSeccion } from "@/components/patrones/cabecera-seccion";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Dialog } from "@/components/ui/dialog";
+import { Sheet, SheetTitle } from "@/components/ui/sheet";
 import { BOTON_DESTRUCTIVO, BOTON_SECUNDARIO, FOCO, TARJETA } from "@/lib/estilos";
 import { PESO_ICONO, PESO_ICONO_ACTIVO } from "@/lib/iconos";
 import type { PreguntaSimulacro } from "@/lib/simulations/api";

@@ -7,7 +7,9 @@
   border-radius: calc(var(--radius) * 1.5) !important;
   background: var(--popover) !important;
   color: var(--popover-foreground) !important;
-  box-shadow: var(--sombra-lg), 0 0 0 1px var(--border) !important;
+  box-shadow:
+    var(--sombra-lg),
+    0 0 0 1px var(--border) !important;
   font-family: var(--font-sans);
   animation: tour-entrada var(--duracion-media) cubic-bezier(0.16, 1, 0.3, 1);
 }

@@ -3,11 +3,12 @@
 import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useState } from "react";
 
+import { Campo } from "@/components/app/campo";
 import { Alerta } from "@/components/feedback/alerta";
 import { EstadoVacio } from "@/components/feedback/estado-vacio";
 import { Skeleton } from "@/components/feedback/skeleton";
 import { useToast } from "@/components/feedback/toast";
-import { AreaTexto, Campo, Entrada } from "@/components/formularios/campo";
+import { AreaTexto, Entrada } from "@/components/formularios/campo";
 import { Tabs } from "@/components/navegacion/tabs";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";

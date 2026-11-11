@@ -5,7 +5,8 @@ import { useFormik } from "formik";
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
-import { AreaTexto, Campo, Entrada } from "@/components/formularios/campo";
+import { Campo } from "@/components/app/campo";
+import { AreaTexto, Entrada } from "@/components/formularios/campo";
 import { Casilla } from "@/components/formularios/casilla";
 import { AYUDA_CAMPO, ETIQUETA_CAMPO } from "@/lib/estilos";
 import type { EspecialidadTema, Tema, TemaPayload } from "@/lib/serums-ia/temas/api";

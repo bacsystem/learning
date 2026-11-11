@@ -2,7 +2,6 @@ package catalogs
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -14,7 +13,6 @@ import (
 
 // Stable codes of the weights endpoints (docs/api/README.md §4).
 const (
-	codigoCuerpoInvalido     = "cuerpo_invalido"
 	codigoParametroInvalido  = "parametro_invalido"
 	codigoNoEncontrado       = "no_encontrado"
 	codigoValidacion         = "validacion"
@@ -26,7 +24,6 @@ const (
 	entidadProceso     = "proceso"
 
 	msgProcesoNoEncontrado = "Proceso no encontrado."
-	msgCuerpoInvalido      = "Cuerpo de solicitud inválido."
 	msgParametroInvalido   = "Parámetro inválido."
 )
 
@@ -72,11 +69,10 @@ func (h *Handler) GuardarPesos(w http.ResponseWriter, r *http.Request) {
 		parametroInvalido(w)
 		return
 	}
+	// 400 cuerpo_invalido, or 413 cuerpo_demasiado_grande when the body goes
+	// past the reader limit (docs/api/README.md §3).
 	var req GuardarPesosRequest
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		httpx.JSONErrorCode(w, http.StatusBadRequest, codigoCuerpoInvalido, msgCuerpoInvalido, nil)
+	if !httpx.DecodeJSONStrict(w, r, &req) {
 		return
 	}
 	actor, ip, ua := claims.UserID, audit.ClientIP(r), r.UserAgent()

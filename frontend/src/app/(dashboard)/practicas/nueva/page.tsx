@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
+import { DialogContent } from "@/components/app/dialogo";
 import { Alerta } from "@/components/feedback/alerta";
 import { Casilla, Interruptor } from "@/components/formularios/casilla";
 import { Combobox } from "@/components/formularios/combobox";
@@ -13,7 +14,7 @@ import { BotonAsync } from "@/components/patrones/boton-async";
 import { CabeceraDialogo, PieDialogo } from "@/components/patrones/cabecera-dialogo";
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
 import { AYUDA_CAMPO, BOTON_PRIMARIO, CONTENEDOR_PAGINA, ETIQUETA_CAMPO, TARJETA } from "@/lib/estilos";
@@ -268,6 +269,8 @@ export default function NuevaPracticaPage() {
                           onBlur={() => clampNum(a.asignaturaId)}
                         >
                           <StepperNumerico
+                            etiquetaDisminuir={t("comun-disminuir")}
+                            etiquetaAumentar={t("comun-aumentar")}
                             id={`num-${a.asignaturaId}`}
                             valor={a.numPreguntas}
                             onCambio={(v) => setNum(a.asignaturaId, v ?? 0)}
@@ -340,6 +343,8 @@ export default function NuevaPracticaPage() {
                 {usarTimer && (
                   <div className="flex items-center gap-2" onBlur={() => setTiempoMin(Math.max(1, tiempoMin || 1))}>
                     <StepperNumerico
+                      etiquetaDisminuir={t("comun-disminuir")}
+                      etiquetaAumentar={t("comun-aumentar")}
                       id="practica-tiempo"
                       valor={tiempoMin}
                       onCambio={(v) => setTiempoMin(v ?? 0)}
