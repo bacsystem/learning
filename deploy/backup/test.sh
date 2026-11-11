@@ -31,7 +31,7 @@ docker network create "$NET" >/dev/null
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=bkt-pg" \
   -keyout "$TMP/server.key" -out "$TMP/server.crt" 2>/dev/null
 docker run -d --name bkt-pg --network "$NET" -e POSTGRES_USER=owner -e POSTGRES_PASSWORD=ownerpw \
-  -e POSTGRES_DB=capacitate -p 127.0.0.1:55445:5432 -v "$TMP:/certs:ro" postgres:16-alpine sh -c \
+  -e POSTGRES_DB=capacitate -p 127.0.0.1:55445:5432 -v "$TMP:/certs:ro" postgres:16.14-alpine3.23 sh -c \
   'install -o postgres -m 0600 /certs/server.key /var/lib/postgresql/server.key &&
    install -o postgres -m 0644 /certs/server.crt /var/lib/postgresql/server.crt &&
    exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/var/lib/postgresql/server.crt -c ssl_key_file=/var/lib/postgresql/server.key' >/dev/null
@@ -62,7 +62,9 @@ SQL
 
 s3() { docker run --rm --network "$NET" -v "$TMP:/k" --entrypoint curl "$IMG" -s --aws-sigv4 'aws:amz:auto:s3' --user testkey:testsecret12345 "$@"; }
 s3 -o /dev/null -X PUT --data '<CreateBucketConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><LocationConstraint>auto</LocationConstraint></CreateBucketConfiguration>' http://bkt-s3:7070/capacitate-backups
-OBJ="http://bkt-s3:7070/capacitate-backups/pg/$(date -u +%Y-%m-%d).dump.age"
+BUCKET_URL=http://bkt-s3:7070/capacitate-backups
+# Claves bajo pg/ (ListObjectsV2), una por línea.
+claves() { s3 "$BUCKET_URL?list-type=2&prefix=pg/" | grep -o '<Key>[^<]*</Key>' | sed -E 's#</?Key>##g'; }
 
 docker run --rm -v "$TMP:/k" --entrypoint sh golang:1.27.4-alpine3.23 -c \
   'go run filippo.io/age/cmd/age-keygen@v1.3.2 -o /k/key.txt 2>/dev/null; chmod 644 /k/key.txt'
@@ -77,22 +79,28 @@ copia() { # $1=usuario:clave de Postgres $2=endpoint $3=bucket $4=secret de S3
 OK_DB=backup_ro:backuppw; S3=http://bkt-s3:7070; B=capacitate-backups; SEC=testsecret12345
 
 copia sin_lectura:sinlecturapw "$S3" "$B" "$SEC" && fail "pg_dump sin permisos no falló" || true
-[ "$(s3 -o /dev/null -w '%{http_code}' --head "$OBJ")" = 404 ] || fail "se subió un objeto tras un pg_dump fallido"
+[ -z "$(claves)" ] || fail "se subió un objeto tras un pg_dump fallido"
 echo "✓ 1. pg_dump sin permisos → fallida y sin objeto en el bucket"
 copia "$OK_DB" "$S3" "$B" "$SEC" && echo "✓ 2. copia correcta (sslmode=require)" || fail "la copia correcta falló"
+sleep 1
+copia "$OK_DB" "$S3" "$B" "$SEC" || fail "repetir la copia el mismo día falló"
+[ "$(claves | wc -l | tr -d ' ')" = 2 ] || fail "esperaba 2 objetos: $(claves)"
+claves | grep -qE '^pg/[0-9]{4}-[0-9]{2}-[0-9]{2}/[0-9]{6}Z\.dump\.age$' || fail "clave con formato inesperado: $(claves)"
+echo "✓ 2b. repetida el mismo día → otro objeto, sin chocar ($(claves | tail -1))"
 copia "$OK_DB" "$S3" no-existe "$SEC" && fail "bucket inexistente no falló" || echo "✓ 3. bucket inexistente → fallida"
 copia "$OK_DB" "$S3" "$B" mala && fail "credenciales malas no fallaron" || echo "✓ 4. credenciales malas → fallida"
 copia "$OK_DB" http://10.255.255.1 "$B" "$SEC" && fail "endpoint colgado no falló" || echo "✓ 5. endpoint colgado → fallida por timeout"
 
 filas=$(docker exec bkt-pg psql -U owner -d capacitate -Atc "select string_agg(resultado, ',' order by id) from copias_bd")
-[ "$filas" = "fallida,correcta,fallida,fallida,fallida" ] || fail "copias_bd: $filas"
+[ "$filas" = "fallida,correcta,correcta,fallida,fallida,fallida" ] || fail "copias_bd: $filas"
 echo "✓ copias_bd: $filas"
 
 # 6. Restauración (RTO de prueba): bajar, descifrar con la privada, pg_restore en una base nueva.
 t0=$(date +%s)
-s3 -f -o /k/r.dump.age "$OBJ"
+ultima=$(claves | sort | tail -1)   # «la última» = la clave más reciente bajo pg/
+s3 -f -o /k/r.dump.age "$BUCKET_URL/$ultima"
 [ "$(head -c 21 "$TMP/r.dump.age")" = "age-encryption.org/v1" ] || fail "el objeto no está cifrado con age"
-docker run -d --name bkt-restore -e POSTGRES_PASSWORD=r -e POSTGRES_DB=restaurada postgres:16-alpine >/dev/null
+docker run -d --name bkt-restore -e POSTGRES_PASSWORD=r -e POSTGRES_DB=restaurada postgres:16.14-alpine3.23 >/dev/null
 until docker exec bkt-restore pg_isready -U postgres -d restaurada >/dev/null 2>&1; do sleep 1; done
 sleep 2
 docker run --rm -v "$TMP:/k" --entrypoint age "$IMG" -d -i /k/key.txt -o /k/r.dump /k/r.dump.age

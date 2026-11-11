@@ -13,8 +13,8 @@ aprobación explícita), y cada paso se anota en
 ## Cómo funciona
 
 ```
-pg_dump -Fc (rol backup_ro, sslmode=require)  →  age -r <clave PÚBLICA>  →  /tmp/AAAA-MM-DD.dump.age
-→ PUT firmado SigV4 a R2: pg/AAAA-MM-DD.dump.age  →  HEAD (mismo tamaño)
+pg_dump -Fc (rol backup_ro, sslmode=require)  →  age -r <clave PÚBLICA>  →  /tmp/copia.dump.age
+→ PUT firmado SigV4 a R2: pg/AAAA-MM-DD/HHMMSSZ.dump.age (UTC)  →  HEAD (mismo tamaño)
 → INSERT en copias_bd (correcta o fallida, con trap)  →  borra /tmp
 ```
 
@@ -92,10 +92,10 @@ con un `R2_BUCKET` inexistente durante una ejecución manual. Si Railway no
 avisa, el panel de salud (PLT-05) lo muestra como degradado o caído, y se le
 lleva al usuario la decisión de otro canal.
 
-**Un solo objeto por día:** `pg/AAAA-MM-DD.dump.age`. Con el bucket lock, otra
-ejecución **correcta** el mismo día no puede sobrescribirlo y queda registrada
-como fallida. Para repetir una copia el mismo día, primero hay que comprobar
-que la anterior falló.
+**Un objeto por ejecución:** `pg/AAAA-MM-DD/HHMMSSZ.dump.age`, en UTC. Repetir el
+cron (por ejemplo `railway cron run`) nunca choca con el bucket lock ni deja una
+`fallida` falsa. Cada objeto queda protegido sus 30 días y el ciclo de vida lo
+borra después. «La última copia» es la clave más reciente bajo `pg/`.
 
 ## Restauración desde R2 (prueba mensual y antes del lanzamiento: C6, C7)
 
@@ -103,12 +103,14 @@ En un Postgres 16 **efímero y aislado**, nunca en `deploy/` ni en producción.
 La clave privada se carga solo durante la prueba.
 
 ```bash
-# 1. Bajar el objeto. Las credenciales se leen sin eco a un archivo 0600:
-#    no quedan en el historial ni en `ps`.
+# 1. Bajar la copia más reciente. Las credenciales se leen sin eco a un archivo
+#    0600: no quedan en el historial ni en `ps`.
 umask 077; read -r -p 'R2 key: ' K; read -rs -p 'R2 secret: ' S; echo
 printf 'user = "%s:%s"\n' "$K" "$S" > r2.curl; unset K S
-curl -K r2.curl --fail --aws-sigv4 'aws:amz:auto:s3' -o copia.dump.age \
-  "https://<ACCOUNT_ID>.r2.cloudflarestorage.com/<bucket>/pg/AAAA-MM-DD.dump.age"
+B="https://<ACCOUNT_ID>.r2.cloudflarestorage.com/<bucket>"
+ultima=$(curl -K r2.curl -s --fail --aws-sigv4 'aws:amz:auto:s3' "$B?list-type=2&prefix=pg/" \
+  | grep -o '<Key>[^<]*</Key>' | sed -E 's#</?Key>##g' | sort | tail -1)
+curl -K r2.curl --fail --aws-sigv4 'aws:amz:auto:s3' -o copia.dump.age "$B/$ultima"
 rm -f r2.curl
 # 2. Descifrar con la clave privada:
 age -d -i capacitate-backup.key -o copia.dump copia.dump.age

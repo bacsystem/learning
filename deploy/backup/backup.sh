@@ -27,9 +27,10 @@ TIMEOUT="${BACKUP_TIMEOUT:-1800}"
 export PGCONNECT_TIMEOUT=30
 
 iniciada=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-dia=$(date -u +%Y-%m-%d)
-objeto="pg/${dia}.dump.age"
-archivo="/tmp/${dia}.dump.age"
+# Un objeto por ejecución (UTC): repetir el cron nunca choca con el bucket lock.
+sello=$(date -u +%Y-%m-%d/%H%M%S)
+objeto="pg/${sello}Z.dump.age"
+archivo="/tmp/copia.dump.age"
 resultado=fallida
 bytes=""
 
