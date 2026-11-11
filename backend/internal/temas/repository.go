@@ -175,7 +175,7 @@ func (r *Repository) Crear(ctx context.Context, asignaturaID int64, d DatosTema,
 		if err != nil {
 			return err
 		}
-		if err := validarEspecialidades(ctx, tx, d.EspecialidadIDs); err != nil {
+		if err := validarEspecialidades(ctx, tx, d.EspecialidadIDs, nil); err != nil {
 			return err
 		}
 		if err := comprobarNombreLibre(ctx, tx, asignaturaID, d.NombreClave, 0); err != nil {
@@ -221,7 +221,9 @@ func (r *Repository) Editar(ctx context.Context, id int64, d DatosTema, aud Audi
 		if err != nil {
 			return err
 		}
-		if err := validarEspecialidades(ctx, tx, d.EspecialidadIDs); err != nil {
+		// T4 keeps the especialidades the tema already had even if they were
+		// deactivated since; a new one must be active (contract § T4).
+		if err := validarEspecialidades(ctx, tx, d.EspecialidadIDs, especialidadesAntes); err != nil {
 			return err
 		}
 		if err := comprobarNombreLibre(ctx, tx, antes.AsignaturaID, d.NombreClave, id); err != nil {
@@ -393,15 +395,20 @@ func bloquearAsignatura(ctx context.Context, tx *sqlx.Tx, id int64) (string, err
 	return estado, nil
 }
 
-// validarEspecialidades requires every id to be an existing, active especialidad.
-func validarEspecialidades(ctx context.Context, tx *sqlx.Tx, ids []int64) error {
+// validarEspecialidades requires every id to be an existing especialidad that
+// is active or already associated with the tema (yaAsociadas; nil on create).
+func validarEspecialidades(ctx context.Context, tx *sqlx.Tx, ids, yaAsociadas []int64) error {
 	if len(ids) == 0 {
 		return nil
 	}
+	if yaAsociadas == nil {
+		yaAsociadas = []int64{}
+	}
 	var validas int
 	if err := tx.GetContext(ctx, &validas, `
-		SELECT COUNT(*) FROM especialidades WHERE id = ANY($1::bigint[]) AND estado = 'activo'`,
-		pq.Array(ids)); err != nil {
+		SELECT COUNT(*) FROM especialidades
+		WHERE id = ANY($1::bigint[]) AND (estado = 'activo' OR id = ANY($2::bigint[]))`,
+		pq.Array(ids), pq.Array(yaAsociadas)); err != nil {
 		return fmt.Errorf("validar especialidades: %w", err)
 	}
 	if validas != len(ids) {

@@ -1,7 +1,7 @@
 # Contrato API — SERUMS IA, épica E1 Taxonomía (MVP)
 
 - **Historias:** SIA-E1-01 (#11), SIA-E1-02 (#12), SIA-E1-03 (#13), SIA-E1-04 (#14)
-- **Estado:** borrador para revisión del tech-lead (2026-11-11)
+- **Estado:** vigente (2026-11-11). Revisión del 2026-11-11 (seguimiento de los PRs #72–#75): T8 documenta lo implementado en el PR #74 y T4 acepta las especialidades inactivas ya asociadas (cambio de contrato: tarea de backend-dev y frontend-dev).
 - **Convenciones transversales:** [README.md](README.md) (errores, auth, paginación, límites, auditoría e i18n). Aquí solo se documenta lo propio de E1.
 - **ADR relacionado:** [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) (unicidad y resolución de `proceso_asignaturas`).
 
@@ -66,9 +66,11 @@ Paquetes backend:
 |---|---|---|
 | `nombre` | Se aplica `TrimSpace` y se colapsan los espacios internos; 3–120 caracteres (runes) | 422 `validacion` (`detalle.campos.nombre`) |
 | `descripcion` | Opcional; ≤ 500 caracteres; `""` se guarda como `null` | 422 `validacion` |
-| `especialidad_ids` | Opcional; 0–50 ids, sin repetidos; cada uno debe ser una especialidad existente y `activo` | 422 `validacion` (tamaño o repetidos) / 422 `referencia_invalida` (inexistente o inactiva) |
+| `especialidad_ids` | Opcional; 0–50 ids, sin repetidos | 422 `validacion` (tamaño o repetidos) |
+| `especialidad_ids` en T3 | Cada id debe ser una especialidad existente y `activo` | 422 `referencia_invalida` (inexistente o inactiva) |
+| `especialidad_ids` en T4 | Cada id debe ser una especialidad existente y `activo`, **o** una que el tema ya tenía asociada antes de la edición (aunque hoy esté inactiva). Ver T4 | 422 `referencia_invalida` (inexistente, o inactiva y nueva para el tema) |
 | `asignatura_id` (solo T3) | Debe existir y estar `activo` | 422 `referencia_invalida` |
-| Unicidad del nombre | `plegar(nombre)` único dentro de la asignatura, sin distinguir mayúsculas ni tildes (á é í ó ú ü; la ñ se distingue). Incluye temas archivados | 422 `tema_duplicado` |
+| Unicidad del nombre | `plegar(nombre)` único dentro de la asignatura, sin distinguir mayúsculas ni tildes (á é í ó ú ü à è ì ò ù; la ñ se distingue), con la tilde compuesta (NFC) o descompuesta (NFD, p. ej. pegada desde un PDF) (ADR 0003 § Plegado). Incluye temas archivados | 422 `tema_duplicado` |
 | Límite | Máximo 60 temas `activo` por asignatura. Los archivados no cuentan (ver nota) | 422 `limite_temas` |
 
 - `plegar` es `texto.Plegar` (paquete nuevo `internal/texto`, lo crea esta historia; ver README §1 y la ADR 0003).
@@ -132,6 +134,13 @@ Rol admin. Reemplazo completo de los campos editables. La asignatura **no** se p
 
 - `200` con el `Tema` actualizado. Un tema archivado también se puede editar.
 - Errores: los de T3 más `404 no_encontrado`. Si se envía `asignatura_id`, se rechaza con `400 cuerpo_invalido` (campo desconocido).
+- **Especialidades inactivas ya asociadas** (decisión del architect, 2026-11-11; cambio sobre la versión publicada):
+  - Se aceptan los ids que el tema **ya tenía** antes de la edición aunque la especialidad se haya desactivado después. Así se puede corregir el nombre o la descripción sin tocar las especialidades.
+  - Se pueden quitar siempre.
+  - **No** se puede agregar una especialidad inactiva que el tema no tenía, ni volver a agregar una inactiva que se quitó en una edición anterior: `422 referencia_invalida`.
+  - Motivo: obligar a desmarcarla para guardar cambiaba los datos como efecto lateral. Si era la única asociada, el tema pasaba a `aplica_a_todas` solo por corregir un nombre. Es el mismo criterio que T8 sigue con el tema archivado que la pregunta ya tiene.
+  - Implementación: `Editar` ya lee `especialidadesAntes` con la fila bloqueada (`temas/repository.go:220`), antes de `validarEspecialidades` (`:224`, consulta en `:396-411`). La validación de T4 acepta `estado = 'activo' OR id = ANY(antes)`. T3 no cambia.
+  - UI (PR #73): el formulario sigue mostrando la especialidad inactiva asociada, marcada y con la etiqueta «(inactiva)». Se puede guardar con ella marcada o desmarcarla. Al desmarcarla se puede volver a marcar mientras no se guarde, porque sigue en `antes`. Las inactivas no asociadas no se ofrecen.
 - Auditoría: `tema.editar`, `detalle = {"antes": {nombre, descripcion, especialidad_ids}, "despues": {…}}`.
 
 ### T5 `PATCH /admin/temas/{id}/estado`
@@ -201,9 +210,19 @@ Va en SIA-E1-01: el tech-lead lo confirmó (TL3).
 - Request de `POST /preguntas` y `PUT /preguntas/{id}` (`questions/routes.go:37,39`): campo opcional `"tema_id": 41 | null`.
 - Response de pregunta: añade `"tema_id"` y `"tema"` (nombre), o `null` si no tiene.
 - `GET /preguntas` acepta el filtro opcional `tema_id`.
-- Validación: el tema debe existir, pertenecer a la misma `asignatura_id` de la pregunta y estar `activo`. Única excepción: en `PUT` se puede reenviar el mismo tema que la pregunta ya tiene aunque esté archivado. Si no se cumple, `422 tema_invalido` (formato de error del README).
-- Si un `PUT` cambia `asignatura_id` sin enviar `tema_id`, el tema queda en `null`. La FK compuesta (§4) impide que el tema y el área queden inconsistentes.
-- La UI no la exige ninguna historia del MVP. Esto da a E3-04 y E3-05 el punto de escritura. El frontend puede posponer el selector de tema en el formulario de pregunta.
+- **`POST`:** ausente o `null` = sin tema.
+- **`PUT`** (decisión del tech-lead en el PR #74, igual que `etiqueta_ids` en H100). El campo distingue ausente de `null` (`OptionalID`, `questions/dto.go:48`), y el tema resultante lo calcula `temaTrasEditar` (`questions/repository.go:98-111`):
+
+  | `tema_id` en el `PUT` | `asignatura_id` | Tema guardado |
+  |---|---|---|
+  | ausente | igual a la actual | se conserva el tema actual |
+  | ausente | cambia | `null` (el tema actual es de otra área) |
+  | `null` explícito | cualquiera | `null` (se quita el tema) |
+  | un id | cualquiera | ese id, si pasa la validación |
+
+- **Validación** (`validarTema`, `questions/repository.go:73-96`), dentro de la transacción y con `FOR SHARE` sobre el tema: el tema debe existir, pertenecer a la `asignatura_id` resultante de la pregunta y estar `activo`. Excepción: el tema que la pregunta ya tiene se acepta aunque esté archivado, tanto si se reenvía como si se conserva por ausencia. Si no se cumple, `422 tema_invalido` (formato de error del README). Una violación de la FK compuesta (§4) por una carrera también se mapea a `tema_invalido` (`questions/service.go:37-38,77-78`).
+- La FK compuesta (§4) impide que el tema y el área queden inconsistentes.
+- La UI no la exige ninguna historia del MVP. Esto da a E3-04 y E3-05 el punto de escritura. El frontend puede posponer el selector de tema en el formulario de pregunta; si el formulario no envía `tema_id`, el `PUT` conserva el tema.
 
 ---
 
@@ -513,7 +532,7 @@ DROP TABLE IF EXISTS postulante_profesiones;
 | E1-01 | Crear tema (201, activo, audit `tema.crear`) | T3, tabla `temas` |
 | E1-01 | Nombre duplicado (422 `tema_duplicado`) | T3/T4, `uq_temas_asignatura_nombre_clave` + `plegar` |
 | E1-01 | Límite de temas (422 `limite_temas`) | T3, T5 (reactivar), bloqueo de la asignatura |
-| E1-01 | Archivar tema con preguntas | T5, T7 (solo activos), T8 (no acepta archivados nuevos) |
+| E1-01 | Archivar tema con preguntas | T5, T7 (solo activos), T8 (no acepta archivados nuevos; conserva el actual aunque esté archivado) |
 | E1-01 | Archivados no cuentan para el límite | T3: conteo solo de `activo` |
 | E1-01 | Nombre de un tema archivado → 422 `tema_duplicado` | `uq_temas_asignatura_nombre_clave` (incluye los archivados) |
 | E1-01 | Reactivar tema (al final, conserva preguntas y especialidades, audit) | T5 `estado = activo` |
@@ -523,10 +542,12 @@ DROP TABLE IF EXISTS postulante_profesiones;
 | E1-01 | Migración reversible | 059 Up/Down |
 | E1-01 | Regla 2 (3–120 / ≤ 500) | Validación T3/T4 + `CHECK` |
 | E1-01 | Regla 3 (0..N especialidades) | `tema_especialidades`, `aplica_a_todas` |
-| E1-01 | Regla 5 (`tema_id` nulo) | 059, T8 |
+| E1-01 | Regla 5 (`tema_id` nulo) | 059, T8 (`POST` sin tema; `PUT`: ausente conserva, `null` quita, cambio de área sin `tema_id` → `null`) |
+| E1-01 | Tema de otra área, inexistente o archivado nuevo → 422 | T8 `tema_invalido` (`validarTema` + FK compuesta) |
 | E1-02 | Listar por área (nombre, especialidades, nº preguntas, estado) | T1 (`preguntas_count`) |
 | E1-02 | Estado vacío | T1 `data: []` (UI) |
 | E1-02 | Editar con error de validación (sin petición) | UI con yup usando las mismas reglas de §1; T4 lo revalida |
+| E1-02 | Editar un tema con una especialidad asociada que se desactivó | T4 acepta las ya asociadas; rechaza agregar inactivas nuevas (`referencia_invalida`) |
 | E1-02 | Archivar con confirmación (nº de preguntas, audit) | T1/T2 `preguntas_count`, T5 audit |
 | E1-02 | Acceso de usuario (redirige) | guard admin de `(dashboard)/layout.tsx` + 403 de la API |
 | E1-02 | Falla de red (conserva datos) | UI (formik conserva valores ante un 500) |

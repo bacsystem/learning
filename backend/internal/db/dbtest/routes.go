@@ -31,7 +31,14 @@ func SessionChecker(t *testing.T, db *sqlx.DB) auth.SessionChecker {
 // that the DB, not the token, decides.
 func RealBearer(t *testing.T, db *sqlx.DB, userID int64, tokenRol string) string {
 	t.Helper()
-	tok, _, err := jwtpkg.Issue(testJWTSecret, userID, tokenRol, "", 0, 0, 0)
+	return RealBearerEspecialidad(t, db, userID, tokenRol, 0)
+}
+
+// RealBearerEspecialidad is RealBearer with especialidadID in the token
+// claims, for handlers that read claims.EspecialidadID.
+func RealBearerEspecialidad(t *testing.T, db *sqlx.DB, userID int64, tokenRol string, especialidadID int64) string {
+	t.Helper()
+	tok, _, err := jwtpkg.Issue(testJWTSecret, userID, tokenRol, "", 0, especialidadID, 0)
 	if err != nil {
 		t.Fatalf("jwt: %v", err)
 	}

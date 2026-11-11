@@ -15,6 +15,7 @@
     "menu-admin-especialidades": "Especialidades",
     "menu-admin-asignaturas": "Asignaturas",
     "menu-admin-temas": "Temas",
+    "menu-admin-pesos": "Pesos por profesión",
     "menu-admin-procesos": "Procesos (Admin)",
     "menu-admin-preguntas": "Preguntas",
     "menu-admin-etiquetas": "Etiquetas",
@@ -1318,6 +1319,74 @@
         "estado_invalido": "El tema ya está en ese estado. Recarga la lista.",
         "no_encontrado": "El tema ya no existe. Recarga la lista.",
         "error_interno": "Error interno del servidor. Inténtalo de nuevo."
+      },
+      "pesos": {
+        "titulo": "Pesos de {especialidad}",
+        "ayuda": "Peso, número de preguntas y coeficiente de cada área. Al guardar se reemplaza la configuración entera.",
+        "guardado": "Pesos guardados: la configuración está completa.",
+        "estimados": "Sin configuración: se usan pesos estimados.",
+        "errorCargar": "No se pudo cargar la configuración de pesos.",
+        "errorCatalogos": "No se pudieron cargar los procesos y las asignaturas.",
+        "estado": {
+          "completa": "Completa",
+          "incompleta": "Incompleta"
+        },
+        "filtro": {
+          "proceso": "Proceso",
+          "procesoElegir": "Elige un proceso",
+          "especialidad": "Especialidad",
+          "especialidadElegir": "Elige una especialidad"
+        },
+        "sinProceso": {
+          "titulo": "Elige un proceso",
+          "texto": "Los pesos se configuran por proceso y especialidad."
+        },
+        "sinEspecialidad": {
+          "titulo": "Elige una especialidad",
+          "texto": "Cada especialidad tiene su propia configuración de pesos."
+        },
+        "sinEspecialidades": {
+          "titulo": "El proceso no tiene especialidades activas",
+          "texto": "Activa especialidades de la institución del proceso para configurar sus pesos."
+        },
+        "vacio": {
+          "titulo": "Aún no hay áreas",
+          "texto": "Añade las áreas del examen con su peso y número de preguntas."
+        },
+        "usarPlantilla": "Usar la configuración general del proceso ({n, plural, one {# área} other {# áreas}})",
+        "col": {
+          "area": "Área",
+          "peso": "Peso (%)",
+          "preguntas": "Preguntas",
+          "coeficiente": "Coeficiente"
+        },
+        "campoDe": "{campo} de {nombre}",
+        "quitar": "Quitar {nombre}",
+        "anadir": "Añadir área",
+        "anadirPlaceholder": "Busca un área…",
+        "anadirVacio": "No quedan áreas por añadir.",
+        "sumaPesos": "Suma de pesos: {suma, number} %",
+        "totalPreguntas": "Preguntas: {n} / {max}",
+        "validacion": {
+          "areasMin": "Añade al menos un área.",
+          "areasMax": "Admite como máximo {max} áreas.",
+          "peso": "El peso va de {min} a {max} con hasta 2 decimales.",
+          "preguntas": "Las preguntas van de {min} a {max} (número entero).",
+          "coeficiente": "El coeficiente va de {min} a {max} con hasta 2 decimales.",
+          "repetidas": "Hay áreas repetidas.",
+          "repetidasNombres": "Área repetida: {nombres}.",
+          "limitePreguntas": "El total de preguntas no puede pasar de {max}.",
+          "sumaPesos": "Los pesos deben sumar 100 %.",
+          "sumaPesosActual": "Los pesos suman {suma, number} %: deben sumar 100 %."
+        },
+        "errores": {
+          "validacion": "Revisa los valores de las áreas.",
+          "referencia_invalida": "La especialidad o alguna área ya no está activa. Recarga y vuelve a intentarlo.",
+          "peso_duplicado": "Hay un área repetida, o otra persona guardó a la vez. Recarga y vuelve a intentarlo.",
+          "limite_preguntas": "El total de preguntas pasa de 200.",
+          "pesos_no_suman_100": "Los pesos no suman 100 %.",
+          "no_encontrado": "El proceso ya no existe. Recarga la página."
+        }
       }
     }
   }

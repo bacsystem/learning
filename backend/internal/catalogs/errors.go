@@ -14,7 +14,14 @@ var (
 	ErrInternal   = errors.New("Error interno del servidor.")
 	// ErrInvalidRef: the request references a row that does not exist (FK).
 	ErrInvalidRef = errors.New("Referencia inválida.")
+	// ErrPesoDuplicado: a proceso_asignaturas row already exists for that
+	// (proceso, especialidad or none, asignatura). It answers 409
+	// peso_duplicado in the coded format (E1-03 regla 7).
+	ErrPesoDuplicado = errors.New("Esta asignatura ya está asignada al proceso.")
 )
+
+// codigoPesoDuplicado is the stable code of ErrPesoDuplicado.
+const codigoPesoDuplicado = "peso_duplicado"
 
 // isFKViolation / isUniqueViolation classify PostgreSQL errors (shared
 // implementation in internal/db/pgerr).
