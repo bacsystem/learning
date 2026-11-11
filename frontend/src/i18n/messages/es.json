@@ -1615,6 +1615,8 @@
           "no_encontrado": "La fuente ya no existe."
         }
       }
-    }
+    },
+    "sesion-servidor-no-disponible-titulo": "El servidor no responde",
+    "sesion-servidor-no-disponible-texto": "Tu sesión sigue abierta. Lo volvemos a intentar cada pocos segundos; en cuanto el servidor responda, verás la aplicación."
   }
 }

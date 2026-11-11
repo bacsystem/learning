@@ -175,6 +175,12 @@ Descartada: el usuario eligió Railway. Además, sin PITR se pierden hasta 24 h 
     - **Rol de solo lectura:** el cron conecta con un rol propio `backup_ro` (`pg_read_all_data`), no con el usuario dueño de la base. Su URL (`BACKUP_DATABASE_URL`, privada y con `sslmode=require`) va como sealed variable del cron.
       - Devops crea el rol una sola vez al aprovisionar y lo documenta en `docs/ops`.
       - No va en las migraciones de goose: los roles son de la instancia, no del esquema.
+      - **Excepción (enmienda del 2026-11-11, [ADR 0005](0005-estado-operativo-panel-salud.md)):** `backup_ro` tiene además **un único** permiso de escritura: `INSERT` sobre `copias_bd` y `USAGE` sobre `copias_bd_id_seq`, sin UPDATE ni DELETE. Es un paso de aprovisionamiento que hace devops, después de la migración que crea la tabla.
+    - **Registro de cada ejecución (PLT-05):**
+      - Al terminar, correcta o fallida (con `trap` y el timeout propio), el cron inserta **una** fila en `copias_bd` con `iniciada_en`, `terminada_en`, `resultado` y `tamano_bytes`. Esquema en `docs/api/plataforma-salud.md`.
+      - Sin bucket, ruta ni error. El panel de salud lo lee de ahí.
+      - Si el INSERT falla después de una subida correcta, el cron sale con error y alerta.
+      - **Restauraciones de prueba (C6, C7):** el dump incluye el GRANT a `backup_ro`. En un Postgres sin ese rol se restaura con `pg_restore --no-owner --no-privileges`.
     - **Cifrado del lado del cliente, antes de subir.** El dump contiene datos personales, así que nunca sale de Railway sin cifrar y no se depende del cifrado en reposo de R2, que no está documentado.
       - Se usa **cifrado asimétrico**: devops propone `age`, una herramienta nueva dentro de la imagen del cron que aprueba el tech-lead. El cron solo tiene la **clave pública** (`AGE_RECIPIENT`): aunque se comprometa, no puede descifrar los dumps.
       - El dump se cifra en tubería (`pg_dump | age`). Al disco temporal solo llega el archivo cifrado, que se sube por la API S3 (`curl --aws-sigv4`, PUT simple más un HEAD de verificación) y después se borra.

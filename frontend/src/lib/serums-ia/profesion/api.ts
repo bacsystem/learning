@@ -1,5 +1,6 @@
 import { API_BASE } from "@/lib/http/api-base";
 import { apiErrorFrom } from "@/lib/http/api-error";
+import { avisarSiSesionExpirada } from "@/lib/http/sesion";
 
 /** Cliente de la profesión del postulante (docs/api/serums-ia-e1-taxonomia.md §3, F1–F3). Sin `usuario_id`: la sesión. */
 
@@ -13,7 +14,7 @@ async function req<T>(path: string, token: string, options?: RequestInit): Promi
     ...options,
   });
   if (!res.ok) {
-    if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
+    avisarSiSesionExpirada(res.status);
     throw await apiErrorFrom(res);
   }
   return res.json() as Promise<T>;
