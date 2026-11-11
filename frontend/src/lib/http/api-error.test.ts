@@ -27,6 +27,20 @@ describe("apiErrorFrom", () => {
     expect(apiErrorCode(err)).toBeUndefined();
   });
 
+  it("treats an empty message like a missing one: error is the text and there is no code", async () => {
+    const err = await apiErrorFrom(jsonResponse({ error: "x", message: "" }, 422));
+
+    expect(err.message).toBe("x");
+    expect(err.code).toBeUndefined();
+  });
+
+  it("falls back to statusText when error and message are empty", async () => {
+    const err = await apiErrorFrom(jsonResponse({ error: "", message: "" }, 400, "Bad Request"));
+
+    expect(err.message).toBe("Bad Request");
+    expect(err.code).toBeUndefined();
+  });
+
   it("falls back to statusText when the body is not a JSON object", async () => {
     const err = await apiErrorFrom(new Response("<html>", { status: 502, statusText: "Bad Gateway" }));
 
