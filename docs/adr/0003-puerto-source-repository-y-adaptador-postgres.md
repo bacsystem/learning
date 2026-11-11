@@ -1,6 +1,6 @@
 # ADR 0003: puerto `SourceRepository` y adaptador propio sobre PostgreSQL
 
-- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD); «El puerto» define los tipos que faltaban (`NuevaFuente`, `FiltroFuentes`, `Pagina`, `FuenteResumen`, `Pasaje`), agrega `auditFn` a `GuardarFuente` y fija el error de `EspecialidadID ≤ 0`.
+- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD); «El puerto» define los tipos que faltaban (`NuevaFuente`, `FiltroFuentes`, `Pagina`, `FuenteResumen`, `Pasaje`), reemplaza `audit.TxFunc` por un `Auditor` que recibe el `Evento` con el id de la fuente (también en `GuardarFuente`), fija la normalización de `Page` y `PerPage` y el error de `EspecialidadID ≤ 0`.
 - **Fecha:** 2026-11-11
 - **Historias:** SIA-E2-02 (#16); la usan SIA-E2-03, E2-05, E2-06, E2-07 y, más adelante, E3-01, E6-03, E6-04 y E6-08
 - **Decisión de producto de origen:** P1 (issue #65). MVP y v2 usan el 100 % del `SourceRepository` propio en PostgreSQL, a $0 USD. La búsqueda semántica (pgvector o NotebookLM) se reevalúa en v3 (SIA-E2-01, SIA-E2-08).
@@ -76,13 +76,29 @@ type Pagina[T any] struct {
     PerPage int
 }
 
-// FiltroFuentes. Valores cero = sin filtro. Page ≥ 1; PerPage 1..100 (0 → 20, > 100 → 100), como README §5.
+// FiltroFuentes. En EspecialidadID, Estado y Tipo, el valor cero = sin filtro.
+// Page y PerPage NO siguen esa regla: el puerto los normaliza, sin error
+// (Page ≤ 0 → 1; PerPage ≤ 0 → 20; PerPage > 100 → 100). La validación estricta
+// de la query (400 parametro_invalido, README §5) la hace el handler HTTP antes de llamar.
 type FiltroFuentes struct {
     EspecialidadID int64  // > 0: fuentes de esa especialidad más las que aplican a todas
     Estado         string // procesando | activa | fallida | retirada
     Tipo           string // balotario | guia | norma | otro
     Page, PerPage  int
 }
+
+// Evento de auditoría que arma el adaptador dentro de su transacción, cuando ya
+// conoce el id de la fuente (mismo patrón que temas.Evento, internal/temas/service.go:12-21).
+type Evento struct {
+    Accion    string         // fuente.crear | fuente.procesar | fuente.fallar
+    Entidad   string         // "fuente"
+    EntidadID int64          // id de la fuente
+    Detalle   map[string]any // sin contenido ni datos personales (README §7)
+}
+
+// Auditor escribe ev en la transacción de la mutación; si falla, la mutación se revierte.
+// Quien llama (handler o worker) lo arma con el actor, la IP y el user agent (actor nil = sistema).
+type Auditor func(ctx context.Context, tx sqlx.ExecerContext, ev Evento) error
 
 // FuenteResumen: mínimo que cualquier adaptador puede dar (sin nombres de catálogo).
 type FuenteResumen struct {
@@ -101,18 +117,20 @@ type FuenteResumen struct {
 type Pasaje = PasajeEncontrado
 
 type SourceRepository interface {
-    // Crea la fuente y su versión 1 en 'procesando'. auditFn (fuente.crear) va en la misma transacción.
-    GuardarFuente(ctx context.Context, f NuevaFuente, auditFn audit.TxFunc) (fuenteID int64, version int, err error)
+    // Crea la fuente y su versión 1 en 'procesando'. Llama a aud con fuente.crear y el id nuevo
+    // en la misma transacción.
+    GuardarFuente(ctx context.Context, f NuevaFuente, aud Auditor) (fuenteID int64, version int, err error)
     ListarFuentes(ctx context.Context, f FiltroFuentes) (Pagina[FuenteResumen], error) // UpdatedAt DESC, ID DESC
-    ObtenerPasajes(ctx context.Context, fuenteID int64, version int, page, perPage int) (Pagina[Pasaje], error) // Orden ASC
+    // Orden ASC; page y perPage se normalizan igual que en FiltroFuentes.
+    ObtenerPasajes(ctx context.Context, fuenteID int64, version int, page, perPage int) (Pagina[Pasaje], error)
     BuscarPasajes(ctx context.Context, b Busqueda) ([]PasajeEncontrado, error) // ≤ 20, por relevancia
     ResolverCita(ctx context.Context, c Cita) (PasajeCitado, error)
 
     // Publicación: la usa el worker y la suite de contrato la usa para sembrar datos.
-    // Atómica: todos los pasajes y la vigencia, o nada. auditFn se escribe en la misma
-    // transacción (el adaptador en memoria la ignora); ver audit.TxFunc en internal/audit/audit.go:73-83.
-    PublicarVersion(ctx context.Context, fuenteID int64, version int, pasajes []PasajeNuevo, auditFn audit.TxFunc) error
-    MarcarVersionFallida(ctx context.Context, fuenteID int64, version int, motivo string, auditFn audit.TxFunc) error
+    // Atómica: todos los pasajes y la vigencia, o nada. aud (fuente.procesar / fuente.fallar)
+    // se escribe en la misma transacción. El adaptador en memoria no llama a aud.
+    PublicarVersion(ctx context.Context, fuenteID int64, version int, pasajes []PasajeNuevo, aud Auditor) error
+    MarcarVersionFallida(ctx context.Context, fuenteID int64, version int, motivo string, aud Auditor) error
 }
 
 var (
@@ -124,9 +142,10 @@ var (
 
 - `PasajeEncontrado` y `PasajeCitado` llevan: `FuenteID`, `Version`, `PasajeID`, `Orden`, `LineaInicio`, `LineaFin`, `Seccion`, `Texto` y, en `PasajeCitado`, además `TituloFuente`, `EstadoFuente` y `OficialVerificada` de esa versión. No llevan ningún dato de usuario (regla 4).
 - `ResolverCita` **no** filtra por estado de la fuente: una cita histórica a la versión 1 devuelve el texto exacto de la versión 1 aunque la fuente vaya por la 3 o esté `retirada` (escenario «Resolver cita histórica»). El consumidor decide qué hacer con `EstadoFuente`.
-- **`ObtenerPasajes`** tampoco filtra por estado de la fuente. Si la fuente o la versión no existen, devuelve `ErrNoEncontrado`. Una versión sin pasajes (`procesando` o `fallida`) devuelve `Data` vacío. Usa la misma paginación que `FiltroFuentes`.
+- **`ObtenerPasajes`** tampoco filtra por estado de la fuente. Si la fuente o la versión no existen, devuelve `ErrNoEncontrado`. Una versión sin pasajes (`procesando` o `fallida`) devuelve `Data` vacío. Normaliza `page` y `perPage` igual que `FiltroFuentes`.
 - **`ListarFuentes` en el puerto, en versión mínima** (decisión del 2026-11-11, consulta de backend-dev al empezar E2-02). La historia SIA-E2-02 (§Contexto, línea 17) pone «listar fuentes» entre las operaciones del puerto, así que no se saca. Pero `FuenteResumen` solo lleva lo que cualquier adaptador puede dar: ids y no nombres de especialidad, y el número de la versión vigente. El listado de admin S3 del contrato E2 (nombres de especialidad, `version_en_proceso`, filtros `oficial` y `q`) es una consulta de `repository.go` fuera del puerto, que implementa E2-07, igual que el ciclo de vida admin.
-- **`GuardarFuente`** recibe `auditFn`, como `PublicarVersion`, para que `fuente.crear` se escriba en la misma transacción (README §7). El adaptador en memoria la ignora. Calcula `sha256`, `tamano_bytes` y `lineas` con `Huella`. E2-02 no valida ni el duplicado por hash ni el límite de fuentes. Los agrega E2-03 dentro de esa misma transacción, bajo el advisory lock del contrato E2 (S1, «Límite de fuentes»), y mapea la violación 23505 de `uq_fuente_versiones_sha256` a `fuente_duplicada`.
+- **Auditoría en el puerto (`Auditor` + `Evento`):** el adaptador arma el `Evento` dentro de su transacción. Solo ahí se conoce el `entidad_id` de una fuente nueva, y el contrato E2 lo exige (S1, «Respuesta 202»: `fuente.crear` con `entidad_id`). También arma el `detalle`: `{"version", "sha256", "tamano_bytes", "tipo", "especialidad_ids", "estado_nuevo"}` en `fuente.crear`. Quien llama solo aporta el actor, la IP y el user agent a través del `Auditor`, igual que `temas.Auditor` (`internal/temas/service.go:19-21`, usado en `temas/repository.go:197`). Un `audit.TxFunc` no basta, porque la closure se arma antes de conocer el id. Si el `Auditor` devuelve error, la mutación se revierte (README §7).
+- **`GuardarFuente`** recibe el `Auditor` para escribir `fuente.crear` en la misma transacción (README §7). El adaptador en memoria no lo llama. Calcula `sha256`, `tamano_bytes` y `lineas` con `Huella`. E2-02 no valida ni el duplicado por hash ni el límite de fuentes. Los agrega E2-03 dentro de esa misma transacción, bajo el advisory lock del contrato E2 (S1, «Límite de fuentes»), y mapea la violación 23505 de `uq_fuente_versiones_sha256` a `fuente_duplicada`.
 
 ### Recuperación de pasajes (adaptador Postgres)
 
@@ -216,7 +235,7 @@ RETURNING …;
   - inserta todos los pasajes con `tsv`;
   - marca la versión `lista`;
   - mueve `fuentes.version_vigente_id` y pone la fuente en `activa`;
-  - escribe el `audit_log` (`audit.LogTx`, `internal/audit/audit.go:55-71`, actor `NULL` = sistema).
+  - escribe el `audit_log` con el `Auditor` del puerto (`fuente.procesar`). El worker lo arma sobre `audit.LogTx` (`internal/audit/audit.go:55-71`) con actor `NULL` = sistema.
 
   Si algo falla, no se publica ningún pasaje (SIA-E2-03 «Falla de procesamiento»; SIA-E2-05 regla 4). El archivado por el límite de 20 versiones **no** ocurre aquí, sino al subir la versión, en S2 del contrato E2: es el único punto que puede responder `422 limite_versiones`.
 - Fallos deterministas (`sin_contenido`, `limite_pasajes`): la versión pasa a `fallida` con su `motivo_fallo` en la primera ejecución.
