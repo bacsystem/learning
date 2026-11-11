@@ -1435,6 +1435,8 @@
           "error_interno": "Internal server error. Please try again."
         }
       }
-    }
+    },
+    "sesion-servidor-no-disponible-titulo": "The server is not responding",
+    "sesion-servidor-no-disponible-texto": "Your session is still open. We retry every few seconds; as soon as the server responds, you will see the app."
   }
 }
