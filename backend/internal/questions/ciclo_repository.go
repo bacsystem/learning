@@ -157,3 +157,93 @@ func contiene(ids []int64, id int64) bool {
 	}
 	return false
 }
+
+// ReemplazarCitas replaces the citations of a pregunta (E3-07 §4). The fuentes
+// of the requested pasajes are locked together with those of the current
+// citations, so a fuente cannot be retired, nor its version archived, while the
+// citation is inserted. decidir validates against the state read under the lock.
+func (r *Repository) ReemplazarCitas(ctx context.Context, id int64, pedidos []int64, decidir func(preguntaBloqueada, map[int64]pasajeInfo) (planCitas, error), aud Auditor) error {
+	return r.enTx(ctx, func(tx *sqlx.Tx) error {
+		previas, err := r.infoPasajes(ctx, tx, pedidos)
+		if err != nil {
+			return err
+		}
+		extra := make([]int64, 0, len(previas))
+		for _, p := range previas {
+			extra = append(extra, p.FuenteID)
+		}
+		b, err := r.bloquear(ctx, tx, id, extra)
+		if err != nil {
+			return err
+		}
+		if b.Estado == EstadoEliminada {
+			return ErrNotFound
+		}
+		// Read again under the lock: a version can be archived, and its pasajes
+		// deleted, between the first read and the lock.
+		info, err := r.infoPasajes(ctx, tx, pedidos)
+		if err != nil {
+			return err
+		}
+		plan, err := decidir(b, info)
+		if err != nil {
+			return err
+		}
+		if plan.sinCambios() {
+			return nil
+		}
+		return r.escribirCitas(ctx, tx, id, plan, aud)
+	})
+}
+
+// infoPasajes returns, for the pasajes that exist, their fuente and whether it is 'activa'.
+func (r *Repository) infoPasajes(ctx context.Context, tx *sqlx.Tx, ids []int64) (map[int64]pasajeInfo, error) {
+	rows, err := tx.QueryxContext(ctx, `
+		SELECT pa.id, fv.fuente_id, f.estado = 'activa'
+		FROM pasajes pa
+		JOIN fuente_versiones fv ON fv.id = pa.fuente_version_id
+		JOIN fuentes f           ON f.id = fv.fuente_id
+		WHERE pa.id = ANY($1)`, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	info := make(map[int64]pasajeInfo, len(ids))
+	for rows.Next() {
+		var id int64
+		var p pasajeInfo
+		if err := rows.Scan(&id, &p.FuenteID, &p.FuenteActiva); err != nil {
+			return nil, err
+		}
+		info[id] = p
+	}
+	return info, rows.Err()
+}
+
+func (r *Repository) escribirCitas(ctx context.Context, tx *sqlx.Tx, id int64, plan planCitas, aud Auditor) error {
+	if len(plan.Quitar) > 0 {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM pregunta_citas WHERE pregunta_id = $1 AND pasaje_id = ANY($2)`, id, pq.Array(plan.Quitar)); err != nil {
+			return err
+		}
+	}
+	if len(plan.Agregar) > 0 {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO pregunta_citas (pregunta_id, pasaje_id) SELECT $1, UNNEST($2::bigint[])`, id, pq.Array(plan.Agregar)); err != nil {
+			return err
+		}
+	}
+	if aud == nil {
+		return nil
+	}
+	return aud(ctx, tx, Evento{Accion: accionCitas, EntidadID: id,
+		Detalle: map[string]any{"antes": nonNil(plan.Antes), "despues": nonNil(plan.Despues)}})
+}
+
+// nonNil makes an empty list marshal as [] instead of null.
+func nonNil(ids []int64) []int64 {
+	if ids == nil {
+		return []int64{}
+	}
+	return ids
+}

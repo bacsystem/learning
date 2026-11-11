@@ -102,6 +102,22 @@ func (s *Service) CambiarEstado(ctx context.Context, id int64, req CambiarEstado
 	return s.repo.GetPregunta(ctx, id)
 }
 
+// ReemplazarCitas replaces the citations of a question (E3-07 §4). It never
+// changes the state.
+func (s *Service) ReemplazarCitas(ctx context.Context, id int64, req ReemplazarCitasRequest, aud Auditor) (PreguntaResponse, error) {
+	pedidos, err := validarPasajeIDs(req)
+	if err != nil {
+		return PreguntaResponse{}, err
+	}
+	decidir := func(b preguntaBloqueada, info map[int64]pasajeInfo) (planCitas, error) {
+		return decidirCitas(b, pedidos, info)
+	}
+	if err := s.repo.ReemplazarCitas(ctx, id, pedidos, decidir, aud); err != nil {
+		return PreguntaResponse{}, err
+	}
+	return s.repo.GetPregunta(ctx, id)
+}
+
 // DeletePregunta soft-deletes a question.
 func (s *Service) DeletePregunta(ctx context.Context, id int64) error {
 	return s.repo.DeletePregunta(ctx, id)

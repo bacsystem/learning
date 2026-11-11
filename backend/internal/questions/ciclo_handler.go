@@ -62,6 +62,28 @@ func (h *Handler) CambiarEstado(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, http.StatusOK, p)
 }
 
+// ReemplazarCitas handles PUT /preguntas/{id}/citas (E3-07 §4).
+func (h *Handler) ReemplazarCitas(w http.ResponseWriter, r *http.Request) {
+	id, ok := idDeRuta(w, r)
+	if !ok {
+		return
+	}
+	var req ReemplazarCitasRequest
+	if !httpx.DecodeJSONStrict(w, r, &req) {
+		return
+	}
+	aud, ok := h.auditor(w, r)
+	if !ok {
+		return
+	}
+	p, err := h.svc.ReemplazarCitas(r.Context(), id, req, aud)
+	if err != nil {
+		responderRegla(w, "questions.reemplazar_citas", err)
+		return
+	}
+	jsonOK(w, http.StatusOK, p)
+}
+
 // idDeRuta reads {id} for the coded endpoints (400 parametro_invalido).
 func idDeRuta(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)

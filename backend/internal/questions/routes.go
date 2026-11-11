@@ -19,6 +19,7 @@ import (
 //   - PUT /preguntas/{id}     (admin)
 //   - DELETE /preguntas/{id}  (admin)
 //   - PATCH /preguntas/{id}/estado (admin)
+//   - PUT /preguntas/{id}/citas (admin)
 //   - GET /etiquetas          (admin)
 //   - POST /etiquetas         (admin)
 //   - PUT /etiquetas/{id}     (admin)
@@ -40,6 +41,7 @@ func Mount(mux *http.ServeMux, svc *Service, audLog *audit.Logger, jwtSecret str
 	mux.Handle("GET /preguntas/{id}", authn(admin(http.HandlerFunc(h.GetPregunta))))
 	mux.Handle("PUT /preguntas/{id}", authn(admin(http.HandlerFunc(h.UpdatePregunta))))
 	mux.Handle("DELETE /preguntas/{id}", authn(admin(http.HandlerFunc(h.DeletePregunta))))
+	mux.Handle("PUT /preguntas/{id}/citas", authn(admin(http.HandlerFunc(h.ReemplazarCitas))))
 	mux.Handle("PATCH /preguntas/{id}/estado", authn(admin(http.HandlerFunc(h.CambiarEstado))))
 
 	// ── Etiquetas ─────────────────────────────────────────────────────────────

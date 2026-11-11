@@ -145,7 +145,7 @@ func fuenteDePrueba(t *testing.T, db *sqlx.DB) (fuenteID, pasajeID int64) {
 	t.Cleanup(func() {
 		for _, q := range []string{
 			`DELETE FROM pregunta_citas WHERE pasaje_id IN (SELECT p.id FROM pasajes p JOIN fuente_versiones v ON v.id = p.fuente_version_id WHERE v.fuente_id = $1)`,
-			`UPDATE fuentes SET version_vigente_id = NULL, estado = 'procesando' WHERE id = $1`,
+			`UPDATE fuentes SET version_vigente_id = NULL, estado = 'procesando', motivo_retiro = NULL WHERE id = $1`,
 			`DELETE FROM pasajes WHERE fuente_version_id IN (SELECT id FROM fuente_versiones WHERE fuente_id = $1)`,
 			`DELETE FROM fuente_versiones WHERE fuente_id = $1`,
 			`DELETE FROM fuentes WHERE id = $1`,
