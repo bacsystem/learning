@@ -198,7 +198,10 @@ Descartada: el usuario eligió Railway. Además, sin PITR se pierden hasta 24 h 
       - Se usa **cifrado asimétrico**: devops propone `age`, una herramienta nueva dentro de la imagen del cron que aprueba el tech-lead. El cron solo tiene la **clave pública** (`AGE_RECIPIENT`): aunque se comprometa, no puede descifrar los dumps.
       - El dump se cifra en tubería (`pg_dump | age`). Al disco temporal solo llega el archivo cifrado, que se sube por la API S3 (`curl --aws-sigv4`, PUT simple más un HEAD de verificación) y después se borra.
       - La **clave privada** la custodia el usuario fuera de Railway y fuera de R2. Está **separada de `ENCRYPTION_KEY`**: son claves distintas, guardadas en lugares distintos. Una restauración completa necesita las dos.
-    - **Bucket:** privado, sin acceso público ni dominio público, dedicado solo a estos dumps. Nombre de objeto con fecha UTC, p. ej. `pg/AAAA-MM-DD.dump.age`.
+    - **Bucket:** privado, sin acceso público ni dominio público, dedicado solo a estos dumps. Nombre de objeto con fecha **y hora** UTC: `pg/AAAA-MM-DD/HHMMSSZ.dump.age` (PR #122).
+      - Con la hora, repetir el cron el mismo día nunca choca con el bucket lock, que impide sobrescribir. Tampoco deja una ejecución `fallida` falsa en `copias_bd` ni pone el panel en degradado.
+      - Cada objeto queda protegido sus 30 días.
+      - Para restaurar se toma la clave más reciente bajo `pg/`.
     - **Credenciales:**
       - Un token de R2 **Object Read & Write limitado a ese bucket**. R2 no tiene un permiso solo de escritura, así que es el mínimo posible.
       - El Access Key ID, el Secret y el endpoint van como **sealed variables** del servicio de cron. El backend **no** las recibe.
