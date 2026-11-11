@@ -24,3 +24,39 @@ func TestPlegar(t *testing.T) {
 		})
 	}
 }
+
+// ADR 0003 § Plegado: every letter of the set folds the same in NFC and NFD,
+// upper and lower case.
+func TestPlegar_NFCyNFDIguales(t *testing.T) {
+	cases := []struct {
+		letra, nfd string
+	}{
+		{"á", "á"}, {"é", "é"}, {"í", "í"}, {"ó", "ó"}, {"ú", "ú"},
+		{"à", "à"}, {"è", "è"}, {"ì", "ì"}, {"ò", "ò"}, {"ù", "ù"},
+		{"ü", "ü"},
+		{"Á", "Á"}, {"É", "É"}, {"Í", "Í"}, {"Ó", "Ó"}, {"Ú", "Ú"},
+		{"À", "À"}, {"È", "È"}, {"Ì", "Ì"}, {"Ò", "Ò"}, {"Ù", "Ù"},
+		{"Ü", "Ü"},
+		{"ñ", "ñ"}, {"Ñ", "Ñ"},
+	}
+	for _, c := range cases {
+		t.Run(c.letra, func(t *testing.T) {
+			if nfc, nfd := Plegar(c.letra), Plegar(c.nfd); nfc != nfd {
+				t.Errorf("Plegar(NFC %q) = %q, Plegar(NFD %q) = %q", c.letra, nfc, c.nfd, nfd)
+			}
+		})
+	}
+}
+
+func TestPlegar_EnieDescompuesta(t *testing.T) {
+	nfd := "año"
+	if got := Plegar(nfd); got != "año" || got != Plegar("año") {
+		t.Errorf("Plegar(año NFD) = %q, want año", got)
+	}
+	if Plegar(nfd) == Plegar("ano") {
+		t.Error("año in NFD must differ from ano")
+	}
+	if got := Plegar("EPIDEMIOLOGÍA"); got != "epidemiologia" {
+		t.Errorf("Plegar(NFD uppercase) = %q", got)
+	}
+}
