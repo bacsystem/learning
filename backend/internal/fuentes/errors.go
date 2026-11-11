@@ -2,6 +2,7 @@ package fuentes
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -64,6 +65,21 @@ type DuplicadaError struct {
 
 func (e *DuplicadaError) Error() string { return ErrFuenteDuplicada.Error() }
 func (e *DuplicadaError) Unwrap() error { return ErrFuenteDuplicada }
+
+// SuscriptorError is a SuscriptorRetiro that failed. Its text names only the
+// subscriber and the fuente, because the handler logs it (contract S5: op and
+// the subscriber's name, never personal data); the cause stays reachable
+// through errors.Is and errors.As.
+type SuscriptorError struct {
+	Nombre   string
+	FuenteID int64
+	Causa    error
+}
+
+func (e *SuscriptorError) Error() string {
+	return fmt.Sprintf("falló el suscriptor de retiro %s (fuente %d)", e.Nombre, e.FuenteID)
+}
+func (e *SuscriptorError) Unwrap() error { return e.Causa }
 
 // LimiteError is ErrLimiteFuentes with the limit that was reached: per
 // profession (EspecialidadID set) or the total.

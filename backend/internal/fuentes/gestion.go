@@ -27,7 +27,7 @@ const (
 // Retirar retires an active fuente without a version in process (S5). It
 // stores the motivo, notifies every subscriber once inside the transaction
 // (an error rolls everything back, named after the subscriber) and returns
-// how many contents they marked.
+// how many contents they marked. A failing subscriber is a SuscriptorError.
 func (r *Repository) Retirar(ctx context.Context, id int64, motivo string, actor int64,
 	suscriptores []SuscriptorRetiro, aud Auditor) (int, error) {
 	marcados := 0
@@ -46,7 +46,7 @@ func (r *Repository) Retirar(ctx context.Context, id int64, motivo string, actor
 		for _, s := range suscriptores {
 			n, err := s.FuenteRetirada(ctx, tx, id, actor)
 			if err != nil {
-				return fmt.Errorf("suscriptor de retiro %s, fuente %d: %w", s.Nombre(), id, err)
+				return &SuscriptorError{Nombre: s.Nombre(), FuenteID: id, Causa: err}
 			}
 			marcados += n
 		}

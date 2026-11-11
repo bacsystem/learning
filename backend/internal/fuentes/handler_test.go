@@ -16,6 +16,8 @@ import (
 	"github.com/cbaciliod/learning/internal/auth"
 	jwtpkg "github.com/cbaciliod/learning/internal/jwt"
 	"github.com/cbaciliod/learning/internal/middleware"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 const secretoUnitario = "unit-secret-32-bytes-exactly-ok!!"
@@ -309,5 +311,29 @@ func TestCambios_IDYCuerpo(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// A failing retirement subscriber is a 500 whose log carries op and the
+// subscriber's name, never the text of its error (contract S5).
+func TestResponderError_SuscriptorSinDatosEnElLog(t *testing.T) {
+	var buf bytes.Buffer
+	anterior := log.Logger
+	log.Logger = zerolog.New(&buf)
+	t.Cleanup(func() { log.Logger = anterior })
+
+	causa := errors.New("pregunta 4 de la persona 12345678")
+	rr := httptest.NewRecorder()
+	responderError(rr, "cambiar_estado", &SuscriptorError{Nombre: "preguntas", FuenteID: 9, Causa: causa})
+	if rr.Code != http.StatusInternalServerError || !strings.Contains(rr.Body.String(), "error_interno") {
+		t.Fatalf("got %d %s", rr.Code, rr.Body)
+	}
+	salida := buf.String()
+	if !strings.Contains(salida, `"op":"fuentes.cambiar_estado"`) || !strings.Contains(salida, "preguntas") || !strings.Contains(salida, "fuente 9") ||
+		strings.Contains(salida, "12345678") {
+		t.Errorf("log = %s", salida)
+	}
+	if !errors.Is(&SuscriptorError{Causa: causa}, causa) {
+		t.Error("the cause is not reachable with errors.Is")
 	}
 }
