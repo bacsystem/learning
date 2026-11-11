@@ -647,3 +647,33 @@ func TestS7_Limite(t *testing.T) {
 		}
 	})
 }
+
+// S5–S7 are admin only: anonymous is 401 and a non-admin 403, and neither
+// changes the fuente.
+func TestS5_S7_Acceso(t *testing.T) {
+	e := nuevoSubidaEnv(t, nil)
+	id := e.fActiva(t)
+	rutas := []struct{ method, path, body string }{
+		{http.MethodPatch, fmt.Sprintf("/admin/fuentes/%d/estado", id), `{"estado":"retirada","motivo":"Norma derogada"}`},
+		{http.MethodPatch, fmt.Sprintf("/admin/fuentes/%d/oficial", id), `{"oficial_verificada":true,"entidad_emisora":"MINSA","nota":"Descargado de la web oficial"}`},
+		{http.MethodPut, fmt.Sprintf("/admin/fuentes/%d", id), `{"titulo":"Título ajeno","especialidad_ids":[]}`},
+	}
+	quienes := []struct {
+		name   string
+		bearer string
+		status int
+	}{{"anónimo", "", http.StatusUnauthorized}, {"no admin", e.usuario, http.StatusForbidden}}
+	for _, r := range rutas {
+		for _, q := range quienes {
+			t.Run(r.method+" "+r.path+" "+q.name, func(t *testing.T) {
+				if status, body := e.enviarJSON(t, r.method, r.path, q.bearer, r.body); status != q.status {
+					t.Errorf("got %d %v, want %d", status, body, q.status)
+				}
+			})
+		}
+	}
+	_, d := e.get(t, fmt.Sprintf("/admin/fuentes/%d", id), e.admin)
+	if d["estado"] != "activa" || d["oficial"] != nil || strings.HasPrefix(d["titulo"].(string), "Título ajeno") {
+		t.Errorf("a refused call changed the fuente: %v", d)
+	}
+}
