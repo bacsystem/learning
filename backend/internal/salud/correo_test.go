@@ -34,6 +34,8 @@ func TestComprobarCorreo(t *testing.T) {
 		{"3 failures in 30 min but something sent: degradado", medidasCorreo{Fallidos24h: 3, Fallidos30m: 3, Enviados30m: 1}, nil, false, true, EstadoDegradado, categoria(CategoriaAtrasado)},
 		{"fallos definitivos repetidos in 24 h", medidasCorreo{Fallidos24h: 3, Enviados30m: 2, UltimoEnviadoEn: &enviado}, nil, false, true, EstadoDegradado, categoria(CategoriaAtrasado)},
 		{"fallo aislado", medidasCorreo{Fallidos24h: 1}, nil, false, true, EstadoOperativo, nil},
+		{"2 final failures in 24 h is still operativo", medidasCorreo{Fallidos24h: 2, Enviados30m: 1}, nil, false, true, EstadoOperativo, nil},
+		{"2 final failures in 30 min with nothing sent is not caido", medidasCorreo{Fallidos24h: 2, Fallidos30m: 2}, nil, false, true, EstadoOperativo, nil},
 		{"no SMTP in development", medidasCorreo{}, nil, false, false, EstadoNoConfigurado, nil},
 		{"no SMTP and a 2 h queue: still no_configurado", medidasCorreo{SinEnviar: 5, AntiguedadMaxMin: minutos(120), Fallidos30m: 5}, nil, false, false, EstadoNoConfigurado, nil},
 		{"no SMTP and a query error: no_configurado wins", medidasCorreo{}, errBD, false, false, EstadoNoConfigurado, nil},
