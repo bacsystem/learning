@@ -47,16 +47,15 @@ docker run -d --name bkt-pg --network "$NET" -e POSTGRES_USER=owner -e POSTGRES_
    exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/var/lib/postgresql/server.crt -c ssl_key_file=/var/lib/postgresql/server.key' >/dev/null
 docker run -d --name bkt-s3 --network "$NET" --entrypoint versitygw "$S3IMG" \
   --access testkey --secret testsecret12345 --region auto posix /tmp >/dev/null
-until docker exec bkt-pg pg_isready -U owner -d capacitate >/dev/null 2>&1; do sleep 1; done
-sleep 2
+# Listo por TCP (-h 127.0.0.1), no por socket: durante la inicialización la imagen
+# oficial levanta un servidor temporal que solo escucha en el socket Unix, dice
+# «ready», se apaga y recién entonces arranca el definitivo con TCP. pg_isready
+# por socket pasa dentro de esa ventana y la migración, por TCP, fallaba a veces.
+until docker exec bkt-pg pg_isready -h 127.0.0.1 -U owner -d capacitate >/dev/null 2>&1; do sleep 1; done
 
 # Esquema real (goose) + copias_bd del contrato (migración 064) + aprovisionamiento.
-# Postgres responde a pg_isready durante su inicialización y luego se reinicia:
-# se reintenta unos segundos antes de dar la migración por fallida.
-n=0
-until make -s migrate/up DATABASE_URL='postgres://owner:ownerpw@127.0.0.1:55445/capacitate?sslmode=require' >"$TMP/migrate.log" 2>&1; do
-  n=$((n + 1)); [ "$n" -lt 10 ] || fail "migraciones: $(tail -3 "$TMP/migrate.log")"; sleep 2
-done
+make -s migrate/up DATABASE_URL='postgres://owner:ownerpw@127.0.0.1:55445/capacitate?sslmode=require' >"$TMP/migrate.log" 2>&1 \
+  || fail "migraciones: $(tail -3 "$TMP/migrate.log")"
 # copias_bd sale de la migración real (064) cuando ya está en el repo. Mientras
 # no exista, se crea con el DDL del contrato (docs/api/plataforma-salud.md):
 # es el único caso en que el test copia el esquema.
@@ -171,8 +170,7 @@ t0=$(date +%s)
 s3 -f -o /k/r.dump.age "$BUCKET_URL/$ultima"
 [ "$(head -c 21 "$TMP/r.dump.age")" = "age-encryption.org/v1" ] || fail "el objeto no está cifrado con age"
 docker run -d --name bkt-restore -e POSTGRES_PASSWORD=r -e POSTGRES_DB=restaurada "$PG" >/dev/null
-until docker exec bkt-restore pg_isready -U postgres -d restaurada >/dev/null 2>&1; do sleep 1; done
-sleep 2
+until docker exec bkt-restore pg_isready -h 127.0.0.1 -U postgres -d restaurada >/dev/null 2>&1; do sleep 1; done
 docker run --rm -v "$TMP:/k" --entrypoint age "$IMG" -d -i /k/key.txt -o /k/r.dump /k/r.dump.age
 docker cp "$TMP/r.dump" bkt-restore:/tmp/r.dump >/dev/null
 docker exec bkt-restore pg_restore -U postgres -d restaurada --no-owner --no-privileges --exit-on-error /tmp/r.dump
