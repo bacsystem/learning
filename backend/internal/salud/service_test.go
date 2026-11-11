@@ -92,10 +92,13 @@ func TestEstado_TiempoAgotado(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			r := &relojFijo{t: inicio}
 			svc := NewService([]Comprobacion{sonda(IDAPI, nil, operativa(IDAPI)), sonda(IDBaseDatos, nil, c.sonda)}, r.ahora)
-			desde := time.Now()
-			got := svc.Estado(context.Background())
-			if d := time.Since(desde); d >= 3*time.Second {
-				t.Fatalf("answer took %v, want < 3 s", d)
+			respuesta := make(chan Respuesta, 1)
+			go func() { respuesta <- svc.Estado(context.Background()) }()
+			var got Respuesta
+			select {
+			case got = <-respuesta:
+			case <-time.After(3 * time.Second): // fail, do not hang, if it waits for the check
+				t.Fatal("no answer within 3 s")
 			}
 			bd := got.Servicios[1]
 			if bd.ID != IDBaseDatos || bd.Estado != EstadoCaido || bd.Categoria == nil || *bd.Categoria != CategoriaTiempoAgotado {
@@ -276,5 +279,33 @@ func TestObtener_SinSecretos(t *testing.T) {
 	}
 	if !strings.Contains(body, `"categoria":null`) {
 		t.Errorf("api categoria must be an explicit null: %s", body)
+	}
+}
+
+// Escenario «Todo operativo», over HTTP: 200, global operativo, both services
+// with their data and comprobado_en in RFC 3339 UTC to the second.
+func TestObtener_TodoOperativo(t *testing.T) {
+	r := &relojFijo{t: inicio.Add(123456789 * time.Nanosecond)}
+	bd := comprobarBD(func(context.Context) error { r.avanzar(20 * time.Millisecond); return nil }, r.ahora)
+	svc := NewService([]Comprobacion{ComprobarAPI("1.4.0", inicio.Add(-time.Hour), r.ahora), bd}, r.ahora)
+	w := httptest.NewRecorder()
+	NewHandler(svc).Obtener(w, httptest.NewRequest(http.MethodGet, "/admin/salud", nil))
+	want := `{"estado":"operativo","comprobado_en":"2026-11-11T15:04:05Z","servicios":[` +
+		`{"id":"api","estado":"operativo","categoria":null,"datos":{"en_marcha_s":3600,"version":"1.4.0"}},` +
+		`{"id":"base_datos","estado":"operativo","categoria":null,"datos":{"latencia_ms":20}}]}`
+	if got := strings.TrimSpace(w.Body.String()); w.Code != http.StatusOK || got != want {
+		t.Errorf("got %d %s\nwant %s", w.Code, got, want)
+	}
+}
+
+// The service owns the id and a non-null Datos, whatever a check returns.
+func TestEstado_NormalizaLoQueDevuelveLaComprobacion(t *testing.T) {
+	r := &relojFijo{t: inicio}
+	svc := NewService([]Comprobacion{sonda(IDBaseDatos, nil, func(context.Context) Servicio {
+		return Servicio{ID: "otro", Estado: EstadoOperativo}
+	})}, r.ahora)
+	got := svc.Estado(context.Background()).Servicios[0]
+	if got.ID != IDBaseDatos || got.Datos == nil {
+		t.Errorf("got %+v, want id base_datos and datos from SinResultado", got)
 	}
 }

@@ -60,7 +60,8 @@ func (s *Service) Estado(ctx context.Context) Respuesta {
 
 // ejecutar runs every check in parallel, each under its own deadline.
 func (s *Service) ejecutar(ctx context.Context) Respuesta {
-	comprobadoEn := s.reloj().UTC()
+	// RFC 3339 to the second, as in the contract example.
+	comprobadoEn := s.reloj().UTC().Truncate(time.Second)
 	servicios := make([]Servicio, len(s.comprobaciones))
 	var wg sync.WaitGroup
 	for i, c := range s.comprobaciones {
@@ -95,6 +96,11 @@ func (s *Service) comprobar(ctx context.Context, c Comprobacion) Servicio {
 	var sv Servicio
 	select {
 	case sv = <-resultado:
+		// The id and a non-null Datos are the service's, whatever the check returns.
+		sv.ID = c.ID
+		if sv.Datos == nil {
+			sv.Datos = copiar(c.SinResultado)
+		}
 	case <-ctx.Done():
 		sv = fallido(c, CategoriaTiempoAgotado)
 	}
@@ -120,19 +126,30 @@ func copiar(m map[string]any) map[string]any {
 
 // gravedad orders the states for the global one: caido > degradado =
 // desconocido > operativo; no_configurado does not count (PLT-01 regla 5).
-var gravedad = map[string]int{EstadoOperativo: 0, EstadoDegradado: 1, EstadoDesconocido: 1, EstadoCaido: 2}
+func gravedad(estado string) (nivel int, cuenta bool) {
+	switch estado {
+	case EstadoOperativo:
+		return 0, true
+	case EstadoDegradado, EstadoDesconocido:
+		return 1, true
+	case EstadoCaido:
+		return 2, true
+	default: // no_configurado
+		return 0, false
+	}
+}
 
 // estadoGlobal is the worst individual state; on a tie between degradado and
 // desconocido, degradado. With no counting service it is operativo.
 func estadoGlobal(servicios []Servicio) string {
-	peor := EstadoOperativo
+	peor, nivelPeor := EstadoOperativo, 0
 	for _, sv := range servicios {
-		g, cuenta := gravedad[sv.Estado]
+		nivel, cuenta := gravedad(sv.Estado)
 		if !cuenta {
 			continue
 		}
-		if g > gravedad[peor] || (g == gravedad[peor] && sv.Estado == EstadoDegradado) {
-			peor = sv.Estado
+		if nivel > nivelPeor || (nivel == nivelPeor && sv.Estado == EstadoDegradado) {
+			peor, nivelPeor = sv.Estado, nivel
 		}
 	}
 	return peor
