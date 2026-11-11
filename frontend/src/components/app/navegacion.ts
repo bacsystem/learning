@@ -20,6 +20,7 @@ import {
   SignpostIcon,
   SlidersHorizontalIcon,
   StarIcon,
+  StethoscopeIcon,
   TagIcon,
   TimerIcon,
   TreeStructureIcon,
@@ -40,6 +41,7 @@ export const NAVEGACION: GrupoDestinos[] = [
     items: [
       { href: "/dashboards/analytics", etiqueta: "menu-inicio", icono: HouseIcon },
       { href: "/procesos", etiqueta: "menu-procesos", icono: GraduationCapIcon },
+      { href: "/profesion", etiqueta: "menu-profesion", icono: StethoscopeIcon },
     ],
   },
   {
