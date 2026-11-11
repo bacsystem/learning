@@ -514,7 +514,7 @@ func (r *Repository) ListProcesos(ctx context.Context, q ListQuery) ([]ProcesoRe
 	query := `
 		SELECT p.id, p.institucion_id, i.nombre AS institucion,
 		       p.nombre, p.tipo, p.grado_id, g.nombre AS grado,
-		       p.descripcion, p.anio, p.estado, p.created_at::text
+		       COALESCE(p.descripcion, '') AS descripcion, p.anio, p.estado, p.created_at::text
 		FROM procesos p
 		JOIN instituciones i ON i.id = p.institucion_id
 		LEFT JOIN grados g ON g.id = p.grado_id
@@ -575,7 +575,7 @@ func (r *Repository) GetProceso(ctx context.Context, id int64) (*ProcesoDetailRe
 	err := r.db.QueryRowContext(ctx, `
 		SELECT p.id, p.institucion_id, i.nombre AS institucion,
 		       p.nombre, p.tipo, p.grado_id, g.nombre AS grado,
-		       p.descripcion, p.anio, p.estado, p.created_at::text
+		       COALESCE(p.descripcion, '') AS descripcion, p.anio, p.estado, p.created_at::text
 		FROM procesos p
 		JOIN instituciones i ON i.id = p.institucion_id
 		LEFT JOIN grados g ON g.id = p.grado_id
@@ -608,7 +608,7 @@ func (r *Repository) CreateProceso(ctx context.Context, req CreateProcesoRequest
 	err := r.db.QueryRowContext(ctx,
 		`INSERT INTO procesos (institucion_id, nombre, tipo, grado_id, descripcion, anio)
 		 VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING id, institucion_id, nombre, tipo, grado_id, descripcion, anio, estado, created_at::text`,
+		 RETURNING id, institucion_id, nombre, tipo, grado_id, COALESCE(descripcion, ''), anio, estado, created_at::text`,
 		req.InstitucionID, req.Nombre, req.Tipo, req.GradoID, req.Descripcion, req.Anio,
 	).Scan(&row.ID, &row.InstitucionID, &row.Nombre, &row.Tipo, &row.GradoID,
 		&row.Descripcion, &row.Anio, &row.Estado, &row.CreatedAt)
@@ -628,7 +628,7 @@ func (r *Repository) UpdateProceso(ctx context.Context, id int64, req CreateProc
 		`UPDATE procesos SET institucion_id=$1, nombre=$2, tipo=$3, grado_id=$4,
 		 descripcion=$5, anio=$6, updated_at=NOW()
 		 WHERE id=$7
-		 RETURNING id, institucion_id, nombre, tipo, grado_id, descripcion, anio, estado, created_at::text`,
+		 RETURNING id, institucion_id, nombre, tipo, grado_id, COALESCE(descripcion, ''), anio, estado, created_at::text`,
 		req.InstitucionID, req.Nombre, req.Tipo, req.GradoID,
 		req.Descripcion, req.Anio, id,
 	).Scan(&row.ID, &row.InstitucionID, &row.Nombre, &row.Tipo, &row.GradoID,
