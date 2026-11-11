@@ -133,7 +133,7 @@ Se permite en `borrador`, `en_revision`, `rechazada`, **`aprobada`** y `activo`.
 
 Sean `actuales` las citas de la pregunta tras el bloqueo, `nuevas = pasaje_ids − actuales` y `quitadas = actuales − pasaje_ids`.
 
-**El estado que cuenta es el leído con `FOR UPDATE` en el paso 5**, no el del paso 4: el paso 4 solo evita bloquear si la pregunta no existe. Si tras el bloqueo la pregunta está `eliminada`, responde `404 no_encontrado`. El paso 8 usa ese estado bloqueado: así una aprobación concurrente (que bloquea la misma fila) y un `PUT` que quita la última cita no pueden dejar una `aprobada` sin cita. Lo mismo vale en §3.2: los pasos 6–11 usan el estado y el origen leídos tras el paso 5.
+**El estado que cuenta es el leído con `FOR UPDATE` en el paso 5**, no el del paso 4: el paso 4 solo evita bloquear si la pregunta no existe. Si tras el bloqueo la pregunta está `eliminada`, responde `404 no_encontrado`. El paso 8 usa ese estado bloqueado: así una aprobación concurrente (que bloquea la misma fila) y un `PUT` que quita la última cita no pueden dejar una `aprobada` sin cita. Lo mismo vale en §3.2: los pasos 6–11 usan el estado y el origen leídos tras el paso 5, y si tras el bloqueo la pregunta está `eliminada`, el `PATCH` también responde **`404 no_encontrado`**, no `409`. En todo `/preguntas/{id}`, una eliminada es un recurso inexistente.
 
 | # | Validación | Error |
 |---|---|---|

@@ -144,7 +144,7 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 
 | Endpoint | Cambio |
 |---|---|
-| `POST /preguntas`, `POST /preguntas/import` | Nacen `estado = 'borrador'`, `origen = 'manual'` (P1, decidida: **toda** pregunta nueva nace en `borrador`, cualquiera sea su origen). El cuerpo **no** acepta `estado` ni `origen`: el origen `ia` lo fijan los generadores (E6) y `balotario` la importación de SIA-E3-01 |
+| `POST /preguntas`, `POST /preguntas/import` | Nacen `estado = 'borrador'`, `origen = 'manual'` (P1, decidida: **toda** pregunta nueva nace en `borrador`, cualquiera sea su origen). El cuerpo **no** acepta `estado` ni `origen`: si llegan, se **ignoran** y nunca se aplican. El handler heredado no usa `DisallowUnknownFields` y no se cambia, para no romper a los clientes existentes (README §3, «Ningún otro endpoint existente cambia»). el origen `ia` lo fijan los generadores (E6) y `balotario` la importación de SIA-E3-01 |
 | `GET /preguntas` | Filtros opcionales nuevos `estado` y `origen`. `estado` es un valor **exacto** entre `borrador`, `en_revision`, `aprobada`, `rechazada` y `activo`: `activo` (heredado) se filtra aparte de `aprobada`. Sin filtro se listan todas las no eliminadas, también los borradores, porque el admin tiene que verlos. Cada item del listado suma `estado`, `origen` y `citas_count` (número de citas), pero **no** el array `citas`, que va solo en `GET /preguntas/{id}` |
 | `GET /preguntas/{id}` | La respuesta suma los campos de §4.4 |
 | `PUT /preguntas/{id}` | La respuesta suma los campos de §4.4. Efecto sobre el estado (P3, decidida) en §4.5 |
