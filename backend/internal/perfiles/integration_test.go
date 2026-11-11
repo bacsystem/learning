@@ -289,3 +289,46 @@ func TestAislamientoYPerfil(t *testing.T) {
 		}
 	}
 }
+
+// Regla 4 under a race: another transaction creates the user's active profile
+// and has not committed. The PUT waits on the unique index and, once the other
+// one commits, answers 409 estado_invalido (not 500), with one active profile.
+func TestElegir_CarreraEsEstadoInvalido(t *testing.T) {
+	e := nuevoEntorno(t)
+	tx, err := e.db.Beginx()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = tx.Rollback() })
+	pid := dbtest.BackendPID(t, tx)
+	if _, err := tx.Exec(`INSERT INTO postulante_profesiones (usuario_id, proceso_id, especialidad_id) VALUES ($1, $2, $3)`,
+		e.usuario.ID, e.proceso, e.enfermeria); err != nil {
+		t.Fatal(err)
+	}
+
+	type respuesta struct {
+		status int
+		code   string
+	}
+	resultado := make(chan int, 1)
+	var r respuesta
+	go func() {
+		status, body := e.elegir(t, e.token, e.proceso, e.obstetricia, false)
+		r = respuesta{status, codigo(body)}
+		resultado <- status
+	}()
+	espero := dbtest.BlockedBy(t, e.db, pid, resultado)
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	<-resultado
+	if !espero {
+		t.Errorf("the PUT did not wait for the other transaction (answered %d)", r.status)
+	}
+	if r.status != http.StatusConflict || r.code != "estado_invalido" {
+		t.Errorf("got %d %s, want 409 estado_invalido", r.status, r.code)
+	}
+	if got := e.perfiles(t, e.usuario.ID); fmt.Sprint(got) != fmt.Sprintf("[%d|activo|false]", e.enfermeria) {
+		t.Errorf("rows = %v, want only the committed one", got)
+	}
+}
