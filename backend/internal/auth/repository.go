@@ -540,13 +540,6 @@ func (r *Repository) UpdateEstado(ctx context.Context, id int64, estado string, 
 
 // ── Sesiones ─────────────────────────────────────────────────────────────────
 
-func (r *Repository) CreateSesion(ctx context.Context, usuarioID int64, tokenHash, ip, userAgent string, expiresAt time.Time) error {
-	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO sesiones (usuario_id,token_hash,ip,user_agent,expires_at) VALUES ($1,$2,$3,$4,$5)`,
-		usuarioID, tokenHash, ip, userAgent, expiresAt)
-	return err
-}
-
 func (r *Repository) InvalidateSesionByHash(ctx context.Context, tokenHash string) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM sesiones WHERE token_hash=$1`, tokenHash)
 	return err
@@ -585,9 +578,36 @@ func (r *Repository) CountSesionesActivas(ctx context.Context, usuarioID int64) 
 	return count, err
 }
 
-// DeleteOldestSesiones removes the oldest sessions keeping only the most recent `keep` ones.
-func (r *Repository) DeleteOldestSesiones(ctx context.Context, usuarioID int64, keep int) error {
-	_, err := r.db.ExecContext(ctx, `
+// LoginClaims are the raw ids and nivel of the JWT claims of a login.
+type LoginClaims struct {
+	GradoID        int64  `db:"grado_id"`
+	EspecialidadID int64  `db:"especialidad_id"`
+	InstitucionID  int64  `db:"institucion_id"`
+	Nivel          string `db:"nivel"`
+}
+
+// LoadLoginClaims reads the claims of userID from its persona and grado.
+func (r *Repository) LoadLoginClaims(ctx context.Context, userID int64) (LoginClaims, error) {
+	var c LoginClaims
+	err := r.db.GetContext(ctx, &c,
+		`SELECT p.grado_id, p.especialidad_id, p.institucion_id, g.nivel
+		 FROM personas p
+		 JOIN usuarios u ON u.persona_id=p.id
+		 JOIN grados g ON g.id=p.grado_id
+		 WHERE u.id=$1`, userID)
+	return c, err
+}
+
+// AbrirSesion stores the session of a new login and evicts the user's oldest
+// sessions so that at most maxSesiones remain, in one transaction: if the
+// INSERT fails, no older session has been removed.
+func (r *Repository) AbrirSesion(ctx context.Context, usuarioID int64, maxSesiones int, tokenHash, ip, userAgent string, expiresAt time.Time) error {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin session tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM sesiones
 		WHERE usuario_id=$1
 		AND id NOT IN (
@@ -595,8 +615,15 @@ func (r *Repository) DeleteOldestSesiones(ctx context.Context, usuarioID int64, 
 			WHERE usuario_id=$1
 			ORDER BY created_at DESC
 			LIMIT $2
-		)`, usuarioID, keep)
-	return err
+		)`, usuarioID, maxSesiones-1); err != nil {
+		return fmt.Errorf("evict sessions: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO sesiones (usuario_id,token_hash,ip,user_agent,expires_at) VALUES ($1,$2,$3,$4,$5)`,
+		usuarioID, tokenHash, ip, userAgent, expiresAt); err != nil {
+		return fmt.Errorf("create session: %w", err)
+	}
+	return tx.Commit()
 }
 
 // ── Usuarios online ──────────────────────────────────────────────────────────
