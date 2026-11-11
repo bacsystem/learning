@@ -60,4 +60,9 @@ func Mount(mux *http.ServeMux, svc *Service, jwtSecret string, checkSession auth
 	mux.Handle("POST /admin/procesos/{id}/asignaturas", authn(admin(http.HandlerFunc(h.AsignarAsignatura))))
 	mux.Handle("PUT /admin/procesos/{id}/asignaturas/{asignaturaId}", authn(admin(http.HandlerFunc(h.UpdateProcesoAsignatura))))
 	mux.Handle("DELETE /admin/procesos/{id}/asignaturas/{asignaturaId}", authn(admin(http.HandlerFunc(h.DeleteProcesoAsignatura))))
+
+	// ── Pesos por especialidad (SIA-E1-03, PE1–PE3) ─────────────────────────────
+	mux.Handle("GET /admin/procesos/{id}/pesos", authn(admin(http.HandlerFunc(h.ResumenPesos))))
+	mux.Handle("GET /admin/procesos/{id}/pesos/{especialidadId}", authn(admin(http.HandlerFunc(h.ConfiguracionPesos))))
+	mux.Handle("PUT /admin/procesos/{id}/pesos/{especialidadId}", authn(admin(http.HandlerFunc(h.GuardarPesos))))
 }

@@ -723,7 +723,7 @@ func (r *Repository) GenerateSet(ctx context.Context, req GenerateSetRequest) ([
 	for _, item := range req.Asignaturas {
 		args := []any{req.ProcesoID, item.AsignaturaID}
 		i := 3
-		where := []string{"p.proceso_id = $1", "p.asignatura_id = $2", "p.estado = 'activo'"}
+		where := []string{"p.proceso_id = $1", "p.asignatura_id = $2", PreguntaServible("p")}
 
 		if req.GradoID != nil {
 			where = append(where, fmt.Sprintf("(p.grado_id = $%d OR p.grado_id IS NULL)", i))
