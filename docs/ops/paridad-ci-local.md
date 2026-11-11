@@ -34,7 +34,7 @@ solo con tags `v*`) es lo mismo que corre un developer con `make lint`,
 | Herramienta | CI | Local (`make`) | Docker |
 |---|---|---|---|
 | Go | `go-version-file: backend/go.mod` → toolchain go1.27.4 | `GOTOOLCHAIN=auto` (por defecto) descarga go1.27.4 según `go.mod` | `golang:1.27.4-alpine3.23` |
-| Node | `frontend/.nvmrc` = 22.23.5 (PR #102) | `nvm use` en `frontend/` (no lo fija make) | `node:22.23.5-alpine3.23` (antes `node:22-alpine`, flotante) |
+| Node | `frontend/.nvmrc` = 22.23.4 (PR #102) | `nvm use` en `frontend/` (no lo fija make) | `node:22.23.4-alpine3.23` (antes `node:22-alpine`, flotante) |
 | Postgres | `postgres:16-alpine` | la base de `TEST_DATABASE_URL` (Postgres 16) | `postgres:16-alpine` (compose) |
 | goose | v3.21.1 | v3.21.1 (`GOOSE_VERSION` del Makefile) | v3.21.1 (`ARG GOOSE_VERSION`) |
 | govulncheck | v1.9.0 | v1.9.0 | — |
@@ -71,8 +71,10 @@ docker stop pg-test
   está en el checklist de release como bloqueo manual.
 - **Node local no lo fija make**: hay que usar `nvm use` (o equivalente) con
   `frontend/.nvmrc`.
-- **Node**: 22.23.5, el último parche de la 22 (de seguridad). `.nvmrc` sube en el
-  PR #102 y el Dockerfile en este PR: se fusionan juntos.
+- **Node**: 22.23.4, el último parche de la 22 con imagen arm64 en Docker Hub. La
+  `node:22.23.5-alpine*` (también de seguridad) hoy no publica arm64, y compose
+  falla en Macs Apple Silicon. `.nvmrc` sube en el PR #102 y el Dockerfile en este
+  PR: se fusionan juntos. Se pasa a 22.23.5 cuando exista su arm64.
 - **`make migrate/create`** usaba la marca de tiempo de goose. Ahora numera en
   secuencia (`-s`, renombrado a 3 dígitos). Comprobado sobre una copia de
   `migrations/`: crea `062_probe.sql`.

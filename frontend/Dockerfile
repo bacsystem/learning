@@ -1,7 +1,7 @@
 # Imagen base fijada a la versión de parche de .nvmrc (la misma que usa el CI).
 # Al subir Node, cambia .nvmrc y las tres líneas FROM juntas.
 # ── Stage 1: Dependencies ───────────────────────────────────────────────────
-FROM node:22.23.5-alpine3.23 AS deps
+FROM node:22.23.4-alpine3.23 AS deps
 
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
 # ── Stage 2: Build ───────────────────────────────────────────────────────────
-FROM node:22.23.5-alpine3.23 AS builder
+FROM node:22.23.4-alpine3.23 AS builder
 
 WORKDIR /app
 
@@ -34,7 +34,7 @@ RUN --mount=type=cache,target=/app/.next/cache \
     npx next build
 
 # ── Stage 3: Runtime ─────────────────────────────────────────────────────────
-FROM node:22.23.5-alpine3.23 AS runner
+FROM node:22.23.4-alpine3.23 AS runner
 
 WORKDIR /app
 

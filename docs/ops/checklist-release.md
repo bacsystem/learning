@@ -82,7 +82,7 @@ La 062 está en el PR #92.
 ## 3. Verificación en local, sobre `release/X.Y.Z`
 
 Con las mismas versiones que el CI (ver [paridad-ci-local.md](paridad-ci-local.md)):
-Go según `backend/go.mod` (toolchain go1.27.4), Node según `frontend/.nvmrc` (22.23.5)
+Go según `backend/go.mod` (toolchain go1.27.4), Node según `frontend/.nvmrc` (22.23.4)
 y Postgres 16.
 
 - [ ] `make lint`

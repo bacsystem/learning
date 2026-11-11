@@ -97,7 +97,9 @@ fmt: ## Formatea: go fmt y eslint --fix
 	cd backend && go fmt ./...
 	cd frontend && npm run lint:fix
 
-# NEXT_PUBLIC_API_URL: la del entorno o, como frontend.yml, http://localhost:8080.
+# Comprobación de paridad con el CI, no un artefacto de producción: producción
+# sale solo de docker/build (build-arg obligatorio). NEXT_PUBLIC_API_URL: la del
+# entorno o, como frontend.yml, http://localhost:8080.
 build: ## Build como el CI: go build ./... + bin/server y next build
 	cd backend && go build ./...
 	cd backend && CGO_ENABLED=0 go build -o bin/server ./cmd/server

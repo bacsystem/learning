@@ -19,7 +19,7 @@ repositorio, en la imagen, en `docker-compose.yml` ni en mensajes.
 
 ## Backend: servidor (`cmd/server`, `config.Load`)
 
-> **Cambios en camino** (fix/backend-config-validation, backend-dev-2; aplican
+> **Cambios en camino** ([PR #100](https://github.com/bacsystem/learning/pull/100), backend-dev-2; aplican
 > cuando se fusione):
 > - **H-2:** `ENCRYPTION_KEY` que no sea de 64 hex falla en `config.Load`, antes
 >   de conectar, con `ENCRYPTION_KEY must be 64 hex characters (a 32-byte key)`.
