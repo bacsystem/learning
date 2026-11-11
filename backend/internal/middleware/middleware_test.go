@@ -45,6 +45,18 @@ func TestClientIP(t *testing.T) {
 	}
 }
 
+// An invalid list fails closed: no proxy is trusted.
+func TestSetTrustedProxies_InvalidListTrustsNoProxy(t *testing.T) {
+	t.Cleanup(func() { SetTrustedProxies("") })
+	SetTrustedProxies("10.0.0.0/8,nope")
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "10.1.1.1:1"
+	r.Header.Set("X-Forwarded-For", "203.0.113.5")
+	if got := ClientIP(r); got != "10.1.1.1" {
+		t.Errorf("got %q, want the peer 10.1.1.1", got)
+	}
+}
+
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 
 func TestRateLimiter_BlocksAfterLimit(t *testing.T) {

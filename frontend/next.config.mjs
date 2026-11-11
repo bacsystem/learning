@@ -1,4 +1,6 @@
+import { PHASE_PRODUCTION_BUILD } from "next/constants.js";
 import createNextIntlPlugin from "next-intl/plugin";
+import process from "node:process";
 
 const withNextIntl = createNextIntlPlugin();
 
@@ -24,4 +26,16 @@ const nextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+/**
+ * `NEXT_PUBLIC_API_URL` se incrusta al compilar: un build de producción sin ella (o vacía) apuntaría en silencio a
+ * localhost o a rutas relativas (docs/ops/variables-de-entorno.md, H-4). Se corta aquí, antes de compilar; la URL la
+ * resuelve y valida `src/lib/http/api-base.ts`.
+ */
+export default function config(phase) {
+  if (phase === PHASE_PRODUCTION_BUILD && !process.env.NEXT_PUBLIC_API_URL?.trim()) {
+    throw new Error(
+      "NEXT_PUBLIC_API_URL no está definida o está vacía: el build de producción la necesita (p. ej. NEXT_PUBLIC_API_URL=https://api.ejemplo.com npm run build).",
+    );
+  }
+  return withNextIntl(nextConfig);
+}

@@ -13,6 +13,7 @@ import { mensajeErrorProfesion } from "@/lib/serums-ia/profesion/errores";
 import {
   cambiarProceso,
   especialidadesDe,
+  especialidadSugerida,
   intentarGuardar,
   puedeGuardar,
   type Seleccion,
@@ -48,6 +49,8 @@ export function FormularioProfesion({
   const especialidades = especialidadesDe(procesos, seleccion.procesoId);
   const parActivo = activa ? { procesoId: activa.proceso.id, especialidadId: activa.especialidad.id } : null;
   const sugerida = !activa && elegida === null && opciones.preseleccion !== null;
+  // Con varios procesos, la sugerencia llega sin proceso: se muestra aparte hasta que se elija uno (qa E1-04 H1).
+  const sugeridaSinProceso = !activa && seleccion.procesoId === null ? especialidadSugerida(opciones) : null;
 
   const nombreProceso = (id: number | null) => procesos.find((p) => p.id === id)?.nombre ?? "";
   const nombreEspecialidad = (id: number | null) => especialidades.find((e) => e.id === id)?.nombre ?? "";
@@ -86,7 +89,13 @@ export function FormularioProfesion({
 
   return (
     <div className="flex flex-col gap-3">
-      {sugerida ? <Alerta tono="info">{t("serumsIa.profesion.sugerida")}</Alerta> : null}
+      {sugeridaSinProceso ? (
+        <Alerta tono="info">
+          {t("serumsIa.profesion.sugeridaElegirProceso", { especialidad: sugeridaSinProceso.nombre })}
+        </Alerta>
+      ) : sugerida ? (
+        <Alerta tono="info">{t("serumsIa.profesion.sugerida")}</Alerta>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <SelectCampo
           id="profesion-proceso"
@@ -94,7 +103,11 @@ export function FormularioProfesion({
           placeholder={t("serumsIa.profesion.campo.procesoElegir")}
           opciones={procesos.map((p) => ({ value: String(p.id), label: `${p.nombre} (${p.anio})` }))}
           valor={seleccion.procesoId ? String(seleccion.procesoId) : ""}
-          onCambio={(v) => setElegida(cambiarProceso(procesos, seleccion, Number(v) || null))}
+          onCambio={(v) =>
+            setElegida(
+              cambiarProceso(procesos, seleccion, Number(v) || null, opciones.preseleccion?.especialidad_id ?? null),
+            )
+          }
           disabled={procesos.length === 1}
         />
         <SelectCampo
@@ -105,7 +118,8 @@ export function FormularioProfesion({
             value: String(e.id),
             label: e.pesos === "estimada" ? t("serumsIa.profesion.campo.conEstimados", { nombre: e.nombre }) : e.nombre,
           }))}
-          valor={seleccion.especialidadId ? String(seleccion.especialidadId) : ""}
+          // Solo un valor que esté entre las opciones: si no, el select mostraría el id crudo.
+          valor={especialidades.some((e) => e.id === seleccion.especialidadId) ? String(seleccion.especialidadId) : ""}
           onCambio={(v) => setElegida({ ...seleccion, especialidadId: Number(v) || null })}
           disabled={seleccion.procesoId === null}
         />
