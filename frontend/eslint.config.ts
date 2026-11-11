@@ -14,6 +14,7 @@ export default [
   {
     ignores: [
       ".next/**",
+      "coverage/**",
       "node_modules/**",
       "public/**",
       "next-env.d.ts",
