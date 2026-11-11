@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -422,7 +423,9 @@ func listarFuentes(t *testing.T, e Entorno) {
 	deB := guardarCon("norma", []int64{e.EspecialidadB})
 	ambas := guardarCon("guia", []int64{e.EspecialidadB, e.EspecialidadA})
 	todas := guardarCon("balotario", nil)
-	// Publishing the first one makes it the most recently updated.
+	// Publishing the first one makes it the most recently updated (or tied:
+	// the expected order below is derived from the returned UpdatedAt, so the
+	// test does not depend on the clock advancing between transactions).
 	if err := e.Repo.PublicarVersion(ctx, deB, 1, nuevos("publicada "+marcador()), nil); err != nil {
 		t.Fatal(err)
 	}
@@ -435,10 +438,34 @@ func listarFuentes(t *testing.T, e Entorno) {
 		}
 		return p
 	}
-	idsDe := func(p fuentes.Pagina[fuentes.FuenteResumen]) []int64 {
+	idsDe := func(rs []fuentes.FuenteResumen) []int64 {
 		var out []int64
-		for _, r := range p.Data {
+		for _, r := range rs {
 			out = append(out, r.ID)
+		}
+		return out
+	}
+	completo := listar(fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadB, PerPage: 100}).Data
+	if fmt.Sprint(sortedIDs(idsDe(completo))) != fmt.Sprint(sortedIDs([]int64{deB, ambas, todas})) {
+		t.Fatalf("especialidad B lists %v, want deB, ambas and todas", idsDe(completo))
+	}
+	for i := 1; i < len(completo); i++ {
+		prev, cur := completo[i-1], completo[i]
+		if cur.UpdatedAt.After(prev.UpdatedAt) || (cur.UpdatedAt.Equal(prev.UpdatedAt) && cur.ID > prev.ID) {
+			t.Errorf("order breaks UpdatedAt DESC, ID DESC at %d: %+v before %+v", i, prev, cur)
+		}
+	}
+	for _, r := range completo {
+		if r.ID != deB && r.UpdatedAt.After(completo[0].UpdatedAt) {
+			t.Errorf("publishing must not leave fuente %d older than %d", deB, r.ID)
+		}
+	}
+	filtrar := func(keep func(fuentes.FuenteResumen) bool) []int64 {
+		var out []int64
+		for _, r := range completo {
+			if keep(r) {
+				out = append(out, r.ID)
+			}
 		}
 		return out
 	}
@@ -447,14 +474,14 @@ func listarFuentes(t *testing.T, e Entorno) {
 		f    fuentes.FiltroFuentes
 		want []int64
 	}{
-		{"sin filtro, la más reciente primero", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadB}, []int64{deB, todas, ambas}},
-		{"especialidad A: las suyas y las de todas", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadA}, []int64{todas, ambas}},
+		{"especialidad A: las suyas y las de todas", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadA},
+			filtrar(func(r fuentes.FuenteResumen) bool { return r.ID != deB })},
 		{"estado activa", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadB, Estado: fuentes.EstadoActiva}, []int64{deB}},
 		{"tipo guia", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadB, Tipo: "guia"}, []int64{ambas}},
-		{"página 2 de 2 en 2", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadB, Page: 2, PerPage: 2}, []int64{ambas}},
+		{"página 2 de 2 en 2", fuentes.FiltroFuentes{EspecialidadID: e.EspecialidadB, Page: 2, PerPage: 2}, idsDe(completo[2:])},
 	}
 	for _, c := range cases {
-		if got := idsDe(listar(c.f)); fmt.Sprint(got) != fmt.Sprint(c.want) {
+		if got := idsDe(listar(c.f).Data); fmt.Sprint(got) != fmt.Sprint(c.want) {
 			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
 		}
 	}
@@ -481,4 +508,10 @@ func listarFuentes(t *testing.T, e Entorno) {
 			}
 		}
 	}
+}
+
+func sortedIDs(ids []int64) []int64 {
+	out := append([]int64(nil), ids...)
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
 }

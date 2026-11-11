@@ -18,6 +18,7 @@ import (
 	"github.com/cbaciliod/learning/internal/config"
 	"github.com/cbaciliod/learning/internal/crypto"
 	"github.com/cbaciliod/learning/internal/db"
+	"github.com/cbaciliod/learning/internal/fuentes"
 	"github.com/cbaciliod/learning/internal/inscripciones"
 	"github.com/cbaciliod/learning/internal/logger"
 	internalmw "github.com/cbaciliod/learning/internal/middleware"
@@ -129,6 +130,7 @@ func run() int {
 	questions.Mount(mux, qSvc, cfg.JWTSecret, checkSession)
 	temas.Mount(mux, temas.NewService(temas.NewRepository(database)), audLog, cfg.JWTSecret, checkSession)
 	perfiles.Mount(mux, perfiles.NewService(perfiles.NewRepository(database), catSvc), cfg.JWTSecret, checkSession)
+	fuentes.Mount(mux, fuentes.NewService(fuentes.NewRepository(database), nil), audLog, cfg.JWTSecret, checkSession)
 	practices.Mount(mux, pSvc, cfg.JWTSecret, checkSession)
 	simulations.Mount(mux, simSvc, cfg.JWTSecret, checkSession)
 	notifications.Mount(mux, database, audLog, cfg.JWTSecret, checkSession)
@@ -139,12 +141,13 @@ func run() int {
 	// (their handlers apply smaller limits). A new upload route must be
 	// added to this list; the client-sent Content-Type alone never raises
 	// the limit.
-	bodyLimit := internalmw.MaxBodySize(internalmw.DefaultJSONBodyLimit, internalmw.DefaultMultipartBodyLimit,
+	rutasSubida := append([]string{
 		"POST /admin/personas/preview",
 		"POST /admin/personas/import",
 		"POST /preguntas/preview",
 		"POST /preguntas/import",
-	)
+	}, fuentes.RutasSubida...)
+	bodyLimit := internalmw.MaxBodySize(internalmw.DefaultJSONBodyLimit, internalmw.DefaultMultipartBodyLimit, rutasSubida...)
 	handler := internalmw.SecurityHeaders(internalmw.CORS(cfg.CORSOrigins)(bodyLimit(mux)))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
