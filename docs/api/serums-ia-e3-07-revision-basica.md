@@ -249,7 +249,7 @@ Lo que F1 adelanta **no se rehace**. Se acepta contra los criterios de la histor
 
 | # | Historia | Tarea | Depende de | h |
 |---|---|---|---|---|
-| F2 | E3-08 | Clientes: `cambiarEstado` y `reemplazarCitas` en `src/lib/questions/api.ts`, `buscarPasajes` en `src/lib/serums-ia/pasajes/api.ts`, con el manejo de errores del README §3 (`code`, `detalle`). Tipos de §2, §3.1 y §5 (incluido `texto`). Claves i18n es/en `dashboard.serumsIa.errores.{fuente_no_activa,limite_citas,ultima_cita_activa}` y el genérico `revision.errores.generico`, que se usa para todo código sin clave (README §8) | F1 | 2 |
+| F2 | E3-08 | Clientes: `cambiarEstado` y `reemplazarCitas` en `src/lib/questions/api.ts`, `buscarPasajes` en `src/lib/serums-ia/pasajes/api.ts`, con el manejo de errores del README §3 (`code`, `detalle`). Tipos de §2, §3.1 y §5 (incluido `texto`). Claves i18n es/en `dashboard.serumsIa.errores.{fuente_no_activa,limite_citas,ultima_cita_activa}` y el genérico `dashboard.serumsIa.errores.generico`, que se usa para todo código sin clave (README §8) | F1 | 2 |
 | F3 | E3-08 | Listado: filtros por estado y por origen (`GET /preguntas?estado=&origen=`, E3-02 §4.3), sobre las insignias, el origen y el nº de citas de F1. Estados de carga, vacío («No hay preguntas con ese filtro») y error | F1 | 2 |
 | F4 | E3-08 | Detalle, citas: citas actuales con fuente, versión, `fuente_estado`, extracto y el **texto completo como texto plano expandible**, con «quitar»; buscador de pasajes con carga, «Sin resultados» y error. Añadir y quitar envían la lista completa (§4) y, tras un error, la lista se recarga. Deja visible la zona de acciones para E3-09 | F2 | 3 |
 | F5 | E3-09 | Acciones según estado y origen: Aprobar (solo `borrador` + `manual`, con casilla), Revalidar (casilla, más nota de 10–500 si el origen es `balotario`/`ia`), Rechazar (motivo de 5–500), Reabrir y «Se revisa en su cola». Ante un 409, recarga y muestra «Esta pregunta cambió de estado…». Claves i18n es/en de `falta_cita`, `verificacion_requerida`, `nota_obligatoria`, `conflicto_clave`, `revision_especializada` y `estado_invalido` | F4 | 3 |
@@ -259,7 +259,7 @@ Lo que F1 adelanta **no se rehace**. Se acepta contra los criterios de la histor
 - **Claves de error** (alineadas con las historias, 2026-11-11):
   - Van en `dashboard.serumsIa.errores.<codigo>`, una por código; si la clave ya existe, se reutiliza (README §8).
   - Reparto: E3-08 tiene `fuente_no_activa`, `limite_citas` y `ultima_cita_activa`; E3-09, `falta_cita`, `verificacion_requerida`, `nota_obligatoria`, `conflicto_clave`, `revision_especializada` y `estado_invalido`; E3-10, `clave_oficial`.
-  - Un código sin clave muestra `revision.errores.generico`, nunca `message`.
+  - Un código sin clave muestra `dashboard.serumsIa.errores.generico`, la clave única del módulo (README §8), nunca `message`.
   - Los textos que no son códigos van en `revision.acciones.*` y `avisosPregunta.*`: el aviso de recarga por un 409 y la ayuda de eliminar.
 - Todo con componentes y tokens de khipu. Si falta un componente (p. ej. la insignia de estado con icono), va primero el PR a khipu (CLAUDE.md).
 - La validación del cliente (casilla, nota, motivo, ≤ 20 citas, 3–300 caracteres en la búsqueda) replica la del servidor; el servidor sigue siendo la fuente de verdad.

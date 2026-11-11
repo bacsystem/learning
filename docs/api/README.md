@@ -183,7 +183,7 @@ Catálogo de códigos usados por E1, E2 y E3:
 ## 8. i18n
 
 - La API responde solo en español (`message`). La UI traduce por código: clave `dashboard.serumsIa.errores.<codigo>` en `frontend/src/i18n/messages/es.json` y `en.json`. Toda clave existe en ambos archivos (CLAUDE.md y supuesto 8). Una clave por código, reutilizada en todas las pantallas.
-- **Código sin clave** (decisión del PO, 2026-11-11, desde E3-08): la UI muestra un **texto genérico traducido**, nunca `message`. `message` viene siempre en español y se vería en español con la UI en inglés. Solo se usa en la consola o los logs del cliente.
+- **Código sin clave** (decisión del PO, 2026-11-11, desde E3-08): la UI muestra el **texto genérico traducido** de la clave única del módulo `dashboard.serumsIa.errores.generico`, nunca `message`. `message` viene siempre en español y se vería en español con la UI en inglés. Solo se usa en la consola o los logs del cliente.
 - Las pantallas existentes de E1 y E2 que hoy muestran `message` se alinean cuando se vuelvan a tocar, sin una tarea aparte.
 - Los estados y enums (`activo`/`archivado`, `procesando`/`activa`/`fallida`/`retirada`, `completa`/`incompleta`, `tipo` de fuente y `motivo_fallo`) viajan como códigos y la UI los traduce con `dashboard.serumsIa.<dominio>.<enum>.<valor>`.
 - El contenido (nombres de temas, títulos y pasajes de fuentes) es solo en español y no se traduce.
