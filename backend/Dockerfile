@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Imágenes base fijadas a versión de parche (H64). Para fijar también por
-# digest: golang:1.27.3-alpine3.23@sha256:... / alpine:3.23.4@sha256:...
+# digest: golang:1.27.4-alpine3.23@sha256:... / alpine:3.23.4@sha256:...
 
 # ── Stage 1: Build ──────────────────────────────────────────────────────────
 # El builder corre en la plataforma nativa y compila en cruzado para
@@ -10,7 +10,7 @@
 # x86-64); con el builder clásico, que no los rellena, los RUN caen a
 # linux/amd64. `make docker/build/backend` sigue pasando --platform
 # linux/amd64 para releases.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine3.23 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.23 AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
