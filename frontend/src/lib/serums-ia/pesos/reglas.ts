@@ -54,11 +54,11 @@ export interface Totales {
   repetidas: number[];
 }
 
-/** Totales en vivo de la tabla (lo que se ve debajo y lo que habilita «Guardar»). Los vacíos cuentan como 0. */
 /** Lo que `totales` lee de una fila (también la forma parcial que da yup al validar). */
 type FilaParaTotales = Pick<FilaPeso, "asignatura_id"> &
   Partial<Pick<FilaPeso, "peso_porcentual" | "numero_preguntas">>;
 
+/** Totales en vivo de la tabla (lo que se ve debajo y lo que habilita «Guardar»). Los vacíos cuentan como 0. */
 export function totales(areas: readonly FilaParaTotales[]): Totales {
   const sumaCentesimos = areas.reduce((s, a) => s + centesimos(aNumero(a.peso_porcentual ?? "") ?? 0), 0);
   const sumaPreguntas = areas.reduce((s, a) => s + (aNumero(a.numero_preguntas ?? "") ?? 0), 0);

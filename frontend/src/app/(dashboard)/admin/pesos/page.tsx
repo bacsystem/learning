@@ -1,7 +1,6 @@
 "use client";
 
 import { FormularioPesos } from "./formulario-pesos";
-import { useCarga } from "./use-carga";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -12,6 +11,7 @@ import { useToast } from "@/components/feedback/toast";
 import { SelectCampo } from "@/components/formularios/select-campo";
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { PillEstado } from "@/components/patrones/pill-estado";
+import { useCarga } from "@/hooks/use-carga";
 import { useAuth } from "@/lib/auth/auth-context";
 import { type Asignatura, catalogsApi, type Proceso } from "@/lib/catalogs/api";
 import { ACCION_SECUNDARIA, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
