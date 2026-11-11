@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -760,4 +761,74 @@ func TestRoutes_AdminOnly(t *testing.T) {
 		"PATCH /admin/temas/999999999/estado",
 		"PUT /admin/asignaturas/999999999/temas/orden",
 	})
+}
+
+// R1 (contract § T4): an edit keeps the especialidades the tema already had
+// even if they were deactivated since; a new inactive one, or one removed in
+// an earlier edit, is 422 referencia_invalida.
+func TestEditarTema_EspecialidadInactivaYaAsociada(t *testing.T) {
+	e := nuevoEntorno(t)
+	activa := e.nuevaEspecialidad(t, "activo")
+	seDesactiva := e.nuevaEspecialidad(t, "activo")
+	inactivaNueva := e.nuevaEspecialidad(t, "inactivo")
+	tema := e.crear(t, e.asig, "Vigilancia", activa, seDesactiva)
+	path := fmt.Sprintf("/admin/temas/%d", idDe(tema))
+	if _, err := e.db.Exec(`UPDATE especialidades SET estado = 'inactivo' WHERE id = $1`, seDesactiva); err != nil {
+		t.Fatal(err)
+	}
+	body := func(nombre string, ids ...int64) string {
+		b, _ := json.Marshal(map[string]any{"nombre": nombre, "especialidad_ids": ids})
+		return string(b)
+	}
+
+	steps := []struct {
+		name   string
+		body   string
+		status int
+		code   string
+		want   []int64
+	}{
+		{"corregir el nombre con la inactiva asociada", body("Vigilancia epidemiológica", activa, seDesactiva), 200, "", []int64{activa, seDesactiva}},
+		{"agregar una inactiva nueva", body("Vigilancia epidemiológica", activa, seDesactiva, inactivaNueva), 422, "referencia_invalida", nil},
+		{"quitar la inactiva asociada", body("Vigilancia epidemiológica", activa), 200, "", []int64{activa}},
+		{"volver a agregar la inactiva quitada", body("Vigilancia epidemiológica", activa, seDesactiva), 422, "referencia_invalida", nil},
+	}
+	for _, s := range steps {
+		status, resp := e.do(t, "PUT", path, e.admin, s.body)
+		if status != s.status || codigo(resp) != s.code {
+			t.Fatalf("%s: got %d %v, want %d %q", s.name, status, resp, s.status, s.code)
+		}
+		if s.want == nil {
+			continue
+		}
+		var got []int64
+		for _, esp := range resp["especialidades"].([]any) {
+			got = append(got, int64(esp.(map[string]any)["id"].(float64)))
+		}
+		if fmt.Sprint(sortInt64(got)) != fmt.Sprint(sortInt64(s.want)) {
+			t.Errorf("%s: especialidades = %v, want %v", s.name, got, s.want)
+		}
+	}
+	// T3 is unchanged: creating with an inactive especialidad is still 422.
+	if status, resp := e.do(t, "POST", "/admin/temas", e.admin,
+		fmt.Sprintf(`{"asignatura_id":%d,"nombre":"Otro tema","especialidad_ids":[%d]}`, e.asig, seDesactiva)); status != 422 || codigo(resp) != "referencia_invalida" {
+		t.Errorf("T3 with an inactive especialidad: %d %v", status, resp)
+	}
+}
+
+// R2 (ADR 0003 § Plegado): a name in NFD collides with the same name in NFC.
+func TestCrearTema_NombreNFDEsDuplicado(t *testing.T) {
+	e := nuevoEntorno(t)
+	e.crear(t, e.asig, "Epidemiología")
+	nfd := "Epidemiologi\u0301a"
+	status, body := e.do(t, "POST", "/admin/temas", e.admin, fmt.Sprintf(`{"asignatura_id":%d,"nombre":"%s"}`, e.asig, nfd))
+	if status != http.StatusUnprocessableEntity || codigo(body) != "tema_duplicado" {
+		t.Errorf("NFD name: got %d %v, want 422 tema_duplicado", status, body)
+	}
+}
+
+func sortInt64(ids []int64) []int64 {
+	out := append([]int64(nil), ids...)
+	slices.Sort(out)
+	return out
 }
