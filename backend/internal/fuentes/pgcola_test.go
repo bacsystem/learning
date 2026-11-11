@@ -25,7 +25,7 @@ func sinOtrasEnProceso(t *testing.T, db *sqlx.DB) {
 	}
 }
 
-func guardar(t *testing.T, repo fuentes.SourceRepository, contenido string) (int64, int) {
+func guardarEnCola(t *testing.T, repo fuentes.SourceRepository, contenido string) (int64, int) {
 	t.Helper()
 	id, v, err := repo.GuardarFuente(context.Background(), fuentes.NuevaFuente{Titulo: "Cola " + dbtest.Uniq(), Tipo: "guia",
 		NombreArchivo: "cola.md", Contenido: []byte(contenido)}, nil)
@@ -45,7 +45,7 @@ func TestPgCola_Reclamar(t *testing.T) {
 		t.Fatalf("empty queue: ok=%v err=%v", ok, err)
 	}
 	contenido := "contenido " + dbtest.Uniq()
-	id, v := guardar(t, e.Repo, contenido)
+	id, v := guardarEnCola(t, e.Repo, contenido)
 
 	got, ok, err := cola.Reclamar(ctx)
 	if err != nil || !ok || got.FuenteID != id || got.Version != v || got.Intentos != 1 || string(got.Contenido) != contenido {
@@ -68,7 +68,7 @@ func TestPgCola_ReclamarConcurrente(t *testing.T) {
 	sinOtrasEnProceso(t, db)
 	const n = 6
 	for range n {
-		guardar(t, e.Repo, "concurrente "+dbtest.Uniq())
+		guardarEnCola(t, e.Repo, "concurrente "+dbtest.Uniq())
 	}
 	cola := fuentes.NewPgCola(db)
 	var (
@@ -106,8 +106,8 @@ func TestIngestaWorker_Postgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	texto := "# Tema " + dbtest.Uniq() + "\n\n" + strings.Repeat("palabra ", 1000)
-	ok, _ := guardar(t, e.Repo, texto)
-	vacia, _ := guardar(t, e.Repo, "   \n\t\n")
+	ok, _ := guardarEnCola(t, e.Repo, texto)
+	vacia, _ := guardarEnCola(t, e.Repo, "   \n\t\n")
 
 	w := fuentes.NewIngestaWorker(fuentes.NewPgCola(db), e.Repo, fuentes.AuditorSistema(audit.New(db)))
 	for w.ProcesarSiguiente(context.Background()) {
@@ -120,7 +120,7 @@ func TestIngestaWorker_Postgres(t *testing.T) {
 		motivo         *string
 	}{
 		{ok, fuentes.EstadoActiva, fuentes.AccionProcesar, 2, nil},
-		{vacia, fuentes.EstadoFallida, fuentes.AccionFallar, 0, ptr(fuentes.MotivoSinContenido)},
+		{vacia, fuentes.EstadoFallida, fuentes.AccionFallar, 0, ptrMotivo(fuentes.MotivoSinContenido)},
 	}
 	for _, c := range cases {
 		var got struct {
@@ -140,4 +140,4 @@ func TestIngestaWorker_Postgres(t *testing.T) {
 	}
 }
 
-func ptr(s string) *string { return &s }
+func ptrMotivo(s string) *string { return &s }

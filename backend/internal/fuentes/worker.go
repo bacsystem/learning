@@ -26,6 +26,8 @@ const (
 	// lets it finish, and stays below the server's workerDrainTimeout (30 s).
 	// If it is cut anyway the transaction rolls back and the claim retries.
 	tiempoOperacion = 25 * time.Second
+	// tiempoFallo bounds recording a failure (one small transaction).
+	tiempoFallo = 5 * time.Second
 )
 
 // colaIngesta hands out the next version to process.
@@ -87,8 +89,9 @@ func (w *IngestaWorker) Run(ctx context.Context) {
 }
 
 // procesarSiguiente claims and processes one version; it reports whether one
-// was claimed, so Run keeps draining.
-func (w *IngestaWorker) procesarSiguiente(ctx context.Context) bool {
+// was claimed, so Run keeps draining. A panic anywhere in the processing is
+// logged and leaves the claim to expire, so it never stops the server.
+func (w *IngestaWorker) procesarSiguiente(ctx context.Context) (reclamada bool) {
 	v, ok, err := w.cola.Reclamar(ctx)
 	if err != nil {
 		log.Error().Err(err).Str("op", "fuentes.reclamar").Msg("ingesta: claim failed")
@@ -97,57 +100,77 @@ func (w *IngestaWorker) procesarSiguiente(ctx context.Context) bool {
 	if !ok {
 		return false
 	}
-	c, cancel := context.WithTimeout(context.WithoutCancel(ctx), tiempoOperacion)
-	defer cancel()
-	w.procesar(c, v)
+	defer func() {
+		if p := recover(); p != nil {
+			registrarError(v, "fuentes.procesar", fmt.Errorf("panic: %v", p)).Msg("ingesta: processing panicked")
+			reclamada = true
+		}
+	}()
+	w.procesar(ctx, v)
 	return true
 }
 
-// procesar decides the outcome of one claimed version.
+// procesar publishes one claimed version or records why it failed. Every
+// write runs on a context detached from the worker's lifetime, so a version
+// in progress at shutdown is finished.
 func (w *IngestaWorker) procesar(ctx context.Context, v VersionReclamada) {
-	if v.Intentos > maxIntentos { // a claim that expired after the last attempt
-		w.fallar(ctx, v, MotivoErrorInterno)
-		return
+	c, cancel := context.WithTimeout(context.WithoutCancel(ctx), tiempoOperacion)
+	motivo, err := w.publicar(c, v)
+	cancel()
+	switch {
+	case motivo != "":
+		w.fallar(ctx, v, motivo)
+	case err != nil:
+		registrarError(v, "fuentes.publicar", err).Msg("ingesta: transient failure")
+		if v.Intentos >= maxIntentos {
+			w.fallar(ctx, v, MotivoErrorInterno)
+		}
 	}
-	pasajes, err := w.normalizarSeguro(v.Contenido)
+}
+
+// publicar normalises and publishes v. It returns the failure reason of a
+// deterministic failure, or the error of a transient one (database, panic).
+func (w *IngestaWorker) publicar(ctx context.Context, v VersionReclamada) (motivo string, err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			motivo, err = "", fmt.Errorf("panic: %v", p)
+		}
+	}()
+	if v.Intentos > maxIntentos { // a claim that expired after the last attempt
+		return MotivoErrorInterno, nil
+	}
+	pasajes, err := w.normalizar(v.Contenido)
 	switch {
 	case errors.Is(err, ErrSinContenido):
-		w.fallar(ctx, v, MotivoSinContenido)
-		return
+		return MotivoSinContenido, nil
 	case errors.Is(err, ErrLimitePasajes):
-		w.fallar(ctx, v, MotivoLimitePasajes)
-		return
+		return MotivoLimitePasajes, nil
 	case err != nil:
-		w.transitorio(ctx, v, "fuentes.normalizar", err)
-		return
+		return "", err
 	}
 	err = w.repo.PublicarVersion(ctx, v.FuenteID, v.Version, pasajes, w.aud)
 	switch {
 	case err == nil:
 		registrar(v).Int("pasajes", len(pasajes)).Msg("ingesta: version published")
-	case errors.Is(err, ErrPublicacionInvalida):
+		return "", nil
+	case errors.Is(err, ErrPublicacionInvalida): // a programming error: retrying cannot help
 		registrarError(v, "fuentes.publicar", err).Msg("ingesta: invalid publication")
-		w.fallar(ctx, v, MotivoErrorInterno)
+		return MotivoErrorInterno, nil
 	case errors.Is(err, ErrNoEncontrado):
 		registrar(v).Msg("ingesta: version no longer in process, skipped")
+		return "", nil
 	default:
-		w.transitorio(ctx, v, "fuentes.publicar", err)
+		return "", err
 	}
 }
 
-// transitorio leaves the claim to expire so the version retries, unless this
-// was the last attempt.
-func (w *IngestaWorker) transitorio(ctx context.Context, v VersionReclamada, op string, err error) {
-	registrarError(v, op, err).Msg("ingesta: transient failure")
-	if v.Intentos >= maxIntentos {
-		w.fallar(ctx, v, MotivoErrorInterno)
-	}
-}
-
-// fallar marks the version failed. If that cannot be recorded, the claim
-// expires and the next attempt fails it again.
+// fallar marks the version failed, on its own deadline so a timed-out
+// publication can still be recorded. If that fails too, the claim expires and
+// the next attempt fails it again.
 func (w *IngestaWorker) fallar(ctx context.Context, v VersionReclamada, motivo string) {
-	err := w.repo.MarcarVersionFallida(ctx, v.FuenteID, v.Version, motivo, w.aud)
+	c, cancel := context.WithTimeout(context.WithoutCancel(ctx), tiempoFallo)
+	defer cancel()
+	err := w.repo.MarcarVersionFallida(c, v.FuenteID, v.Version, motivo, w.aud)
 	switch {
 	case err == nil:
 		registrar(v).Str("motivo", motivo).Msg("ingesta: version failed")
@@ -156,16 +179,6 @@ func (w *IngestaWorker) fallar(ctx context.Context, v VersionReclamada, motivo s
 	default:
 		registrarError(v, "fuentes.fallar", err).Str("motivo", motivo).Msg("ingesta: could not mark the version failed")
 	}
-}
-
-// normalizarSeguro turns a panic of the normaliser into a transient error.
-func (w *IngestaWorker) normalizarSeguro(contenido []byte) (pasajes []PasajeNuevo, err error) {
-	defer func() {
-		if p := recover(); p != nil {
-			err = fmt.Errorf("panic al normalizar: %v", p)
-		}
-	}()
-	return w.normalizar(contenido)
 }
 
 // registrar and registrarError start a log line with the version's ids only.

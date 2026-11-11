@@ -36,14 +36,19 @@ func (c *colaFalsa) Reclamar(context.Context) (VersionReclamada, bool, error) {
 	return v, true, nil
 }
 
-// publicadorFalso records what the worker did with each version.
+// publicadorFalso records what the worker did with each version; alPublicar,
+// if set, runs inside PublicarVersion.
 type publicadorFalso struct {
 	errPublicar, errFallar error
+	alPublicar             func(ctx context.Context)
 	publicados             []int // passages per published version
 	fallidos               []string
 }
 
-func (p *publicadorFalso) PublicarVersion(_ context.Context, _ int64, _ int, pasajes []PasajeNuevo, _ Auditor) error {
+func (p *publicadorFalso) PublicarVersion(ctx context.Context, _ int64, _ int, pasajes []PasajeNuevo, _ Auditor) error {
+	if p.alPublicar != nil {
+		p.alPublicar(ctx)
+	}
 	if p.errPublicar != nil {
 		return p.errPublicar
 	}
@@ -128,23 +133,74 @@ func TestIngestaWorker_FallarSinRegistrar(t *testing.T) {
 	}
 }
 
-// A panic while normalising is a transient failure: retried, and error_interno
-// on the last attempt.
-func TestIngestaWorker_PanicoAlNormalizar(t *testing.T) {
+// A panic while normalising or publishing is a transient failure: retried,
+// and error_interno on the last attempt. It never escapes the worker.
+func TestIngestaWorker_Panico(t *testing.T) {
+	entrarEnPanico := func(context.Context) { panic("fallo interno") }
 	for _, c := range []struct {
+		name      string
+		enNormal  bool
 		intentos  int
 		wantFallo string
-	}{{1, ""}, {maxIntentos, MotivoErrorInterno}} {
-		pub := &publicadorFalso{}
-		cola := &colaFalsa{versiones: []VersionReclamada{{FuenteID: 1, Version: 1, Intentos: c.intentos}}}
-		w := NewIngestaWorker(cola, pub, nil)
-		w.normalizar = func([]byte) ([]PasajeNuevo, error) { panic("fallo interno") }
-		if !w.procesarSiguiente(context.Background()) {
-			t.Fatal("want a claimed version")
-		}
-		if got := strings.Join(pub.fallidos, ","); got != c.wantFallo || len(pub.publicados) != 0 {
-			t.Errorf("intento %d: fallidos %q publicados %v, want %q", c.intentos, got, pub.publicados, c.wantFallo)
-		}
+	}{
+		{"normalising, attempt 1", true, 1, ""},
+		{"normalising, last attempt", true, maxIntentos, MotivoErrorInterno},
+		{"publishing, attempt 1", false, 1, ""},
+		{"publishing, last attempt", false, maxIntentos, MotivoErrorInterno},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			pub := &publicadorFalso{}
+			cola := &colaFalsa{versiones: []VersionReclamada{{FuenteID: 1, Version: 1, Contenido: []byte("hola"), Intentos: c.intentos}}}
+			w := NewIngestaWorker(cola, pub, nil)
+			if c.enNormal {
+				w.normalizar = func([]byte) ([]PasajeNuevo, error) { panic("fallo interno") }
+			} else {
+				pub.alPublicar = entrarEnPanico
+			}
+			if !w.procesarSiguiente(context.Background()) {
+				t.Fatal("want a claimed version")
+			}
+			if got := strings.Join(pub.fallidos, ","); got != c.wantFallo || len(pub.publicados) != 0 {
+				t.Errorf("fallidos %q publicados %v, want %q", got, pub.publicados, c.wantFallo)
+			}
+		})
+	}
+}
+
+// A panic while recording the failure is contained too.
+func TestIngestaWorker_PanicoAlFallar(t *testing.T) {
+	pub := &publicadorPanico{}
+	cola := &colaFalsa{versiones: []VersionReclamada{{FuenteID: 1, Version: 1, Intentos: 1}}}
+	if !NewIngestaWorker(cola, pub, nil).procesarSiguiente(context.Background()) {
+		t.Fatal("want a claimed version")
+	}
+}
+
+type publicadorPanico struct{ publicadorFalso }
+
+func (*publicadorPanico) MarcarVersionFallida(context.Context, int64, int, string, Auditor) error {
+	panic("fallo interno")
+}
+
+// Shutdown: the version in progress when the worker's ctx is cancelled is
+// still written with a live context, and Run returns after it.
+func TestIngestaWorker_ApagadoTerminaLaVersionEnCurso(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	var errEnPublicar error
+	pub := &publicadorFalso{alPublicar: func(c context.Context) {
+		cancel() // shutdown arrives mid-publication
+		errEnPublicar = c.Err()
+	}}
+	texto := []byte(strings.Repeat("palabra ", 200))
+	cola := &colaFalsa{versiones: []VersionReclamada{
+		{FuenteID: 1, Version: 1, Contenido: texto, Intentos: 1},
+		{FuenteID: 2, Version: 1, Contenido: texto, Intentos: 1},
+	}}
+	w := NewIngestaWorker(cola, pub, nil)
+	w.intervalo = time.Millisecond
+	w.Run(ctx)
+	if errEnPublicar != nil || len(pub.publicados) != 1 {
+		t.Errorf("publication ctx err %v, %d published; want nil and only the version in progress", errEnPublicar, len(pub.publicados))
 	}
 }
 
