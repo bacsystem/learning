@@ -51,13 +51,16 @@ func TestValidarAreasPesos(t *testing.T) {
 		{"peso 0,01", []AreaPesoRequest{area(7, 0.01, 1)}, nil},
 		{"peso 100,01", []AreaPesoRequest{area(7, 100.01, 1)}, map[string]string{"areas[0].peso_porcentual": "max"}},
 		{"peso con 3 decimales", []AreaPesoRequest{area(7, 33.333, 1)}, map[string]string{"areas[0].peso_porcentual": "decimales"}},
+		{"peso absurdo", []AreaPesoRequest{area(7, 1e300, 1)}, map[string]string{"areas[0].peso_porcentual": "max"}},
+		{"peso negativo", []AreaPesoRequest{area(7, -5, 1)}, map[string]string{"areas[0].peso_porcentual": "min"}},
 		{"coeficiente 0", []AreaPesoRequest{{AsignaturaID: 7, PesoPorcentual: 100, NumeroPreguntas: 1}},
 			map[string]string{"areas[0].coeficiente": "min"}},
 		{"coeficiente 999,99", []AreaPesoRequest{{AsignaturaID: 7, PesoPorcentual: 100, NumeroPreguntas: 1, Coeficiente: 999.99}}, nil},
 		{"coeficiente 1000", []AreaPesoRequest{{AsignaturaID: 7, PesoPorcentual: 100, NumeroPreguntas: 1, Coeficiente: 1000}},
 			map[string]string{"areas[0].coeficiente": "max"}},
 		{"varias filas y campos", []AreaPesoRequest{area(7, 100, 1), {AsignaturaID: -1, PesoPorcentual: 0.001, NumeroPreguntas: 0, Coeficiente: 1}},
-			map[string]string{"areas[1].asignatura_id": "requerido", "areas[1].peso_porcentual": "decimales", "areas[1].numero_preguntas": "min"}},
+			map[string]string{"areas[1].asignatura_id": "requerido", "areas[1].peso_porcentual": "min", "areas[1].numero_preguntas": "min"}},
+		{"debajo del mínimo con 3 decimales es min", []AreaPesoRequest{area(7, 0.005, 1)}, map[string]string{"areas[0].peso_porcentual": "min"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

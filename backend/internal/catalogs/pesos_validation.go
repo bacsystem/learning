@@ -82,12 +82,17 @@ func validarAreasPesos(areas []AreaPesoRequest) error {
 	return &errorPesos{base: ErrPesosValidacion, msg: msgPesosValidacion, detalle: map[string]any{"campos": campos}}
 }
 
-// reglaDecimal: 0.01 ≤ f ≤ maxCentesimas/100 with at most two decimals.
+// reglaDecimal: 0.01 ≤ f ≤ maxCentesimas/100 with at most two decimals. The
+// range is checked first, in float64, so any value outside it (even 1e300)
+// is min or max; the decimals only matter inside the range.
 func reglaDecimal(f float64, maxCentesimas int64) string {
+	if regla := reglaRango(f*100, 1, float64(maxCentesimas)); regla != "" {
+		return regla
+	}
 	if !hasAtMost2Decimals(f) {
 		return reglaPesoDecimales
 	}
-	return reglaRango(float64(centesimas(f)), 1, float64(maxCentesimas))
+	return ""
 }
 
 func reglaRango(v, min, max float64) string {

@@ -371,6 +371,9 @@ func TestResumenYConfiguracionPesos(t *testing.T) {
 		t.Errorf("plantilla = %v", enf["plantilla"])
 	}
 
+	if _, body := e.do(t, "GET", e.pathPesos(999999999), e.admin, ``); body["message"] != "La especialidad no existe, está inactiva o es de otra institución." {
+		t.Errorf("referencia_invalida message = %v", body["message"])
+	}
 	for _, c := range []struct {
 		path, code string
 		status     int

@@ -168,7 +168,7 @@ func especialidadDelProceso(ctx context.Context, q sqlx.QueryerContext, procesoI
 		JOIN procesos p ON p.institucion_id = e.institucion_id
 		WHERE p.id = $1 AND e.id = $2 AND e.estado = 'activo'`, procesoID, especialidadID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", invalidRef("la especialidad no existe, está inactiva o es de otra institución.")
+		return "", &errorPesos{base: ErrInvalidRef, msg: "La especialidad no existe, está inactiva o es de otra institución."}
 	}
 	if err != nil {
 		return "", fmt.Errorf("validar especialidad %d: %w", especialidadID, err)
@@ -188,7 +188,7 @@ func asignaturasExisten(ctx context.Context, tx *sqlx.Tx, areas []AreaPesoReques
 		return fmt.Errorf("validar asignaturas: %w", err)
 	}
 	if faltan > 0 {
-		return invalidRef("alguna asignatura no existe.")
+		return &errorPesos{base: ErrInvalidRef, msg: "Alguna asignatura no existe."}
 	}
 	return nil
 }
