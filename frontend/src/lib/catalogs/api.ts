@@ -1,4 +1,5 @@
 import { apiErrorFrom } from "@/lib/http/api-error";
+import { avisarSiSesionExpirada } from "@/lib/http/sesion";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
@@ -12,7 +13,7 @@ async function req<T>(path: string, token: string, options?: RequestInit): Promi
     ...options,
   });
   if (!res.ok) {
-    if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
+    avisarSiSesionExpirada(res.status);
     throw await apiErrorFrom(res);
   }
   return res.json() as Promise<T>;

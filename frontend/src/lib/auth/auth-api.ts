@@ -1,3 +1,5 @@
+import { avisarSiSesionExpirada } from "@/lib/http/sesion";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 async function requestMultipart<T>(path: string, token: string, form: FormData): Promise<T> {
@@ -7,7 +9,7 @@ async function requestMultipart<T>(path: string, token: string, form: FormData):
     body: form,
   });
   if (!res.ok) {
-    if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
+    avisarSiSesionExpirada(res.status);
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw Object.assign(new Error(body.error ?? res.statusText), { status: res.status });
   }
@@ -59,9 +61,7 @@ async function request<T>(
     // public endpoint (e.g. POST /auth/login with bad credentials) must reach
     // the caller so it can show its own message. `avisarExpiracion: false` lets
     // the caller handle the 401 itself (the initial session restore).
-    if (avisarExpiracion && res.status === 401 && new Headers(options?.headers).has("Authorization")) {
-      window.dispatchEvent(new Event("auth:expired"));
-    }
+    if (avisarExpiracion && new Headers(options?.headers).has("Authorization")) avisarSiSesionExpirada(res.status);
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw Object.assign(new Error(body.error ?? res.statusText), { status: res.status });
   }
@@ -127,7 +127,7 @@ export const authApi = {
   },
 
   /**
-   * `silencioso: true` does not fire "auth:expired" on a 401: the caller clears
+   * `silencioso: true` does not fire the session-expired event on a 401: the caller clears
    * the session itself. Used by the initial restore of a stored token, which
    * must not redirect away from a public page (e.g. an e-mailed link).
    */

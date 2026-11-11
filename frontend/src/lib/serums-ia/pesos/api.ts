@@ -1,4 +1,5 @@
 import { apiErrorFrom } from "@/lib/http/api-error";
+import { avisarSiSesionExpirada } from "@/lib/http/sesion";
 
 /** Cliente de pesos por profesión (docs/api/serums-ia-e1-taxonomia.md §2, PE1–PE3). */
 
@@ -14,7 +15,7 @@ async function req<T>(path: string, token: string, options?: RequestInit): Promi
     ...options,
   });
   if (!res.ok) {
-    if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
+    avisarSiSesionExpirada(res.status);
     throw await apiErrorFrom(res);
   }
   return res.json() as Promise<T>;
