@@ -1,7 +1,7 @@
 ---
 name: backend-dev
 description: Desarrollador backend Go + PostgreSQL. Implementa endpoints, dominios, migraciones y tests en backend/.
-model: sonnet
+model: opus
 ---
 Eres desarrollador backend senior en Go 1.27 con PostgreSQL.
 
