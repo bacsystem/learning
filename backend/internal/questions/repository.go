@@ -95,6 +95,21 @@ func validarTema(ctx context.Context, q sqlx.QueryerContext, temaID *int64, asig
 	return nil
 }
 
+// temaTrasEditar is the tema_id a PUT stores (tech-lead decision on T8, like
+// etiqueta_ids in H100): a sent value or null replaces it; an absent field
+// keeps the current tema, unless the asignatura changes, since the old tema
+// no longer belongs to it.
+func temaTrasEditar(enviado OptionalID, actual *int64, asignaturaActual, asignaturaNueva int64) *int64 {
+	switch {
+	case enviado.Set:
+		return enviado.Value
+	case asignaturaNueva != asignaturaActual:
+		return nil
+	default:
+		return actual
+	}
+}
+
 // CreatePregunta inserts a new question with its answers, tags, and optional feedback.
 func (r *Repository) CreatePregunta(ctx context.Context, req CreatePreguntaRequest, institucionID int64) (PreguntaResponse, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -458,11 +473,11 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 
 	// proceso_id is immutable; the stored one also scopes the asignatura and
 	// etiquetas check below (H19). FOR UPDATE keeps the row stable meanwhile.
-	var storedProcesoID int64
+	var storedProcesoID, storedAsignaturaID int64
 	var storedTemaID *int64
 	err = tx.QueryRowContext(ctx,
-		`SELECT proceso_id, tema_id FROM preguntas WHERE id = $1 AND estado != 'eliminada' FOR UPDATE`, id,
-	).Scan(&storedProcesoID, &storedTemaID)
+		`SELECT proceso_id, asignatura_id, tema_id FROM preguntas WHERE id = $1 AND estado != 'eliminada' FOR UPDATE`, id,
+	).Scan(&storedProcesoID, &storedAsignaturaID, &storedTemaID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PreguntaResponse{}, ErrNotFound
 	}
@@ -484,9 +499,10 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 	if err := validarClasificacion(ctx, tx, storedProcesoID, req.AsignaturaID, etiquetas); err != nil {
 		return PreguntaResponse{}, err
 	}
-	// tema_id is replaced like any PUT field (absent or null = no tema), in
-	// the same UPDATE as asignatura_id so the composite FK sees both.
-	if err := validarTema(ctx, tx, req.TemaID, req.AsignaturaID, storedTemaID); err != nil {
+	// The resulting tema goes in the same UPDATE as asignatura_id so the
+	// composite FK sees both.
+	temaID := temaTrasEditar(req.TemaID, storedTemaID, storedAsignaturaID, req.AsignaturaID)
+	if err := validarTema(ctx, tx, temaID, req.AsignaturaID, storedTemaID); err != nil {
 		return PreguntaResponse{}, err
 	}
 
@@ -495,7 +511,7 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 		SET asignatura_id = $1, grado_id = $2, especialidad_id = $3, tema_id = $4,
 		    enunciado = $5, tipo = $6, dificultad = $7, updated_at = NOW()
 		WHERE id = $8 AND estado != 'eliminada'`,
-		req.AsignaturaID, req.GradoID, req.EspecialidadID, req.TemaID,
+		req.AsignaturaID, req.GradoID, req.EspecialidadID, temaID,
 		req.Enunciado, req.Tipo, req.Dificultad, id,
 	)
 	if err != nil {

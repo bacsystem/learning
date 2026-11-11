@@ -103,8 +103,9 @@ func TestT8_CrearPreguntaConTema(t *testing.T) {
 	}
 }
 
-// T8: PUT /preguntas/{id} reemplaza tema_id; se puede reenviar el tema actual
-// aunque se haya archivado, y cambiar de asignatura sin tema lo deja en null.
+// T8: PUT /preguntas/{id}. tema_id ausente conserva el tema salvo que cambie
+// la asignatura (entonces null), null lo quita y un valor se valida; el tema
+// actual se puede reenviar aunque se haya archivado.
 func TestT8_EditarPreguntaConTema(t *testing.T) {
 	f, mux := newMux(t, qt.Options{Asignaturas: []qt.AsignaturaSpec{
 		{NumeroPreguntas: 1, Peso: 50, Unicas: 1},
@@ -118,6 +119,7 @@ func TestT8_EditarPreguntaConTema(t *testing.T) {
 		otraAsig = f.Asignaturas[0]
 	}
 	actual := sembrarTema(t, f, asig, "Actual", "activo")
+	otroActivo := sembrarTema(t, f, asig, "Otro activo", "activo")
 	otroArchivado := sembrarTema(t, f, asig, "Otro archivado", "archivado")
 	deOtraAsig := sembrarTema(t, f, otraAsig, "De la otra", "activo")
 	path := fmt.Sprintf("/preguntas/%d", p.ID)
@@ -126,49 +128,77 @@ func TestT8_EditarPreguntaConTema(t *testing.T) {
 	for i := range p.Respuestas {
 		alts = append(alts, map[string]any{"texto": fmt.Sprintf("Alt %d", i+1), "es_correcta": i == 0, "orden": i + 1})
 	}
-	body := func(asignaturaID int64, temaID any) string {
+	// tema is the raw JSON of tema_id, or "" to leave the field out.
+	body := func(asignaturaID int64, tema string) string {
 		m := map[string]any{"asignatura_id": asignaturaID, "enunciado": "Enunciado editado de prueba",
 			"tipo": p.Tipo, "dificultad": "medio", "respuestas": alts}
-		if temaID != nil {
-			m["tema_id"] = temaID
+		if tema != "" {
+			m["tema_id"] = json.RawMessage(tema)
 		}
 		b, _ := json.Marshal(m)
 		return string(b)
 	}
-	put := func(t *testing.T, b string, status int) []byte {
+	setTema := func(t *testing.T, asignaturaID int64, temaID *int64) {
 		t.Helper()
-		w := qt.Do(mux, "PUT", path, admin, b)
-		if w.Code != status {
-			t.Fatalf("PUT %s: got %d %s, want %d", b, w.Code, w.Body, status)
-		}
-		return w.Body.Bytes()
-	}
-
-	if temaID, _ := temaDe(t, put(t, body(asig, actual), http.StatusOK)); temaID == nil || int64(*temaID) != actual {
-		t.Fatalf("tema_id = %v, want %d", temaID, actual)
-	}
-
-	// The current tema is archived meanwhile: sending it back is allowed.
-	if _, err := f.DB.Exec(`UPDATE temas SET estado = 'archivado' WHERE id = $1`, actual); err != nil {
-		t.Fatal(err)
-	}
-	if temaID, _ := temaDe(t, put(t, body(asig, actual), http.StatusOK)); temaID == nil || int64(*temaID) != actual {
-		t.Errorf("re-sending the archived current tema: tema_id = %v", temaID)
-	}
-
-	// Another archived tema, or one from another asignatura, is rejected.
-	for _, b := range []string{body(asig, otroArchivado), body(asig, deOtraAsig), body(otraAsig, actual)} {
-		if code, _ := codigoDe(t, put(t, b, http.StatusUnprocessableEntity)); code != "tema_invalido" {
-			t.Errorf("PUT %s: code %q, want tema_invalido", b, code)
+		if _, err := f.DB.Exec(`UPDATE preguntas SET asignatura_id = $1, tema_id = $2 WHERE id = $3`, asignaturaID, temaID, p.ID); err != nil {
+			t.Fatal(err)
 		}
 	}
+	num := func(id int64) string { return fmt.Sprint(id) }
 
-	// Changing the asignatura without tema_id leaves the question without tema.
-	if temaID, tema := temaDe(t, put(t, body(otraAsig, nil), http.StatusOK)); temaID != nil || tema != nil {
-		t.Errorf("tema = %v %v, want null", temaID, tema)
+	cases := []struct {
+		name       string
+		inicial    *int64 // tema before the PUT (in asig)
+		archivarlo bool   // archive the initial tema before the PUT
+		asignatura int64
+		tema       string
+		status     int
+		want       *int64
+	}{
+		{"ausente conserva el tema", &actual, false, asig, "", http.StatusOK, &actual},
+		{"ausente conserva un tema archivado", &actual, true, asig, "", http.StatusOK, &actual},
+		{"ausente con cambio de asignatura lo limpia", &actual, false, otraAsig, "", http.StatusOK, nil},
+		{"null explícito lo quita", &actual, false, asig, "null", http.StatusOK, nil},
+		{"valor activo lo reemplaza", &actual, false, asig, num(otroActivo), http.StatusOK, &otroActivo},
+		{"reenviar el actual archivado", &actual, true, asig, num(actual), http.StatusOK, &actual},
+		{"cambio de asignatura con tema de la nueva", &actual, false, otraAsig, num(deOtraAsig), http.StatusOK, &deOtraAsig},
+		{"otro tema archivado", &actual, false, asig, num(otroArchivado), http.StatusUnprocessableEntity, &actual},
+		{"tema de otra asignatura", &actual, false, asig, num(deOtraAsig), http.StatusUnprocessableEntity, &actual},
+		{"cambio de asignatura reenviando el actual", &actual, false, otraAsig, num(actual), http.StatusUnprocessableEntity, &actual},
+		{"tema inexistente", nil, false, asig, "999999999", http.StatusUnprocessableEntity, nil},
 	}
-	if temaID, _ := temaDe(t, put(t, body(otraAsig, deOtraAsig), http.StatusOK)); temaID == nil || int64(*temaID) != deOtraAsig {
-		t.Errorf("tema_id = %v, want %d", temaID, deOtraAsig)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			setTema(t, asig, c.inicial)
+			estado := "activo"
+			if c.archivarlo {
+				estado = "archivado"
+			}
+			if _, err := f.DB.Exec(`UPDATE temas SET estado = $1 WHERE id = $2`, estado, actual); err != nil {
+				t.Fatal(err)
+			}
+			w := qt.Do(mux, "PUT", path, admin, body(c.asignatura, c.tema))
+			if w.Code != c.status {
+				t.Fatalf("got %d %s, want %d", w.Code, w.Body, c.status)
+			}
+			if c.status == http.StatusUnprocessableEntity {
+				if code, _ := codigoDe(t, w.Body.Bytes()); code != "tema_invalido" {
+					t.Errorf("code %q, want tema_invalido", code)
+				}
+			}
+			var stored *int64
+			if err := f.DB.Get(&stored, `SELECT tema_id FROM preguntas WHERE id = $1`, p.ID); err != nil {
+				t.Fatal(err)
+			}
+			if (stored == nil) != (c.want == nil) || (stored != nil && *stored != *c.want) {
+				t.Errorf("stored tema_id = %v, want %v", stored, c.want)
+			}
+			if c.status == http.StatusOK {
+				if temaID, _ := temaDe(t, w.Body.Bytes()); (temaID == nil) != (c.want == nil) {
+					t.Errorf("response tema_id = %v, want %v", temaID, c.want)
+				}
+			}
+		})
 	}
 }
 
