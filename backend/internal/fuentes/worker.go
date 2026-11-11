@@ -26,7 +26,7 @@ const (
 	// lets it finish, and stays below the server's workerDrainTimeout (30 s).
 	// If it is cut anyway the transaction rolls back and the claim retries.
 	tiempoOperacion = 25 * time.Second
-	// tiempoFallo bounds recording a failure (one small transaction).
+	// tiempoFallo bounds a small transaction: a claim or recording a failure.
 	tiempoFallo = 5 * time.Second
 )
 
@@ -92,7 +92,13 @@ func (w *IngestaWorker) Run(ctx context.Context) {
 // was claimed, so Run keeps draining. A panic anywhere in the processing is
 // logged and leaves the claim to expire, so it never stops the server.
 func (w *IngestaWorker) procesarSiguiente(ctx context.Context) (reclamada bool) {
-	v, ok, err := w.cola.Reclamar(ctx)
+	// The claim runs detached from shutdown: a cancel between Run's check and
+	// the UPDATE would otherwise be able to commit the claim (spending an
+	// attempt) and still drop the version, which then waits for the claim to
+	// expire. Once claimed, a version is always processed.
+	c, cancel := context.WithTimeout(context.WithoutCancel(ctx), tiempoFallo)
+	v, ok, err := w.cola.Reclamar(c)
+	cancel()
 	if err != nil {
 		log.Error().Err(err).Str("op", "fuentes.reclamar").Msg("ingesta: claim failed")
 		return false
