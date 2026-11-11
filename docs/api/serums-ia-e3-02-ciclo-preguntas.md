@@ -91,6 +91,8 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 
 ### 4.1 `PATCH /preguntas/{id}/estado` (nuevo)
 
+> **Pendiente de actualizar con SIA-E3-07:** B4 se implementa con las reglas del contrato de E3-07: `revision_especializada` al aprobar `balotario` o `ia`, y `verificado` y `nota` en el cuerpo para revalidar. Ese contrato actualiza este §, y el cuerpo definitivo **incluye** `verificado` y `nota` desde el inicio, para que agregarlos después no rompa a los clientes por `DisallowUnknownFields` (p. ej. el seed B8). Donde este § y E3-07 difieran, manda E3-07.
+
 ```json
 { "estado": "rechazada", "motivo": "La clave no coincide con la NTS vigente." }
 ```
@@ -118,6 +120,8 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 - Auditoría, en la misma transacción: `accion = "pregunta.estado"`, `entidad = "pregunta"`, `detalle = {"estado_anterior", "estado_nuevo", "motivo"}` (regla 7). Con `rechazada`, `motivo` va a `motivo_rechazo`; con `borrador` (reabrir), `motivo_rechazo` pasa a `NULL`.
 
 ### 4.2 `PUT /preguntas/{id}/citas` (nuevo)
+
+> **Pendiente de actualizar con SIA-E3-07:** B5 se implementa con las reglas del contrato de E3-07: `422 fuente_no_activa` al citar un pasaje de una fuente no activa; en una `aprobada` se permiten agregar citas siempre y quitarlas solo si queda una cita a una fuente activa (si no, `409 ultima_cita_activa`); y `422 limite_citas` por encima de 20. Ese contrato actualiza este §. Donde este § y E3-07 difieran, manda E3-07.
 
 ```json
 { "pasaje_ids": [9012, 9013] }
