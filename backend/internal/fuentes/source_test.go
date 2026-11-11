@@ -2,6 +2,7 @@ package fuentes
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -70,7 +71,7 @@ func TestHuella(t *testing.T) {
 	}{
 		{"", 0}, {"a", 1}, {"a\n", 1}, {"a\nb", 2}, {"a\nb\n", 2}, {"\n", 1}, {"\n\n", 2},
 		{"a\r\nb", 2}, {"a\r\nb\r\n", 2}, {"a\rb", 2}, {"a\r", 1}, {"\r\n", 1}, {"\r\r", 2},
-		{"a\r\n\r\nb", 3}, {"a\n\rb", 3}, {"a\r\rb\n", 3},
+		{"a\r\n\r\nb", 3}, {"a\n\rb", 3}, {"a\r\rb\n", 3}, {"a\r\rb", 3},
 	}
 	for _, c := range cases {
 		sha, tamano, lineas := Huella([]byte(c.in))
@@ -80,5 +81,29 @@ func TestHuella(t *testing.T) {
 	}
 	if sha, _, _ := Huella([]byte("abc")); sha != "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" {
 		t.Errorf("sha256(abc) = %s", sha)
+	}
+}
+
+// Lineas: one rule for splitting and counting; \r\n is one break, not two.
+func TestLineas(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+	}{
+		{"", nil},
+		{"a", []string{"a"}},
+		{"a\n", []string{"a"}},
+		{"a\rb", []string{"a", "b"}},
+		{"a\r\nb", []string{"a", "b"}},
+		{"a\r\rb", []string{"a", "", "b"}},
+		{"a\r\n\r\nb", []string{"a", "", "b"}},
+		{"\n", []string{""}},
+		{"x\n\ny\r", []string{"x", "", "y"}},
+	}
+	for _, c := range cases {
+		got := Lineas([]byte(c.in))
+		if fmt.Sprintf("%q", got) != fmt.Sprintf("%q", c.want) || ContarLineas([]byte(c.in)) != len(c.want) {
+			t.Errorf("Lineas(%q) = %q, want %q", c.in, got, c.want)
+		}
 	}
 }
