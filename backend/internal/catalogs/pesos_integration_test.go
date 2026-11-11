@@ -48,9 +48,6 @@ func nuevoPesosEnv(t *testing.T) *pesosEnv {
 	e.admin = dbtest.RealBearer(t, db, admin.ID, "admin")
 	e.usuario = dbtest.RealBearer(t, db, usuario.ID, "usuario")
 	e.proceso = dbtest.SeedProceso(t, db, e.cat, 2030, "inactivo")
-	// The API always stores a descripcion; GetProceso cannot scan the NULL
-	// that SeedProceso leaves (pre-existing, reported apart).
-	e.exec(t, `UPDATE procesos SET descripcion = '' WHERE id = $1`, e.proceso)
 	e.medicina = e.cat.EspecialidadID
 	e.enfermeria = e.especialidad(t, e.cat.InstitucionID, "activo")
 	e.a1, e.a2, e.a3 = dbtest.SeedAsignatura(t, db), dbtest.SeedAsignatura(t, db), dbtest.SeedAsignatura(t, db)
