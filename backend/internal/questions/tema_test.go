@@ -14,7 +14,7 @@ func sembrarTema(t *testing.T, f *qt.Fixture, asignaturaID int64, nombre, estado
 	t.Helper()
 	var id int64
 	if err := f.DB.QueryRow(`INSERT INTO temas (asignatura_id, nombre, nombre_clave, estado)
-		VALUES ($1, $2, lower($2), $3) RETURNING id`, asignaturaID, nombre, estado).Scan(&id); err != nil {
+		VALUES ($1, $2::text, lower($2::text), $3) RETURNING id`, asignaturaID, nombre, estado).Scan(&id); err != nil {
 		t.Fatal(err)
 	}
 	return id
