@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/db/dbtest"
@@ -286,42 +286,102 @@ func TestCrearTema_Limite(t *testing.T) {
 	}
 }
 
-// Several simultaneous creates with 59 active temas: the asignatura lock lets
-// exactly one through.
-func TestCrearTema_Concurrente(t *testing.T) {
+// The asignatura lock guards «never more than 60 active temas» (T3, T5).
+// Another transaction holds the lock with the 60th tema still uncommitted:
+// the request must wait for it and then see 60 active temas. Without the lock
+// it would count 59, insert and leave 61 once the other one commits.
+func TestLimite_EsperaElBloqueoDeLaAsignatura(t *testing.T) {
+	cases := []struct {
+		name    string
+		request func(e *entorno, asig, archivado int64) (method, path, body string)
+	}{
+		{"crear", func(_ *entorno, asig, _ int64) (string, string, string) {
+			return "POST", "/admin/temas", fmt.Sprintf(`{"asignatura_id":%d,"nombre":"Uno más"}`, asig)
+		}},
+		{"reactivar", func(_ *entorno, _, archivado int64) (string, string, string) {
+			return "PATCH", fmt.Sprintf("/admin/temas/%d/estado", archivado), `{"estado":"activo"}`
+		}},
+	}
 	e := nuevoEntorno(t)
-	e.sembrar(t, e.asig, MaxTemasActivos-1, "activo")
-	const n = 5
-	statuses := make([]int, n)
-	var wg sync.WaitGroup
-	start := make(chan struct{})
-	for i := range n {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-start
-			req := httptest.NewRequest("POST", "/admin/temas",
-				strings.NewReader(fmt.Sprintf(`{"asignatura_id":%d,"nombre":"Concurrente %d"}`, e.asig, i)))
-			req.Header.Set("Authorization", e.admin)
-			rr := httptest.NewRecorder()
-			e.mux.ServeHTTP(rr, req)
-			statuses[i] = rr.Code
-		}()
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			asig := e.nuevaAsignatura(t)
+			e.sembrar(t, asig, MaxTemasActivos-1, "activo")
+			archivado := e.sembrar(t, asig, 1, "archivado")[0]
+
+			otra, pid := e.bloquearConTemaPendiente(t, asig)
+			method, path, body := c.request(e, asig, archivado)
+			resultado := make(chan int, 1)
+			go func() {
+				req := httptest.NewRequest(method, path, strings.NewReader(body))
+				req.Header.Set("Authorization", e.admin)
+				rr := httptest.NewRecorder()
+				e.mux.ServeHTTP(rr, req)
+				resultado <- rr.Code
+			}()
+
+			bloqueada := e.esperarBloqueadoPor(t, pid, resultado)
+			if err := otra.Commit(); err != nil {
+				t.Fatal(err)
+			}
+			status := <-resultado
+			if !bloqueada {
+				t.Errorf("the request did not wait for the asignatura lock (answered %d)", status)
+			}
+			if status != http.StatusUnprocessableEntity || e.contar(t, asig, "activo") != MaxTemasActivos {
+				t.Errorf("status %d, %d active temas; want 422 and %d", status, e.contar(t, asig, "activo"), MaxTemasActivos)
+			}
+		})
 	}
-	close(start)
-	wg.Wait()
-	creados := 0
-	for _, s := range statuses {
-		switch s {
-		case http.StatusCreated:
-			creados++
-		case http.StatusUnprocessableEntity:
-		default:
-			t.Errorf("unexpected status %d", s)
+}
+
+// bloquearConTemaPendiente opens a transaction that takes the asignatura lock
+// like the repository and inserts one active tema without committing. It
+// returns the transaction and its backend pid.
+func (e *entorno) bloquearConTemaPendiente(t *testing.T, asig int64) (*sqlx.Tx, int) {
+	t.Helper()
+	tx, err := e.db.Beginx()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = tx.Rollback() })
+	var pid int
+	if err := tx.Get(&pid, `SELECT pg_backend_pid()`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`SELECT 1 FROM asignaturas WHERE id = $1 FOR NO KEY UPDATE`, asig); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`INSERT INTO temas (asignatura_id, nombre, nombre_clave, orden)
+		VALUES ($1, 'Pendiente', 'pendiente', 999)`, asig); err != nil {
+		t.Fatal(err)
+	}
+	return tx, pid
+}
+
+// esperarBloqueadoPor reports whether some backend ends up blocked by pid
+// before the request answers on its own (bounded by a timeout). If the request
+// answers first, its status is put back on the channel for the caller.
+func (e *entorno) esperarBloqueadoPor(t *testing.T, pid int, resultado chan int) bool {
+	t.Helper()
+	limite := time.After(5 * time.Second)
+	for {
+		var bloqueado bool
+		if err := e.db.Get(&bloqueado,
+			`SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid)))`, pid); err != nil {
+			t.Fatal(err)
 		}
-	}
-	if creados != 1 || e.contar(t, e.asig, "activo") != MaxTemasActivos {
-		t.Errorf("created %d (statuses %v), active %d; want 1 and %d", creados, statuses, e.contar(t, e.asig, "activo"), MaxTemasActivos)
+		if bloqueado {
+			return true
+		}
+		select {
+		case status := <-resultado:
+			resultado <- status
+			return false
+		case <-limite:
+			return false
+		case <-time.After(20 * time.Millisecond):
+		}
 	}
 }
 
