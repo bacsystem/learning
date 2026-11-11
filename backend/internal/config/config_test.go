@@ -22,6 +22,9 @@ func setBaseEnv(t *testing.T) {
 	t.Setenv("SMTP_FROM", "")
 	t.Setenv("LOG_LEVEL", "")
 	t.Setenv("TRUSTED_PROXIES", "")
+	t.Setenv("IA_PROVEEDOR", "")
+	t.Setenv("IA_API_KEY", "")
+	t.Setenv("IA_MODELO", "")
 }
 
 // setProductionEnv is setBaseEnv plus everything a non-development ENV needs.
@@ -346,6 +349,49 @@ func TestLoad_DatabaseSSLMode(t *testing.T) {
 			}
 			if strings.Contains(err.Error(), secret) {
 				t.Errorf("error quotes the DSN: %v", err)
+			}
+		})
+	}
+}
+
+// SIA-E6-01 §3: empty disables the AI service; the double is accepted only
+// with ENV development, test or preprod; anything else fails closed.
+func TestLoad_IAProveedor(t *testing.T) {
+	cases := []struct {
+		name, env, proveedor string
+		wantErr              bool
+	}{
+		{"empty disables it in production", "production", "", false},
+		{"double in development", "development", "doble", false},
+		{"double in test", "test", "doble", false},
+		{"double in preprod", "preprod", "doble", false},
+		{"double in production", "production", "doble", true},
+		{"double with a misspelled ENV", "prod", "doble", true},
+		{"double with ENV unset", "", "doble", true},
+		{"unknown provider", "development", "openai", true},
+		{"spaces are trimmed", "development", "  doble ", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			setProductionEnv(t)
+			t.Setenv("ENV", c.env)
+			t.Setenv("IA_PROVEEDOR", c.proveedor)
+			t.Setenv("IA_API_KEY", "sk-secreto-no-se-imprime")
+			cfg, err := Load()
+			if c.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "IA_PROVEEDOR") {
+					t.Fatalf("want IA_PROVEEDOR error, got %v", err)
+				}
+				if strings.Contains(err.Error(), "sk-secreto") {
+					t.Errorf("error quotes IA_API_KEY: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.IAProveedor != strings.TrimSpace(c.proveedor) {
+				t.Errorf("IAProveedor %q", cfg.IAProveedor)
 			}
 		})
 	}

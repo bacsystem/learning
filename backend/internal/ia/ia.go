@@ -1,0 +1,110 @@
+// Package ia is the provider-agnostic AI service of SERUMS IA (SIA-E6-01,
+// docs/api/serums-ia-e6-01-servicio-ia.md, ADR 0006): four typed operations
+// that reject personal data and oversized input before calling the provider,
+// bound every call, retry only transient errors and invalid output, validate
+// the output and record one usage row per invocation, never its content.
+// It has no HTTP routes: consumers run it in jobs or workers.
+package ia
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+)
+
+// Operations (regla 1); they are also ia_usos.operacion.
+const (
+	OpClasificar         = "clasificar"
+	OpGenerarPreguntas   = "generar_preguntas"
+	OpGenerarMaterial    = "generar_material"
+	OpGenerarExplicacion = "generar_explicacion"
+)
+
+// Actor roles of ia_usos.actor_rol.
+const (
+	RolAdmin   = "admin"
+	RolUsuario = "usuario"
+	RolSistema = "sistema"
+)
+
+// MaxEntradaRunes is the input limit per call, over the texts of the data
+// blocks (regla 6).
+const MaxEntradaRunes = 30000
+
+// Actor identifies who asked for the call, by opaque id only: never a name,
+// e-mail or DNI. ID is nil for the system and set for admin and usuario.
+type Actor struct {
+	Rol string
+	ID  *int64
+}
+
+// Servicio is what consumers use; every method records one usage row.
+type Servicio interface {
+	Clasificar(ctx context.Context, a Actor, in EntradaClasificar) (SalidaClasificar, error)
+	GenerarPreguntas(ctx context.Context, a Actor, in EntradaGenerarPreguntas) (SalidaGenerarPreguntas, error)
+	GenerarMaterial(ctx context.Context, a Actor, in EntradaGenerarMaterial) (SalidaGenerarMaterial, error)
+	GenerarExplicacion(ctx context.Context, a Actor, in EntradaGenerarExplicacion) (SalidaGenerarExplicacion, error)
+}
+
+// Errors of the service (contract §5). Their text is the stable code.
+var (
+	ErrNoDisponible           = errors.New("ia_no_disponible")
+	ErrEntradaDemasiadoGrande = errors.New("entrada_demasiado_grande")
+	ErrDatosPersonales        = errors.New("datos_personales")
+	ErrTimeout                = errors.New("ia_timeout")
+	ErrSalidaInvalida         = errors.New("salida_invalida")
+	ErrProveedor              = errors.New("ia_error")
+	// ErrActorInvalido is a programming error of the consumer: the actor
+	// would break ck_ia_usos_actor, so nothing is called nor recorded.
+	ErrActorInvalido = errors.New("actor_invalido")
+)
+
+// Personal data types reported by ErrorDatosPersonales.
+const (
+	TipoDNI      = "dni"
+	TipoEmail    = "email"
+	TipoTelefono = "telefono"
+)
+
+// BloqueInstrucciones is the Bloque index reported when the match is in the
+// instructions rather than in a data block.
+const BloqueInstrucciones = -1
+
+// ErrorDatosPersonales says which kind of personal data was found and in
+// which block, so the consumer knows what to review. It never carries the
+// matched text. It is ErrDatosPersonales for errors.Is.
+type ErrorDatosPersonales struct {
+	Tipo   string
+	Bloque int
+}
+
+func (e *ErrorDatosPersonales) Error() string {
+	return fmt.Sprintf("%s: %s en el bloque %d", ErrDatosPersonales, e.Tipo, e.Bloque)
+}
+
+func (e *ErrorDatosPersonales) Unwrap() error { return ErrDatosPersonales }
+
+// Codigo maps an error of the service to the code (format 2) and the HTTP
+// status a consumer must use to expose it (contract §5); ok is false for an
+// error that is not of the service.
+func Codigo(err error) (codigo string, status int, ok bool) {
+	for _, m := range mapaErrores {
+		if errors.Is(err, m.err) {
+			return m.err.Error(), m.status, true
+		}
+	}
+	return "", 0, false
+}
+
+var mapaErrores = []struct {
+	err    error
+	status int
+}{
+	{ErrNoDisponible, http.StatusServiceUnavailable},
+	{ErrEntradaDemasiadoGrande, http.StatusUnprocessableEntity},
+	{ErrDatosPersonales, http.StatusUnprocessableEntity},
+	{ErrTimeout, http.StatusGatewayTimeout},
+	{ErrSalidaInvalida, http.StatusBadGateway},
+	{ErrProveedor, http.StatusBadGateway},
+}
