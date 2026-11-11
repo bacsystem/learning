@@ -141,3 +141,52 @@ func TestIngestaWorker_Postgres(t *testing.T) {
 }
 
 func ptrMotivo(s string) *string { return &s }
+
+// Seguimiento del #110: a worker whose claim expired while another one
+// reclaimed and published the version must not publish it again.
+func TestIngestaWorker_ReclamoVencidoSobreVersionPublicada(t *testing.T) {
+	e, db := entornoPg(t)
+	sinOtrasEnProceso(t, db)
+	var desdeAudit int64
+	if err := db.Get(&desdeAudit, `SELECT COALESCE(MAX(id), 0) FROM audit_log`); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	id, _ := guardarEnCola(t, e.Repo, "# Tema "+dbtest.Uniq()+"\n\n"+strings.Repeat("palabra ", 300))
+	cola := fuentes.NewPgCola(db)
+	w := fuentes.NewIngestaWorker(cola, e.Repo, fuentes.AuditorSistema(audit.New(db)))
+
+	lento, ok, err := cola.Reclamar(ctx) // worker A claims and stalls
+	if err != nil || !ok {
+		t.Fatalf("claim: ok=%v err=%v", ok, err)
+	}
+	if _, err := db.Exec(`UPDATE fuente_versiones SET claimed_at = NOW() - INTERVAL '11 minutes' WHERE fuente_id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if !w.ProcesarSiguiente(ctx) { // worker B reclaims the expired claim and publishes
+		t.Fatal("worker B: want the expired claim reclaimed")
+	}
+	w.Procesar(ctx, lento) // worker A wakes up with its old claim
+
+	var got struct {
+		Estado    string `db:"estado"`
+		Pasajes   int    `db:"pasajes_count"`
+		Filas     int    `db:"filas"`
+		Versiones int    `db:"versiones"`
+	}
+	if err := db.Get(&got, `SELECT f.estado, v.pasajes_count,
+		       (SELECT COUNT(*) FROM pasajes p WHERE p.fuente_version_id = v.id) AS filas,
+		       (SELECT COUNT(*) FROM fuente_versiones WHERE fuente_id = f.id) AS versiones
+		FROM fuentes f JOIN fuente_versiones v ON v.id = f.version_vigente_id WHERE f.id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if got.Estado != fuentes.EstadoActiva || got.Pasajes != 1 || got.Filas != 1 || got.Versiones != 1 {
+		t.Errorf("after the stale worker: %+v; want activa with its single passage once", got)
+	}
+	detalleAudit(t, db, desdeAudit, fuentes.AccionProcesar, id) // exactly one fuente.procesar
+	var fallos int
+	if err := db.Get(&fallos, `SELECT COUNT(*) FROM audit_log WHERE id > $1 AND accion = $2 AND entidad_id = $3`,
+		desdeAudit, fuentes.AccionFallar, id); err != nil || fallos != 0 {
+		t.Errorf("fuente.fallar rows %d (err %v), want 0", fallos, err)
+	}
+}

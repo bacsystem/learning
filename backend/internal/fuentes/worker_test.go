@@ -16,11 +16,13 @@ type colaFalsa struct {
 	versiones []VersionReclamada
 	err       error
 	vacia     chan struct{}
+	errCtx    []error // ctx.Err() seen by each claim
 }
 
-func (c *colaFalsa) Reclamar(context.Context) (VersionReclamada, bool, error) {
+func (c *colaFalsa) Reclamar(ctx context.Context) (VersionReclamada, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.errCtx = append(c.errCtx, ctx.Err())
 	if c.err != nil {
 		return VersionReclamada{}, false, c.err
 	}
@@ -230,5 +232,20 @@ func TestIngestaWorker_Run(t *testing.T) {
 	<-hecho
 	if len(pub.publicados) != 2 {
 		t.Errorf("published %d versions, want 2", len(pub.publicados))
+	}
+}
+
+// Seguimiento del #110: a shutdown that lands between Run's check and the
+// claim must not cancel the claim half-way; the claimed version is processed.
+func TestIngestaWorker_ReclamoNoSeCancelaAlApagar(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // shutdown already signalled when the claim starts
+	pub := &publicadorFalso{}
+	cola := &colaFalsa{versiones: []VersionReclamada{{FuenteID: 1, Version: 1, Contenido: []byte(strings.Repeat("palabra ", 200)), Intentos: 1}}}
+	if !NewIngestaWorker(cola, pub, nil).procesarSiguiente(ctx) {
+		t.Fatal("want the version claimed")
+	}
+	if cola.errCtx[0] != nil || len(pub.publicados) != 1 {
+		t.Errorf("claim ctx err %v, %d published; want nil and 1", cola.errCtx[0], len(pub.publicados))
 	}
 }
