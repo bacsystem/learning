@@ -569,7 +569,7 @@
     "admin-preguntas-import-fila": "Row {n}:",
     "admin-preguntas-eliminada": "Question deleted successfully.",
     "admin-preguntas-estado": "Status",
-    "admin-preguntas-estado-activo": "Active",
+    "admin-preguntas-estado-activo": "Active (legacy)",
     "admin-preguntas-estado-eliminada": "Deleted",
     "admin-preguntas-reintentar": "Retry",
     "admin-preguntas-importar-csv": "Import CSV",
@@ -1679,6 +1679,22 @@
         "correcta": "Successful",
         "fallida": "Failed"
       }
-    }
+    },
+    "admin-preguntas-estado-borrador": "Draft",
+    "admin-preguntas-estado-en-revision": "In review",
+    "admin-preguntas-estado-aprobada": "Approved",
+    "admin-preguntas-estado-rechazada": "Rejected",
+    "admin-preguntas-origen": "Origin",
+    "admin-preguntas-origen-manual": "Manual",
+    "admin-preguntas-origen-balotario": "Question bank",
+    "admin-preguntas-origen-ia": "AI",
+    "admin-preguntas-filtro-origen-todos": "Origin: all",
+    "admin-preguntas-citas": "Citations",
+    "admin-preguntas-creada-borrador": "Question created as a draft. It is published once approved.",
+    "admin-preguntas-aviso-edicion-titulo": "This question is published",
+    "admin-preguntas-aviso-edicion-texto": "If you change the statement, type, options, answer key or feedback, it moves to “In review” and stops being shown to applicants until it is approved again. Other fields do not change its status.",
+    "admin-preguntas-aviso-clave-oficial": "It comes from a question bank: its official answer key cannot be changed.",
+    "admin-preguntas-error-estado-invalido": "The question cannot be deleted in its current status. Reload the list.",
+    "admin-preguntas-error-clave-oficial": "The official answer key of a question bank question cannot be changed."
   }
 }

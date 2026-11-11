@@ -569,7 +569,7 @@
     "admin-preguntas-import-fila": "Fila {n}:",
     "admin-preguntas-eliminada": "Pregunta eliminada exitosamente.",
     "admin-preguntas-estado": "Estado",
-    "admin-preguntas-estado-activo": "Activo",
+    "admin-preguntas-estado-activo": "Activa (heredada)",
     "admin-preguntas-estado-eliminada": "Eliminada",
     "admin-preguntas-reintentar": "Reintentar",
     "admin-preguntas-importar-csv": "Importar CSV",
@@ -1679,6 +1679,22 @@
         "correcta": "Correcta",
         "fallida": "Fallida"
       }
-    }
+    },
+    "admin-preguntas-estado-borrador": "Borrador",
+    "admin-preguntas-estado-en-revision": "En revisión",
+    "admin-preguntas-estado-aprobada": "Aprobada",
+    "admin-preguntas-estado-rechazada": "Rechazada",
+    "admin-preguntas-origen": "Origen",
+    "admin-preguntas-origen-manual": "Manual",
+    "admin-preguntas-origen-balotario": "Balotario",
+    "admin-preguntas-origen-ia": "IA",
+    "admin-preguntas-filtro-origen-todos": "Origen: todos",
+    "admin-preguntas-citas": "Citas",
+    "admin-preguntas-creada-borrador": "Pregunta creada en borrador. Se publica cuando se aprueba.",
+    "admin-preguntas-aviso-edicion-titulo": "Esta pregunta está publicada",
+    "admin-preguntas-aviso-edicion-texto": "Si cambias el enunciado, el tipo, las alternativas, la clave o la retroalimentación, pasará a «En revisión» y dejará de mostrarse a los postulantes hasta que se vuelva a aprobar. Los demás datos no cambian su estado.",
+    "admin-preguntas-aviso-clave-oficial": "Viene de un balotario: su clave oficial no se puede cambiar.",
+    "admin-preguntas-error-estado-invalido": "La pregunta no se puede eliminar en su estado actual. Recarga la lista.",
+    "admin-preguntas-error-clave-oficial": "La clave oficial de una pregunta de balotario no se puede cambiar."
   }
 }

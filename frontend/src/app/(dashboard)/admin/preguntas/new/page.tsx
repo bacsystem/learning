@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
+import { useToast } from "@/components/feedback/toast";
 import { CabeceraPagina, EnlaceVolver } from "@/components/patrones/cabecera-pagina";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, Especialidad, Grado, Proceso, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
@@ -25,6 +26,7 @@ const DEFAULT_RESPUESTAS: RespuestaRow[] = [
 export default function NuevaPreguntaPage() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const toast = useToast();
   const router = useRouter();
 
   const [procesos, setProcesos] = useState<Proceso[]>([]);
@@ -159,6 +161,8 @@ export default function NuevaPreguntaPage() {
           ? { explicacion: retroExplicacion, referencia: retroReferencia || null }
           : null,
       });
+      // P1 (SIA-E3-02): toda pregunta nueva nace en borrador y no se sirve hasta aprobarla.
+      toast.ok(t("admin-preguntas-creada-borrador"));
       router.push("/admin/preguntas");
     } catch (e: unknown) {
       const err = e as { message?: string };
