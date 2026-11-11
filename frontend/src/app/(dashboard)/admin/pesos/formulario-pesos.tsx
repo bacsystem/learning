@@ -10,7 +10,7 @@ import { Entrada } from "@/components/formularios/campo";
 import { Combobox } from "@/components/formularios/combobox";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { Chip } from "@/components/patrones/pill-estado";
-import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, ETIQUETA_CAMPO } from "@/lib/estilos";
+import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, ETIQUETA_CAMPO, OBJETIVO_TACTIL } from "@/lib/estilos";
 import type { AreaPesoPayload, ConfiguracionPesos } from "@/lib/serums-ia/pesos/api";
 import { mensajeErrorPesos } from "@/lib/serums-ia/pesos/errores";
 import {
@@ -178,7 +178,7 @@ export function FormularioPesos({
                       onClick={() => establecer(areas.filter((_, j) => j !== i))}
                       aria-label={t("serumsIa.pesos.quitar", { nombre: a.nombre })}
                       title={t("serumsIa.pesos.quitar", { nombre: a.nombre })}
-                      className={cn(ACCION_SECUNDARIA, "px-2.5 sm:hidden")}
+                      className={cn(OBJETIVO_TACTIL, ACCION_SECUNDARIA, "px-2.5 sm:hidden")}
                     >
                       <TrashIcon className="size-4" />
                     </button>
@@ -212,7 +212,7 @@ export function FormularioPesos({
                     onClick={() => establecer(areas.filter((_, j) => j !== i))}
                     aria-label={t("serumsIa.pesos.quitar", { nombre: a.nombre })}
                     title={t("serumsIa.pesos.quitar", { nombre: a.nombre })}
-                    className={cn(ACCION_SECUNDARIA, "justify-center px-2.5 max-sm:hidden")}
+                    className={cn(OBJETIVO_TACTIL, ACCION_SECUNDARIA, "justify-center px-2.5 max-sm:hidden")}
                   >
                     <TrashIcon className="size-4" />
                   </button>

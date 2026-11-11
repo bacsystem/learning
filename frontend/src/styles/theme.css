@@ -93,6 +93,8 @@
   --shadow-elevada: var(--sombra-elevada);
   /* Altura única de control (docs/design-system.md §4): 32 px. `h-control`, `size-control`, `min-h-control`. */
   --spacing-control: 2rem;
+  /* Objetivo táctil (docs/design-system.md §4): 44 px, el área mínima de toque con el dedo (WCAG 2.5.5). La usa la receta `OBJETIVO_TACTIL`. */
+  --spacing-objetivo-tactil: 2.75rem;
   /* Escala tipográfica con nombre (docs/design-system.md §3). `npm run check:tipografia` prohíbe los tamaños sueltos. */
   --text-etiqueta: 0.71875rem;
   --text-etiqueta--line-height: 1rem;

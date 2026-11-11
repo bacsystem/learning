@@ -23,6 +23,15 @@ export const pasoEntrada = (i: number) => ({ "--i": i }) as CSSProperties;
 export const FOCO =
   "outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
+/**
+ * Objetivo táctil: con puntero grueso (dedo) amplía el área que acepta el toque a 44×44 px (`--spacing-objetivo-tactil`) con un
+ * `::after` invisible centrado, sin cambiar el tamaño que se ve. Con mouse no hace nada. Va en botones de icono **sueltos** (cerrar,
+ * «⋯», hamburguesa): en un grupo apretado el halo taparía al vecino. Trae `relative`; ponla primera en `cn` para que un `absolute`
+ * propio la pise.
+ */
+export const OBJETIVO_TACTIL =
+  "relative pointer-coarse:after:absolute pointer-coarse:after:top-1/2 pointer-coarse:after:left-1/2 pointer-coarse:after:size-full pointer-coarse:after:min-h-objetivo-tactil pointer-coarse:after:min-w-objetivo-tactil pointer-coarse:after:-translate-x-1/2 pointer-coarse:after:-translate-y-1/2";
+
 const TRANSICION_CONTROL =
   "transition-[color,background-color,border-color,box-shadow,transform] duration-(--duracion-rapida) ease-salida";
 const DESHABILITADO = "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-60";
