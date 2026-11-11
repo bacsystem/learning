@@ -15,8 +15,9 @@ interface ErrorBody {
   detalle?: Record<string, unknown>;
 }
 
+/** Solo un texto no vacío cuenta: `""` se trata igual que un campo ausente. */
 function stringOrUndefined(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
+  return typeof value === "string" && value !== "" ? value : undefined;
 }
 
 function parseErrorBody(raw: unknown): ErrorBody {
@@ -35,7 +36,7 @@ export async function apiErrorFrom(res: Response): Promise<ApiError> {
   const body = parseErrorBody(await res.json().catch(() => null));
   return Object.assign(new Error(body.message ?? body.error ?? res.statusText), {
     status: res.status,
-    code: body.message ? body.error : undefined,
+    code: body.message !== undefined ? body.error : undefined,
     detalle: body.detalle,
   });
 }
