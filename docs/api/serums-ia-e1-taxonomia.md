@@ -383,13 +383,16 @@ Rol usuario (cualquier autenticado). Alimenta el selector.
 
 - `procesos` = solo procesos donde el usuario tiene inscripción `aprobado` (`internal/examen/examen.go:141-149`). Sin ninguna, `procesos: []` y la UI explica que hace falta una inscripción aprobada.
 - `especialidades` = especialidades `activo` de la institución del proceso. `pesos` es `completa` si existe el conjunto (ADR 0001) y `estimada` en otro caso (regla 2).
-- `preseleccion`:
-  - si hay perfil activo, es ese perfil;
-  - si no hay perfil activo, `especialidad_id` es la especialidad de los datos de persona del usuario (regla 5);
-  - en otro caso, `null`.
+- `preseleccion` es un objeto `{"proceso_id": P | null, "especialidad_id": E}` o `null`. Nunca va un objeto con `especialidad_id: null`. Se calcula así (aclaración del 2026-11-11, pregunta de backend-dev):
+  1. **Perfil activo**, si su `proceso_id` está en `procesos` y su `especialidad_id` está entre las `especialidades` de ese proceso → `{proceso_id, especialidad_id}` del perfil.
+  2. Si no (no hay perfil, o el perfil ya no cumple el punto 1 porque se revocó la inscripción o la especialidad se desactivó): la **especialidad de persona**, si es válida (ver abajo) → `{proceso_id: único proceso o null, especialidad_id: E}`.
+  3. Si no → `preseleccion: null` (escenario «Sin preselección válida»: el selector viene vacío).
+  - **Invariante:** todo id de `preseleccion` aparece en `procesos`, así la UI nunca recibe una sugerencia que no puede mostrar.
+  - Si hay un solo proceso pero no hay especialidad válida, `preseleccion` es `null`. La UI puede elegir sola el único proceso de `procesos`; el servidor no lo sugiere.
+  - Un perfil cuya inscripción se revocó no sale en F1. F2 sigue respondiendo `403 inscripcion_requerida` para ese perfil.
 - Cómo se obtiene la especialidad de persona:
   - Se lee de la **base de datos** en cada request: `SELECT p.especialidad_id FROM usuarios u JOIN personas p ON p.id = u.persona_id WHERE u.id = $1` (FK `usuarios.persona_id`, ver `usuarios_persona_id_key` en `auth/repository.go:380`). No se usa `claims.EspecialidadID`, porque es el valor que se copió al emitir el JWT y puede estar desactualizado.
-  - Solo se usa si cumple la regla 2: existe, está `activo` y figura entre las `especialidades` de algún proceso de la respuesta. Si no la cumple, `especialidad_id` es `null` (escenario «Sin preselección válida»).
+  - Solo se usa si cumple la regla 2: existe, está `activo` y figura entre las `especialidades` de algún proceso de la respuesta. Si no la cumple, no hay sugerencia de persona y se aplica el punto 3 (`preseleccion: null`).
   - `proceso_id` de la preselección es el único proceso disponible si hay uno solo; si hay varios, `null`.
 - F1 es de solo lectura: no guarda nada y no modifica `personas` (reglas 5–6).
 
@@ -577,7 +580,7 @@ DROP TABLE IF EXISTS postulante_profesiones;
 | E1-03 | Acceso a la pantalla | guard admin del layout + `RequireAdmin` en PE1–PE3 |
 | E1-04 | Elegir profesión (muestra áreas) | F3 + F2 `pesos` |
 | E1-04 | Preselección desde los datos de persona (sin guardar) | F1 `preseleccion` leída de la BD |
-| E1-04 | Sin preselección válida | F1 `preseleccion.especialidad_id = null` |
+| E1-04 | Sin preselección válida | F1 `preseleccion = null` |
 | E1-04 | Elegir otra profesión no cambia los datos de persona | F3 no toca `personas` |
 | E1-04 | Sin inscripción aprobada → 403 | F3 regla 2; F1 `procesos: []` para la explicación |
 | E1-04 | Cambio de profesión (archiva dominio, el nuevo vacío) | F3 reglas 5–6, `postulante_profesiones.estado` (el dominio llega con E4-03) |
