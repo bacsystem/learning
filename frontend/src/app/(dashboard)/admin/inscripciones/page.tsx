@@ -2,6 +2,7 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { DialogContent } from "@/components/app/dialogo";
 import { type ColumnaListado, TablaListado } from "@/components/app/tabla-listado";
 import { Alerta } from "@/components/feedback/alerta";
 import { useToast } from "@/components/feedback/toast";
@@ -13,7 +14,7 @@ import type { Tono } from "@/components/patrones/metricas";
 import { Chip, PillEstado } from "@/components/patrones/pill-estado";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { GrupoBotones } from "@/components/ui/grupo-botones";
 import { useAuth } from "@/lib/auth/auth-context";
 import { BOTON_DESTRUCTIVO, BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA } from "@/lib/estilos";

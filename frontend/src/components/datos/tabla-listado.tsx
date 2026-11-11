@@ -2,7 +2,7 @@
 
 import { type ReactNode, useMemo, useState } from "react";
 
-import { type Columna, TablaDatos } from "@/components/datos/tabla-datos";
+import { type Columna, TablaDatos, type TextosTablaDatos } from "@/components/datos/tabla-datos";
 import { Buscador } from "@/components/formularios/buscador";
 import {
   Menu,
@@ -105,9 +105,10 @@ export function TablaListado<T>({
   exportar?: boolean;
   filtros?: ReactNode;
   acciones?: ReactNode;
-  textos?: Partial<TextosTablaListado>;
+  /** Textos de la barra y, además, los de la tabla (`TextosTablaDatos`), que se pasan a `TablaDatos`. */
+  textos?: Partial<TextosTablaListado & TextosTablaDatos>;
   onImpresionBloqueada?: () => void;
-} & Omit<React.ComponentProps<typeof TablaDatos<T>>, "columnas" | "filas" | "clave">) {
+} & Omit<React.ComponentProps<typeof TablaDatos<T>>, "columnas" | "filas" | "clave" | "textos">) {
   const textos = { ...TEXTOS_ES, ...textosParciales };
   const textoBusqueda = placeholderBusqueda ?? textos.buscar;
   const [busqueda, setBusqueda] = useState("");
@@ -208,6 +209,7 @@ export function TablaListado<T>({
         clave={clave}
         {...resto}
         reinicioPagina={reinicio}
+        textos={textosParciales}
         onOrdenCambio={(o) => {
           setOrden(o);
           resto.onOrdenCambio?.(o);

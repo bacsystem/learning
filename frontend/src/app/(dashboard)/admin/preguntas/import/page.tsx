@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import React, { useEffect, useRef, useState } from "react";
 
+import { PieTabla } from "@/components/app/pie-tabla";
 import { Alerta } from "@/components/feedback/alerta";
 import { Campo } from "@/components/formularios/campo";
 import { SelectCampo } from "@/components/formularios/select-campo";
@@ -12,7 +13,7 @@ import { BotonAsync } from "@/components/patrones/boton-async";
 import { CabeceraPagina, EnlaceVolver } from "@/components/patrones/cabecera-pagina";
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { FilaMetricas, Metrica } from "@/components/patrones/metricas";
-import { CONTENEDOR_TABLA, FilaVacia, PieTabla } from "@/components/patrones/pie-tabla";
+import { CONTENEDOR_TABLA, FilaVacia } from "@/components/patrones/pie-tabla";
 import { Chip, PillEstado } from "@/components/patrones/pill-estado";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

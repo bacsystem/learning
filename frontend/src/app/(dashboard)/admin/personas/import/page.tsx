@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
-import { type Columna, TablaDatos } from "@/components/datos/tabla-datos";
+import { TablaDatos } from "@/components/app/tabla-datos";
+import { type Columna } from "@/components/datos/tabla-datos";
 import { Alerta } from "@/components/feedback/alerta";
 import { ZonaArchivos } from "@/components/formularios/zona-archivos";
 import { Pasos } from "@/components/navegacion/pasos";

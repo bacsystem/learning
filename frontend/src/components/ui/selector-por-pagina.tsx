@@ -3,14 +3,25 @@
 import { OPCIONES_POR_PAGINA } from "@/lib/paginacion";
 import { cn } from "@/lib/utils";
 
-export function SelectorPorPagina({ valor, onCambio }: { valor: number; onCambio: (n: number) => void }) {
+/** `etiqueta` es el nombre del grupo para el lector de pantalla y `textoFilas` el rótulo visible; por defecto en castellano. */
+export function SelectorPorPagina({
+  valor,
+  onCambio,
+  etiqueta = "Filas por página",
+  textoFilas = "Filas",
+}: {
+  valor: number;
+  onCambio: (n: number) => void;
+  etiqueta?: string;
+  textoFilas?: string;
+}) {
   return (
     <div
       className="text-etiqueta text-muted-foreground inline-flex items-center gap-2"
       role="group"
-      aria-label="Filas por página"
+      aria-label={etiqueta}
     >
-      <span>Filas</span>
+      <span>{textoFilas}</span>
       <div className="h-control border-border bg-card inline-flex items-center rounded-lg border p-0.5 shadow-xs">
         {OPCIONES_POR_PAGINA.map((n) => (
           <button

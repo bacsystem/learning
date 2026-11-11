@@ -3,8 +3,10 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
+import { DialogContent } from "@/components/app/dialogo";
+import { TablaDatos } from "@/components/app/tabla-datos";
 import { GraficoBarras } from "@/components/datos/grafico";
-import { type Columna, TablaDatos } from "@/components/datos/tabla-datos";
+import { type Columna } from "@/components/datos/tabla-datos";
 import { Alerta } from "@/components/feedback/alerta";
 import { EstadoVacio } from "@/components/feedback/estado-vacio";
 import { Skeleton, SkeletonMetricas } from "@/components/feedback/skeleton";
@@ -15,7 +17,7 @@ import { CabeceraDialogo, PieDialogo } from "@/components/patrones/cabecera-dial
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { FilaMetricas, Metrica } from "@/components/patrones/metricas";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import {
   adminGetIngresos,
   adminGetIngresosConfig,

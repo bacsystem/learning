@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { DialogContent } from "@/components/app/dialogo";
 import { Alerta } from "@/components/feedback/alerta";
 import { Skeleton } from "@/components/feedback/skeleton";
 import { Campo } from "@/components/formularios/campo";
@@ -13,7 +14,7 @@ import { CabeceraDialogo, PieDialogo } from "@/components/patrones/cabecera-dial
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { Chip } from "@/components/patrones/pill-estado";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth/auth-context";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA, ROTULO, TARJETA } from "@/lib/estilos";
 import { type IconoComponente, PESO_ICONO } from "@/lib/iconos";
