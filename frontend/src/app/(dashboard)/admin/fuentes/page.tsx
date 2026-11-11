@@ -201,7 +201,8 @@ export default function FuentesPage() {
               ) : (
                 filas.map((f) => (
                   <TableRow key={f.id}>
-                    <TableCell className="max-w-80 whitespace-normal">
+                    {/* `min-w-48`: en celular la tabla se desplaza dentro de su contenedor y el título no se parte letra a letra. */}
+                    <TableCell className="max-w-80 min-w-48 whitespace-normal">
                       <div className="grid min-w-0 gap-1 wrap-anywhere">
                         <Link
                           href={`/admin/fuentes/${f.id}`}
