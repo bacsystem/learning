@@ -20,6 +20,7 @@ depende_de: [SIA-E5-03]
 4. Se identifica como «dirigido» en el historial; su nota no se compara con simulacros completos.
 5. Exige inscripción aprobada (403).
 6. Un simulacro en curso por usuario y proceso (409 si ya existe uno).
+7. Si los pesos de la profesión no están completos (SIA-E1-03), el 30 % restante se reparte con pesos iguales; el simulacro dirigido sí está disponible, guarda `pesos_estimados: true` y muestra el aviso «Pesos estimados». Solo el simulacro oficial (SIA-E9-05) exige pesos completos (decisión P6, issue #65).
 
 ## Criterios de aceptación
 ```gherkin
@@ -47,6 +48,11 @@ Escenario: Tiempo agotado
   Dado un simulacro dirigido con el plazo vencido
   Cuando el usuario responde una pregunta
   Entonces recibe 409 "tiempo_agotado" (comportamiento existente)
+
+Escenario: Pesos estimados
+  Dado una profesión con configuración de pesos "incompleta"
+  Cuando el usuario crea un simulacro dirigido
+  Entonces se crea con "pesos_estimados": true y se muestra el aviso «Pesos estimados»
 
 Escenario: Sin inscripción aprobada
   Dado un usuario sin inscripción aprobada

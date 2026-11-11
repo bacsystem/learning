@@ -22,6 +22,8 @@ Extiende el import con preview existente. Entrada: una fuente de tipo `balotario
 3. La confirmación es idempotente por (fuente, versión): importar dos veces no duplica (409 `ya_importado`).
 4. Máx. 1 000 preguntas por importación; la operación es atómica (todo o nada).
 5. Se audita con la fuente, la versión y los totales.
+6. La vista previa indica si la versión vigente de la fuente es «oficial verificada» (SIA-E2-06) y explica la ruta de revisión que tendrán las preguntas en SIA-E3-05: revisión de clasificación y estructura (fuente oficial verificada) o verificación explícita de clave (fuente no oficial). Decisión P2, issue #65.
+7. Cada pregunta creada guarda sus `alertas_estructura` (SIA-E3-01). La ruta de revisión no se fija al importar: se calcula en servidor al aprobar (SIA-E3-05), según la marca vigente de la fuente en ese momento.
 
 ```mermaid
 sequenceDiagram
@@ -53,6 +55,16 @@ Escenario: Confirmar
   Dado una vista previa con 580 preguntas válidas
   Cuando confirma con especialidad Medicina y proceso SERUMS 2026-I
   Entonces se crean 580 preguntas en "borrador" con origen "balotario" y cita a la fuente
+
+Escenario: Vista previa de fuente oficial verificada
+  Dado un balotario ingerido cuya versión vigente está marcada como oficial verificada por "MINSA"
+  Cuando el admin abre la vista previa
+  Entonces ve la insignia «Oficial verificada · MINSA» y el aviso de que la revisión será de clasificación y estructura
+
+Escenario: Vista previa de fuente no oficial
+  Dado un balotario ingerido sin marca oficial verificada
+  Cuando el admin abre la vista previa
+  Entonces ve el aviso de que cada pregunta exigirá verificación explícita de la clave
 
 Escenario: Doble importación
   Dado una versión de balotario ya importada

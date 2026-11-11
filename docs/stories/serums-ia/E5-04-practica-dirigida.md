@@ -22,6 +22,7 @@ Reutiliza `practicas` (inscripción aprobada obligatoria). Solo cambia la selecc
 3. Si el área tiene menos preguntas que las pedidas, se usan las disponibles y se informa; si el total es 0, 422 `sin_preguntas`.
 4. Exige inscripción aprobada (403 si no); la práctica creada es del usuario.
 5. Se puede elegir manualmente un área desde el dashboard («Practicar esta área»).
+6. Si los pesos de la profesión no están completos (SIA-E1-03), la priorización usa pesos iguales; la práctica se crea igual, guarda `pesos_estimados: true` y muestra el aviso «Pesos estimados» (decisión P6, issue #65).
 
 ## Criterios de aceptación
 ```gherkin
@@ -49,6 +50,11 @@ Escenario: Sin inscripción aprobada
   Dado un usuario sin inscripción aprobada
   Cuando pulsa «Practicar mis áreas débiles»
   Entonces recibe 403
+
+Escenario: Pesos estimados
+  Dado una profesión con configuración de pesos "incompleta"
+  Cuando el usuario pulsa «Practicar mis áreas débiles»
+  Entonces se crea la práctica con "pesos_estimados": true y se muestra el aviso «Pesos estimados»
 
 Escenario: Área manual
   Dado el dashboard con varias áreas

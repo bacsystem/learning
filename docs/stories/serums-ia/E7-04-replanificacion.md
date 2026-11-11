@@ -14,11 +14,12 @@ depende_de: [SIA-E7-03]
 **Como** postulante, **quiero** que el plan se ajuste cuando me atraso o cambia mi dominio, **para** no quedar con un plan obsoleto.
 
 ## Reglas de negocio
-1. Se propone replanificar (no se hace sin confirmación) cuando: (a) hay ≥ 3 días consecutivos con bloques sin marcar, o (b) el puntaje de prioridad de un área cambió más de 30 % desde la generación, o (c) cambió la fecha de examen o las horas.
+1. Se propone replanificar (no se hace sin confirmación) cuando: (a) hay ≥ 3 días consecutivos con bloques sin marcar, o (b) el puntaje de prioridad de un área cambió más de 30 % desde la generación, o (c) cambió la fecha de examen o las horas, incluida la propagación automática de la fecha oficial del hito `examen` (SIA-E7-01, decisión P5, issue #65).
 2. La propuesta se muestra con un resumen de los cambios; al confirmar se ejecuta el generador (SIA-E7-02) desde hoy y el plan anterior queda `reemplazado`.
 3. Máx. 1 propuesta por día; si el usuario la descarta, no se repite en 3 días salvo cambio de fecha.
 4. El bloque marcado hecho nunca se modifica.
 5. No se replanifica a menos de 2 días del examen.
+6. Un cambio de fecha propagado desde el cronograma genera la propuesta en la siguiente evaluación diaria aunque el usuario haya descartado otra en los últimos 3 días; la propuesta indica «La fecha oficial del examen cambió» con la fecha anterior y la nueva.
 
 ```mermaid
 flowchart TD
@@ -30,7 +31,7 @@ flowchart TD
   D -- Si --> P[Propone replanificar]
   D -- No --> E{Puntaje de un area cambio mas de 30 por ciento}
   E -- Si --> P
-  E -- No --> F{Cambio la fecha de examen o las horas}
+  E -- No --> F{Cambio la fecha de examen propia u oficial propagada o las horas}
   F -- Si --> P
   F -- No --> X3[No propone]
   P --> G{Usuario confirma}
@@ -49,6 +50,11 @@ Escenario: Cambio de dominio
   Dado un área cuyo puntaje subió 35 % desde la generación
   Cuando corre la evaluación diaria del plan
   Entonces se propone replanificar
+
+Escenario: Fecha oficial propagada
+  Dado un plan con fecha de origen oficial y una propuesta descartada hace 1 día
+  Cuando se propaga una nueva fecha del hito "examen" y corre la evaluación diaria
+  Entonces se propone replanificar con «La fecha oficial del examen cambió», la fecha anterior y la nueva
 
 Escenario: Confirmar
   Dado una propuesta de replanificación visible

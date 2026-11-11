@@ -20,8 +20,9 @@ Botones «Material de estudio» y «Preguntas tipo SERUMS» en cada área débil
 1. «Material»: si existe material aprobado del área/tema, se abre de inmediato; si no, se ofrece «Solicitar al equipo» (crea una solicitud para admin, SIA-E6-06) y se informa que se revisará antes de mostrarse.
 2. «Preguntas»: abre una práctica con preguntas aprobadas (SIA-E5-04); si hay menos de 10, se ofrece solicitar más al equipo.
 3. El alumno nunca ve contenido generado que no esté aprobado.
-4. Las solicitudes cuentan para el límite de 5 por día y 60 por mes (README) y se informa el consumo restante.
-5. Se evita duplicar una solicitud abierta del mismo (área, tema).
+4. Encolar una solicitud al equipo no llama al LLM y **no descuenta cuota de IA** del postulante (decisión P3, issue #65; SIA-E6-02 regla 7). La generación posterior la hace un admin y descuenta de su propio límite.
+5. Se evita duplicar una solicitud abierta del mismo (área, tema) (409 `solicitud_abierta`).
+6. Para evitar abuso sin cuota IA: máx. 5 solicitudes abiertas a la vez por postulante (429 `limite_solicitudes`); al atenderse o descartarse una, se libera el cupo.
 
 ## Criterios de aceptación
 ```gherkin
@@ -40,10 +41,20 @@ Escenario: Solicitud duplicada
   Cuando el usuario solicita de nuevo ese tema
   Entonces recibe 409 "solicitud_abierta"
 
-Escenario: Límite diario
-  Dado 5 solicitudes hoy
-  Cuando el usuario hace otra solicitud
-  Entonces recibe 429 con la hora de reinicio
+Escenario: Solicitud no descuenta cuota de IA
+  Dado un postulante con 2 de 5 acciones IA reales consumidas hoy
+  Cuando crea una solicitud al equipo
+  Entonces la solicitud se crea y su consumo de IA sigue en 2 de 5
+
+Escenario: Cuota de IA agotada no bloquea la solicitud
+  Dado un postulante con 5 de 5 acciones IA reales consumidas hoy
+  Cuando crea una solicitud al equipo de un tema nuevo
+  Entonces la solicitud se crea
+
+Escenario: Límite de solicitudes abiertas
+  Dado un postulante con 5 solicitudes abiertas
+  Cuando crea otra solicitud
+  Entonces recibe 429 "limite_solicitudes"
 
 Escenario: Ningún contenido sin aprobar
   Dado un material en borrador cuyo id conoce el usuario

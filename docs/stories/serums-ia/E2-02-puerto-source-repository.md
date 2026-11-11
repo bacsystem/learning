@@ -52,7 +52,7 @@ Escenario: Intercambiabilidad
 ```
 
 ## Fuera de alcance
-Adaptador NotebookLM (SIA-E2-08); búsqueda semántica con embeddings (decisión técnica futura).
+Búsqueda semántica (pgvector o NotebookLM): se reevalúa en v3 (SIA-E2-01, SIA-E2-08; decisión P1, issue #65). El MVP y la v2 operan al 100 % sobre este adaptador propio.
 
 ## Dependencias
 Ninguna.

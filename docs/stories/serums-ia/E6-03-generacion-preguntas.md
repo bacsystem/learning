@@ -42,9 +42,9 @@ sequenceDiagram
 2. Si no hay al menos 3 pasajes relevantes de fuentes activas, se rechaza con 422 `fuentes_insuficientes` (no se inventa).
 3. Cada pregunta debe incluir: enunciado, 4 alternativas (única) o 4–5 (múltiple), clave(s), ≥1 cita (id de pasaje) a un pasaje que sustente la clave, y un campo de incertidumbre.
 4. Origen `ia`, estado `borrador`; el modelo y la versión de prompt se guardan como metadatos de procedencia.
-5. Máx. 20 preguntas por solicitud y 200 por día por admin.
+5. Máx. 20 preguntas por solicitud; cada solicitud que llama al LLM cuenta como acción IA real contra el límite de 200 por día por admin (SIA-E6-02, decisión P3, issue #65).
 6. Se aplica deduplicación (SIA-E3-06) a los borradores creados.
-7. Consume límites y registra uso (SIA-E6-02).
+7. Consume límites y presupuesto global (40 USD/mes, corte al 100 %) y registra uso en USD (SIA-E6-02).
 8. Se audita (actor, parámetros, n creadas).
 
 ## Criterios de aceptación
@@ -65,9 +65,14 @@ Escenario: Cantidad fuera de límite
   Entonces recibe 422
 
 Escenario: Límite diario
-  Dado un admin con 200 preguntas generadas hoy
+  Dado un admin con 200 acciones IA reales hoy
   Cuando pide generar más preguntas
-  Entonces recibe 429 "limite_ia"
+  Entonces recibe 429 "limite_ia" y no se llama a la IA
+
+Escenario: Presupuesto agotado
+  Dado el presupuesto global del mes consumido al 100 %
+  Cuando el admin pide generar preguntas
+  Entonces recibe 429 "presupuesto_agotado" y no se llama a la IA
 
 Escenario: Pregunta sin cita
   Dado una respuesta de la IA con una pregunta sin citas

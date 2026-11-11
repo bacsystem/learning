@@ -6,7 +6,7 @@ fase: v2
 prioridad: Alta
 estimacion: 3
 roles: [usuario, admin]
-depende_de: [SIA-E4-03]
+depende_de: [SIA-E4-03, SIA-E6-02]
 ---
 
 # SIA-E9-07 Privacidad: exportar y borrar datos de aprendizaje
@@ -21,6 +21,9 @@ depende_de: [SIA-E4-03]
 5. Se registra en audit_log el hecho (usuario opaco, fecha) sin el contenido borrado.
 6. Los registros de uso de IA conservan solo el id opaco sin contenido; tras el borrado se desvinculan del usuario.
 7. Solo el dueño puede solicitarlo; un admin no puede exportar datos de un usuario desde esta función.
+8. Plazos aprobados (decisión P8, issue #65): máx. 1 exportación por hora por usuario; borrado completado en ≤ 24 h desde la confirmación.
+9. Contadores antifraude que **no se borran**: el contador de acciones IA (SIA-E6-02) y el cooldown de diagnóstico de 30 días (SIA-E4-01). Se conservan bajo `HMAC(usuario_id)` con un secreto de servidor, sin id en claro ni otros datos personales, para que borrar y volver a empezar no reinicie la cuota ni la espera. Cada uno se elimina al vencer su periodo (fin del mes en curso; 30 días desde el último diagnóstico).
+10. La pantalla de borrado informa antes de confirmar que la cuota de IA del mes y la espera del diagnóstico se mantienen.
 
 ```mermaid
 stateDiagram-v2
@@ -61,6 +64,21 @@ Escenario: Efecto del borrado
   Cuando el trabajo de borrado termina
   Entonces dominio, plan, cuaderno y repaso quedan vacíos y las estadísticas agregadas de preguntas se conservan
 
+Escenario: Plazo de borrado
+  Dado una solicitud de borrado confirmada
+  Cuando pasan 24 h desde la confirmación
+  Entonces la solicitud consta "completado"
+
+Escenario: Contadores antifraude conservados
+  Dado un usuario con 5 acciones IA reales hoy y un diagnóstico finalizado hace 10 días
+  Cuando su borrado se completa
+  Entonces el contador de IA y el cooldown de diagnóstico siguen vigentes bajo el HMAC del usuario y no queda ningún otro dato de aprendizaje suyo
+
+Escenario: Aviso previo sobre contadores
+  Dado la pantalla de borrado de datos
+  Cuando el usuario la abre
+  Entonces ve que su cuota de IA del mes y la espera del diagnóstico se mantienen tras el borrado
+
 Escenario: Auditoría
   Dado una solicitud de borrado completada
   Cuando se revisa audit_log
@@ -81,10 +99,10 @@ Escenario: Aislamiento
 Borrado de la cuenta completa y de intentos históricos (política existente).
 
 ## Dependencias
-SIA-E4-03 y las tablas de E7 y E9 que existan al momento.
+SIA-E4-03 y las tablas de E7 y E9 que existan al momento; contadores HMAC de SIA-E6-02 y SIA-E4-01.
 
 ## Seguridad y privacidad
-Exportación solo autenticada, sin URL pública; sin PII en logs.
+Exportación solo autenticada, sin URL pública; sin PII en logs. El secreto del HMAC vive solo en variables de entorno; los contadores HMAC no se incluyen en la exportación porque no son datos de aprendizaje.
 
 ## i18n
 Pantalla, confirmación y notificaciones en es/en (palabra de confirmación por idioma).

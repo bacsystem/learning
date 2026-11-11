@@ -21,7 +21,7 @@ Es la barrera automática previa a la revisión humana; no la sustituye. Se apli
 2. Contenido con cualquier cita inválida: se descarta si no le quedan citas válidas; si le quedan, se conserva con la etiqueta `cita_invalida_eliminada`.
 3. Marca de incertidumbre (`incierto = true`) cuando ocurra al menos una: el modelo declara confianza < 0,80; una alternativa distractora aparece también respaldada en los pasajes; la clave no tiene extracto de apoyo; las citas provienen de menos de 1 pasaje distinto; hay discrepancia entre pasajes citados.
 4. Lo marcado `incierto` guarda sus motivos (lista de códigos) visibles al admin.
-5. Contenido `incierto` no puede aprobarse sin revisión explícita (ver SIA-E6-05).
+5. Contenido `incierto` no puede aprobarse sin revisión explícita: verificación de cita y nota obligatoria (ver SIA-E6-05). Esta exigencia se mantiene aunque el segundo revisor esté desactivado (decisión P4, issue #65).
 6. Salida de IA que no cumple el esquema se rechaza (SIA-E6-01).
 
 ## Criterios de aceptación

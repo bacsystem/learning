@@ -44,6 +44,8 @@ sequenceDiagram
 5. Un solo diagnóstico en curso por usuario; se permite repetir el diagnóstico una vez cada 30 días.
 6. Si un área tiene menos de 3 preguntas aprobadas, se omite y se informa que no fue medida.
 7. La clave y la explicación no se muestran hasta finalizar.
+8. El diagnóstico está disponible aunque falten los pesos de la profesión: si la configuración de SIA-E1-03 no está `completa`, el intento y su resultado (SIA-E4-02) llevan `pesos_estimados: true` y la pantalla muestra «Pesos estimados: aún no tenemos los pesos oficiales de tu profesión» (decisión P6, issue #65).
+9. Cooldown antifraude (decisión P8, issue #65): la fecha del último diagnóstico finalizado se registra también bajo `HMAC(usuario_id)` (secreto en variable de entorno), sin otros datos personales. Borrar los datos de aprendizaje (SIA-E9-07) no reinicia la espera de 30 días. El registro se elimina al cumplirse los 30 días.
 
 ## Criterios de aceptación
 ```gherkin
@@ -77,6 +79,21 @@ Escenario: Repetición temprana
   Cuando inicia otro
   Entonces recibe 409 "repeticion_no_permitida" con la fecha en que podrá
 
+Escenario: Cooldown tras borrado de datos
+  Dado un diagnóstico finalizado hace 10 días y el usuario borró después sus datos de aprendizaje
+  Cuando inicia otro diagnóstico
+  Entonces recibe 409 "repeticion_no_permitida" con la fecha en que podrá
+
+Escenario: Registro de cooldown sin datos personales
+  Dado el registro de cooldown de diagnóstico guardado
+  Cuando se inspecciona
+  Entonces solo contiene el HMAC del usuario y la fecha del último diagnóstico, sin id en claro, nombre, DNI ni email
+
+Escenario: Pesos estimados
+  Dado una profesión cuya configuración de pesos está "incompleta"
+  Cuando el usuario inicia el diagnóstico
+  Entonces el intento se crea con "pesos_estimados": true y la pantalla muestra el aviso de pesos estimados
+
 Escenario: Aislamiento
   Dado el diagnóstico de otro usuario
   Cuando un usuario consulta ese intento
@@ -92,10 +109,10 @@ Escenario: Borradores excluidos
 Diagnóstico adaptativo (selección dinámica según aciertos); resultado y dominio (SIA-E4-02, E4-03).
 
 ## Dependencias
-SIA-E3-05 (banco aprobado), SIA-E1-04.
+SIA-E3-05 (banco aprobado), SIA-E1-04, SIA-E1-03 (servicio de pesos con `pesos_estimados`, transitiva vía SIA-E1-04).
 
 ## Seguridad y privacidad
-Orden de alternativas estable por intento; la clave no viaja al cliente antes de finalizar. Logs solo con ids.
+Orden de alternativas estable por intento; la clave no viaja al cliente antes de finalizar. Logs solo con ids. El secreto del HMAC vive solo en variables de entorno.
 
 ## i18n
 Pantalla, instrucciones y errores en es/en; estados de carga/error.
