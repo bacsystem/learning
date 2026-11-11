@@ -1,6 +1,6 @@
+import { API_BASE } from "@/lib/http/api-base";
 import { apiErrorFrom } from "@/lib/http/api-error";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { avisarSiSesionExpirada } from "@/lib/http/sesion";
 
 async function req<T>(path: string, token: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -12,7 +12,7 @@ async function req<T>(path: string, token: string, options?: RequestInit): Promi
     ...options,
   });
   if (!res.ok) {
-    if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
+    avisarSiSesionExpirada(res.status);
     throw await apiErrorFrom(res);
   }
   return res.json() as Promise<T>;
@@ -27,7 +27,7 @@ async function reqMultipart<T>(path: string, token: string, form: FormData): Pro
     body: form,
   });
   if (!res.ok) {
-    if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
+    avisarSiSesionExpirada(res.status);
     throw await apiErrorFrom(res);
   }
   return res.json() as Promise<T>;

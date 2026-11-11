@@ -4,6 +4,8 @@ import { authApi, type UserProfile } from "./auth-api";
 import { esRutaPublica } from "./rutas-publicas";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
+import { escucharSesionExpirada, sesionExpirada } from "@/lib/http/sesion";
+
 const TOKEN_KEY = "auth_token";
 
 interface AuthState {
@@ -25,7 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({ user: null, token: null, loading: true });
 
   // Restore session from localStorage on mount. The request is silent: a stale
-  // token is cleared here without firing "auth:expired", so opening a public
+  // token is cleared here without firing the session-expired event, so opening a public
   // page (an e-mailed verify-email / password-new link) with an old token in
   // localStorage never redirects. Private pages are guarded by the dashboard
   // layout, which sends a session-less visitor to sign-in.
@@ -44,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Only a 401 means the session is gone. A network error, 5xx or 429
         // keeps the token: the session stays open with `user` pending, and the
         // polling below retries /auth/me until it answers.
-        if (err?.status === 401) {
+        if (typeof err?.status === "number" && sesionExpirada(err.status)) {
           localStorage.removeItem(TOKEN_KEY);
           setState({ user: null, token: null, loading: false });
         } else {
@@ -63,8 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState({ user: null, token: null, loading: false });
       if (!esRutaPublica(window.location.pathname)) window.location.replace("/auth/sign-in");
     };
-    window.addEventListener("auth:expired", handler);
-    return () => window.removeEventListener("auth:expired", handler);
+    return escucharSesionExpirada(handler);
   }, []);
 
   // Poll /auth/me every 60s to detect session revocation from another device.
@@ -80,8 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authApi
           .getMe(sessionToken)
           .then((user) => setState((s) => (s.token === sessionToken && !s.user ? { ...s, user } : s)))
-          // A 401 already fired "auth:expired" inside request(); any other
-          // error (network, 5xx, 429) is transient and keeps the session.
+          // A 401 already fired the session-expired event inside request(); any
+          // other error (network, 403, 5xx such as 503, 429) keeps the session.
           .catch(() => {});
       },
       userPending ? 5_000 : 60_000,

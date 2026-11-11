@@ -1,4 +1,5 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { API_BASE } from "@/lib/http/api-base";
+import { avisarSiSesionExpirada } from "@/lib/http/sesion";
 
 async function adminFetch<T>(path: string, token: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -10,7 +11,7 @@ async function adminFetch<T>(path: string, token: string, options?: RequestInit)
     ...options,
   });
   if (!res.ok) {
-    if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
+    avisarSiSesionExpirada(res.status);
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw Object.assign(new Error(body.error ?? res.statusText), { status: res.status });
   }

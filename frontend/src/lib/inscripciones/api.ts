@@ -1,4 +1,5 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+import { API_BASE } from "@/lib/http/api-base";
+import { avisarSiSesionExpirada } from "@/lib/http/sesion";
 
 async function req<T>(path: string, token: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -10,7 +11,7 @@ async function req<T>(path: string, token: string, options?: RequestInit): Promi
     ...options,
   });
   if (!res.ok) {
-    if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
+    avisarSiSesionExpirada(res.status);
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw Object.assign(new Error(body.error ?? res.statusText), { status: res.status });
   }
@@ -92,8 +93,6 @@ export interface SesionHistorialItem {
   activa: boolean;
 }
 
-const API_PUBLIC = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
 export interface StatsPublicos {
   total_usuarios: number;
   total_simulacros: number;
@@ -102,13 +101,13 @@ export interface StatsPublicos {
 }
 
 export async function fetchStatsPublicos(): Promise<StatsPublicos> {
-  const res = await fetch(`${API_PUBLIC}/stats/publico`);
+  const res = await fetch(`${API_BASE}/stats/publico`);
   if (!res.ok) throw new Error("stats unavailable");
   return res.json();
 }
 
 export async function fetchProcesosPublico(): Promise<Proceso[]> {
-  const res = await fetch(`${API_PUBLIC}/procesos/publico`);
+  const res = await fetch(`${API_BASE}/procesos/publico`);
   if (!res.ok) return [];
   return res.json();
 }

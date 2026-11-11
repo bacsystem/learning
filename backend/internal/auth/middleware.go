@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/cbaciliod/learning/internal/jwt"
 )
 
@@ -30,6 +32,9 @@ type SessionChecker func(ctx context.Context, tokenHash string) (*Session, error
 // RequireAuth validates the Bearer JWT signature and checks the session exists
 // in the DB. The claims placed in the context carry the role from the DB
 // (not the one embedded in the token); users that are no longer activo get 401.
+// If the session cannot be checked (DB error or timeout) it fails closed with
+// 503 instead of 401, so a DB outage does not log every user out
+// (docs/api/plataforma-salud.md § Autenticación con la BD caída).
 func RequireAuth(secret string, checkSession SessionChecker) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +53,13 @@ func RequireAuth(secret string, checkSession SessionChecker) func(http.Handler) 
 			// max_sesiones, role changes and deactivation).
 			tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(tokenStr)))
 			sess, err := checkSession(r.Context(), tokenHash)
-			if err != nil || sess == nil || sess.UserID != claims.UserID {
+			if err != nil {
+				// The driver error may carry connection details: log the op only.
+				log.Error().Str("op", "auth.check_session").Msg("session check failed")
+				jsonError(w, http.StatusServiceUnavailable, "Servicio no disponible.")
+				return
+			}
+			if sess == nil || sess.UserID != claims.UserID {
 				jsonError(w, http.StatusUnauthorized, "Sesión revocada.")
 				return
 			}
