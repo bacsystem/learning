@@ -191,3 +191,34 @@ func TestPutCitas_ConcurrenciaConAprobar(t *testing.T) {
 		}
 	}
 }
+
+// R4 of E3-07: citas[] carries seccion, lineas and the excerpt, never the full text.
+func TestGetPregunta_CitasConExtracto(t *testing.T) {
+	c := newCicloFx(t)
+	_, a := fuenteDePrueba(t, c.f.DB)
+	largo := "Caso probable\n de dengue  " + strings.Repeat("x", 400)
+	if _, err := c.f.DB.Exec(`UPDATE pasajes SET texto = $2, seccion = '3.2 Definición de caso', linea_inicio = 120, linea_fin = 148 WHERE id = $1`, a, largo); err != nil {
+		t.Fatal(err)
+	}
+	c.citar(t, a)
+
+	w := qt.Do(c.mux, "GET", fmt.Sprintf("/preguntas/%d", c.p.ID), c.admin, "")
+	c.esperar(t, w, http.StatusOK, "")
+	var got struct {
+		Citas []map[string]any `json:"citas"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil || len(got.Citas) != 1 {
+		t.Fatalf("citas: %s (%v)", w.Body.String(), err)
+	}
+	cita := got.Citas[0]
+	extracto, _ := cita["extracto"].(string)
+	if !strings.HasPrefix(extracto, "Caso probable de dengue xxx") || !strings.HasSuffix(extracto, "…") || len([]rune(extracto)) != 301 {
+		t.Errorf("extracto = %q", extracto)
+	}
+	if cita["seccion"] != "3.2 Definición de caso" || cita["linea_inicio"] != float64(120) || cita["linea_fin"] != float64(148) || cita["fuente_estado"] != "activa" {
+		t.Errorf("cita = %+v", cita)
+	}
+	if _, hay := cita["texto"]; hay {
+		t.Error("el texto completo no debe salir")
+	}
+}

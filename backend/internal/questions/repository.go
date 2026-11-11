@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/cbaciliod/learning/internal/grading"
+	"github.com/cbaciliod/learning/internal/texto"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -255,7 +256,8 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 			) AS etiqueta_ids_json,
 			COALESCE(
 				(SELECT JSON_AGG(c ORDER BY c.fuente_id, c.version, c.pasaje_id)
-				 FROM (SELECT pc.pasaje_id, fv.fuente_id, fv.numero AS version, f.titulo AS fuente_titulo, f.estado AS fuente_estado
+				 FROM (SELECT pc.pasaje_id, fv.fuente_id, fv.numero AS version, f.titulo AS fuente_titulo, f.estado AS fuente_estado,
+				              pa.seccion, pa.linea_inicio, pa.linea_fin, pa.texto
 				       FROM pregunta_citas pc
 				       JOIN pasajes pa          ON pa.id = pc.pasaje_id
 				       JOIN fuente_versiones fv ON fv.id = pa.fuente_version_id
@@ -307,8 +309,8 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 	if err := json.Unmarshal(r0.EtiquetaIDsJSON, &etiquetaIDs); err != nil {
 		return PreguntaResponse{}, err
 	}
-	citas := []CitaResponse{}
-	if err := json.Unmarshal(r0.CitasJSON, &citas); err != nil {
+	citas, err := decodificarCitas(r0.CitasJSON)
+	if err != nil {
 		return PreguntaResponse{}, err
 	}
 
@@ -944,4 +946,26 @@ func (r *Repository) GetGlobalStats(ctx context.Context) (StatsGlobalesResponse,
 	}
 
 	return stats, nil
+}
+
+// citaConTexto is a citation row with the raw passage text, which never leaves
+// the repository: only its excerpt does.
+type citaConTexto struct {
+	CitaResponse
+	Texto string `json:"texto"`
+}
+
+// decodificarCitas turns the JSON_AGG of GetPregunta into CitaResponse with
+// the excerpt of each passage (contract E3-07 §5).
+func decodificarCitas(raw []byte) ([]CitaResponse, error) {
+	var filas []citaConTexto
+	if err := json.Unmarshal(raw, &filas); err != nil {
+		return nil, err
+	}
+	citas := make([]CitaResponse, 0, len(filas))
+	for _, f := range filas {
+		f.Extracto = texto.Extracto(f.Texto)
+		citas = append(citas, f.CitaResponse)
+	}
+	return citas, nil
 }

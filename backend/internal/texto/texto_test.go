@@ -1,6 +1,9 @@
 package texto
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestPlegar(t *testing.T) {
 	cases := []struct {
@@ -58,5 +61,29 @@ func TestPlegar_EnieDescompuesta(t *testing.T) {
 	}
 	if got := Plegar("EPIDEMIOLOGI\u0301A"); got != "epidemiologia" {
 		t.Errorf("Plegar(NFD uppercase) = %q", got)
+	}
+}
+
+func TestExtracto(t *testing.T) {
+	cortos := strings.Repeat("a", MaxExtracto)
+	tests := []struct {
+		name, in, want string
+	}{
+		{"vacío", "", ""},
+		{"solo espacios", " \n\t ", ""},
+		{"colapsa espacios y saltos", "  Caso   probable\n\nde\tdengue  ", "Caso probable de dengue"},
+		{"espacios Unicode", "uno dos tres", "uno dos tres"},
+		{"exactamente 300 no se corta", cortos, cortos},
+		{"301 se corta en 300 y agrega …", cortos + "b", cortos + "…"},
+		{"multibyte cuenta runes, no bytes", strings.Repeat("ñ", MaxExtracto+5), strings.Repeat("ñ", MaxExtracto) + "…"},
+		{"300 runes multibyte no se corta", strings.Repeat("é", MaxExtracto), strings.Repeat("é", MaxExtracto)},
+		{"el recorte se hace tras colapsar", strings.Repeat("a ", 200), strings.Repeat("a ", 150) + "…"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Extracto(tt.in); got != tt.want {
+				t.Errorf("Extracto(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
 	}
 }

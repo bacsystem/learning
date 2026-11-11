@@ -1,9 +1,12 @@
 // Package texto holds text helpers shared by several modules and free of any
-// domain: today, the folding used to compare names and search text without
-// case or accents (ADR 0003 § Plegado).
+// domain: the folding used to compare names and search text without case or
+// accents (ADR 0003 § Plegado) and the excerpt shown for a passage.
 package texto
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 // Combining marks of the decomposed (NFD) forms that Plegar folds.
 const (
@@ -34,4 +37,20 @@ var tildes = strings.NewReplacer(
 // names normalise them first.
 func Plegar(s string) string {
 	return tildes.Replace(strings.ToLower(s))
+}
+
+// MaxExtracto is the length, in runes, at which Extracto cuts.
+const MaxExtracto = 300
+
+const puntosSuspensivos = "…"
+
+// Extracto returns the excerpt of a passage: every run of white space
+// (line breaks included) becomes one space, the ends are trimmed, and what
+// goes past MaxExtracto runes is cut and ends with «…». It is plain text.
+func Extracto(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if utf8.RuneCountInString(s) <= MaxExtracto {
+		return s
+	}
+	return string([]rune(s)[:MaxExtracto]) + puntosSuspensivos
 }
