@@ -54,7 +54,7 @@ El repo tiene dos formatos:
 | Campo | Regla |
 |---|---|
 | `error` | Código estable en `snake_case`, que es el contrato. Nunca cambia por un cambio de texto |
-| `message` | Texto en español para logs del cliente y como respaldo. La UI no lo muestra si existe la traducción del código (§8) |
+| `message` | Texto en español para los logs del cliente. La UI muestra la traducción del código o, si no existe, un genérico traducido (§8) |
 | `detalle` | Opcional, objeto sin datos personales (p. ej. `{"suma_pesos": 95.0}`, `{"campos": {"nombre": "min"}}`) |
 
 - **Helper:** backend-dev añade a `internal/httpx` una función `JSONErrorCode(w, status, code, msg string, detalle map[string]any)`, junto a `JSONError`, para no duplicar `jsonError` por paquete.
@@ -182,7 +182,9 @@ Catálogo de códigos usados por E1, E2 y E3:
 
 ## 8. i18n
 
-- La API responde solo en español (`message`). La UI traduce por código: clave `dashboard.serumsIa.errores.<codigo>` en `frontend/src/i18n/messages/es.json` y `en.json`. Toda clave existe en ambos archivos (CLAUDE.md y supuesto 8). Si un código no tiene clave, la UI muestra `message`.
+- La API responde solo en español (`message`). La UI traduce por código: clave `dashboard.serumsIa.errores.<codigo>` en `frontend/src/i18n/messages/es.json` y `en.json`. Toda clave existe en ambos archivos (CLAUDE.md y supuesto 8). Una clave por código, reutilizada en todas las pantallas.
+- **Código sin clave** (decisión del PO, 2026-11-11, desde E3-08): la UI muestra un **texto genérico traducido**, nunca `message`. `message` viene siempre en español y se vería en español con la UI en inglés. Solo se usa en la consola o los logs del cliente.
+- Las pantallas existentes de E1 y E2 que hoy muestran `message` se alinean cuando se vuelvan a tocar, sin una tarea aparte.
 - Los estados y enums (`activo`/`archivado`, `procesando`/`activa`/`fallida`/`retirada`, `completa`/`incompleta`, `tipo` de fuente y `motivo_fallo`) viajan como códigos y la UI los traduce con `dashboard.serumsIa.<dominio>.<enum>.<valor>`.
 - El contenido (nombres de temas, títulos y pasajes de fuentes) es solo en español y no se traduce.
 
