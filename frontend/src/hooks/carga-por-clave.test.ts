@@ -114,3 +114,26 @@ describe("CargaPorClave.refrescar", () => {
     expect(carga.obtenerEstado()).toMatchObject({ clave: "b", datos: "datos de b" });
   });
 });
+
+describe("CargaPorClave.refrescar durante un cargar en curso (review #99 H1)", () => {
+  it("a failed refresh does not leave the screen loading forever", async () => {
+    const c = new CargaPorClave<string>();
+    let resolver!: (v: string) => void;
+    const carga = c.cargar("p1", () => new Promise<string>((r) => (resolver = r)));
+    await c.refrescar("p1", () => Promise.reject(new Error("red")));
+    resolver("datos");
+    await carga;
+    expect(c.obtenerEstado()).toMatchObject({ datos: "datos", cargando: false });
+  });
+
+  it("a refresh of the previous key never overwrites the new key's load", async () => {
+    const c = new CargaPorClave<string>();
+    await c.cargar("p1", async () => "datos p1");
+    let terminarRefresco!: (v: string) => void;
+    const refresco = c.refrescar("p1", () => new Promise<string>((r) => (terminarRefresco = r)));
+    const carga = c.cargar("p2", async () => "datos p2");
+    terminarRefresco("p1 tarde");
+    await Promise.all([refresco, carga]);
+    expect(vistaDeCarga(c.obtenerEstado(), "p2")).toEqual({ datos: "datos p2", error: null, cargando: false });
+  });
+});

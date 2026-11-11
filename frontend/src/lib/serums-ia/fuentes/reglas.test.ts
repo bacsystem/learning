@@ -3,6 +3,7 @@ import {
   accionesDisponibles,
   ARCHIVO_MAX_BYTES,
   enProceso,
+  esquemaEdicion,
   esquemaMarca,
   esquemaMotivo,
   esquemaSubida,
@@ -138,6 +139,13 @@ describe("esquemas", () => {
     expect(await errores(esquemaSubida(m), { ...valido, titulo: "  ab  " })).toContain("titulo");
     expect(await errores(esquemaSubida(m), { ...valido, anio: "1899" })).toContain("anio");
     expect(await errores(esquemaSubida(m), { ...valido, anio: "2025" })).toEqual([]);
+  });
+
+  it("counts runes, not UTF-16 units: a 150-character title with an emoji is valid (review #99 H2)", async () => {
+    const titulo = "😀" + "a".repeat(149);
+    expect(titulo.length).toBe(151);
+    expect(await errores(esquemaEdicion(m), { titulo, especialidad_ids: [] })).toEqual([]);
+    expect(await errores(esquemaEdicion(m), { titulo: titulo + "a", especialidad_ids: [] })).toEqual(["titulo"]);
   });
 
   it("reason: 5–500 after trimming", async () => {

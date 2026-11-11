@@ -65,8 +65,8 @@ export function accionesDisponibles(f: Pick<FuenteResumen, "estado" | "version_e
 
 // ── Esquemas de los formularios ───────────────────────────────────────────────
 
-/** Longitud del texto recortado: el servidor aplica `TrimSpace` antes de contar. */
-const largo = (v: string | undefined) => (v ?? "").trim().length;
+/** Longitud del texto recortado, en runas (code points) como el servidor: aplica `TrimSpace` y cuenta caracteres. */
+const largo = (v: string | undefined) => [...(v ?? "").trim()].length;
 const entre = (min: number, max: number) => (v: string | undefined) => largo(v) >= min && largo(v) <= max;
 
 export interface MensajesFuente {
