@@ -39,6 +39,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Cadena de suministro: falla con hallazgos altos o críticos en dependencias
+      # de producción (igual que `make lint`).
+      - name: npm audit
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Typecheck
         run: npx tsc --noEmit
 
