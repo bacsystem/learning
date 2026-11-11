@@ -1,7 +1,7 @@
 # Contrato API — SERUMS IA, épica E2 Repositorio de fuentes (MVP)
 
 - **Historias:** SIA-E2-02 (#16), SIA-E2-03 (#17), SIA-E2-05 (#19), SIA-E2-06 (#20), SIA-E2-07 (#21). Fuera de alcance: E2-01 y E2-08 (v3), E2-04 (v2).
-- **Estado:** borrador para revisión del tech-lead (2026-11-11)
+- **Estado:** aprobado, pendiente de implementación (2026-11-11)
 - **Convenciones transversales:** [README.md](README.md)
 - **ADR relacionado:** [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md): puerto, adaptador Postgres, búsqueda FTS, worker y normalización.
 

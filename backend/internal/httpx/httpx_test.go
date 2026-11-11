@@ -136,3 +136,45 @@ func TestInternalErrorCode(t *testing.T) {
 		t.Errorf("log = %s", buf.String())
 	}
 }
+
+func TestDecodeJSONStrict(t *testing.T) {
+	cases := []struct {
+		name   string
+		body   string
+		limit  int64 // 0 = no MaxBytesReader
+		ok     bool
+		status int
+		code   string
+	}{
+		{"válido", `{"nombre":"Tema"}`, 0, true, 0, ""},
+		{"campo desconocido", `{"nombre":"Tema","x":1}`, 0, false, http.StatusBadRequest, "cuerpo_invalido"},
+		{"mal formado", `{"nombre":`, 0, false, http.StatusBadRequest, "cuerpo_invalido"},
+		{"dentro del límite", `{"nombre":"Tema"}`, 64, true, 0, ""},
+		{"pasa el límite al leer", `{"nombre":"` + strings.Repeat("a", 100) + `"}`, 16, false, http.StatusRequestEntityTooLarge, "cuerpo_demasiado_grande"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest("POST", "/", strings.NewReader(c.body))
+			if c.limit > 0 {
+				req.Body = http.MaxBytesReader(rr, req.Body, c.limit)
+			}
+			var v struct {
+				Nombre string `json:"nombre"`
+			}
+			if got := DecodeJSONStrict(rr, req, &v); got != c.ok {
+				t.Fatalf("ok = %v, want %v (%s)", got, c.ok, rr.Body)
+			}
+			if c.ok {
+				return
+			}
+			var body map[string]string
+			if err := json.NewDecoder(rr.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if rr.Code != c.status || body["error"] != c.code || body["message"] == "" {
+				t.Errorf("got %d %v, want %d %s", rr.Code, body, c.status, c.code)
+			}
+		})
+	}
+}
