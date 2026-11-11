@@ -128,9 +128,10 @@ export default function ProfesionPage() {
               {activa ? t("serumsIa.profesion.elegir.tituloCambiar") : t("serumsIa.profesion.elegir.titulo")}
             </span>
           }
-          subtitulo={t("serumsIa.profesion.elegir.ayuda")}
         />
-        <div className="p-4">
+        <div className="flex flex-col gap-3 p-4">
+          {/* En el cuerpo y no como subtítulo: `CabeceraSeccion` lo trunca a una línea. */}
+          <p className="text-control text-muted-foreground">{t("serumsIa.profesion.elegir.ayuda")}</p>
           <FormularioProfesion opciones={opciones.datos} activa={activa} onGuardar={guardar} />
         </div>
       </section>

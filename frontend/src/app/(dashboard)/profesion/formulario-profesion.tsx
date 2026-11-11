@@ -135,6 +135,7 @@ export function FormularioProfesion({
         textoConfirmar={t("serumsIa.profesion.confirmar.boton")}
         textoCancelar={t("comun-cancelar")}
         textoPendiente={t("comun-guardando")}
+        etiquetaCerrar={t("comun-cerrar")}
         onConfirmar={() => guardar(true)}
       />
     </div>
