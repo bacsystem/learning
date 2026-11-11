@@ -1,6 +1,6 @@
 # ADR 0003: puerto `SourceRepository` y adaptador propio sobre PostgreSQL
 
-- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD); «El puerto» define los tipos que faltaban (`NuevaFuente`, `FiltroFuentes`, `Pagina`, `FuenteResumen`, `Pasaje`), reemplaza `audit.TxFunc` por un `Auditor` que recibe el `Evento` con el id de la fuente (también en `GuardarFuente`), fija la normalización de `Page` y `PerPage` y el error de `EspecialidadID ≤ 0`.
+- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD); «El puerto» define los tipos que faltaban (`NuevaFuente`, `FiltroFuentes`, `Pagina`, `FuenteResumen`, `Pasaje`), reemplaza `audit.TxFunc` por un `Auditor` que recibe el `Evento` con el id de la fuente (también en `GuardarFuente`), fija la normalización de `Page` y `PerPage` y el error de `EspecialidadID ≤ 0`; la suite de contrato recibe los ganchos de prueba `Retirar` y `NuevaVersion`, y se fija el `detalle` de `fuente.procesar` y `fuente.fallar`.
 - **Fecha:** 2026-11-11
 - **Historias:** SIA-E2-02 (#16); la usan SIA-E2-03, E2-05, E2-06, E2-07 y, más adelante, E3-01, E6-03, E6-04 y E6-08
 - **Decisión de producto de origen:** P1 (issue #65). MVP y v2 usan el 100 % del `SourceRepository` propio en PostgreSQL, a $0 USD. La búsqueda semántica (pgvector o NotebookLM) se reevalúa en v3 (SIA-E2-01, SIA-E2-08).
@@ -30,7 +30,25 @@ Paquete nuevo `backend/internal/fuentes` con la convención del repo (`handler.g
 
 - `source.go`: el **puerto** `SourceRepository` y sus tipos. No importa nada de HTTP ni de `auth`.
 - `pgsource.go`: el **adaptador propio** sobre Postgres (`*sqlx.DB`).
-- `fuentestest/contract.go`: la **suite de contrato** `RunContract(t, nuevo func(t *testing.T) Entorno)`, donde `Entorno{Repo SourceRepository; EspecialidadA, EspecialidadB int64}`. Con Postgres las especialidades deben existir por la FK, así que la fábrica las siembra y entrega sus ids; el adaptador en memoria no valida que existan. Se ejecuta sobre el adaptador Postgres y sobre `fuentestest/memoria.go` (adaptador en memoria de prueba). Cubre el escenario «Intercambiabilidad» de SIA-E2-02. Siembra sus datos solo a través del puerto (`GuardarFuente` y luego `PublicarVersion`), así los dos adaptadores parten del mismo estado. Para «Fuente inactiva excluida», el retiro se simula con un hook de prueba del adaptador (`fuentestest.Retirar`), porque el ciclo de vida admin no está en el puerto.
+- `fuentestest/contract.go`: la **suite de contrato** `RunContract(t, nuevo func(t *testing.T) Entorno)`, donde:
+
+  ```go
+  type Entorno struct {
+      Repo                         SourceRepository
+      EspecialidadA, EspecialidadB int64
+      // Ganchos de prueba: lo que la suite necesita y el puerto no ofrece.
+      Retirar      func(t *testing.T, fuenteID int64)                                // fuente → 'retirada'
+      NuevaVersion func(t *testing.T, fuenteID int64, contenido []byte) (version int) // crea la versión n+1 en 'procesando'
+  }
+  ```
+
+  - Con Postgres las especialidades deben existir por la FK, así que la fábrica las siembra y entrega sus ids. El adaptador en memoria no valida que existan.
+  - Se ejecuta sobre el adaptador Postgres y sobre `fuentestest/memoria.go` (adaptador en memoria de prueba). Cubre el escenario «Intercambiabilidad» de SIA-E2-02.
+  - Siembra sus datos a través del puerto (`GuardarFuente` y luego `PublicarVersion`), así los dos adaptadores parten del mismo estado.
+  - Los ganchos cubren lo que el puerto no hace porque es ciclo de vida admin (E2-03, E2-06):
+    - «Fuente inactiva excluida» usa `Retirar`;
+    - «Resolver cita histórica» usa `NuevaVersion` para crear las versiones 2 y 3, que luego publica con `PublicarVersion`.
+  - En Postgres los ganchos son SQL del test; en memoria, métodos de `Memoria`. Viven solo en `fuentestest`: no forman parte de la interfaz `SourceRepository` ni de la API de producción. Cuando existan las operaciones reales de E2-03 y E2-06, se prueban con sus propios tests, no con estos ganchos.
 - `normalizar.go`: normalización y segmentación deterministas (SIA-E2-05), sin IA y sin E/S.
 - `worker.go`: worker de ingesta (abajo).
 - El ciclo de vida admin (retirar, restaurar, reintentar, marca oficial) vive en `service.go` y `repository.go`, **fuera** del puerto: no es intercambiable por proveedor. Un adaptador v3 (SIA-E2-08) solo reemplazaría `BuscarPasajes`. Las citas se resuelven siempre con el adaptador propio (SIA-E2-08, regla 3).
@@ -144,7 +162,15 @@ var (
 - `ResolverCita` **no** filtra por estado de la fuente: una cita histórica a la versión 1 devuelve el texto exacto de la versión 1 aunque la fuente vaya por la 3 o esté `retirada` (escenario «Resolver cita histórica»). El consumidor decide qué hacer con `EstadoFuente`.
 - **`ObtenerPasajes`** tampoco filtra por estado de la fuente. Si la fuente o la versión no existen, devuelve `ErrNoEncontrado`. Una versión sin pasajes (`procesando` o `fallida`) devuelve `Data` vacío. Normaliza `page` y `perPage` igual que `FiltroFuentes`.
 - **`ListarFuentes` en el puerto, en versión mínima** (decisión del 2026-11-11, consulta de backend-dev al empezar E2-02). La historia SIA-E2-02 (§Contexto, línea 17) pone «listar fuentes» entre las operaciones del puerto, así que no se saca. Pero `FuenteResumen` solo lleva lo que cualquier adaptador puede dar: ids y no nombres de especialidad, y el número de la versión vigente. El listado de admin S3 del contrato E2 (nombres de especialidad, `version_en_proceso`, filtros `oficial` y `q`) es una consulta de `repository.go` fuera del puerto, que implementa E2-07, igual que el ciclo de vida admin.
-- **Auditoría en el puerto (`Auditor` + `Evento`):** el adaptador arma el `Evento` dentro de su transacción. Solo ahí se conoce el `entidad_id` de una fuente nueva, y el contrato E2 lo exige (S1, «Respuesta 202»: `fuente.crear` con `entidad_id`). También arma el `detalle`: `{"version", "sha256", "tamano_bytes", "tipo", "especialidad_ids", "estado_nuevo"}` en `fuente.crear`. Quien llama solo aporta el actor, la IP y el user agent a través del `Auditor`, igual que `temas.Auditor` (`internal/temas/service.go:19-21`, usado en `temas/repository.go:197`). Un `audit.TxFunc` no basta, porque la closure se arma antes de conocer el id. Si el `Auditor` devuelve error, la mutación se revierte (README §7).
+- **Auditoría en el puerto (`Auditor` + `Evento`):** el adaptador arma el `Evento` dentro de su transacción. Solo ahí se conoce el `entidad_id` de una fuente nueva, y el contrato E2 lo exige (S1, «Respuesta 202»: `fuente.crear` con `entidad_id`). También arma el `detalle` de cada acción:
+
+  | Acción | `detalle` |
+  |---|---|
+  | `fuente.crear` | `{"version", "sha256", "tamano_bytes", "tipo", "especialidad_ids", "estado_nuevo"}` |
+  | `fuente.procesar` | `{"version", "pasajes_count", "estado_anterior", "estado_nuevo"}` |
+  | `fuente.fallar` | `{"version", "motivo_fallo", "estado_anterior", "estado_nuevo"}` |
+
+  `estado_anterior` y `estado_nuevo` son los de la **fuente**, no los de la versión (E2-06, escenario «Auditoría»). Al publicar la versión 2 de una fuente `activa` quedan `activa → activa`, y `version` distingue el caso. Quien llama solo aporta el actor, la IP y el user agent a través del `Auditor`, igual que `temas.Auditor` (`internal/temas/service.go:19-21`, usado en `temas/repository.go:197`). Un `audit.TxFunc` no basta, porque la closure se arma antes de conocer el id. Si el `Auditor` devuelve error, la mutación se revierte (README §7).
 - **`GuardarFuente`** recibe el `Auditor` para escribir `fuente.crear` en la misma transacción (README §7). El adaptador en memoria no lo llama. Calcula `sha256`, `tamano_bytes` y `lineas` con `Huella`. E2-02 no valida ni el duplicado por hash ni el límite de fuentes. Los agrega E2-03 dentro de esa misma transacción, bajo el advisory lock del contrato E2 (S1, «Límite de fuentes»), y mapea la violación 23505 de `uq_fuente_versiones_sha256` a `fuente_duplicada`.
 
 ### Recuperación de pasajes (adaptador Postgres)
