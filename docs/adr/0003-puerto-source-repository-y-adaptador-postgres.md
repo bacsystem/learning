@@ -182,7 +182,16 @@ var (
   | `fuente.fallar` | `{"version", "motivo_fallo", "estado_anterior", "estado_nuevo"}` |
 
   `estado_anterior` y `estado_nuevo` son los de la **fuente**, no los de la versión (E2-06, escenario «Auditoría»). Al publicar la versión 2 de una fuente `activa` quedan `activa → activa`, y `version` distingue el caso. Quien llama solo aporta el actor, la IP y el user agent a través del `Auditor`, igual que `temas.Auditor` (`internal/temas/service.go:19-21`, usado en `temas/repository.go:197`). Un `audit.TxFunc` no basta, porque la closure se arma antes de conocer el id. Si el `Auditor` devuelve error, la mutación se revierte (README §7).
-- **`GuardarFuente`** recibe el `Auditor` para escribir `fuente.crear` en la misma transacción (README §7). El adaptador en memoria no lo llama. Calcula `sha256`, `tamano_bytes` y `lineas` con `Huella`. En E2-02 ya mapea la violación 23505 de `uq_fuente_versiones_sha256` a `ErrFuenteDuplicada` (ver arriba). E2-03 agrega, dentro de esa misma transacción y bajo el advisory lock del contrato E2 (S1, «Límite de fuentes»), la comprobación previa de duplicado con detalle y el límite de fuentes.
+- **`GuardarFuente`** recibe el `Auditor` para escribir `fuente.crear` en la misma transacción (README §7). El adaptador en memoria no lo llama. Calcula `sha256`, `tamano_bytes` y `lineas` con `Huella`. En E2-02 ya mapea la violación 23505 de `uq_fuente_versiones_sha256` a `ErrFuenteDuplicada` (ver arriba). E2-03 (S1 y S2) no cambia el método del puerto. El **repositorio admin** (`repository.go`, fuera del puerto) abre **una sola transacción** con estos pasos:
+  1. `pg_advisory_xact_lock` con la clave constante del módulo (contrato E2, S1, «Límite de fuentes»);
+  2. la comprobación previa del duplicado, con detalle (`fuente_id`, `titulo`, `estado`, `version`);
+  3. el límite de fuentes;
+  4. los mismos INSERT y el mismo evento `fuente.crear` de `GuardarFuente`, sacados a una función interna compartida;
+  5. commit.
+
+  Así el alta admin y el puerto escriben igual, y `GuardarFuente` queda para la suite de contrato y los consumidores internos. Mapeo de las violaciones 23505 que pasen a pesar del lock (red ante carreras):
+  - `uq_fuente_versiones_sha256` → `409 fuente_duplicada`;
+  - `uq_fuente_versiones_una_procesando` → `409 estado_invalido`.
 
 ### Recuperación de pasajes (adaptador Postgres)
 
@@ -306,13 +315,17 @@ Es determinista e idempotente: mismo contenido y misma `normalizador_version` da
    - Los bytes que no son UTF-8 válido se reemplazan por U+FFFD (`strings.ToValidUTF8`). Es solo defensivo: S1 ya rechaza el archivo que no es UTF-8.
    - Los saltos pasan a `\n` según la regla de líneas.
    - Se eliminan los caracteres de control salvo `\n` y `\t`, y `\t` pasa a espacio.
-   - Se colapsan los espacios repetidos dentro de cada línea.
+   - Los de control que **también** son espacio (`unicode.IsSpace`: `\f`, `\v`, U+0085) pasan a espacio en vez de eliminarse, para no pegar palabras: «fin\finicio» → «fin inicio». `\f` es habitual en texto extraído de PDF.
+   - Dentro de cada línea, toda racha de espacios Unicode (`unicode.IsSpace`, incluidos NBSP y los `\t` ya convertidos) pasa a un solo espacio, y la línea se recorta al inicio y al final. La viñeta con sangría opcional (paso 2) se detecta **antes** de recortar.
+   - Se pierde la sangría, también dentro de los bloques de código. Se acepta porque el contenido es académico, no código. `linea_inicio` y `linea_fin` siguen siendo las líneas del original.
 2. **Viñetas unificadas.** Al inicio de línea, con sangría opcional, `*`, `+`, `•`, `▪` o `◦` seguidos de **al menos un espacio** pasan a `- `. Sin el espacio no es viñeta: «**negrita**» queda igual.
 3. **Marcas.** `<mark>` y `</mark>` se conservan literalmente. No se interpreta ningún otro HTML: el texto es dato, no instrucción.
-4. **Bloques de código** (entre líneas que empiezan con ` ``` `). Dentro no se detectan encabezados ni se unifican viñetas; sí se aplica la limpieza del paso 1. Un bloque sin cerrar llega hasta el final del documento.
+4. **Bloques de código** (entre líneas que empiezan con ` ``` ` en la **columna 1**; con sangría es texto). Dentro no se detectan encabezados ni se unifican viñetas; sí se aplica la limpieza del paso 1. Las líneas en blanco separan párrafos igual que fuera del bloque. Un bloque sin cerrar llega hasta el final del documento.
 5. **Estructura.**
-   - Encabezado: línea que empieza con `#`…`######` seguido de un espacio, fuera de un bloque de código.
-   - Párrafo: líneas consecutivas separadas por una o más líneas en blanco.
+   - Encabezado: línea que empieza en la **columna 1** con `#`…`######` seguido de un espacio, fuera de un bloque de código. `  ## x`, con sangría, es texto. La detección se hace sobre la línea original, antes del recorte del paso 1.
+   - Un encabezado sin texto (`## `) también corta bloque, pero su `seccion` vale `nil`.
+   - Párrafo: líneas consecutivas separadas por una o más líneas en blanco. Varias líneas en blanco seguidas cuentan como **un** solo corte (`\n\n` en el texto del pasaje).
+   - Un encabezado **siempre** abre párrafo y bloque nuevos, aunque la línea anterior no esté en blanco: en el texto va precedido de `\n\n`. El texto pegado debajo del encabezado, sin línea en blanco, es su primer párrafo (`## T\ntexto`).
    - Texto del pasaje: las líneas normalizadas unidas con `\n` y los párrafos con `\n\n`. Incluye la línea del encabezado.
    - `seccion`: texto del encabezado del primer bloque del pasaje, sin los `#`, con `TrimSpace` y ≤ 300 runes. Vale `nil` para el texto anterior al primer encabezado.
 6. **Segmentación** (SIA-E2-05 regla 2).
