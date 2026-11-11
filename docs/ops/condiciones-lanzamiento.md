@@ -1,6 +1,6 @@
 # Condiciones de lanzamiento (ADR 0004)
 
-Registro de verificación de las condiciones C1–C13 del
+Registro de verificación de las condiciones C1–C14 del
 [ADR 0004](../adr/0004-alojamiento-base-de-datos-produccion.md) (aceptado con
 condiciones). Ninguna se marca como cumplida sin ejecutarla. Cada fila se
 completa con la fecha, quién la verificó y el resultado medido.
@@ -26,4 +26,4 @@ procedimientos están en [railway.md](railway.md).
 | C11 | Las imágenes públicas no llevan secretos, datos ni `.env` | `make docker/verify DOCKER_TAG=vX.Y.Z` en cada release (`docker/push` depende de él) | Verificado en local con imágenes de prueba (11-11-2026). Se repite en cada release | 11-11-2026 · devops · las dos imágenes pasan; una imagen mala a propósito se rechaza |
 | C12 | Ubicación o jurisdicción del bucket de R2 | La decide el usuario antes de crear el bucket | Pendiente (usuario) | |
 | C13 | El cron alerta si falla o no corre | Una ejecución fallida provocada a propósito | Pendiente (implementación en `deploy/backup/`) | |
-| C14 | Uptime Kuma vigila `/health` y avisa por email al usuario (docs/ops/railway.md §7.1) | Monitor temporal hacia una ruta 404: llega el email de caído, y el de recuperado al pausarlo | Pendiente (lo crea el usuario) | |
+| C14 | Uptime Kuma vigila `/health` y avisa por email al usuario (docs/ops/railway.md §7.1) | El monitor temporal apunta a una ruta 404 → llega el correo de caído; se cambia ese monitor a /health → llega el de recuperado; después se borra | Pendiente (lo crea el usuario) | |
