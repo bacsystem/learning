@@ -73,6 +73,8 @@ func TestNormalizar_Limpieza(t *testing.T) {
 		{"other HTML kept as text", "<b>x</b> <script>y</script>", "<b>x</b> <script>y</script>"},
 		{"pasted alternatives are kept", "¿Cuál? a) uno b) dos c) tres d) vitamina b) doce", "¿Cuál? a) uno b) dos c) tres d) vitamina b) doce"},
 		{"code block keeps headings and bullets", "texto\n```\n# no es encabezado\n* no es viñeta\n```\n* sí", "texto\n```\n# no es encabezado\n* no es viñeta\n```\n- sí"},
+		{"indentation is lost inside code blocks too", "```\n    x := 1\n\tfin\n```", "```\nx := 1\nfin\n```"},
+		{"blank lines inside a code block split paragraphs", "```\nuno\n\n\n\ndos\n```", "```\nuno\n\ndos\n```"},
 		{"unclosed code block runs to the end", "```\n* a\n# b", "```\n* a\n# b"},
 		{"heading opens a paragraph", "intro\n## Título\ncuerpo", "intro\n\n## Título\ncuerpo"},
 		{"indented heading and fence are text", "intro\n  ## no\n ```\n* sí", "intro\n## no\n```\n- sí"},
