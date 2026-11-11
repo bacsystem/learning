@@ -14,6 +14,7 @@
     "menu-admin-grados": "Grades",
     "menu-admin-especialidades": "Specialties",
     "menu-admin-asignaturas": "Subjects",
+    "menu-admin-temas": "Topics",
     "menu-admin-procesos": "Processes (Admin)",
     "menu-admin-preguntas": "Questions",
     "menu-admin-etiquetas": "Tags",
@@ -1208,6 +1209,97 @@
     "simulacros-sin-inscripcion-aprobada": "You need an approved enrollment in a process to take simulations.",
     "simulacros-error-cargar-procesos": "Your processes could not be loaded. Reload the page to try again.",
     "practicas-error-eliminar-no-encontrada": "Some practice no longer exists. Refresh the list and try again.",
-    "practicas-error-eliminar-limite": "You can delete at most {max} practices at once."
+    "practicas-error-eliminar-limite": "You can delete at most {max} practices at once.",
+    "serumsIa": {
+      "temas": {
+        "titulo": "Topics",
+        "unidad": "topics",
+        "buscar": "Search topic…",
+        "crear": "Create topic",
+        "nuevo": "New topic",
+        "editar": "Edit topic",
+        "acciones": "Actions for {nombre}",
+        "creado": "Topic created.",
+        "actualizado": "Topic updated.",
+        "archivado": "Topic archived.",
+        "reactivado": "Topic reactivated.",
+        "aplicaATodas": "All professions",
+        "archivar": "Archive",
+        "archivarTitulo": "Archive topic",
+        "archivarConfirm": "{n, plural, =0 {This topic has no questions.} one {This topic has # question: it keeps it, but nothing new can be classified under it.} other {This topic has # questions: it keeps them, but nothing new can be classified under it.}}",
+        "reactivar": "Reactivate",
+        "reactivarTitulo": "Reactivate topic",
+        "reactivarConfirm": "The topic becomes active again, at the end of the order, with its questions and specialties.",
+        "errorCargar": "Topics could not be loaded.",
+        "errorCatalogos": "Subjects and specialties could not be loaded.",
+        "vacioFiltros": "No topics match the filters.",
+        "vacio": {
+          "titulo": "There are no topics in this area yet",
+          "texto": "Create the first topic to start classifying this subject's questions."
+        },
+        "sinAsignatura": {
+          "titulo": "Choose a subject",
+          "texto": "Topics are managed per subject. Choose one to see its topics."
+        },
+        "estado": {
+          "activo": "Active",
+          "archivado": "Archived"
+        },
+        "col": {
+          "orden": "Order",
+          "nombre": "Name",
+          "especialidades": "Specialties",
+          "preguntas": "Questions",
+          "estado": "Status"
+        },
+        "filtro": {
+          "asignatura": "Subject",
+          "asignaturaElegir": "Choose a subject",
+          "especialidad": "Specialty",
+          "especialidadTodas": "All specialties",
+          "todos": "All"
+        },
+        "campo": {
+          "nombre": "Name",
+          "descripcion": "Description (optional)",
+          "descripcionAyuda": "{n} / {max} characters",
+          "especialidades": "Specialties",
+          "especialidadesAyuda": "With none selected, the topic applies to all professions.",
+          "sinEspecialidades": "There are no active specialties."
+        },
+        "validacion": {
+          "nombreRequerido": "The name is required.",
+          "nombreLongitud": "The name must have between {min} and {max} characters.",
+          "descripcionLongitud": "The description allows up to {max} characters.",
+          "especialidadesMax": "Choose at most {max} specialties."
+        },
+        "reordenar": {
+          "boton": "Reorder",
+          "titulo": "Reorder active topics",
+          "ayuda": "Move topics with Up and Down, then save the order.",
+          "subir": "Up",
+          "bajar": "Down",
+          "subirTema": "Move {nombre} up",
+          "bajarTema": "Move {nombre} down",
+          "anuncio": "{nombre}: position {posicion} of {total}.",
+          "guardar": "Save order",
+          "guardado": "Order saved.",
+          "recargar": "Reload",
+          "sinActivos": "There are no active topics to order.",
+          "minimo": "At least 2 active topics are needed."
+        }
+      },
+      "errores": {
+        "validacion": "Check the form data.",
+        "referencia_invalida": "One of the specialties or the subject is no longer active. Reload and try again.",
+        "tema_duplicado": "A topic with that name already exists in this subject (it may be archived: reactivate it).",
+        "limite_temas": "This subject already has 60 active topics. Archive one to free a slot.",
+        "orden_invalido": "The order list is not valid.",
+        "orden_desactualizado": "The topics changed while you were ordering. Reload the list and order again.",
+        "estado_invalido": "The topic is already in that state. Reload the list.",
+        "no_encontrado": "The topic no longer exists. Reload the list.",
+        "error_interno": "Internal server error. Please try again."
+      }
+    }
   }
 }
