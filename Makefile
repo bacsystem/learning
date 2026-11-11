@@ -136,7 +136,7 @@ check/docker-tag:
 # La imagen sale del tag, nunca del árbol de trabajo.
 check/release-tree: check/docker-tag
 	@test -z "$$(git status --porcelain)" || (echo "ERROR: hay cambios sin commit o archivos sin seguimiento; construye desde un checkout limpio del tag" && exit 1)
-	@test "$$(git describe --exact-match --tags HEAD 2>/dev/null)" = "$(DOCKER_TAG)" || (echo "ERROR: HEAD no es el tag $(DOCKER_TAG) (git switch --detach $(DOCKER_TAG))" && exit 1)
+	@git tag --points-at HEAD | grep -qxF "$(DOCKER_TAG)" || (echo "ERROR: HEAD no es el tag $(DOCKER_TAG) (git switch --detach $(DOCKER_TAG))" && exit 1)
 	@v=$$(sed -nE 's/^  "version": "([^"]+)".*/\1/p' frontend/package.json); \
 	  test "$$v" = "$(VERSION)" || (echo "ERROR: frontend/package.json dice $$v y el tag es $(DOCKER_TAG); alinéalo en release/$(VERSION)" && exit 1)
 
