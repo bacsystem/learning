@@ -249,7 +249,7 @@ L_IMAGES    = BACKEND_IMAGE="$(or $(1),unused)" FRONTEND_IMAGE="$(or $(2),unused
 LOCAL_COMPOSE := docker compose --env-file $(LOCAL_DIR)/preprod.vars -f $(LOCAL_DIR)/compose.yml \
                  $(if $(BUILD),-f $(LOCAL_DIR)/compose.build.yml)
 
-.PHONY: local/up local/down local/reset local/seed local/logs local/ps local/psql \
+.PHONY: local/up local/down local/reset local/seed local/test local/logs local/ps local/psql \
         local/certs check/local-images
 
 check/local-images:
@@ -283,6 +283,9 @@ local/reset: check/local-images ## BORRA la base de preproducción, vuelve a lev
 	$(call L_IMAGES) $(LOCAL_COMPOSE) down -v
 	$(MAKE) local/up TAG=$(TAG) BUILD=$(BUILD)
 	$(MAKE) local/seed
+
+local/test: ## make test contra capacitate_preprod_test (con la preproducción levantada)
+	$(MAKE) test TEST_DATABASE_URL="postgres://$(L_PG_USER):$(L_PG_PASS)@localhost:5441/capacitate_preprod_test?sslmode=require"
 
 local/logs: ## Logs en vivo de la preproducción (s=db|backend|frontend|mailpit)
 	$(call L_IMAGES) $(LOCAL_COMPOSE) logs -f --tail=100 $(s)

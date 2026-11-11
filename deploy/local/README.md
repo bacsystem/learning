@@ -80,8 +80,10 @@ ejecuta emuladas: funcionan, pero más lento. `BUILD=1` las construye nativas.
 `make local/up` crea también `capacitate_preprod_test`:
 
 ```bash
-make test TEST_DATABASE_URL='postgres://capacitate:NOT-FOR-PRODUCTION-preprod-pg-password@localhost:5441/capacitate_preprod_test?sslmode=require'
+make local/test    # = make test con TEST_DATABASE_URL hacia capacitate_preprod_test (TLS)
 ```
+
+La URL se arma con `PREPROD_PG_USER` y `PREPROD_PG_PASSWORD` de `preprod.vars`.
 
 ## Variables
 
