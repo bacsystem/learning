@@ -1393,6 +1393,7 @@
       },
       "profesion": {
         "sugerida": "We suggest this profession based on your details. Nothing is saved until you press «Save».",
+        "sugeridaElegirProceso": "We suggest {especialidad} based on your details. Choose the SERUMS process to confirm it; nothing is saved until you press «Save».",
         "guardar": "Save profession",
         "cambiar": "Change profession",
         "guardada": "Profession saved: {especialidad}.",

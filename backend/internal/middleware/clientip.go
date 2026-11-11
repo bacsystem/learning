@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/cbaciliod/learning/internal/netutil"
 )
 
 // Trusted proxy configuration shared by every component that needs the real
@@ -15,25 +17,13 @@ var (
 	trustedNets []*net.IPNet
 )
 
-// SetTrustedProxies parses a comma-separated list of CIDRs/IPs. Invalid
-// entries are ignored. An empty list means X-Forwarded-For is never trusted.
+// SetTrustedProxies configures the trusted proxies from a list already
+// validated by config.Load. An invalid list fails closed: no proxy is
+// trusted, so X-Forwarded-For is ignored.
 func SetTrustedProxies(list string) {
-	var nets []*net.IPNet
-	for _, entry := range strings.Split(list, ",") {
-		entry = strings.TrimSpace(entry)
-		if entry == "" {
-			continue
-		}
-		if !strings.Contains(entry, "/") {
-			if ip := net.ParseIP(entry); ip != nil && ip.To4() == nil {
-				entry += "/128"
-			} else {
-				entry += "/32"
-			}
-		}
-		if _, cidr, err := net.ParseCIDR(entry); err == nil {
-			nets = append(nets, cidr)
-		}
+	nets, err := netutil.ParseTrustedProxies(list)
+	if err != nil {
+		nets = nil
 	}
 	trustedMu.Lock()
 	trustedNets = nets

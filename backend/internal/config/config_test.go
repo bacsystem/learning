@@ -21,6 +21,7 @@ func setBaseEnv(t *testing.T) {
 	t.Setenv("SMTP_PORT", "")
 	t.Setenv("SMTP_FROM", "")
 	t.Setenv("LOG_LEVEL", "")
+	t.Setenv("TRUSTED_PROXIES", "")
 }
 
 // setProductionEnv is setBaseEnv plus everything a non-development ENV needs.
@@ -28,6 +29,7 @@ func setProductionEnv(t *testing.T) {
 	t.Helper()
 	setBaseEnv(t)
 	t.Setenv("ENV", "production")
+	t.Setenv("DATABASE_URL", "postgres://u:p@db.internal:5432/app?sslmode=require")
 	t.Setenv("CORS_ORIGINS", "https://app.example.com")
 	t.Setenv("SMTP_HOST", "smtp.example.com")
 	t.Setenv("SMTP_PORT", "587")
@@ -181,5 +183,170 @@ func TestLoad_LogLevelFromDotEnv(t *testing.T) {
 	}
 	if cfg.LogLevel != "warn" {
 		t.Errorf("LogLevel %q, want warn", cfg.LogLevel)
+	}
+}
+
+// H-2 (PR #97): ENCRYPTION_KEY is validated in Load, before the database
+// connects, with an error that names the variable and never echoes the key.
+func TestLoad_EncryptionKeyFormat(t *testing.T) {
+	cases := []struct {
+		name, key string
+		wantErr   bool
+	}{
+		{"64 hex chars", strings.Repeat("ab", 32), false},
+		{"upper-case hex", strings.Repeat("AB", 32), false},
+		{"too short", strings.Repeat("0", 62), true},
+		{"too long", strings.Repeat("0", 66), true},
+		{"odd length", strings.Repeat("0", 63), true},
+		{"not hex", strings.Repeat("z", 64), true},
+		{"surrounding spaces", " " + strings.Repeat("0", 64) + " ", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv("ENCRYPTION_KEY", c.key)
+			_, err := Load()
+			if !c.wantErr {
+				if err != nil {
+					t.Fatalf("Load: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "ENCRYPTION_KEY") {
+				t.Fatalf("want ENCRYPTION_KEY error, got %v", err)
+			}
+			if strings.Contains(err.Error(), strings.TrimSpace(c.key)) {
+				t.Errorf("error echoes the key: %v", err)
+			}
+		})
+	}
+}
+
+// H-3 (PR #97): an invalid TRUSTED_PROXIES entry fails Load instead of being
+// dropped; empty or blank means no proxy.
+func TestLoad_TrustedProxies(t *testing.T) {
+	cases := []struct {
+		name, value string
+		wantErr     bool
+	}{
+		{"unset", "", false},
+		{"blank", "   ", false},
+		{"CIDR list", "10.0.0.0/8, 172.16.0.0/12", false},
+		{"single IPv4 and IPv6", "10.1.1.1,2001:db8::1", false},
+		{"trailing comma", "10.0.0.0/8,", false},
+		{"typo in IP", "10.0.0.256", true},
+		{"bad mask", "10.0.0.0/33", true},
+		{"hostname", "proxy.internal", true},
+		{"one bad entry among good ones", "10.0.0.0/8,nope", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv("TRUSTED_PROXIES", c.value)
+			_, err := Load()
+			if c.wantErr && (err == nil || !strings.Contains(err.Error(), "TRUSTED_PROXIES")) {
+				t.Fatalf("want TRUSTED_PROXIES error, got %v", err)
+			}
+			if !c.wantErr && err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+		})
+	}
+}
+
+// H-3 (PR #97): LOG_LEVEL accepts only the closed list, case-insensitive and
+// trimmed; anything else fails Load instead of falling back silently.
+func TestLoad_LogLevel(t *testing.T) {
+	cases := []struct {
+		value, want string
+		wantErr     bool
+	}{
+		{"", "", false},
+		{"debug", "debug", false},
+		{" INFO ", "info", false},
+		{"Warn", "warn", false},
+		{"trace", "trace", false},
+		{"error", "error", false},
+		{"warning", "", true},
+		{"disabled", "", true},
+		{"panic", "", true},
+		{"5", "", true},
+	}
+	for _, c := range cases {
+		t.Run(c.value, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv("LOG_LEVEL", c.value)
+			cfg, err := Load()
+			if c.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "LOG_LEVEL") {
+					t.Fatalf("want LOG_LEVEL error, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.LogLevel != c.want {
+				t.Errorf("LogLevel %q, want %q", cfg.LogLevel, c.want)
+			}
+		})
+	}
+}
+
+// H-5 (PR #97, ADR 0004 § Decisión 2): outside development/test the effective
+// sslmode of DATABASE_URL must encrypt; the error never quotes the DSN.
+func TestLoad_DatabaseSSLMode(t *testing.T) {
+	const secret = "s3cr3t-pass"
+	const (
+		weak    = "sslmode=require"
+		invalid = "connection string"
+	)
+	cases := []struct {
+		name, env, dsn, pgsslmode string
+		wantErr                   string // "" = Load succeeds
+	}{
+		{"URL require", "production", "postgres://u:" + secret + "@db:5432/app?sslmode=require", "", ""},
+		{"Railway URL with other params", "production", "postgresql://u:" + secret + "@db.railway.internal:5432/railway?connect_timeout=10&sslmode=require", "", ""},
+		{"verify-full", "production", "postgres://u:" + secret + "@db/app?sslmode=verify-full", "", ""},
+		{"key=value verify-ca", "production", "host=db user=u password=" + secret + " dbname=app sslmode=verify-ca", "", ""},
+		{"sslrootcert=system means verify-full", "production", "postgres://u:" + secret + "@db/app?sslrootcert=system", "", ""},
+		{"unset", "production", "postgres://u:" + secret + "@db/app", "", weak},
+		{"disable", "production", "postgres://u:" + secret + "@db/app?sslmode=disable", "", weak},
+		{"prefer", "staging", "postgres://u:" + secret + "@db/app?sslmode=prefer", "", weak},
+		{"allow, key=value", "", "host=db user=u password=" + secret + " sslmode=allow", "", weak},
+		{"PGSSLMODE disable without DSN sslmode", "production", "postgres://u:" + secret + "@db/app", "disable", weak},
+		{"PGSSLMODE require without DSN sslmode", "production", "postgres://u:" + secret + "@db/app", "require", ""},
+		{"DSN require wins over PGSSLMODE", "production", "postgres://u:" + secret + "@db/app?sslmode=require", "disable", ""},
+		{"unknown sslmode", "production", "postgres://u:" + secret + "@db/app?sslmode=bogus", "", invalid},
+		{"malformed URL", "production", "postgres://u:" + secret + "@db:notaport/app?sslmode=require", "", invalid},
+		{"development keeps disable", "development", "postgres://u:" + secret + "@db/app?sslmode=disable", "", ""},
+		{"test keeps unset", "test", "postgres://u:" + secret + "@db/app", "", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			setProductionEnv(t)
+			t.Setenv("ENV", c.env)
+			t.Setenv("DATABASE_URL", c.dsn)
+			t.Setenv("PGSSLMODE", c.pgsslmode) // restores the variable after the test
+			if c.pgsslmode == "" {
+				// lib/pq rejects an empty PGSSLMODE, so "unset" must really unset it.
+				if err := os.Unsetenv("PGSSLMODE"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err := Load()
+			if c.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Load: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "DATABASE_URL") || !strings.Contains(err.Error(), c.wantErr) {
+				t.Fatalf("want DATABASE_URL error containing %q, got %v", c.wantErr, err)
+			}
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("error quotes the DSN: %v", err)
+			}
+		})
 	}
 }

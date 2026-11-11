@@ -48,3 +48,6 @@ next-env.d.ts
 
 # Informes de cobertura de vitest (npm run test:coverage)
 coverage/
+
+# Generado por `next dev` (Next 16.4+) con reglas para agentes: no se versiona; las del proyecto están en CLAUDE.md.
+AGENTS.md

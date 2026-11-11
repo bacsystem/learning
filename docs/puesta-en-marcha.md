@@ -206,6 +206,11 @@ Solo aplica a bases locales que ya tenían datos antes de la rama
 
 ## 6. Verificación
 
+Lo mismo que el CI, con las versiones fijadas, desde la raíz:
+`make lint`, `make test TEST_DATABASE_URL=...` (base desechable: hace
+`down-to 0`) y `make build`. Ver `docs/ops/paridad-ci-local.md`; la
+operación de producción está en `docs/ops/`. Paso a paso:
+
 ```bash
 cd backend
 go build ./... && go vet ./...
