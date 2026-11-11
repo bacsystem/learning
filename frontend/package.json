@@ -9,7 +9,7 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "test": "vitest run",
-    "test:coverage": "echo 'No frontend tests configured yet' && exit 0",
+    "test:coverage": "vitest run --coverage",
     "prettier": "prettier --write './src/**/*.{js,jsx,json,ts,tsx,scss,css,md}'",
     "prepare": "husky",
     "pre-commit": "lint-staged"
@@ -37,6 +37,7 @@
     "@types/node": "22.15.32",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "5.0.5",
     "eslint": "9.29.0",
     "eslint-config-next": "16.2.4",
     "eslint-config-prettier": "10.1.5",
