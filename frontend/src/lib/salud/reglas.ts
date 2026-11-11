@@ -142,10 +142,17 @@ export function ultimaCopiaCorrecta(datos: DatosCopiaR2): Momento {
 }
 
 const BYTES_POR_MB = 1024 * 1024;
+/** Por debajo de esto una copia no vacía se muestra como «< 0,1 MB» y no como «0 MB» (hallazgo H1 del #145). */
+export const MB_MINIMO_VISIBLE = 0.1;
 
-/** Tamaño de la copia en MB (PLT-05 regla 2); el contrato usa 50 MB = 52 428 800 bytes. */
-export function megabytes(bytes: number): number {
-  return bytes / BYTES_POR_MB;
+/** Tamaño de la copia en MB (PLT-05 regla 2; 50 MB = 52 428 800 bytes, como el contrato), redondeado a un decimal. */
+export type TamanoCopia = { tipo: "cero" } | { tipo: "menor_al_minimo" } | { tipo: "mb"; valor: number };
+
+export function tamanoCopia(bytes: number): TamanoCopia {
+  if (bytes <= 0) return { tipo: "cero" };
+  const mb = bytes / BYTES_POR_MB;
+  if (mb < MB_MINIMO_VISIBLE) return { tipo: "menor_al_minimo" };
+  return { tipo: "mb", valor: Math.round(mb * 10) / 10 };
 }
 
 /** Versión del backend, la del servicio `api`, o `null` si no vino. */

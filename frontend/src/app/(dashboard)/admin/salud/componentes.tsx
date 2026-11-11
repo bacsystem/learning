@@ -14,9 +14,11 @@ import {
   type CategoriaFallo,
   desglosarDuracion,
   type EstadoServicio,
-  megabytes,
+  MB_MINIMO_VISIBLE,
   type Momento,
   type ServicioSalud,
+  type TamanoCopia,
+  tamanoCopia,
   ultimaCopiaCorrecta,
   ultimoEnvio,
 } from "@/lib/salud/reglas";
@@ -103,6 +105,19 @@ function useDatosServicio(servicio: ServicioSalud): DatoLista[] {
     }
   };
 
+  const textoTamano = (tamano: TamanoCopia) => {
+    switch (tamano.tipo) {
+      case "cero":
+        return t("saludServicios.dato.tamanoValor", { valor: formato.number(0) });
+      case "menor_al_minimo":
+        return t("saludServicios.dato.tamanoMenor", { valor: formato.number(MB_MINIMO_VISIBLE) });
+      case "mb":
+        return t("saludServicios.dato.tamanoValor", {
+          valor: formato.number(tamano.valor, { maximumFractionDigits: 1 }),
+        });
+    }
+  };
+
   switch (servicio.id) {
     case "api": {
       const { version, en_marcha_s } = servicio.datos;
@@ -162,12 +177,7 @@ function useDatosServicio(servicio: ServicioSalud): DatoLista[] {
         },
         {
           etiqueta: t("saludServicios.dato.tamano"),
-          valor:
-            d.tamano_bytes === null
-              ? SIN_DATO
-              : t("saludServicios.dato.tamanoValor", {
-                  valor: formato.number(megabytes(d.tamano_bytes), { maximumFractionDigits: 1 }),
-                }),
+          valor: d.tamano_bytes === null ? SIN_DATO : textoTamano(tamanoCopia(d.tamano_bytes)),
           mono: true,
         },
       ];

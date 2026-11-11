@@ -2,9 +2,9 @@ import type { RespuestaSaludApi } from "./api";
 import {
   type DatosCopiaR2,
   desglosarDuracion,
-  megabytes,
   normalizarSalud,
   RespuestaSaludInvalida,
+  tamanoCopia,
   ultimaCopiaCorrecta,
   ultimoEnvio,
   versionBackend,
@@ -169,8 +169,16 @@ describe("copia_r2 (PLT-05)", () => {
     ).toEqual({ tipo: "sin_dato" });
   });
 
-  it("converts bytes to MB like the contract example", () => {
-    expect(megabytes(52_428_800)).toBe(50);
-    expect(megabytes(0)).toBe(0);
+  it.each([
+    ["an empty backup", 0, { tipo: "cero" }],
+    ["30 000 bytes (H1 del #145)", 30_000, { tipo: "menor_al_minimo" }],
+    ["just under 0.1 MB", 104_857, { tipo: "menor_al_minimo" }],
+    ["exactly 0.1 MB", 104_858, { tipo: "mb", valor: 0.1 }],
+    ["the contract example", 52_428_800, { tipo: "mb", valor: 50 }],
+    ["12.5 MB", 13_107_200, { tipo: "mb", valor: 12.5 }],
+    ["a size that rounds to one decimal", 13_060_000, { tipo: "mb", valor: 12.5 }],
+    ["3 GB, still in MB", 3 * 1024 ** 3, { tipo: "mb", valor: 3072 }],
+  ])("sizes %s", (_, bytes, esperado) => {
+    expect(tamanoCopia(bytes)).toEqual(esperado);
   });
 });

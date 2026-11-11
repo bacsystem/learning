@@ -1670,7 +1670,8 @@
         "ultimaEjecucion": "Last run",
         "ejecucionValor": "{resultado} · {fecha}",
         "tamano": "Size",
-        "tamanoValor": "{valor} MB"
+        "tamanoValor": "{valor} MB",
+        "tamanoMenor": "< {valor} MB"
       },
       "frontendNota": "The version you are viewing. It has no status: if the frontend were down, you would not see this panel.",
       "versionesDistintas": "The frontend and the backend have different versions.",
