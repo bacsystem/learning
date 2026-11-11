@@ -26,6 +26,7 @@ import (
 	"github.com/cbaciliod/learning/internal/practices"
 	"github.com/cbaciliod/learning/internal/questions"
 	"github.com/cbaciliod/learning/internal/simulations"
+	"github.com/cbaciliod/learning/internal/temas"
 	"github.com/cbaciliod/learning/internal/testimonios"
 	"github.com/rs/zerolog/log"
 )
@@ -125,6 +126,7 @@ func run() int {
 	testimonios.Mount(mux, tesSvc, audLog, cfg.JWTSecret, checkSession)
 	catalogs.Mount(mux, catSvc, cfg.JWTSecret, checkSession)
 	questions.Mount(mux, qSvc, cfg.JWTSecret, checkSession)
+	temas.Mount(mux, temas.NewService(temas.NewRepository(database)), audLog, cfg.JWTSecret, checkSession)
 	practices.Mount(mux, pSvc, cfg.JWTSecret, checkSession)
 	simulations.Mount(mux, simSvc, cfg.JWTSecret, checkSession)
 	notifications.Mount(mux, database, audLog, cfg.JWTSecret, checkSession)

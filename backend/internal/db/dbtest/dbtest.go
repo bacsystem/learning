@@ -103,6 +103,7 @@ func SeedCatalog(t *testing.T, db *sqlx.DB) Catalog {
 			`DELETE FROM proceso_asignaturas WHERE proceso_id IN (SELECT id FROM procesos WHERE institucion_id=$1)`,
 			`DELETE FROM procesos WHERE institucion_id=$1`,
 			`DELETE FROM grados WHERE institucion_id=$1`,
+			`DELETE FROM tema_especialidades WHERE especialidad_id IN (SELECT id FROM especialidades WHERE institucion_id=$1)`,
 			`DELETE FROM especialidades WHERE institucion_id=$1`,
 			`DELETE FROM instituciones WHERE id=$1`,
 		} {
@@ -133,6 +134,7 @@ func SeedAsignatura(t *testing.T, db *sqlx.DB) int64 {
 		"Asig "+u, "A"+u).Scan(&id))
 	t.Cleanup(func() {
 		_, _ = db.Exec(`DELETE FROM proceso_asignaturas WHERE asignatura_id=$1`, id)
+		_, _ = db.Exec(`DELETE FROM temas WHERE asignatura_id=$1`, id)
 		_, _ = db.Exec(`DELETE FROM asignaturas WHERE id=$1`, id)
 	})
 	return id

@@ -34,6 +34,9 @@ func (s *Service) CreatePregunta(ctx context.Context, req CreatePreguntaRequest)
 
 	result, err := s.repo.CreatePregunta(ctx, req, instID)
 	if err != nil {
+		if isTemaFKViolation(err) {
+			return PreguntaResponse{}, ErrTemaInvalido
+		}
 		if isForeignKeyViolation(err) {
 			return PreguntaResponse{}, fmt.Errorf("%w: grado o especialidad no existe", ErrValidation)
 		}
@@ -70,6 +73,9 @@ func (s *Service) UpdatePregunta(ctx context.Context, id int64, req UpdatePregun
 	if err != nil {
 		if isAlternativaConIntentos(err) {
 			return PreguntaResponse{}, fmt.Errorf("%w: %s", ErrConflict, msgAlternativaConIntentos)
+		}
+		if isTemaFKViolation(err) {
+			return PreguntaResponse{}, ErrTemaInvalido
 		}
 		if isForeignKeyViolation(err) {
 			return PreguntaResponse{}, fmt.Errorf("%w: grado o especialidad no existe", ErrValidation)

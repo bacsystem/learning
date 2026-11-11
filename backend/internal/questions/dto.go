@@ -1,5 +1,7 @@
 package questions
 
+import "encoding/json"
+
 // ── Request structs ────────────────────────────────────────────────────────────
 
 // CreateRespuestaItem is one answer option in a create/update request.
@@ -24,6 +26,7 @@ type CreatePreguntaRequest struct {
 	AsignaturaID      int64                 `json:"asignatura_id"   validate:"required"`
 	GradoID           *int64                `json:"grado_id"`
 	EspecialidadID    *int64                `json:"especialidad_id"`
+	TemaID            *int64                `json:"tema_id"` // optional main tema (SIA-E1-01, T8)
 	Enunciado         string                `json:"enunciado"       validate:"required,min=10,max=2000"`
 	Tipo              string                `json:"tipo"            validate:"required,oneof=unica multiple"`
 	Dificultad        string                `json:"dificultad"      validate:"required,oneof=facil medio dificil"`
@@ -35,18 +38,42 @@ type CreatePreguntaRequest struct {
 // UpdatePreguntaRequest is the payload for PUT /preguntas/{id}.
 // proceso_id is intentionally absent — it's immutable after creation.
 // etiqueta_ids replaces the question's tags; when absent (null) they are kept
-// and an explicit [] clears them (H100).
+// and an explicit [] clears them (H100). tema_id follows the same idea (see
+// OptionalID and temaTrasEditar).
 type UpdatePreguntaRequest struct {
 	ProcesoID         *int64                `json:"proceso_id"` // checked for immutability
 	AsignaturaID      int64                 `json:"asignatura_id"   validate:"required"`
 	GradoID           *int64                `json:"grado_id"`
 	EspecialidadID    *int64                `json:"especialidad_id"`
+	TemaID            OptionalID            `json:"tema_id"`
 	Enunciado         string                `json:"enunciado"       validate:"required,min=10,max=2000"`
 	Tipo              string                `json:"tipo"            validate:"required,oneof=unica multiple"`
 	Dificultad        string                `json:"dificultad"      validate:"required,oneof=facil medio dificil"`
 	EtiquetaIDs       []int64               `json:"etiqueta_ids"`
 	Respuestas        []CreateRespuestaItem `json:"respuestas"     validate:"required,min=2,max=6,dive"`
 	Retroalimentacion *CreateRetroRequest   `json:"retroalimentacion"`
+}
+
+// OptionalID is a nullable id that also records whether the JSON field was
+// sent: absent (Set false), null (Set true, Value nil) or a number.
+type OptionalID struct {
+	Set   bool
+	Value *int64
+}
+
+// UnmarshalJSON runs only when the field is present, null included.
+func (o *OptionalID) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	o.Value = nil
+	if string(b) == "null" {
+		return nil
+	}
+	var v int64
+	if err := json.Unmarshal(b, &v); err != nil {
+		return err
+	}
+	o.Value = &v
+	return nil
 }
 
 // CreateEtiquetaRequest is the payload for POST /etiquetas.
@@ -112,6 +139,8 @@ type PreguntaResponse struct {
 	Grado             *string                    `json:"grado"`
 	EspecialidadID    *int64                     `json:"especialidad_id"`
 	Especialidad      *string                    `json:"especialidad"`
+	TemaID            *int64                     `json:"tema_id"`
+	Tema              *string                    `json:"tema"`
 	Enunciado         string                     `json:"enunciado"`
 	Tipo              string                     `json:"tipo"`
 	Dificultad        string                     `json:"dificultad"`
@@ -236,6 +265,7 @@ type ListQuery struct {
 	EspecialidadID int64
 	Dificultad     string
 	EtiquetaID     int64
+	TemaID         int64
 	Estado         string
 	Search         string
 	Page           int

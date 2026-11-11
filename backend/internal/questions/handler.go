@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/cbaciliod/learning/internal/httpx"
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog/log"
 )
@@ -48,6 +49,9 @@ func pathID(r *http.Request, key string) (int64, error) {
 
 func mapErr(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, ErrTemaInvalido):
+		// Only this error uses the coded format (docs/api/README.md §3, T8).
+		httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codigoTemaInvalido, err.Error(), nil)
 	case errors.Is(err, ErrNotFound):
 		jsonError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, ErrConflict):
@@ -99,6 +103,10 @@ func (h *Handler) ListPreguntas(w http.ResponseWriter, r *http.Request) {
 	q.Dificultad = params.Get("dificultad")
 	if q.EtiquetaID, ok = parseInt("etiqueta_id"); !ok {
 		jsonError(w, http.StatusBadRequest, "etiqueta_id inválido.")
+		return
+	}
+	if q.TemaID, ok = parseInt("tema_id"); !ok {
+		jsonError(w, http.StatusBadRequest, "tema_id inválido.")
 		return
 	}
 	q.Estado = params.Get("estado")
