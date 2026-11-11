@@ -7,6 +7,7 @@ import { useTemas } from "./use-temas";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { BotonReintentar } from "@/components/app/boton-reintentar";
 import { type ColumnaListado, TablaListado } from "@/components/app/tabla-listado";
 import { Alerta } from "@/components/feedback/alerta";
 import { EstadoVacio } from "@/components/feedback/estado-vacio";
@@ -172,8 +173,10 @@ export default function TemasPage() {
         id: "nombre",
         titulo: t("serumsIa.temas.col.nombre"),
         ordenable: true,
+        // Un nombre de 120 caracteres sin espacios se parte en vez de empujar las demás columnas fuera de vista.
+        className: "whitespace-normal",
         render: (r) => (
-          <div className="grid gap-0.5">
+          <div className="grid min-w-0 gap-0.5 wrap-anywhere">
             <CeldaNombre>{r.nombre}</CeldaNombre>
             {r.descripcion ? (
               <span className="text-etiqueta text-muted-foreground line-clamp-2">{r.descripcion}</span>
@@ -260,14 +263,7 @@ export default function TemasPage() {
   return (
     <div className={CONTENEDOR_PAGINA}>
       {errorCatalogos ? (
-        <Alerta
-          tono="error"
-          accion={
-            <button type="button" onClick={cargarCatalogos} className={ACCION_SECUNDARIA}>
-              {t("comun-reintentar")}
-            </button>
-          }
-        >
+        <Alerta tono="error" accion={<BotonReintentar onReintentar={cargarCatalogos} />}>
           {t("serumsIa.temas.errorCatalogos")}
         </Alerta>
       ) : null}
@@ -309,14 +305,7 @@ export default function TemasPage() {
       ) : (
         <>
           {error ? (
-            <Alerta
-              tono="error"
-              accion={
-                <button type="button" onClick={recargar} className={ACCION_SECUNDARIA}>
-                  {t("comun-reintentar")}
-                </button>
-              }
-            >
+            <Alerta tono="error" accion={<BotonReintentar onReintentar={recargar} />}>
               {mensajeErrorTema(error, t, t("serumsIa.temas.errorCargar"))}
             </Alerta>
           ) : null}

@@ -15,6 +15,7 @@ const CLAVES_TEMAS: ClavesDeError = Object.fromEntries(
     "estado_invalido",
     "no_encontrado",
     "error_interno",
+    "cuerpo_demasiado_grande",
   ].map((code) => [code, `serumsIa.errores.${code}`]),
 );
 

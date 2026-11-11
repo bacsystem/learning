@@ -4,6 +4,7 @@ import { useTemas } from "./use-temas";
 import { useTranslations } from "next-intl";
 import { useMemo, useRef, useState } from "react";
 
+import { BotonReintentar } from "@/components/app/boton-reintentar";
 import { Alerta } from "@/components/feedback/alerta";
 import { SkeletonTabla } from "@/components/feedback/skeleton";
 import { BotonAsync } from "@/components/patrones/boton-async";
@@ -70,6 +71,8 @@ export function ModoReordenar({
   async function recargarOrden() {
     setOrden(null);
     setErrorGuardar(null);
+    // El anuncio de la última posición movida ya no describe la lista recargada.
+    setAnuncio("");
     await recargar();
   }
 
@@ -104,14 +107,7 @@ export function ModoReordenar({
       />
       <div className="flex flex-col gap-3 p-4">
         {errorCarga ? (
-          <Alerta
-            tono="error"
-            accion={
-              <button type="button" onClick={recargarOrden} className={ACCION_SECUNDARIA}>
-                {t("comun-reintentar")}
-              </button>
-            }
-          >
+          <Alerta tono="error" accion={<BotonReintentar onReintentar={recargarOrden} />}>
             {mensajeErrorTema(errorCarga, t, t("serumsIa.temas.errorCargar"))}
           </Alerta>
         ) : null}
