@@ -1286,7 +1286,8 @@
           "guardado": "Order saved.",
           "recargar": "Reload",
           "sinActivos": "There are no active topics to order.",
-          "minimo": "At least 2 active topics are needed."
+          "minimo": "At least 2 active topics are needed.",
+          "mover": "Move"
         }
       },
       "errores": {

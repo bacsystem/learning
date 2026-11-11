@@ -8,7 +8,9 @@ import { Alerta } from "@/components/feedback/alerta";
 import { SkeletonTabla } from "@/components/feedback/skeleton";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
-import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, TARJETA } from "@/lib/estilos";
+import { CONTENEDOR_TABLA } from "@/components/patrones/pie-tabla";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CABECERA_TABLA, TARJETA } from "@/lib/estilos";
 import { type Tema, temasApi } from "@/lib/temas/api";
 import { claveErrorTema, mensajeErrorTema } from "@/lib/temas/errores";
 import { type Direccion, mover } from "@/lib/temas/reglas";
@@ -133,40 +135,57 @@ export function ModoReordenar({
         ) : lista.length === 0 && !errorCarga ? (
           <p className="text-control text-muted-foreground">{t("serumsIa.temas.reordenar.sinActivos")}</p>
         ) : (
-          <ol className="divide-border border-border divide-y rounded-lg border">
-            {lista.map((tema, i) => (
-              <li key={tema.id} className="flex items-center gap-3 px-3 py-2">
-                <span className="text-etiqueta text-muted-foreground w-6 shrink-0 text-right font-mono tabular-nums">
-                  {i + 1}
-                </span>
-                <span className="text-control text-foreground min-w-0 flex-1 font-medium break-words">
-                  {tema.nombre}
-                </span>
-                <button
-                  ref={registrar(`${tema.id}-subir`)}
-                  type="button"
-                  disabled={i === 0 || guardando}
-                  onClick={() => moverFila(i, "subir")}
-                  aria-label={t("serumsIa.temas.reordenar.subirTema", { nombre: tema.nombre })}
-                  className={ACCION_SECUNDARIA}
-                >
-                  <ArrowUpIcon className="size-4" />
-                  <span className="max-sm:sr-only">{t("serumsIa.temas.reordenar.subir")}</span>
-                </button>
-                <button
-                  ref={registrar(`${tema.id}-bajar`)}
-                  type="button"
-                  disabled={i === lista.length - 1 || guardando}
-                  onClick={() => moverFila(i, "bajar")}
-                  aria-label={t("serumsIa.temas.reordenar.bajarTema", { nombre: tema.nombre })}
-                  className={ACCION_SECUNDARIA}
-                >
-                  <ArrowDownIcon className="size-4" />
-                  <span className="max-sm:sr-only">{t("serumsIa.temas.reordenar.bajar")}</span>
-                </button>
-              </li>
-            ))}
-          </ol>
+          <div className={CONTENEDOR_TABLA}>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className={cn(CABECERA_TABLA, "w-12 text-right")}>
+                    {t("serumsIa.temas.col.orden")}
+                  </TableHead>
+                  <TableHead className={CABECERA_TABLA}>{t("serumsIa.temas.col.nombre")}</TableHead>
+                  <TableHead className={CABECERA_TABLA}>
+                    <span className="sr-only">{t("serumsIa.temas.reordenar.mover")}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lista.map((tema, i) => (
+                  <TableRow key={tema.id}>
+                    <TableCell className="text-muted-foreground text-right font-mono tabular-nums">{i + 1}</TableCell>
+                    <TableCell className="text-foreground font-medium break-words whitespace-normal">
+                      {tema.nombre}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          ref={registrar(`${tema.id}-subir`)}
+                          type="button"
+                          disabled={i === 0 || guardando}
+                          onClick={() => moverFila(i, "subir")}
+                          aria-label={t("serumsIa.temas.reordenar.subirTema", { nombre: tema.nombre })}
+                          className={ACCION_SECUNDARIA}
+                        >
+                          <ArrowUpIcon className="size-4" />
+                          <span className="max-sm:sr-only">{t("serumsIa.temas.reordenar.subir")}</span>
+                        </button>
+                        <button
+                          ref={registrar(`${tema.id}-bajar`)}
+                          type="button"
+                          disabled={i === lista.length - 1 || guardando}
+                          onClick={() => moverFila(i, "bajar")}
+                          aria-label={t("serumsIa.temas.reordenar.bajarTema", { nombre: tema.nombre })}
+                          className={ACCION_SECUNDARIA}
+                        >
+                          <ArrowDownIcon className="size-4" />
+                          <span className="max-sm:sr-only">{t("serumsIa.temas.reordenar.bajar")}</span>
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
         <p className="sr-only" aria-live="polite">
           {anuncio}

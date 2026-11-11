@@ -37,6 +37,8 @@ type DialogoTema = { tema: Tema | null } | null;
 
 /** Tamaño de página inicial del listado (E1-02 regla 2). */
 const POR_PAGINA_TEMAS = 20;
+/** Con menos de dos temas activos no hay nada que ordenar. */
+const MINIMO_PARA_REORDENAR = 2;
 
 export default function TemasPage() {
   const { token } = useAuth();
@@ -80,7 +82,11 @@ export default function TemasPage() {
   const { temas, cargando, error, recargar } = useTemas(token, filtro);
 
   const filas = useMemo(() => (tab === "todos" ? temas : temas.filter((x) => x.estado === tab)), [temas, tab]);
-  const activos = useMemo(() => temas.filter((x) => x.estado === "activo").length, [temas]);
+  // Con filtro de especialidad la lista no trae todos los activos: el modo «Reordenar» los pide completos al entrar.
+  const puedeReordenar = useMemo(
+    () => Boolean(especialidadId) || temas.filter((x) => x.estado === "activo").length >= MINIMO_PARA_REORDENAR,
+    [temas, especialidadId],
+  );
   const asignatura = asignaturas.find((a) => a.id === asignaturaId);
 
   const opcionesAsignatura = useMemo(
@@ -146,6 +152,8 @@ export default function TemasPage() {
         titulo: t("serumsIa.temas.col.orden"),
         ancho: "64px",
         ordenable: true,
+        // Los archivados conservan un `orden` que ya no se usa: van al final en vez de intercalarse con los activos.
+        valor: (r) => (r.estado === "activo" ? r.orden : Number.MAX_SAFE_INTEGER),
         texto: (r) => (r.estado === "activo" ? r.orden : ""),
         render: (r) =>
           r.estado === "activo" ? (
@@ -342,8 +350,8 @@ export default function TemasPage() {
                   <button
                     type="button"
                     onClick={() => setReordenando(true)}
-                    disabled={activos < 2}
-                    title={activos < 2 ? t("serumsIa.temas.reordenar.minimo") : undefined}
+                    disabled={!puedeReordenar}
+                    title={puedeReordenar ? undefined : t("serumsIa.temas.reordenar.minimo")}
                     className={ACCION_SECUNDARIA}
                   >
                     <ArrowsDownUpIcon className="size-4" />

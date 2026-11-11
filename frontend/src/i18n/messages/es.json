@@ -1286,7 +1286,8 @@
           "guardado": "Orden guardado.",
           "recargar": "Recargar",
           "sinActivos": "No hay temas activos para ordenar.",
-          "minimo": "Se necesitan al menos 2 temas activos."
+          "minimo": "Se necesitan al menos 2 temas activos.",
+          "mover": "Mover"
         }
       },
       "errores": {
