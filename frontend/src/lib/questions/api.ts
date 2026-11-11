@@ -1,3 +1,5 @@
+import { apiErrorFrom } from "@/lib/http/api-error";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 async function req<T>(path: string, token: string, options?: RequestInit): Promise<T> {
@@ -11,8 +13,7 @@ async function req<T>(path: string, token: string, options?: RequestInit): Promi
   });
   if (!res.ok) {
     if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw Object.assign(new Error(body.error ?? res.statusText), { status: res.status });
+    throw await apiErrorFrom(res);
   }
   return res.json() as Promise<T>;
 }
@@ -27,8 +28,7 @@ async function reqMultipart<T>(path: string, token: string, form: FormData): Pro
   });
   if (!res.ok) {
     if (res.status === 401) window.dispatchEvent(new Event("auth:expired"));
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw Object.assign(new Error(body.error ?? res.statusText), { status: res.status });
+    throw await apiErrorFrom(res);
   }
   return res.json() as Promise<T>;
 }
