@@ -6,7 +6,7 @@ fase: v2
 prioridad: Media
 estimacion: 3
 roles: [usuario]
-depende_de: [SIA-E9-01]
+depende_de: [SIA-E9-01, SIA-E4-02]
 ---
 
 # SIA-E9-02 Cuaderno de errores
@@ -20,6 +20,7 @@ depende_de: [SIA-E9-01]
 4. Acciones: «Repasar» (SIA-E9-01) y «Practicar este tema» (SIA-E5-04).
 5. Paginación 20 por defecto, máx. 100; ordenado por último fallo descendente.
 6. Una pregunta que sale de aprobada deja de mostrarse (conserva la nota).
+7. Clave retenida por intento en curso (corrección de auditoría, hallazgo E; regla de SIA-E4-02): si el usuario tiene un intento en curso (práctica, simulacro o diagnóstico) que contiene la pregunta, el cuaderno la lista sin clave ni explicación y con «La clave se mostrará cuando termines tu intento en curso»; la búsqueda de texto tampoco devuelve la clave. Al cerrarse el intento se muestran normalmente.
 
 ## Criterios de aceptación
 ```gherkin
@@ -48,6 +49,16 @@ Escenario: Explicación
   Cuando el usuario abre ambas
   Entonces se muestra la explicación con sus citas en la primera y solo la clave en la segunda
 
+Escenario: Clave retenida en el cuaderno
+  Dado una pregunta P del cuaderno y un simulacro en curso del mismo usuario que contiene P
+  Cuando el usuario abre el cuaderno
+  Entonces P aparece con su enunciado y su última respuesta, sin clave ni explicación en la pantalla ni en la respuesta de la API
+
+Escenario: Clave visible al cerrar el intento
+  Dado la clave de P retenida en el cuaderno por un simulacro en curso
+  Cuando el usuario finaliza el simulacro y vuelve a abrir el cuaderno
+  Entonces P muestra la clave y la explicación aprobada si existe
+
 Escenario: Vacío
   Dado ningún error registrado
   Cuando abre el cuaderno
@@ -68,7 +79,7 @@ Escenario: Estados de UI
 Exportar a PDF; compartir cuaderno.
 
 ## Dependencias
-SIA-E9-01; SIA-E6-08 para explicaciones.
+SIA-E9-01; SIA-E6-08 para explicaciones; SIA-E4-02 (regla de clave retenida).
 
 ## Seguridad y privacidad
 Notas como texto no confiable (escape); privadas.

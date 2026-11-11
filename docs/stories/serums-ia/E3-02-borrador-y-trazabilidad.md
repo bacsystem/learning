@@ -14,14 +14,14 @@ depende_de: [SIA-E1-01, SIA-E2-06]
 **Como** admin, **quiero** que las preguntas tengan un ciclo de vida con `borrador` y un vínculo a su fuente, **para** que ninguna pregunta nueva llegue a un alumno sin pasar por revisión y con origen trazable.
 
 ## Contexto
-Hoy `preguntas.estado` es `activo`/`eliminada`; no hay `borrador` ni fuente. Las preguntas existentes se mantienen `activo` (grandfathering). Los estados nuevos son `borrador`, `en_revision`, `aprobada`, `rechazada`; `activo` se trata como equivalente a `aprobada` para el contenido ya publicado.
+Hoy `preguntas.estado` es `activo`/`eliminada`; no hay `borrador` ni fuente. Las preguntas existentes se mantienen `activo` (grandfathering). Los estados nuevos son `borrador`, `en_revision`, `aprobada`, `rechazada`; `activo` se trata como equivalente a `aprobada` para el contenido ya publicado, con una excepción: ante 3 reportes de postulantes (SIA-E6-09) una pregunta `activo` heredada pasa sola a `en_revision`, mientras que una `aprobada` solo la retira un admin.
 
 ```mermaid
 stateDiagram-v2
   [*] --> borrador: importada o generada
   borrador --> aprobada: admin aprueba con cita
   borrador --> rechazada: admin rechaza con motivo
-  aprobada --> en_revision: fuente retirada o reporte
+  aprobada --> en_revision: fuente retirada o admin tras reportes
   en_revision --> aprobada: admin revalida
   en_revision --> rechazada: admin rechaza
   rechazada --> borrador: admin reabre

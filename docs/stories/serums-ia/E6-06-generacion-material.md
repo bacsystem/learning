@@ -24,7 +24,7 @@ stateDiagram-v2
   solicitado --> descartado: admin descarta con motivo
   borrador --> aprobado: admin aprueba
   borrador --> rechazado: admin rechaza con motivo
-  aprobado --> en_revision: fuente retirada o reporte
+  aprobado --> en_revision: fuente retirada o admin tras reportes
   en_revision --> aprobado: admin revalida
   en_revision --> rechazado: admin rechaza
   rechazado --> borrador: admin regenera

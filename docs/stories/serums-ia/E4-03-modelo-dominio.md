@@ -17,7 +17,7 @@ depende_de: [SIA-E4-01]
 El dominio es un servicio de cálculo determinista (sin IA). Se almacena por (usuario, proceso, especialidad, área, tema nulo para el nivel de área).
 
 ## Reglas de negocio
-1. Estimación bayesiana simple: `dominio = (1 + Σ wᵢ·cᵢ) / (2 + Σ wᵢ)`, con `cᵢ` ∈ [0,1] (1 acierto; en múltiple, fracción de aciertos correctos sin penalizar erróneas) y prior uniforme (1,1).
+1. Estimación bayesiana simple: `dominio = (1 + Σ wᵢ·cᵢ) / (2 + Σ wᵢ)`, con prior uniforme (1,1) y `cᵢ` ∈ {0, 1}: `cᵢ = 1` solo si el conjunto marcado es exactamente el conjunto de claves (en `unica`, la clave; en `multiple`, todas las correctas y ninguna incorrecta); en cualquier otro caso, incluida la pregunta sin responder, `cᵢ = 0`. Es la misma regla que la calificación existente de prácticas y simulacros (`backend/internal/grading`), para que dominio y nota no discrepen (corrección de auditoría, hallazgo B).
 2. Peso temporal: `wᵢ = 0,5^(días_desde_respuesta / 30)`; las respuestas de hace 60 días pesan 0,25.
 3. `n_efectivo = Σ wᵢ`; confianza `baja` si n_efectivo < 5, `media` 5–14, `alta` ≥ 15.
 4. Nivel: `bajo` < 0,50, `medio` 0,50–0,74, `alto` ≥ 0,75.
@@ -43,10 +43,30 @@ Escenario: Decaimiento
   Cuando el sistema calcula su peso temporal
   Entonces su peso es 0,5
 
-Escenario: Selección múltiple
-  Dado una pregunta con 2 claves de las que acierta 1 sin marcar incorrectas
-  Cuando el sistema calcula su contribución
-  Entonces c = 0,5
+Escenario: Selección múltiple exacta
+  Dado una pregunta múltiple con claves B y D
+  Cuando el usuario marca exactamente B y D
+  Entonces c = 1
+
+Escenario: Selección múltiple parcial
+  Dado una pregunta múltiple con claves B y D
+  Cuando el usuario marca solo B
+  Entonces c = 0
+
+Escenario: Selección múltiple con una incorrecta
+  Dado una pregunta múltiple con claves B y D
+  Cuando el usuario marca B, D y A
+  Entonces c = 0
+
+Escenario: Marcar todas las alternativas
+  Dado una pregunta múltiple de 5 alternativas con claves B y D
+  Cuando el usuario marca las 5 alternativas
+  Entonces c = 0
+
+Escenario: Coherencia con la calificación existente
+  Dado un intento de práctica finalizado
+  Cuando el sistema calcula c de cada pregunta
+  Entonces c = 1 exactamente en las preguntas que la calificación existente marca como correctas
 
 Escenario: Reconstrucción
   Dado el historial de respuestas de un usuario
