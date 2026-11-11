@@ -32,10 +32,12 @@ type ProcesoOpcion struct {
 	Especialidades []EspecialidadOpcion `json:"especialidades"`
 }
 
-// Preseleccion is the suggestion of F1; nothing is stored (regla 5).
+// Preseleccion is the suggestion of F1; nothing is stored (regla 5). The
+// especialidad is always set: without a valid one there is no preselection
+// (contract F1, PR #85); the proceso is null when there are several.
 type Preseleccion struct {
 	ProcesoID      *int64 `json:"proceso_id"`
-	EspecialidadID *int64 `json:"especialidad_id"`
+	EspecialidadID int64  `json:"especialidad_id"`
 }
 
 // Opciones is the F1 response.

@@ -59,13 +59,13 @@ func (s *Service) preseleccion(ctx context.Context, usuarioID int64, procesos []
 		return nil, err
 	}
 	if err == nil && ofrecidaEn(procesos, perfil.ProcesoID, perfil.EspecialidadID) {
-		return &Preseleccion{ProcesoID: &perfil.ProcesoID, EspecialidadID: &perfil.EspecialidadID}, nil
+		return &Preseleccion{ProcesoID: &perfil.ProcesoID, EspecialidadID: perfil.EspecialidadID}, nil
 	}
 	esp, err := s.repo.EspecialidadDePersona(ctx, usuarioID)
 	if err != nil || esp == nil || !ofrecida(procesos, *esp) {
 		return nil, err
 	}
-	pre := &Preseleccion{EspecialidadID: esp}
+	pre := &Preseleccion{EspecialidadID: *esp}
 	if len(procesos) == 1 {
 		pre.ProcesoID = &procesos[0].ID
 	}
