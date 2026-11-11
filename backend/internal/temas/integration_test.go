@@ -12,7 +12,10 @@ import (
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/db/dbtest"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
+
+func pqArray(ids []int64) any { return pq.Array(ids) }
 
 // entorno is the real mux with the real session checker over the test DB, an
 // admin, a non-admin user and one empty asignatura.
@@ -506,6 +509,12 @@ func TestReordenar(t *testing.T) {
 	if len(e.auditoria(t, "tema.reordenar", e.asig)) != 0 {
 		t.Fatal("a rejected reorder was audited")
 	}
+	_, sinCambios := e.do(t, "GET", fmt.Sprintf("/asignaturas/%d/temas", e.asig), e.usuario, ``)
+	for i, item := range sinCambios["data"].([]any) {
+		if idDe(item.(map[string]any)) != ids[i] {
+			t.Fatalf("a rejected reorder changed the order: %v", sinCambios["data"])
+		}
+	}
 
 	nuevo := []int64{ids[2], ids[0], ids[1]}
 	status, body := e.do(t, "PUT", path, e.admin, lista(nuevo...))
@@ -533,6 +542,46 @@ func TestReordenar(t *testing.T) {
 	// A tema created afterwards goes to the end.
 	if creado := e.crear(t, e.asig, "Al final"); creado["orden"] != 4.0 {
 		t.Errorf("orden del nuevo = %v, want 4", creado["orden"])
+	}
+}
+
+// Escenario «Orden desactualizado»: another admin archives B while the first
+// one still holds A, B, C.
+func TestReordenar_OtroAdminArchiva(t *testing.T) {
+	e := nuevoEntorno(t)
+	ids := e.sembrar(t, e.asig, 3, "activo")
+	if status, body := e.do(t, "PATCH", fmt.Sprintf("/admin/temas/%d/estado", ids[1]), e.admin, `{"estado":"archivado"}`); status != http.StatusOK {
+		t.Fatalf("archivar B: %d %v", status, body)
+	}
+	b, _ := json.Marshal(map[string]any{"tema_ids": ids})
+	status, body := e.do(t, "PUT", fmt.Sprintf("/admin/asignaturas/%d/temas/orden", e.asig), e.admin, string(b))
+	if status != http.StatusConflict || codigo(body) != "orden_desactualizado" {
+		t.Fatalf("got %d %v, want 409 orden_desactualizado", status, body)
+	}
+	var ordenes []int
+	if err := e.db.Select(&ordenes, `SELECT orden FROM temas WHERE id = ANY($1) ORDER BY id`, pqArray(ids)); err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(ordenes) != "[1 2 3]" {
+		t.Errorf("orden = %v, want unchanged [1 2 3]", ordenes)
+	}
+}
+
+// An asignatura without active temas accepts the empty list and answers an
+// empty array, never null.
+func TestReordenar_ListaVacia(t *testing.T) {
+	e := nuevoEntorno(t)
+	e.sembrar(t, e.asig, 1, "archivado")
+	status, body := e.do(t, "PUT", fmt.Sprintf("/admin/asignaturas/%d/temas/orden", e.asig), e.admin, `{"tema_ids":[]}`)
+	if data, ok := body["data"].([]any); status != http.StatusOK || !ok || len(data) != 0 {
+		t.Fatalf("got %d %v, want 200 data []", status, body)
+	}
+	d := e.detalleAudit(t, "tema.reordenar", "asignatura", e.asig)
+	if a, ok := d["antes"].([]any); !ok || len(a) != 0 {
+		t.Errorf("audit antes = %v, want []", d["antes"])
+	}
+	if status, body := e.do(t, "PUT", "/admin/asignaturas/999999999/temas/orden", e.admin, `{"tema_ids":[]}`); status != http.StatusNotFound || body["message"] != ErrAsignaturaNoEncontrada.Error() {
+		t.Errorf("404: %d %v", status, body)
 	}
 }
 

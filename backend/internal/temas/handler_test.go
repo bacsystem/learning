@@ -89,6 +89,7 @@ func TestHandler_TraduceErroresDeDominio(t *testing.T) {
 	}{
 		{&ValidacionError{Campos: map[string]string{"nombre": "min"}}, http.StatusUnprocessableEntity, "validacion"},
 		{ErrNoEncontrado, http.StatusNotFound, "no_encontrado"},
+		{ErrAsignaturaNoEncontrada, http.StatusNotFound, "no_encontrado"},
 		{ErrReferenciaInvalida, http.StatusUnprocessableEntity, "referencia_invalida"},
 		{ErrTemaDuplicado, http.StatusUnprocessableEntity, "tema_duplicado"},
 		{ErrLimiteTemas, http.StatusUnprocessableEntity, "limite_temas"},

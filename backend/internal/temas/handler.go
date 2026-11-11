@@ -231,7 +231,7 @@ func responderError(w http.ResponseWriter, op string, err error) {
 	case errors.As(err, &verr):
 		httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codigoValidacion, ErrValidacion.Error(),
 			map[string]any{"campos": verr.Campos})
-	case errors.Is(err, ErrNoEncontrado):
+	case errors.Is(err, ErrNoEncontrado), errors.Is(err, ErrAsignaturaNoEncontrada):
 		httpx.JSONErrorCode(w, http.StatusNotFound, codigoNoEncontrado, err.Error(), nil)
 	case errors.Is(err, ErrReferenciaInvalida):
 		httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codigoReferenciaInvalida, err.Error(), nil)

@@ -131,7 +131,7 @@ func (r *Repository) ListarActivos(ctx context.Context, asignaturaID, especialid
 		return nil, fmt.Errorf("buscar asignatura %d: %w", asignaturaID, err)
 	}
 	if !existe {
-		return nil, ErrNoEncontrado
+		return nil, ErrAsignaturaNoEncontrada
 	}
 	var rows []struct {
 		ID              int64   `db:"id"`
@@ -308,12 +308,12 @@ func reactivar(ctx context.Context, tx *sqlx.Tx, id, asignaturaID int64) (int, e
 // Reordenar sets orden = 1..n following ids, which must be exactly the active
 // temas of the asignatura (ErrOrdenDesactualizado otherwise).
 func (r *Repository) Reordenar(ctx context.Context, asignaturaID int64, ids []int64, aud Auditor) ([]PosicionTema, error) {
-	var posiciones []PosicionTema
+	posiciones := []PosicionTema{}
 	err := r.enTx(ctx, func(tx *sqlx.Tx) error {
 		if _, err := bloquearAsignatura(ctx, tx, asignaturaID); err != nil {
-			return err
+			return asignaturaNoEncontrada(err)
 		}
-		var antes []int64
+		antes := []int64{}
 		if err := tx.SelectContext(ctx, &antes, `
 			SELECT id FROM temas WHERE asignatura_id = $1 AND estado = 'activo'
 			ORDER BY orden, id`, asignaturaID); err != nil {
@@ -362,6 +362,15 @@ func mapearUnico(err error) error {
 	var pqErr *pq.Error
 	if errors.As(err, &pqErr) && pqErr.Code == "23505" && pqErr.Constraint == constraintNombre {
 		return ErrTemaDuplicado
+	}
+	return err
+}
+
+// asignaturaNoEncontrada names the missing row when the asignatura of the
+// path is the one that does not exist.
+func asignaturaNoEncontrada(err error) error {
+	if errors.Is(err, ErrNoEncontrado) {
+		return ErrAsignaturaNoEncontrada
 	}
 	return err
 }

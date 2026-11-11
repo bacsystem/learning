@@ -10,14 +10,17 @@ import (
 // codes of docs/api/serums-ia-e1-taxonomia.md §1; the texts are the Spanish
 // fallback message.
 var (
-	ErrNoEncontrado        = errors.New("Tema no encontrado.")
-	ErrValidacion          = errors.New("Datos inválidos.")
-	ErrReferenciaInvalida  = errors.New("El área o alguna especialidad no existe o está inactiva.")
-	ErrTemaDuplicado       = errors.New("Ya existe un tema con ese nombre en esta área.")
-	ErrLimiteTemas         = errors.New("El área ya tiene el máximo de temas activos.")
-	ErrEstadoInvalido      = errors.New("El tema ya está en ese estado.")
-	ErrOrdenInvalido       = errors.New("La lista de orden es inválida.")
-	ErrOrdenDesactualizado = errors.New("El orden está desactualizado; recarga la lista.")
+	ErrNoEncontrado = errors.New("Tema no encontrado.")
+	// ErrAsignaturaNoEncontrada is the 404 of the routes keyed by asignatura
+	// (T6, T7); it answers the same no_encontrado code.
+	ErrAsignaturaNoEncontrada = errors.New("Área no encontrada.")
+	ErrValidacion             = errors.New("Datos inválidos.")
+	ErrReferenciaInvalida     = errors.New("El área o alguna especialidad no existe o está inactiva.")
+	ErrTemaDuplicado          = errors.New("Ya existe un tema con ese nombre en esta área.")
+	ErrLimiteTemas            = errors.New("El área ya tiene el máximo de temas activos.")
+	ErrEstadoInvalido         = errors.New("El tema ya está en ese estado.")
+	ErrOrdenInvalido          = errors.New("La lista de orden es inválida.")
+	ErrOrdenDesactualizado    = errors.New("El orden está desactualizado; recarga la lista.")
 )
 
 // Rule names used in ValidacionError.Campos (detalle.campos of the 422).
