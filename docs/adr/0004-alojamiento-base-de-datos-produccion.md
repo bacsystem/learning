@@ -137,12 +137,20 @@ Descartada: el usuario eligió Railway. Además, sin PITR se pierden hasta 24 h 
      - Se despliega por tag inmutable `vX.Y.Z` o por digest, **nunca** `:latest`.
      - El backend se **promueve**: la misma imagen, con el mismo digest, que validó qa en `deploy/` es la que va a Railway.
      - **Quién publica:** el usuario construye y publica las imágenes **desde su máquina** con la cuenta `cbaciliod`, en repositorios **públicos** de Docker Hub. Las credenciales de Docker Hub quedan en esa máquina y nunca van al repo. Hoy no hay publicación desde el CI.
-       - **Orden del release** (diseño de devops):
-         1. tag `vX.Y.Z`;
-         2. CI del tag en verde;
-         3. build y `make docker/verify` desde un **checkout limpio del tag**: el Makefile falla si hay cambios sin commit o si HEAD no es el tag;
-         4. push hecho por el usuario;
-         5. cambio del tag en Railway.
+       - **Orden del release** (diseño de devops, aprobado por el tech-lead; revisado el 2026-11-11):
+         1. **Validación completa de qa ANTES del tag**: en `deploy/local`, con las imágenes construidas en local desde la rama `release/*` (Decisión 10).
+         2. Tag `vX.Y.Z` (GitFlow: `release/*` → `main`).
+         3. CI del tag en verde.
+         4. El usuario construye, desde un **checkout limpio del tag**, tres imágenes:
+            - backend `vX.Y.Z`;
+            - frontend `vX.Y.Z`, con la URL de producción;
+            - frontend `vX.Y.Z-preprod`, con `NEXT_PUBLIC_API_URL=http://localhost:8180`.
+
+            Pasan por `make docker/verify` y el usuario las publica. El Makefile falla si hay cambios sin commit o si HEAD no es el tag.
+         5. **Guardia de versión:** el `version` de `frontend/package.json` debe coincidir con el tag sin la «v», igual que `main.version` del backend. Si no coincide, el build falla.
+         6. **Smoke sobre las imágenes publicadas**, en `deploy/local` con `make local/up TAG=vX.Y.Z`: arranque, migraciones, login y `/health`. Se anota el **digest** del backend probado.
+         7. Cambio en Railway al tag `vX.Y.Z`, o a ese digest. El backend de producción es **la misma imagen**, con el mismo digest, que pasó el smoke.
+       - **Si el smoke falla, no se despliega.** La corrección sale como `vX.Y.(Z+1)` por el mismo flujo: los tags publicados **nunca se reescriben**, ni en git ni en Docker Hub.
        - Ningún agente hace `docker login` ni `docker push`.
        - Rollback: volver al tag anterior en Railway.
      - **Consecuencia de que sean públicas:** cualquiera puede descargarlas. Por eso **ninguna imagen lleva secretos, datos ni `.env`**:
@@ -162,7 +170,11 @@ Descartada: el usuario eligió Railway. Además, sin PITR se pierden hasta 24 h 
    - Hoy se cumple: no hay ninguna referencia a `RAILWAY` en `backend/` ni en `frontend/src` (búsqueda del 2026-11-11).
    - **Frontend:** `NEXT_PUBLIC_*` se fija en el **build** de Next.js (`ARG NEXT_PUBLIC_API_URL` en `frontend/Dockerfile:19-22`), así que la imagen del frontend se construye por entorno, con su `NEXT_PUBLIC_API_URL`, y se publica con un tag por entorno (p. ej. `vX.Y.Z-preprod` y `vX.Y.Z`). Es un límite del framework, no de la plataforma, y aplica igual en cualquier nube. Que qa valide la misma imagen del frontend que va a producción exigiría leer la URL en runtime: es un cambio de código del frontend que queda fuera de este ADR.
 10. **Entornos.**
-    - **Preproducción local:** un directorio `deploy/` del repo levanta el stack con las mismas imágenes y la misma forma de configuración que producción. qa valida ahí antes de cada despliegue a Railway. Estructura propuesta por devops y revisada por el architect:
+    - **Preproducción local:** un directorio `deploy/` del repo levanta el stack con las mismas imágenes y la misma forma de configuración que producción. qa valida ahí antes de cada despliegue a Railway, en dos momentos (Decisión 9):
+      - **antes del tag:** validación completa contra los criterios de aceptación, con las imágenes construidas en local desde la rama `release/*`;
+      - **después de publicar:** un smoke sobre las imágenes publicadas (`make local/up TAG=vX.Y.Z`), anotando el digest del backend.
+
+      Estructura propuesta por devops y revisada por el architect:
       - `deploy/local/`: compose propio (proyecto `capacitate-preprod`, puertos solo en `127.0.0.1`, red propia), un TLS autofirmado generado por `make` (en `.gitignore`), una semilla sintética y la guía para qa;
       - `deploy/railway/`: guía y lista de variables sin secretos, sin archivos de configuración de Railway;
       - una carpeta por destino, `deploy/<nube>/`, todas con las mismas imágenes.
