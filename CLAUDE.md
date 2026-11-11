@@ -51,8 +51,8 @@ El frontend no tiene runner de tests todavía; la verificación es `tsc`, `lint`
 - Nunca subir `assets/`, binarios de `backend/` ni archivos `.env`.
 
 ## Equipo de agentes
-Roles (definidos en .claude/agents/): po, tech-lead (sesión principal), backend-dev, frontend-dev, qa.
-Flujo: po escribe historias en docs/stories/ -> tech-lead define contrato en docs/api/ y reparte tareas ->
+Roles (definidos en .claude/agents/): po, architect, tech-lead (sesión principal), backend-dev, frontend-dev, qa.
+Flujo: po escribe historias en docs/stories/ -> architect revisa su impacto, define el contrato en docs/api/ y los ADR en docs/adr/ -> tech-lead reparte tareas ->
 backend-dev (backend/) y frontend-dev (frontend/) trabajan en paralelo, cada uno dueño de sus archivos ->
 qa valida contra criterios de aceptación -> cada developer crea su PR a develop -> tech-lead lo revisa con el skill /pr-review ->
 si hay hallazgos, los corrige el developer autor y el tech-lead vuelve a revisar, hasta que quede limpio.
