@@ -28,9 +28,9 @@ esa aprobación explícita.
       ([variables-de-entorno.md](variables-de-entorno.md)). Si hay variables
       nuevas, ya están cargadas en el gestor de secretos del entorno y
       documentadas. Nunca se pegan en el PR ni en mensajes.
-- [ ] `npm audit --omit=dev --audit-level=high` en `frontend/` y `govulncheck`
-      en `backend/` sin hallazgos (`make test` corre govulncheck). Un hallazgo
-      alto o crítico bloquea el release.
+- [ ] `npm audit --omit=dev --audit-level=high` en `frontend/` (lo corre
+      `make lint` y el workflow) y `govulncheck` en `backend/` (lo corre
+      `make test`) sin hallazgos. Un hallazgo alto o crítico bloquea el release.
 
 ## 2. Orden de las migraciones
 

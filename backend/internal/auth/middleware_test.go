@@ -1,11 +1,16 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	jwtpkg "github.com/cbaciliod/learning/internal/jwt"
 )
@@ -59,7 +64,9 @@ func TestRequireAuth(t *testing.T) {
 		{"not bearer", fakeChecker(&Session{UserID: 7, Rol: "usuario", Estado: "activo"}, nil), "Basic abc", 401},
 		{"bad signature", fakeChecker(&Session{UserID: 7, Rol: "usuario", Estado: "activo"}, nil), "Bearer " + tok + "x", 401},
 		{"session missing", fakeChecker(nil, nil), "Bearer " + tok, 401},
-		{"checker error", fakeChecker(nil, errors.New("db down")), "Bearer " + tok, 401},
+		{"checker error", fakeChecker(nil, errors.New("db down")), "Bearer " + tok, 503},
+		{"checker timeout", fakeChecker(nil, context.DeadlineExceeded), "Bearer " + tok, 503},
+		{"checker error with a session", fakeChecker(&Session{UserID: 7, Rol: "usuario", Estado: "activo"}, errors.New("partial")), "Bearer " + tok, 503},
 		{"session of another user", fakeChecker(&Session{UserID: 8, Rol: "usuario", Estado: "activo"}, nil), "Bearer " + tok, 401},
 		{"user inactivo", fakeChecker(&Session{UserID: 7, Rol: "usuario", Estado: "inactivo"}, nil), "Bearer " + tok, 401},
 		{"user rechazado", fakeChecker(&Session{UserID: 7, Rol: "usuario", Estado: "rechazado"}, nil), "Bearer " + tok, 401},
@@ -103,5 +110,56 @@ func TestRequireAdmin_WithoutClaims_403(t *testing.T) {
 	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
 	if w.Code != http.StatusForbidden {
 		t.Errorf("got %d, want 403", w.Code)
+	}
+}
+
+// Contract «Autenticación con la BD caída»: the three cases, with their bodies,
+// and the request never reaches the handler unless the session is valid.
+func TestRequireAuth_BDCaida(t *testing.T) {
+	tok := issue(t, 7, "usuario")
+	cases := []struct {
+		name     string
+		checker  SessionChecker
+		wantCode int
+		wantBody string
+		wantPasa bool
+	}{
+		{"missing session → 401", fakeChecker(nil, nil), http.StatusUnauthorized, `{"error":"Sesión revocada."}`, false},
+		{"DB error → 503", fakeChecker(nil, errors.New("dial tcp: password=secreto")), http.StatusServiceUnavailable, `{"error":"Servicio no disponible."}`, false},
+		{"valid session → passes", fakeChecker(&Session{UserID: 7, Rol: "usuario", Estado: "activo"}, nil), http.StatusOK, "", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			pasa := false
+			h := RequireAuth(testJWTSecret, c.checker)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				pasa = true
+				w.WriteHeader(http.StatusOK)
+			}))
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Header.Set("Authorization", "Bearer "+tok)
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, req)
+			if w.Code != c.wantCode || pasa != c.wantPasa {
+				t.Fatalf("got %d (handler reached %v), want %d (%v)", w.Code, pasa, c.wantCode, c.wantPasa)
+			}
+			if body := strings.TrimSpace(w.Body.String()); c.wantBody != "" && body != c.wantBody {
+				t.Errorf("body %s, want %s", body, c.wantBody)
+			}
+		})
+	}
+}
+
+// The 503 log carries the op only, never the driver error (it may hold the DSN).
+func TestRequireAuth_BDCaidaNoRegistraElError(t *testing.T) {
+	var buf bytes.Buffer
+	anterior := log.Logger
+	log.Logger = zerolog.New(&buf)
+	t.Cleanup(func() { log.Logger = anterior })
+
+	if code, _ := serve(t, fakeChecker(nil, errors.New("dial tcp db:5432: password=secreto")), false, "Bearer "+issue(t, 7, "usuario")); code != http.StatusServiceUnavailable {
+		t.Fatalf("got %d, want 503", code)
+	}
+	if out := buf.String(); !strings.Contains(out, "auth.check_session") || strings.Contains(out, "secreto") || strings.Contains(out, "dial tcp") {
+		t.Errorf("log %q: want the op and no driver error", out)
 	}
 }

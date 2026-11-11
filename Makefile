@@ -86,12 +86,13 @@ test: check/test-db ## Tests como el CI (exige TEST_DATABASE_URL a una base *_te
 	cd backend && TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -race -count=1 ./...
 	cd frontend && npm test
 
-lint: ## Lint como el CI: go vet, golangci-lint, tsc, eslint, i18n (no reescribe)
+lint: ## Lint como el CI: go vet, golangci-lint, tsc, eslint, i18n, npm audit (no reescribe)
 	cd backend && go vet ./...
 	cd backend && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --timeout=5m ./...
 	cd frontend && npx tsc --noEmit
 	cd frontend && npm run lint
 	cd frontend && node scripts/check-i18n.mjs
+	cd frontend && npm audit --omit=dev --audit-level=high
 
 fmt: ## Formatea: go fmt y eslint --fix
 	cd backend && go fmt ./...

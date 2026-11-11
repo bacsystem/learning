@@ -85,3 +85,68 @@ describe("vistaDeCarga", () => {
     await pendiente;
   });
 });
+
+describe("CargaPorClave.refrescar", () => {
+  it("replaces the data without marking loading", async () => {
+    const carga = new CargaPorClave<string>();
+    await carga.cargar("a", async () => "v1");
+    const pendiente = carga.refrescar("a", async () => "v2");
+    expect(carga.obtenerEstado().cargando).toBe(false);
+    await pendiente;
+    expect(vistaDeCarga(carga.obtenerEstado(), "a")).toEqual({ datos: "v2", error: null, cargando: false });
+  });
+
+  it("keeps the previous data and shows no error when it fails", async () => {
+    const carga = new CargaPorClave<string>();
+    await carga.cargar("a", async () => "v1");
+    await carga.refrescar("a", async () => Promise.reject(new Error("500")));
+    expect(vistaDeCarga(carga.obtenerEstado(), "a")).toEqual({ datos: "v1", error: null, cargando: false });
+  });
+
+  it("does not overwrite a newer load of another key", async () => {
+    const carga = new CargaPorClave<string>();
+    await carga.cargar("a", async () => "v1");
+    let terminar!: (v: string) => void;
+    const refresco = carga.refrescar("a", () => new Promise((r) => (terminar = r)));
+    await carga.cargar("b", async () => "datos de b");
+    terminar("tarde");
+    await refresco;
+    expect(carga.obtenerEstado()).toMatchObject({ clave: "b", datos: "datos de b" });
+  });
+});
+
+describe("CargaPorClave.refrescar durante un cargar en curso (review #99 H1)", () => {
+  it("a failed refresh does not leave the screen loading forever", async () => {
+    const c = new CargaPorClave<string>();
+    let resolver!: (v: string) => void;
+    const carga = c.cargar("p1", () => new Promise<string>((r) => (resolver = r)));
+    await c.refrescar("p1", () => Promise.reject(new Error("red")));
+    resolver("datos");
+    await carga;
+    expect(c.obtenerEstado()).toMatchObject({ datos: "datos", cargando: false });
+  });
+
+  it("a refresh of the previous key never overwrites the new key's load", async () => {
+    const c = new CargaPorClave<string>();
+    await c.cargar("p1", async () => "datos p1");
+    let terminarRefresco!: (v: string) => void;
+    const refresco = c.refrescar("p1", () => new Promise<string>((r) => (terminarRefresco = r)));
+    const carga = c.cargar("p2", async () => "datos p2");
+    terminarRefresco("p1 tarde");
+    await Promise.all([refresco, carga]);
+    expect(vistaDeCarga(c.obtenerEstado(), "p2")).toEqual({ datos: "datos p2", error: null, cargando: false });
+  });
+});
+
+describe("CargaPorClave.reemplazar con un refresco en vuelo (seguimiento del review #99)", () => {
+  it("a refresh that started before a save does not bring back the old data", async () => {
+    const c = new CargaPorClave<string>();
+    await c.cargar("f1", async () => "antes");
+    let terminarRefresco!: (v: string) => void;
+    const refresco = c.refrescar("f1", () => new Promise<string>((r) => (terminarRefresco = r)));
+    c.reemplazar("f1", "guardado");
+    terminarRefresco("antes (respuesta vieja)");
+    await refresco;
+    expect(vistaDeCarga(c.obtenerEstado(), "f1").datos).toBe("guardado");
+  });
+});

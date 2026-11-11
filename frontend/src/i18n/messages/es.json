@@ -17,6 +17,7 @@
     "menu-admin-asignaturas": "Asignaturas",
     "menu-admin-temas": "Temas",
     "menu-admin-pesos": "Pesos por profesión",
+    "menu-admin-fuentes": "Fuentes",
     "menu-admin-procesos": "Procesos (Admin)",
     "menu-admin-preguntas": "Preguntas",
     "menu-admin-etiquetas": "Etiquetas",
@@ -1392,6 +1393,7 @@
       },
       "profesion": {
         "sugerida": "Te sugerimos esta profesión a partir de tus datos. No se guarda hasta que pulses «Guardar».",
+        "sugeridaElegirProceso": "Te sugerimos {especialidad} a partir de tus datos. Elige el proceso SERUMS para confirmarla; no se guarda hasta que pulses «Guardar».",
         "guardar": "Guardar profesión",
         "cambiar": "Cambiar profesión",
         "guardada": "Profesión guardada: {especialidad}.",
@@ -1434,7 +1436,187 @@
           "validacion": "Revisa el proceso y la profesión elegidos.",
           "error_interno": "Error interno del servidor. Inténtalo de nuevo."
         }
+      },
+      "fuentes": {
+        "unidad": "fuentes",
+        "buscar": "Buscar por título…",
+        "todasProfesiones": "Todas las profesiones",
+        "subiendo": "Subiendo…",
+        "errorCargar": "No se pudieron cargar las fuentes.",
+        "errorCargarDetalle": "No se pudo cargar la fuente.",
+        "vacio": {
+          "titulo": "Aún no hay fuentes",
+          "texto": "Sube un balotario, guía o norma en formato .md para empezar a construir el repositorio."
+        },
+        "vacioFiltros": "Ninguna fuente coincide con los filtros.",
+        "estado": {
+          "procesando": "Procesando",
+          "activa": "Activa",
+          "fallida": "Fallida",
+          "retirada": "Retirada"
+        },
+        "tipo": {
+          "balotario": "Balotario",
+          "guia": "Guía",
+          "norma": "Norma",
+          "otro": "Otro"
+        },
+        "motivos": {
+          "sin_contenido": "El archivo no tiene texto que se pueda usar.",
+          "limite_pasajes": "El archivo supera el número máximo de pasajes.",
+          "error_interno": "Falló el procesamiento por un error interno. Reintenta."
+        },
+        "versionEstado": {
+          "procesando": "procesando",
+          "lista": "lista",
+          "fallida": "fallida",
+          "archivada": "archivada"
+        },
+        "versionEnProceso": {
+          "procesando": "Versión {numero, number} procesando",
+          "fallida": "La versión {numero, number} falló"
+        },
+        "oficial": {
+          "insignia": "Oficial verificada"
+        },
+        "col": {
+          "titulo": "Título",
+          "tipo": "Tipo",
+          "profesiones": "Profesiones",
+          "version": "Versión",
+          "pasajes": "Pasajes",
+          "estado": "Estado",
+          "actualizada": "Actualizada"
+        },
+        "filtro": {
+          "estado": "Estado",
+          "tipo": "Tipo",
+          "profesion": "Profesión",
+          "oficial": "Oficial verificada",
+          "todos": "Todos",
+          "todas": "Todas",
+          "oficialSi": "Sí",
+          "oficialNo": "No"
+        },
+        "campo": {
+          "titulo": "Título",
+          "tipo": "Tipo",
+          "tipoElegir": "Elige el tipo",
+          "anio": "Año",
+          "proceso": "Proceso",
+          "procesoNinguno": "Ninguno",
+          "profesiones": "Profesiones",
+          "profesionesAyuda": "Sin selección, la fuente aplica a todas las profesiones.",
+          "profesionInactiva": "{nombre} (inactiva)",
+          "archivoTitulo": "Arrastra el archivo .md o haz clic para elegirlo",
+          "archivoAyuda": "Solo .md, hasta {mb, number} MB.",
+          "archivoQuitar": "Quitar archivo",
+          "motivo": "Motivo",
+          "entidad": "Entidad emisora",
+          "nota": "Nota de verificación"
+        },
+        "validacion": {
+          "titulo": "El título debe tener entre {min, number} y {max, number} caracteres.",
+          "tipo": "Elige un tipo.",
+          "anio": "El año va de {min} a {max}.",
+          "especialidadesMax": "Elige como máximo {max, number} profesiones.",
+          "archivoRequerido": "Elige un archivo .md.",
+          "archivoExtension": "Solo se aceptan archivos .md.",
+          "archivoTamano": "El archivo supera {mb, number} MB.",
+          "motivo": "El motivo debe tener entre {min, number} y {max, number} caracteres.",
+          "entidad": "La entidad emisora debe tener entre {min, number} y {max, number} caracteres.",
+          "nota": "La nota debe tener entre {min, number} y {max, number} caracteres."
+        },
+        "subir": {
+          "titulo": "Subir fuente",
+          "boton": "Subir",
+          "ok": "Fuente «{titulo}» subida: se está procesando.",
+          "avisoDatos": "No subas documentos con datos personales. La fuente no se marca como oficial verificada al subirla."
+        },
+        "version": {
+          "titulo": "Nueva versión",
+          "boton": "Subir versión",
+          "ayuda": "La versión vigente sigue en uso hasta que la nueva termine de procesarse. La nueva versión no hereda la marca oficial.",
+          "ok": "Versión subida: se está procesando."
+        },
+        "editar": {
+          "titulo": "Editar fuente",
+          "ayuda": "Cambia el título y las profesiones sin crear una versión nueva.",
+          "ok": "Fuente actualizada."
+        },
+        "acciones": {
+          "nuevaVersion": "Nueva versión",
+          "editar": "Editar",
+          "retirar": "Retirar",
+          "restaurar": "Restaurar",
+          "reintentar": "Reintentar",
+          "marcarOficial": "Marcar como oficial verificada",
+          "desmarcarOficial": "Quitar marca oficial"
+        },
+        "retirar": {
+          "titulo": "Retirar fuente",
+          "citantes": "{n, plural, =0 {Ningún contenido cita esta fuente.} one {# contenido que la cita se marcará «en revisión».} other {# contenidos que la citan se marcarán «en revisión».}}",
+          "ok": "Fuente retirada. {n, plural, =0 {Ningún contenido marcado.} one {# contenido marcado «en revisión».} other {# contenidos marcados «en revisión».}}"
+        },
+        "restaurar": {
+          "titulo": "Restaurar fuente",
+          "efecto": "La fuente vuelve a estar activa. El contenido que se marcó «en revisión» no se reaprueba solo.",
+          "ok": "Fuente restaurada."
+        },
+        "reintentar": {
+          "titulo": "Reintentar procesamiento",
+          "efecto": "La última versión fallida vuelve a procesarse.",
+          "ok": "Procesamiento reintentado."
+        },
+        "marcar": {
+          "titulo": "Marcar como oficial verificada",
+          "boton": "Marcar",
+          "efecto": "Las preguntas pendientes de este balotario sin conflicto de clave se aprobarán revisando solo su clasificación y estructura. Marca solo fuentes que verificaste en la fuente oficial.",
+          "ok": "Fuente marcada como oficial verificada."
+        },
+        "desmarcar": {
+          "titulo": "Quitar marca oficial",
+          "efecto": "Desde ahora las preguntas pendientes de esta fuente exigirán verificar la clave.",
+          "ok": "Marca oficial quitada."
+        },
+        "duplicada": {
+          "titulo": "Esta fuente ya existe",
+          "texto": "El archivo es idéntico a «{titulo}».",
+          "ver": "Ver la fuente existente"
+        },
+        "detalle": {
+          "volver": "Volver a fuentes",
+          "version": "Versión {numero, number}",
+          "versionDatos": "{pasajes, number} pasajes · {lineas, number} líneas · {kb, number} KB",
+          "versionOficial": "Oficial verificada por {entidad}",
+          "citantes": "Contenidos que la citan",
+          "oficialEntidad": "Verificada por {entidad}",
+          "fallida": "Procesamiento fallido",
+          "procesando": "Se está procesando una versión. Esta página se actualiza sola.",
+          "retirada": "Fuente retirada",
+          "versiones": "Historial de versiones"
+        },
+        "errores": {
+          "archivo_demasiado_grande": "El archivo supera 2 MB.",
+          "archivo_invalido": {
+            "extension": "Solo se aceptan archivos .md.",
+            "tipo": "El archivo no es de texto Markdown.",
+            "codificacion": "El archivo no está en UTF-8 o contiene caracteres no válidos.",
+            "lineas": "El archivo supera 20 000 líneas."
+          },
+          "limite_fuentes": {
+            "especialidad": "Una profesión ya tiene {limite, number} fuentes activas o en proceso.",
+            "total": "Se alcanzó el máximo de {limite, number} fuentes activas o en proceso."
+          },
+          "limite_versiones": "La fuente ya tiene 20 versiones y ninguna se puede archivar.",
+          "estado_invalido": "La fuente cambió de estado. Recarga la página.",
+          "validacion": "Revisa los datos del formulario.",
+          "referencia_invalida": "Una profesión o el proceso ya no está activo. Recarga y vuelve a intentarlo.",
+          "no_encontrado": "La fuente ya no existe."
+        }
       }
-    }
+    },
+    "sesion-servidor-no-disponible-titulo": "El servidor no responde",
+    "sesion-servidor-no-disponible-texto": "Tu sesión sigue abierta. Lo volvemos a intentar cada pocos segundos; en cuanto el servidor responda, verás la aplicación."
   }
 }

@@ -1,5 +1,12 @@
 import type { ProcesoOpcion } from "./api";
-import { cambiarProceso, especialidadesDe, intentarGuardar, puedeGuardar, seleccionInicial } from "./seleccion";
+import {
+  cambiarProceso,
+  especialidadesDe,
+  especialidadSugerida,
+  intentarGuardar,
+  puedeGuardar,
+  seleccionInicial,
+} from "./seleccion";
 import { describe, expect, it, vi } from "vitest";
 
 const proceso = (id: number, especialidades: number[]): ProcesoOpcion => ({
@@ -26,15 +33,6 @@ describe("seleccionInicial", () => {
       procesoId: 12,
       especialidadId: 5,
     });
-  });
-
-  it("keeps proceso_id null with several processes", () => {
-    expect(
-      seleccionInicial({
-        procesos: [proceso(12, [5]), proceso(13, [5])],
-        preseleccion: { proceso_id: null, especialidad_id: 5 },
-      }),
-    ).toEqual({ procesoId: null, especialidadId: 5 });
   });
 
   it("without a suggestion, picks the only process and leaves the specialty empty", () => {
@@ -131,5 +129,51 @@ describe("intentarGuardar (409 confirmacion_requerida → diálogo → reenvío)
   it("returns any other error as is", async () => {
     const error = Object.assign(new Error("x"), { status: 422, code: "especialidad_invalida" });
     expect(await intentarGuardar(async () => Promise.reject(error), false)).toEqual({ tipo: "error", error });
+  });
+});
+
+describe("sugerencia con varios procesos (qa E1-04 H1)", () => {
+  const dosProcesos = [proceso(12, [2, 5]), proceso(13, [5, 7])];
+  const opciones = { procesos: dosProcesos, preseleccion: { proceso_id: null, especialidad_id: 5 } };
+
+  it("does not put the suggested specialty in the selector while no process is chosen", () => {
+    expect(seleccionInicial(opciones)).toEqual({ procesoId: null, especialidadId: null });
+  });
+
+  it("exposes the suggestion apart, with its name", () => {
+    expect(especialidadSugerida(opciones)).toEqual({ id: 5, nombre: "Esp 5" });
+    expect(especialidadSugerida({ procesos: dosProcesos, preseleccion: null })).toBeNull();
+  });
+
+  it("applies the suggestion when the chosen process has it", () => {
+    expect(cambiarProceso(dosProcesos, { procesoId: null, especialidadId: null }, 13, 5)).toEqual({
+      procesoId: 13,
+      especialidadId: 5,
+    });
+  });
+
+  it("does not apply it when the chosen process lacks it, nor over the user's own choice", () => {
+    const tres = [...dosProcesos, proceso(14, [7])];
+    expect(cambiarProceso(tres, { procesoId: null, especialidadId: null }, 14, 5)).toEqual({
+      procesoId: 14,
+      especialidadId: null,
+    });
+    expect(cambiarProceso(dosProcesos, { procesoId: 12, especialidadId: 2 }, 13, 5)).toEqual({
+      procesoId: 13,
+      especialidadId: null,
+    });
+  });
+
+  it("keeps the single-process and full-suggestion cases as before", () => {
+    expect(
+      seleccionInicial({ procesos: [proceso(12, [5])], preseleccion: { proceso_id: null, especialidad_id: 5 } }),
+    ).toEqual({
+      procesoId: 12,
+      especialidadId: 5,
+    });
+    expect(seleccionInicial({ procesos: dosProcesos, preseleccion: { proceso_id: 13, especialidad_id: 5 } })).toEqual({
+      procesoId: 13,
+      especialidadId: 5,
+    });
   });
 });
