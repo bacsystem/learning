@@ -60,21 +60,16 @@ export function FormularioTema({
     () => opcionesEspecialidad(especialidades, tema?.especialidades ?? []),
     [especialidades, tema],
   );
-  const inactivas = useMemo(() => opciones.filter((o) => o.inactiva).map((o) => o.id), [opciones]);
 
   const validationSchema = useMemo(
     () =>
-      esquemaTema(
-        {
-          nombreRequerido: t("serumsIa.temas.validacion.nombreRequerido"),
-          nombreLongitud: t("serumsIa.temas.validacion.nombreLongitud", { min: NOMBRE_MIN, max: NOMBRE_MAX }),
-          descripcionLongitud: t("serumsIa.temas.validacion.descripcionLongitud", { max: DESCRIPCION_MAX }),
-          especialidadesMax: t("serumsIa.temas.validacion.especialidadesMax", { max: ESPECIALIDADES_MAX }),
-          especialidadInactiva: t("serumsIa.temas.validacion.especialidadInactiva"),
-        },
-        inactivas,
-      ),
-    [t, inactivas],
+      esquemaTema({
+        nombreRequerido: t("serumsIa.temas.validacion.nombreRequerido"),
+        nombreLongitud: t("serumsIa.temas.validacion.nombreLongitud", { min: NOMBRE_MIN, max: NOMBRE_MAX }),
+        descripcionLongitud: t("serumsIa.temas.validacion.descripcionLongitud", { max: DESCRIPCION_MAX }),
+        especialidadesMax: t("serumsIa.temas.validacion.especialidadesMax", { max: ESPECIALIDADES_MAX }),
+      }),
+    [t],
   );
 
   const formik = useFormik<ValoresTema>({

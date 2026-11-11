@@ -6,7 +6,6 @@ const esquema = esquemaTema({
   nombreLongitud: "longitud",
   descripcionLongitud: "descripcion",
   especialidadesMax: "max",
-  especialidadInactiva: "inactiva",
 });
 
 const valido = { nombre: "Vigilancia epidemiológica", descripcion: "", especialidad_ids: [2, 5] };
@@ -114,18 +113,7 @@ describe("opcionesEspecialidad", () => {
 });
 
 describe("esquemaTema with inactive especialidades", () => {
-  it("rejects a checked inactive especialidad and accepts the form once it is unchecked", async () => {
-    const conInactiva = esquemaTema(
-      {
-        nombreRequerido: "requerido",
-        nombreLongitud: "longitud",
-        descripcionLongitud: "descripcion",
-        especialidadesMax: "max",
-        especialidadInactiva: "inactiva",
-      },
-      [9],
-    );
-    await expect(conInactiva.validate({ ...valido, especialidad_ids: [2, 9] })).rejects.toThrow("inactiva");
-    await expect(conInactiva.validate({ ...valido, especialidad_ids: [2] })).resolves.toBeTruthy();
+  it("accepts an associated inactive especialidad checked (T4: the server keeps the ones the tema already had)", async () => {
+    await expect(esquema.validate({ ...valido, especialidad_ids: [2, 9] })).resolves.toBeTruthy();
   });
 });

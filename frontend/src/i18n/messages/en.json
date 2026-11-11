@@ -1109,6 +1109,7 @@
     "simulacros-revision-sr-incorrecta": "Incorrect",
     "simulacros-vacio": "No simulations yet. Start one with “{accion}”.",
     "comun-reintentar": "Retry",
+    "comun-reintentando": "Retrying...",
     "barra-recursos": "Resources",
     "notif-hace-ahora": "Just now",
     "notif-hace-min": "{n} min ago",
@@ -1268,14 +1269,13 @@
           "especialidadesAyuda": "With none selected, the topic applies to all professions.",
           "sinEspecialidades": "There are no active specialties.",
           "especialidadInactiva": "{nombre} (inactive)",
-          "especialidadInactivaAyuda": "No longer active: uncheck it to save."
+          "especialidadInactivaAyuda": "No longer active: you can keep it. If you remove it and save, it cannot be added again."
         },
         "validacion": {
           "nombreRequerido": "The name is required.",
           "nombreLongitud": "The name must have between {min} and {max} characters.",
           "descripcionLongitud": "The description allows up to {max} characters.",
-          "especialidadesMax": "Choose at most {max} specialties.",
-          "especialidadInactiva": "Uncheck the inactive specialties to save."
+          "especialidadesMax": "Choose at most {max} specialties."
         },
         "reordenar": {
           "boton": "Reorder",
@@ -1303,7 +1303,8 @@
         "orden_desactualizado": "The topics changed while you were ordering. Reload the list and order again.",
         "estado_invalido": "The topic is already in that state. Reload the list.",
         "no_encontrado": "The topic no longer exists. Reload the list.",
-        "error_interno": "Internal server error. Please try again."
+        "error_interno": "Internal server error. Please try again.",
+        "cuerpo_demasiado_grande": "The data sent is too large. Shorten the text and try again."
       },
       "pesos": {
         "titulo": "Weights for {especialidad}",
