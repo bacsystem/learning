@@ -49,8 +49,9 @@ func NewDBLimiter(db *sql.DB, prefix string, limit int, window time.Duration) *D
 // Postgres, and returns l. Only for tests: in production the window comes from
 // now() of Postgres so that every replica shares one clock. A test fixes ahora
 // at its real start instant, so requests that cross a window boundary while it
-// runs still count in one window, and the sweep and Release (which keep using
-// now() and the reserved window) stay consistent.
+// runs still count in one window. Release uses the reserved window, and the
+// sweep keeps every row one extra window after it expires, so a test that
+// crosses a real boundary does not lose its fixed window.
 func (l *DBLimiter) ConReloj(ahora func() time.Time) *DBLimiter {
 	l.ahora = ahora
 	return l
@@ -152,7 +153,7 @@ func (l *DBLimiter) Count(ctx context.Context, key string) (int, error) {
 	return n, err
 }
 
-// maybeSweep deletes expired windows of every limiter, at most once per
+// maybeSweep deletes windows of every limiter expired for more than one window, at most once per
 // dbLimiterSweepEvery per process (lazy cleanup, no cron). Errors are ignored:
 // stale rows never affect correctness, only table size.
 func (l *DBLimiter) maybeSweep(ctx context.Context) {
@@ -163,5 +164,12 @@ func (l *DBLimiter) maybeSweep(ctx context.Context) {
 	}
 	l.lastSweep = time.Now()
 	l.sweepMu.Unlock()
-	_, _ = l.db.ExecContext(ctx, `DELETE FROM auth_intentos_fallidos WHERE expira_en < now()`)
+	// Each row is kept one extra window after it expires (expira_en -
+	// ventana_inicio is its window length). Production never reads an
+	// expired window, so the margin only delays the cleanup; it keeps a test
+	// whose clock is fixed (ConReloj) from losing its window when the test
+	// crosses a real boundary and any limiter sweeps (#139).
+	_, _ = l.db.ExecContext(ctx, `
+		DELETE FROM auth_intentos_fallidos
+		WHERE expira_en + (expira_en - ventana_inicio) < now()`)
 }
