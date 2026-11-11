@@ -94,7 +94,7 @@ func (m *Memoria) BuscarPasajes(_ context.Context, b fuentes.Busqueda) ([]fuente
 	}
 	var hits []hit
 	for _, f := range m.fuentes {
-		if f.estado != fuentes.EstadoActiva || !(len(f.especialidades) == 0 || f.especialidades[b.EspecialidadID]) {
+		if f.estado != fuentes.EstadoActiva || !f.aplicaA(b.EspecialidadID) {
 			continue
 		}
 		for _, p := range f.versiones[f.vigente].pasajes {
@@ -209,6 +209,11 @@ func (m *Memoria) NuevaVersion(_ context.Context, fuenteID int64, contenido []by
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// aplicaA: a fuente without professions applies to every one (E2-03 regla 2).
+func (f *fuenteMem) aplicaA(especialidadID int64) bool {
+	return len(f.especialidades) == 0 || f.especialidades[especialidadID]
+}
 
 func (m *Memoria) registrarHash(contenido []byte) error {
 	h := sha256.Sum256(contenido)
