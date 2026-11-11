@@ -163,6 +163,7 @@ func TestPatchEstado_Guardas(t *testing.T) {
 		{"revalidar ia sin nota", EstadoEnRevision, OrigenIA, true, `{"estado":"aprobada","verificado":true}`, 422, CodigoNotaObligatoria},
 		{"orden: ia en revisión sin nota ni casilla", EstadoEnRevision, OrigenIA, true, `{"estado":"aprobada"}`, 422, CodigoNotaObligatoria},
 		{"concurrencia: otro admin la rechazó", EstadoRechazada, OrigenManual, true, `{"estado":"aprobada","verificado":true}`, 409, CodigoEstadoInvalido},
+		{"pregunta eliminada", EstadoEliminada, OrigenManual, false, `{"estado":"borrador"}`, 404, "no_encontrado"},
 		{"estado desconocido", EstadoBorrador, OrigenManual, false, `{"estado":"activo"}`, 422, CodigoValidacion},
 		{"campo desconocido", EstadoBorrador, OrigenManual, false, `{"estado":"aprobada","origen":"ia"}`, 400, "cuerpo_invalido"},
 		{"verificado con tipo incorrecto", EstadoBorrador, OrigenManual, false, `{"estado":"aprobada","verificado":"si"}`, 400, "cuerpo_invalido"},

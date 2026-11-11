@@ -21,6 +21,8 @@ func codigoRegla(t *testing.T, err error) string {
 		return re.Codigo
 	case errors.As(err, &ve):
 		return CodigoValidacion
+	case errors.Is(err, ErrNotFound):
+		return "no_encontrado"
 	}
 	t.Fatalf("error inesperado: %v", err)
 	return ""
@@ -80,7 +82,7 @@ func TestDecidirCambioEstado(t *testing.T) {
 		{"aprobada → aprobada", preguntaBloqueada{EstadoAprobada, OrigenManual, citaActiva()}, CambiarEstadoRequest{Estado: EstadoAprobada, Verificado: ptr(true)}, CodigoEstadoInvalido},
 		{"activo → en_revision", preguntaBloqueada{Estado: EstadoActivo}, CambiarEstadoRequest{Estado: EstadoEnRevision}, ""},
 		{"activo → aprobada", preguntaBloqueada{EstadoActivo, OrigenManual, citaActiva()}, CambiarEstadoRequest{Estado: EstadoAprobada, Verificado: ptr(true)}, CodigoEstadoInvalido},
-		{"eliminada → borrador", preguntaBloqueada{Estado: EstadoEliminada}, CambiarEstadoRequest{Estado: EstadoBorrador}, CodigoEstadoInvalido},
+		{"eliminada tras el bloqueo es inexistente", preguntaBloqueada{Estado: EstadoEliminada}, CambiarEstadoRequest{Estado: EstadoBorrador}, "no_encontrado"},
 
 		// Steps 7–11.
 		{"aprobar balotario: revision_especializada", preguntaBloqueada{EstadoBorrador, OrigenBalotario, citaActiva()}, CambiarEstadoRequest{Estado: EstadoAprobada, Verificado: ptr(true)}, CodigoRevisionEspecializada},

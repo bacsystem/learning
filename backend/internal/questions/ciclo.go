@@ -152,6 +152,9 @@ func validarCuerpoEstado(req CambiarEstadoRequest) error {
 // decidirCambioEstado applies steps 6–11 of E3-07 §3.2, in order, to the state
 // read under the row lock. It returns the first rule that fails.
 func decidirCambioEstado(b preguntaBloqueada, req CambiarEstadoRequest) (cambioEstado, error) {
+	if b.Estado == EstadoEliminada { // deleted while we waited for the lock: it no longer exists
+		return cambioEstado{}, ErrNotFound
+	}
 	if !transicionPermitida(b.Estado, req.Estado) {
 		return cambioEstado{}, regla(CodigoEstadoInvalido, map[string]any{"estado_actual": b.Estado})
 	}
