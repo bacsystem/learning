@@ -156,8 +156,8 @@ func TestFlush_FailureBackoff(t *testing.T) {
 			t.Fatalf("backoff not growing: %.0fs then %.0fs", first, s.NextRetryIn)
 		}
 	}
-	if s.RetryCount != maxRetries {
-		t.Fatalf("retry_count = %d, want capped at %d", s.RetryCount, maxRetries)
+	if s.RetryCount != MaxRetries {
+		t.Fatalf("retry_count = %d, want capped at %d", s.RetryCount, MaxRetries)
 	}
 }
 
@@ -183,7 +183,7 @@ func TestFlush_PanicRecovered(t *testing.T) {
 
 // H30: a claim left behind (worker died / could not record the result) is
 // retried only after the stale timeout, counts as an attempt, and is abandoned
-// after maxRetries instead of being resent forever.
+// after MaxRetries instead of being resent forever.
 func TestFlush_StaleClaims(t *testing.T) {
 	db := dbtest.Open(t)
 	f := newFake()
@@ -199,7 +199,7 @@ func TestFlush_StaleClaims(t *testing.T) {
 	if s := state(t, db, addrs[1]); f.count(addrs[1]) != 1 || s.Status != "sent" || s.RetryCount != 1 {
 		t.Fatalf("stale claim not retried once: sent=%d %+v", f.count(addrs[1]), s)
 	}
-	if s := state(t, db, addrs[2]); f.count(addrs[2]) != 0 || s.Status != "failed" || s.RetryCount != maxRetries {
+	if s := state(t, db, addrs[2]); f.count(addrs[2]) != 0 || s.Status != "failed" || s.RetryCount != MaxRetries {
 		t.Fatalf("exhausted stale claim: sent=%d %+v", f.count(addrs[2]), s)
 	}
 }
@@ -508,7 +508,7 @@ func TestSMTPSender_SilentServerTimesOut(t *testing.T) {
 // each send, not only the claim of the row about to be sent. Otherwise the
 // tail of a long batch (batchSize·sendTimeout can exceed staleAfter) goes
 // stale while its owner is busy with earlier rows, another replica reclaims
-// it with retry_count+1 although it was never attempted, and after maxRetries
+// it with retry_count+1 although it was never attempted, and after MaxRetries
 // such reclaims the message ends 'failed' without a single delivery attempt.
 //
 // Real time, scaled down: staleAfter = 1s and each send of replica A takes

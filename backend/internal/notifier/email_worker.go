@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	// maxRetries is the number of delivery attempts before a message is left
-	// as 'failed' for good.
-	maxRetries = 5
+	// MaxRetries is the number of delivery attempts before a message is left
+	// as 'failed' for good. Exported for the correo health check (PLT-03), so
+	// the threshold is never duplicated.
+	MaxRetries = 5
 	// backoffBase/backoffMax: next_retry_at = now + min(base·2^attempt, max).
 	backoffBase = 30 * time.Second
 	backoffMax  = time.Hour
@@ -34,7 +35,7 @@ type Sender interface {
 // atomically (status 'sending' + claimed_at, FOR UPDATE SKIP LOCKED), so two
 // workers never pick the same row. A claim whose result could not be recorded
 // (crash, DB error) is reclaimed after staleAfter and counts as an attempt, so
-// a message is never resent in a tight loop and gives up after maxRetries.
+// a message is never resent in a tight loop and gives up after MaxRetries.
 //
 // A replica that is slow on SMTP must not keep sending rows another replica
 // already reclaimed (H69): right before each Send the claims of that row and
@@ -150,7 +151,7 @@ func (w *EmailWorker) claim(ctx context.Context) ([]emailRow, error) {
 		SET status='failed', retry_count=retry_count+1, claimed_at=NULL, updated_at=NOW(),
 		    last_error='claim expired: delivery result unknown, retries exhausted'
 		WHERE status='sending' AND claimed_at < NOW() - $1 * INTERVAL '1 second'
-		  AND retry_count >= $2 - 1`, staleSecs, maxRetries); err != nil {
+		  AND retry_count >= $2 - 1`, staleSecs, MaxRetries); err != nil {
 		return nil, fmt.Errorf("abandon stale: %w", err)
 	}
 	var rows []emailRow
@@ -168,7 +169,7 @@ func (w *EmailWorker) claim(ctx context.Context) ([]emailRow, error) {
 		) c
 		WHERE q.id = c.id
 		RETURNING q.id, q.to_address, q.subject, q.body_html, q.retry_count, q.claimed_at`,
-		maxRetries, staleSecs, w.batchSize)
+		MaxRetries, staleSecs, w.batchSize)
 	return rows, err
 }
 
