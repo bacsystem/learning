@@ -33,8 +33,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const version = "1.0.0"
-
 const (
 	shutdownTimeout = 10 * time.Second
 	// workerDrainTimeout bounds how long we wait for the email worker to
@@ -111,15 +109,7 @@ func run() int {
 	simSvc := simulations.NewService(simRepo, simulations.NewQuestionsAdapter(qSvc))
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		if err := database.PingContext(r.Context()); err != nil {
-			http.Error(w, `{"status":"unhealthy"}`, http.StatusServiceUnavailable)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok","version":"` + version + `"}`))
-	})
+	mux.HandleFunc("GET /health", healthHandler(database, version))
 	// The session checker also returns the user's current rol/estado, so role
 	// changes and deactivations apply on the next request (see auth.RequireAuth).
 	checkSession := auth.SessionChecker(repo.FindActiveSesion)
