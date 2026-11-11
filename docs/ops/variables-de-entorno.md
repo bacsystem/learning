@@ -13,7 +13,8 @@ ejemplo, `SMTP_PORT` vale 0 en el código y 587 en compose.
 > para el rol devops por una regla de denegación (ver la sección
 > [Hallazgos](#hallazgos-para-el-tech-lead)).
 
-Los secretos van **solo** en el gestor de secretos del entorno. Nunca en el
+En producción (Railway) cada variable se carga como variable de servicio, y
+los secretos van sellados. Ver [railway.md](railway.md) §4. Los secretos van **solo** en el gestor de secretos del entorno. Nunca en el
 repositorio, en la imagen, en `docker-compose.yml` ni en mensajes.
 
 ## Backend: servidor (`cmd/server`, `config.Load`)

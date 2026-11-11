@@ -5,7 +5,10 @@ decide devops: se pidió un ADR al architect (`docs/adr/`). Este documento fija
 los requisitos que salen del código, las opciones y los procedimientos de
 backup y restauración que valen para cualquiera de ellas.
 
-Decisión del usuario: **Postgres 16** en producción (mínimo 15).
+Decisión del usuario: **Postgres 16** en producción (mínimo 15), alojado en
+**Railway** por ahora (11-11-2026). Lo que Railway ofrece (backups, PITR,
+red privada) y lo que falta comprobar al aprovisionar está en
+[railway.md](railway.md). La sección 2 queda como contexto del ADR 0004.
 
 ## 1. Requisitos que salen del código
 

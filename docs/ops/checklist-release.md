@@ -99,19 +99,26 @@ y Postgres 16.
 - [ ] El CI del tag pasa (`backend` y `frontend`). Si falla, no se despliega.
 - [ ] Merge de vuelta `main → develop`, también con merge commit.
 
-## 5. Despliegue (lo aprueba el usuario)
+## 5. Despliegue en Railway (lo aprueba el usuario)
 
-- [ ] **Backup verificado justo antes de desplegar.** El arranque del backend
-      migra solo, así que el backup tiene que ser anterior a la imagen nueva
-      (ver [plan-base-produccion.md](plan-base-produccion.md)).
-- [ ] Imágenes con el tag explícito: `make docker/release DOCKER_TAG=vX.Y.Z`
-      (sin `DOCKER_TAG` falla) y `NEXT_PUBLIC_API_URL` de producción.
-      Hay una imagen de frontend por entorno.
-- [ ] Un solo backend migra a la vez. Si hay varias réplicas, el advisory lock
-      de `cmd/migrate` las serializa. La conexión de migración tiene que ser
-      **directa** a Postgres: un pooler en modo transaction rompe el lock de
-      sesión.
-- [ ] Desplegar el backend primero y el frontend después. Al terminar,
+La configuración de cada servicio está en [railway.md](railway.md). El autodeploy
+está desactivado: el despliegue se lanza a mano cuando el CI del tag pasa.
+
+- [ ] **Backup manual del volumen de Postgres** (pestaña Backups) justo antes
+      de desplegar, porque el pre-deploy del backend migra. Con PITR activo,
+      anotar además la hora exacta: es el punto de restauración.
+- [ ] Variables nuevas del release ya cargadas en el servicio (selladas si
+      son secretos) y con su copia en el gestor de secretos.
+- [ ] Railway construye desde `main`, desde su `Dockerfile`. Las imágenes de
+      Docker Hub (`make docker/release DOCKER_TAG=vX.Y.Z`) no se usan en
+      Railway: solo si el usuario las pide.
+- [ ] **Backend primero**: «Deploy» del commit del tag. El Pre-deploy Command
+      corre `cmd/migrate`. Si falla, el despliegue se detiene y el anterior
+      sigue sirviendo. Revisar los logs del pre-deploy.
+- [ ] La migración usa conexión **directa** por la red privada, sin pooler: el
+      advisory lock es de sesión.
+- [ ] Luego el frontend, con `NEXT_PUBLIC_API_URL` = el dominio público del
+      backend. Al terminar,
       `GET /health` responde 200 y los logs no muestran errores de
       `config load failed` ni de migración.
 - [ ] Prueba rápida: login, listado de un dominio y envío de un correo de
@@ -121,9 +128,9 @@ y Postgres 16.
 
 | Situación | Qué hacer |
 |---|---|
-| El release **no trae migraciones** | Volver a la imagen anterior (`vX.Y.(Z-1)`) |
+| El release **no trae migraciones** | En Railway: **Rollback** al despliegue anterior. Restaura la imagen, la configuración y las variables, siempre que la imagen siga retenida: 72 h en Hobby, 120 h en Pro ([plans](https://docs.railway.com/pricing/plans)). Pasado ese plazo, redeploy del commit anterior |
 | El release trae migraciones **aditivas** (tablas, columnas o índices nuevos) que el código anterior ignora | Volver a la imagen anterior **sin revertir la base**. Comprobado: con la base en la versión N y una imagen que solo llega a N−1, `goose up` responde `no migrations to run` y la imagen anterior arranca. Las migraciones se revierten después, si hace falta, con un hotfix |
-| La migración **cambia o borra datos o columnas** que usa el código anterior | **Corregir hacia adelante** con un `hotfix/*`. Si eso no es viable, restaurar el backup del paso 5 (se pierde lo escrito desde entonces: decisión del usuario) |
+| La migración **cambia o borra datos o columnas** que usa el código anterior | **Corregir hacia adelante** con un `hotfix/*`. Si eso no es viable, restaurar el backup del paso 5 o hacer PITR a la hora anotada (crea un servicio hermano: hay que apuntar `DATABASE_URL` a él). Se pierde lo escrito desde entonces, y eso lo decide el usuario. Ver [railway.md](railway.md) §5 |
 | Revertir el esquema a mano | Solo como último recurso y con la aprobación del usuario: `cmd/migrate` con `down-to <versión>` contra producción, después de otro backup. El `down-to 0` del CI prueba que los `Down` **ejecutan**, no que **conserven datos**. 039 y 051 no se revierten |
 
 Por eso cada migración se escribe de forma que la imagen anterior siga
