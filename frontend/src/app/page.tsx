@@ -11,6 +11,7 @@ import { EstadoVacio } from "@/components/feedback/estado-vacio";
 import { Skeleton } from "@/components/feedback/skeleton";
 import { Chip } from "@/components/patrones/pill-estado";
 import { CONTACT_EMAIL } from "@/config";
+import { useHidratado } from "@/hooks/use-hidratado";
 import { useScrollReveal } from "@/hooks/use-scroll-reveal";
 import { useAuth } from "@/lib/auth/auth-context";
 import {
@@ -137,6 +138,8 @@ function MarcaAgua() {
 export default function Home() {
   const t = useTranslations("dashboard");
   const { isAuthenticated, loading } = useAuth();
+  // La sesión vive en localStorage: se conoce recién en el cliente y después de hidratar (issue #134).
+  const sesionConocida = useHidratado() && !loading;
   const [procesos, setProcesos] = useState<Proceso[]>([]);
   const [loadingProcesos, setLoadingProcesos] = useState(true);
   const [errorProcesos, setErrorProcesos] = useState(false);
@@ -164,8 +167,6 @@ export default function Home() {
       .then(setTestimonios)
       .catch(() => {});
   }, []);
-
-  if (loading) return null;
 
   const metricas = [
     { icon: UsersIcon, value: stats ? fmtNum(stats.total_usuarios) : "—", label: t("landing-metrica-usuarios") },
@@ -369,8 +370,8 @@ export default function Home() {
               </div>
             )}
 
-            <div className="mt-8 flex justify-center">
-              {isAuthenticated ? (
+            <div className="min-h-control mt-8 flex justify-center">
+              {!sesionConocida ? null : isAuthenticated ? (
                 <Link href="/settings#opinion" className={ACCION_SECUNDARIA}>
                   {t("landing-dejar-opinion")}
                 </Link>
