@@ -48,6 +48,11 @@ Como `entrypoint.sh` migra con `set -e`, ese error deja al backend sin arrancar.
       Dos PRs abiertos pueden haber elegido el mismo número. Con varios PRs que
       agregan migraciones, se renumeran **antes** de fusionarlos, en el orden en
       que se fusionan.
+- [ ] Las migraciones nuevas se crean con `make migrate/create name=…`, que
+      numera en secuencia (`062_…`). Un `goose create` sin `-s` usa una marca
+      de tiempo (`20261111…_x.sql`): una vez aplicada, toda migración numerada
+      posterior quedaría fuera de orden. Ningún archivo nuevo puede llevar una
+      marca de tiempo.
 - [ ] **No se rellenan los huecos existentes** (028–033 y 053). En una base que
       ya pasó esas versiones, una migración nueva con ese número sería
       rechazada por estar fuera de orden.

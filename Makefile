@@ -68,8 +68,10 @@ dev/frontend:
 
 # ── Tests (= jobs test de backend.yml y check de frontend.yml) ────────────────
 # Uso: make test TEST_DATABASE_URL=postgres://...@localhost:5432/learning_test?sslmode=disable
+# (o exportada en el entorno). El nombre de la base debe terminar en _test.
 check/test-db:
 	@test -n "$(TEST_DATABASE_URL)" || (echo "ERROR: set TEST_DATABASE_URL=postgres://... (base desechable: se hace down-to 0)" && exit 1)
+	@echo "$(TEST_DATABASE_URL)" | grep -qE '/[^/?]+_test([?]|$$)' || (echo "ERROR: el nombre de la base de TEST_DATABASE_URL debe terminar en _test (make test hace down-to 0)" && exit 1)
 
 test: check/test-db
 	cd backend && go mod tidy && git diff --exit-code -- go.mod go.sum
@@ -116,9 +118,15 @@ migrate/status:
 	cd backend && $(GOOSE) -dir migrations postgres "$(DATABASE_URL)" status
 
 # Uso: make migrate/create name=add_algo
+# Numeración secuencial (-s) de 3 dígitos como las existentes (001…). Sin -s,
+# goose usa una marca de tiempo y, una vez aplicada, toda migración numerada
+# posterior quedaría fuera de orden.
 migrate/create:
 	@test -n "$(name)" || (echo "ERROR: set name=nombre_de_la_migracion" && exit 1)
-	cd backend && $(GOOSE) -dir migrations create $(name) sql
+	cd backend && $(GOOSE) -dir migrations -s create $(name) sql \
+	  && f=$$(ls migrations/00[0-9][0-9][0-9]_$(name).sql) \
+	  && mv "$$f" "migrations/$$(basename "$$f" | cut -c3-)" \
+	  && echo "→ migrations/$$(basename "$$f" | cut -c3-)"
 
 # Genera los UPDATE para cifrar personas con DNI en texto plano. Uso: make fix-encrypt-personas [DB=prod]
 fix-encrypt-personas:

@@ -56,7 +56,7 @@ Las migraciones corren **en cada arranque** del contenedor, antes del servidor
 
 | Variable | Comandos | Secreto | Si falta |
 |---|---|---|---|
-| `DATABASE_URL`, `ENCRYPTION_KEY` | todos | **Sí** | `cmd/seed`: `env X is required`. Los demás validan con su propio mensaje |
+| `DATABASE_URL`, `ENCRYPTION_KEY` | todos | **Sí** | Mensaje claro y salida. `cmd/seed`: `env X is required`. `rehash-emails`, `fix-encrypt-personas` y `seed/admin`: `DATABASE_URL y ENCRYPTION_KEY son obligatorios/requeridas`. Con formato inválido: `ENCRYPTION_KEY inválida: …` |
 | `ADMIN_EMAIL` | `cmd/seed/admin` (obligatoria) | No (dato personal: no va en logs ni en mensajes) | Error y salida |
 | `ADMIN_USERNAME`, `ADMIN_DNI`, `ADMIN_REBIND`, `ADMIN_INSTITUCION_ID`, `ADMIN_GRADO_ID`, `ADMIN_ESPECIALIDAD_ID` | `cmd/seed/admin` (opcionales) | No | Valores por defecto documentados en la cabecera de `cmd/seed/admin/main.go` |
 | `ADMIN_PASSWORD` | `cmd/seed/admin` (opcional) | **Sí** | Si está vacía, se lee una línea de stdin. Es lo recomendado: `make compose/seed/admin` la pide por teclado |
@@ -117,7 +117,16 @@ Todos son de código de la app, así que no se cambian en este PR:
   no cubre la cadena vacía. El Dockerfile ya lo impide en este PR, pero
   `npm run build` fuera de Docker con la variable vacía repite el problema.
   Propuesta: usar `||` o fallar en el build si falta en producción.
-- **H-5. `DATABASE_URL` sin política de `sslmode`.** `lib/pq` usa `require`
-  por defecto: cifra, pero no verifica el certificado. El nivel de producción
+- **H-5. `DATABASE_URL` sin política de `sslmode`.** `lib/pq` v1.12.3 usa
+  `require` por defecto: cifra, pero no verifica el certificado (comprobado en
+  `connector.go`). Con `sslrootcert=system` pasa a `verify-full`. `lib/pq`
+  también lee las variables `PG*` estándar (`PGSSLMODE`, `PGHOST`…), que no
+  deben quedar definidas por accidente en el entorno del contenedor. El nivel de producción
   (`require` o `verify-full` con `sslrootcert`) depende del ADR de la base.
   Ver [plan-base-produccion.md](plan-base-produccion.md).
+- **H-6. La versión de `/health` está fija.** `GET /health` devuelve
+  `"version":"1.0.0"` desde `const version` en `cmd/server/main.go`, mientras
+  que `frontend/package.json` dice 1.1.0 y todavía no hay tags. Propuesta:
+  `var version = "dev"` y que el Dockerfile la inyecte con
+  `-ldflags "-X main.version=$VERSION"` desde el tag. Requiere cambiar el
+  código; el lado Docker lo hace devops.

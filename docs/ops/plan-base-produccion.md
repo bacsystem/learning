@@ -15,7 +15,7 @@ Decisión del usuario: **Postgres 16** en producción (mínimo 15).
 | Extensión `pg_trgm` | La migración 013 hace `CREATE EXTENSION IF NOT EXISTS pg_trgm`. El usuario que migra necesita permiso para crearla, o hay que crearla una vez por adelantado |
 | Conexión **directa** (sin pooler en modo transaction) para migrar | `cmd/migrate` toma `pg_advisory_lock` de **sesión** para que solo una réplica migre. Un PgBouncer en modo transaction lo rompe. El servidor puede ir por un pooler en modo session |
 | `CREATE INDEX CONCURRENTLY` | Las migraciones 054 y 058 van sin transacción. Si un proveedor limita la duración de las sentencias, hay que tenerlo en cuenta |
-| TLS en `DATABASE_URL` | `lib/pq` usa `sslmode=require` por defecto (cifra pero no verifica el certificado). En producción, `verify-full` con el CA del proveedor si es posible |
+| TLS en `DATABASE_URL` | `lib/pq` v1.12.3 usa `sslmode=require` por defecto (cifra pero no verifica el certificado). En producción, `verify-full`: con el CA del proveedor (`sslrootcert=<ruta>`) o con `sslrootcert=system` |
 | Usuarios separados | Un **propietario** del esquema, para migrar, y un usuario de la **aplicación**. Hoy `entrypoint.sh` migra con la misma `DATABASE_URL` que usa el servidor: separarlos exige un cambio en el arranque, que se decide en el ADR |
 | `ENCRYPTION_KEY` custodiada **aparte** del backup | Los datos personales van cifrados con AES-GCM. Un backup sin su clave no sirve, y la clave junto al backup anula el cifrado |
 
