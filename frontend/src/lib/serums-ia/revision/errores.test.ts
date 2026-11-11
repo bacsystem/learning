@@ -10,7 +10,17 @@ const tieneEn = (mensajes: object) => (clave: string) =>
     .split(".")
     .reduce<unknown>((nodo, parte) => (nodo as Record<string, unknown> | undefined)?.[parte], mensajes) !== undefined;
 
-const CODIGOS_DE_PREGUNTAS = ["fuente_no_activa", "limite_citas", "ultima_cita_activa", "clave_oficial"];
+const CODIGOS_DE_PREGUNTAS = [
+  "fuente_no_activa",
+  "limite_citas",
+  "ultima_cita_activa",
+  "falta_cita",
+  "verificacion_requerida",
+  "nota_obligatoria",
+  "conflicto_clave",
+  "revision_especializada",
+  "clave_oficial",
+];
 
 describe.each([
   ["es", es.dashboard],
