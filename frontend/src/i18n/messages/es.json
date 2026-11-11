@@ -1392,6 +1392,7 @@
       },
       "profesion": {
         "sugerida": "Te sugerimos esta profesión a partir de tus datos. No se guarda hasta que pulses «Guardar».",
+        "sugeridaElegirProceso": "Te sugerimos {especialidad} a partir de tus datos. Elige el proceso SERUMS para confirmarla; no se guarda hasta que pulses «Guardar».",
         "guardar": "Guardar profesión",
         "cambiar": "Cambiar profesión",
         "guardada": "Profesión guardada: {especialidad}.",
