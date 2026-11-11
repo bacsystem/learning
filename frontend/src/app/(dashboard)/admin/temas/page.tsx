@@ -18,8 +18,8 @@ import { Chip, PillEstado } from "@/components/patrones/pill-estado";
 import { useAuth } from "@/lib/auth/auth-context";
 import { type Asignatura, catalogsApi, type Especialidad } from "@/lib/catalogs/api";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
-import { type EstadoTema, type Tema, type TemaPayload, temasApi } from "@/lib/temas/api";
-import { mensajeErrorTema } from "@/lib/temas/errores";
+import { type EstadoTema, type Tema, type TemaPayload, temasApi } from "@/lib/serums-ia/temas/api";
+import { mensajeErrorTema } from "@/lib/serums-ia/temas/errores";
 import {
   ArchiveIcon,
   ArrowCounterClockwiseIcon,

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cargarTodo } from "@/lib/paginar-todo";
-import { type EstadoTema, type Tema, temasApi } from "@/lib/temas/api";
+import { type EstadoTema, type Tema, temasApi } from "@/lib/serums-ia/temas/api";
 
 export interface FiltroTemas {
   asignaturaId: number;

@@ -8,8 +8,8 @@ import { useMemo, useState } from "react";
 import { AreaTexto, Campo, Entrada } from "@/components/formularios/campo";
 import { Casilla } from "@/components/formularios/casilla";
 import { AYUDA_CAMPO, ETIQUETA_CAMPO } from "@/lib/estilos";
-import type { EspecialidadTema, Tema, TemaPayload } from "@/lib/temas/api";
-import { claveErrorTema, mensajeErrorTema } from "@/lib/temas/errores";
+import type { EspecialidadTema, Tema, TemaPayload } from "@/lib/serums-ia/temas/api";
+import { claveErrorTema, mensajeErrorTema } from "@/lib/serums-ia/temas/errores";
 import {
   aPayload,
   DESCRIPCION_MAX,
@@ -18,7 +18,7 @@ import {
   NOMBRE_MAX,
   NOMBRE_MIN,
   type ValoresTema,
-} from "@/lib/temas/reglas";
+} from "@/lib/serums-ia/temas/reglas";
 import { TreeStructureIcon } from "@phosphor-icons/react";
 
 /** Errores del servidor que se muestran bajo el campo del nombre en vez de en el aviso del diálogo. */

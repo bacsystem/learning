@@ -11,9 +11,9 @@ import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { CONTENEDOR_TABLA } from "@/components/patrones/pie-tabla";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CABECERA_TABLA, TARJETA } from "@/lib/estilos";
-import { type Tema, temasApi } from "@/lib/temas/api";
-import { claveErrorTema, mensajeErrorTema } from "@/lib/temas/errores";
-import { type Direccion, mover } from "@/lib/temas/reglas";
+import { type Tema, temasApi } from "@/lib/serums-ia/temas/api";
+import { claveErrorTema, mensajeErrorTema } from "@/lib/serums-ia/temas/errores";
+import { type Direccion, mover } from "@/lib/serums-ia/temas/reglas";
 import { cn } from "@/lib/utils";
 import { ArrowDownIcon, ArrowsDownUpIcon, ArrowUpIcon } from "@phosphor-icons/react";
 
