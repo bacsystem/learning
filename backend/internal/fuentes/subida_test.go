@@ -22,17 +22,16 @@ import (
 // subidaEnv is the real fuentes mux behind the real body limit, with an admin,
 // a non-admin user, two active especialidades (A, B) and a proceso.
 type subidaEnv struct {
-	db        *sqlx.DB
-	h         http.Handler
-	adminID   int64
-	admin     string
-	usuario   string
-	espA      int64
-	espB      int64
-	proceso   int64
-	cat       dbtest.Catalog
-	publicar  *fuentes.PgSource
-	sinCupoDe int64
+	db       *sqlx.DB
+	h        http.Handler
+	adminID  int64
+	admin    string
+	usuario  string
+	espA     int64
+	espB     int64
+	proceso  int64
+	cat      dbtest.Catalog
+	publicar *fuentes.PgSource
 }
 
 // citaTodo is a Citantes that says every version is cited.
