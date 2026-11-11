@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import { OBJETIVO_TACTIL } from "@/lib/estilos";
 import { cn } from "@/lib/utils";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { XIcon } from "@phosphor-icons/react";
@@ -75,7 +76,10 @@ function DialogContent({
               render={
                 <Button
                   variant="ghost"
-                  className="text-texto-terciario hover:text-foreground absolute top-4 right-4 size-8"
+                  className={cn(
+                    OBJETIVO_TACTIL,
+                    "text-texto-terciario hover:text-foreground absolute top-4 right-4 size-8",
+                  )}
                   size="icon-sm"
                 />
               }

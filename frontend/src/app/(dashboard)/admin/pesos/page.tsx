@@ -147,7 +147,6 @@ export default function PesosPage() {
           <CabeceraSeccion
             icon={ScalesIcon}
             titulo={<span id="pesos-titulo">{t("serumsIa.pesos.titulo", { especialidad: config.especialidad })}</span>}
-            subtitulo={t("serumsIa.pesos.ayuda")}
             derecha={
               <PillEstado tono={config.estado === "completa" ? "ok" : "aviso"}>
                 {etiquetaEstado(config.estado)}
@@ -155,6 +154,8 @@ export default function PesosPage() {
             }
           />
           <div className="flex flex-col gap-3 p-4">
+            {/* La ayuda va en el cuerpo y no como subtítulo: `CabeceraSeccion` lo trunca a una línea y en celular se corta. */}
+            <p className="text-control text-muted-foreground">{t("serumsIa.pesos.ayuda")}</p>
             {config.estado === "incompleta" ? <Alerta tono="info">{t("serumsIa.pesos.estimados")}</Alerta> : null}
             <FormularioPesos
               key={`${clavePar}-${version}`}

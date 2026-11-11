@@ -1370,13 +1370,13 @@
         "totalPreguntas": "Questions: {n} / {max}",
         "validacion": {
           "areasMin": "Add at least one area.",
-          "areasMax": "At most {max} areas are allowed.",
-          "peso": "The weight goes from {min} to {max} with up to 2 decimals.",
-          "preguntas": "Questions go from {min} to {max} (whole number).",
-          "coeficiente": "The coefficient goes from {min} to {max} with up to 2 decimals.",
+          "areasMax": "At most {max, number} areas are allowed.",
+          "peso": "The weight goes from {min, number} to {max, number} with up to 2 decimals.",
+          "preguntas": "Questions go from {min, number} to {max, number} (whole number).",
+          "coeficiente": "The coefficient goes from {min, number} to {max, number} with up to 2 decimals.",
           "repetidas": "There are repeated areas.",
           "repetidasNombres": "Repeated area: {nombres}.",
-          "limitePreguntas": "The total of questions cannot exceed {max}.",
+          "limitePreguntas": "The total of questions cannot exceed {max, number}.",
           "sumaPesos": "Weights must sum 100 %.",
           "sumaPesosActual": "Weights sum {suma, number} %: they must sum 100 %."
         },

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 
-import { ANIMACION_POPUP } from "@/lib/estilos";
+import { ANIMACION_POPUP, OBJETIVO_TACTIL } from "@/lib/estilos";
 import { cn } from "@/lib/utils";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { XIcon } from "@phosphor-icons/react";
@@ -76,7 +76,10 @@ function PopoverHeader({
       {conCierre ? (
         <PopoverClose
           aria-label="Cerrar"
-          className="text-muted-foreground/70 hover:bg-secondary hover:text-foreground shrink-0 rounded p-0.5 transition-colors"
+          className={cn(
+            OBJETIVO_TACTIL,
+            "text-muted-foreground/70 hover:bg-secondary hover:text-foreground shrink-0 rounded p-0.5 transition-colors",
+          )}
         >
           <XIcon weight="bold" className="size-3.5" />
         </PopoverClose>

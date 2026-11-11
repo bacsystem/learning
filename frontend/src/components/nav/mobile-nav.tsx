@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { OBJETIVO_TACTIL } from "@/lib/estilos";
 import { ListIcon } from "@phosphor-icons/react";
 
 /**
@@ -21,7 +22,7 @@ export function MobileNav({ children, etiqueta = "Abrir menú" }: { children: Re
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger render={<Button variant="ghost" size="icon-sm" />}>
+      <SheetTrigger render={<Button variant="ghost" size="icon-sm" className={OBJETIVO_TACTIL} />}>
         <ListIcon weight="bold" className="size-5" />
         <span className="sr-only">{etiqueta}</span>
       </SheetTrigger>
