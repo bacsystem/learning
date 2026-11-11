@@ -39,12 +39,21 @@ make local/up BUILD=1
 `CORS_ORIGINS` y `FRONTEND_BASE_URL` apuntan a `http://localhost:3110`, y el
 frontend se construye con `NEXT_PUBLIC_API_URL=http://localhost:8180`.
 
+**Ojo con el seed y `TAG=`:** las imágenes salen del registro, pero
+`make local/seed` corre `cmd/seed/demo` desde el **código de tu checkout**.
+Para validar un release, haz checkout de ese tag (`git switch --detach vX.Y.Z`),
+así el seed coincide con el esquema de la imagen. `cmd/seed/demo` necesita las
+migraciones hasta la 062.
+
+Las imágenes publicadas son `linux/amd64`. En un Mac Apple Silicon, Docker las
+ejecuta emuladas: funcionan, pero más lento. `BUILD=1` las construye nativas.
+
 ## Comandos
 
 | Comando | Qué hace |
 |---|---|
 | `make local/up TAG=…` o `BUILD=1` | Levanta todo y espera a que esté sano |
-| `make local/seed` | Carga los datos sintéticos (`cmd/seed/demo`). **Pendiente**: lo está haciendo backend-dev. Hasta entonces el comando avisa y sale con error |
+| `make local/seed` | Carga los datos sintéticos (`cmd/seed/demo`), idempotente. Usuarios `demo_admin`, `demo_enfermeria`, `demo_medicina`, `demo_pendiente` y `demo_esp_inactiva`, todos activos y con el tour completado; contraseñas `PREPROD_DEMO_*` de `preprod.vars`. **Pendiente**: lo está haciendo backend-dev (feature/seed-demo). Hasta entonces el comando avisa y sale con error |
 | `make local/reset TAG=…` o `BUILD=1` | **Borra** la base, vuelve a levantar (migra) y siembra |
 | `make local/logs` (`s=backend`) | Logs en vivo |
 | `make local/ps` | Estado de los contenedores |
