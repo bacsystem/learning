@@ -133,10 +133,10 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 | Endpoint | Cambio |
 |---|---|
 | `POST /preguntas`, `POST /preguntas/import` | Nacen `estado = 'borrador'`, `origen = 'manual'` (P1). El cuerpo **no** acepta `estado` ni `origen`: el origen `ia` lo fijan los generadores (E6) y `balotario` la importación de SIA-E3-01 |
-| `GET /preguntas` | Filtros opcionales nuevos `estado` (los 6, salvo `eliminada`, que no se lista) y `origen` |
+| `GET /preguntas` | Filtros opcionales nuevos `estado` y `origen`. `estado` es un valor **exacto** entre `borrador`, `en_revision`, `aprobada`, `rechazada` y `activo`: `activo` (heredado) se filtra aparte de `aprobada`. Sin filtro se listan todas las no eliminadas, también los borradores, porque el admin tiene que verlos. Cada item del listado suma `estado`, `origen` y `citas_count` (número de citas), pero **no** el array `citas`, que va solo en `GET /preguntas/{id}` |
 | `GET /preguntas/{id}`, `PUT /preguntas/{id}` | La respuesta suma los campos de §4.4. Por defecto, `PUT` no cambia el estado (P3) |
 | `DELETE /preguntas/{id}` | Solo desde `aprobada`, `rechazada` o `activo`; si no, `409 estado_invalido` con el formato 2 (P2). Audita `pregunta.estado` con `estado_nuevo = "eliminada"` |
-| `GET /preguntas/stats` | Si cuenta por estado, incluye los nuevos (backend-dev decide la forma) |
+| `GET /preguntas/stats` y `preguntas_count` de temas (`temas/repository.go:48,277`) | Siguen contando las no eliminadas, borradores incluidos: son vistas de admin del banco completo. Si stats desglosa por estado, incluye los nuevos (backend-dev decide la forma). Lo «servible» solo lo cuenta `PreguntaServible` |
 
 ### 4.4 Objeto pregunta: campos nuevos
 
@@ -157,8 +157,9 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 
 Implementaciones en `internal/questions`, registradas en `cmd/server/main.go` al construir `fuentes.NewService`:
 
+- **Cableado** (extensión del #138): `fuentes.NewService(repo, citantes, suscriptores…)` en `main.go`. `internal/questions` implementa las dos interfaces sin importar `internal/fuentes`.
 - **`Citantes`:**
-  - `ContarPorFuente`: preguntas no eliminadas con alguna cita a esa fuente.
+  - `ContarPorFuente`: preguntas en `aprobada` o `activo` con alguna cita a esa fuente. Son exactamente las que el retiro pasaría a `en_revision`, así que el diálogo de retiro (`contenidos_citantes`, S4) coincide con el `contenidos_marcados` de S5.
   - `VersionCitada`: hay alguna cita a un pasaje de esa versión.
 - **`SuscriptorRetiro`**, con `Nombre() = "preguntas"` y `FuenteRetirada(ctx, tx, fuenteID, actorID)`. Corre **dentro** de la transacción del retiro, con la fuente ya bloqueada. Hace **dos sentencias por conjunto**, nunca un bucle por pregunta:
 
@@ -206,6 +207,8 @@ Implementaciones en `internal/questions`, registradas en `cmd/server/main.go` al
 | `estado_invalido` | 409 | §3, §4 |
 | `validacion`, `referencia_invalida` | 422 | §4 |
 | `falta_cita` | 422 | §4.1 |
+
+Los códigos de esta tabla usan el **formato 2** (`{"error": "<codigo>", "message": "…", "detalle"?}`, README §3). También usa el formato 2 el `409 estado_invalido` del `DELETE` existente. El resto de los errores heredados de `internal/questions` no cambia.
 
 ## 8. Preguntas abiertas al PO (con decisión por defecto)
 
