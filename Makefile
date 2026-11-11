@@ -250,7 +250,18 @@ LOCAL_COMPOSE := docker compose --env-file $(LOCAL_DIR)/preprod.vars -f $(LOCAL_
                  $(if $(BUILD),-f $(LOCAL_DIR)/compose.build.yml)
 
 .PHONY: local/up local/down local/reset local/seed local/test local/logs local/ps local/psql \
-        local/certs check/local-images
+        local/certs check/local-images check/local-owner
+
+# Hay UNA sola preproducción por máquina (proyecto capacitate-preprod, puertos
+# fijos). Si ya corre desde OTRO checkout, up/down/reset/seed abortan: así nadie
+# pisa ni borra la de otro (qa, otro agente). Para usarla desde aquí, primero
+# `make local/down` en el checkout que la levantó (o ver deploy/local/README.md).
+L_MY_COMPOSE := $(CURDIR)/$(LOCAL_DIR)/compose.yml
+check/local-owner:
+	@cfg=$$(docker compose ls --all --filter name=capacitate-preprod 2>/dev/null | awk '$$1=="capacitate-preprod"{print $$NF}'); \
+	if [ -n "$$cfg" ] && ! echo "$$cfg" | tr ',' '\n' | grep -qxF "$(L_MY_COMPOSE)"; then \
+	  echo "ERROR: la preproducción ya corre desde otro checkout:"; echo "  $$cfg" | tr ',' '\n' | sed -n 1p; \
+	  echo "  Usa ese checkout, o pide a su dueño un 'make local/down' allí. No se tocó nada."; exit 1; fi
 
 check/local-images:
 	@test -n "$(BUILD)" || echo "$(TAG)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' || \
@@ -262,14 +273,14 @@ local/certs:
 	    -keyout $(LOCAL_DIR)/certs/server.key -out $(LOCAL_DIR)/certs/server.crt 2>/dev/null && \
 	  echo "✓ certificado autofirmado de Postgres en $(LOCAL_DIR)/certs/"; }
 
-local/up: check/local-images local/certs ## Levanta la preproducción (TAG=vX.Y.Z o BUILD=1): db TLS, mailpit, backend (migra), frontend
+local/up: check/local-images check/local-owner local/certs ## Levanta la preproducción (TAG=vX.Y.Z o BUILD=1): db TLS, mailpit, backend (migra), frontend
 	$(call L_IMAGES,$(L_BACKEND),$(L_FRONTEND)) $(LOCAL_COMPOSE) up -d --wait $(if $(BUILD),--build)
 	@$(call L_IMAGES) $(LOCAL_COMPOSE) ps
 
-local/down: ## Detiene la preproducción (conserva los datos)
+local/down: check/local-owner ## Detiene la preproducción (conserva los datos)
 	$(call L_IMAGES) $(LOCAL_COMPOSE) down
 
-local/seed: ## Carga los datos sintéticos de qa (cmd/seed/demo)
+local/seed: check/local-owner ## Carga los datos sintéticos de qa (cmd/seed/demo)
 	@test -d backend/cmd/seed/demo || (echo "PENDIENTE: falta backend/cmd/seed/demo (backend-dev); crea catálogos, admin y usuarios sintéticos." && exit 1)
 	docker run --rm --network capacitate-preprod_default \
 	  -v "$(CURDIR)/backend:/src:ro" -v capacitate-preprod-gomod:/go/pkg/mod -w /src \
@@ -279,7 +290,10 @@ local/seed: ## Carga los datos sintéticos de qa (cmd/seed/demo)
 	  -e DEMO_ADMIN_PASSWORD="$(L_DEMO_ADM)" -e DEMO_POSTULANTE_PASSWORD="$(L_DEMO_USR)" \
 	  golang:1.27.4-alpine3.23 go run ./cmd/seed/demo
 
-local/reset: check/local-images ## BORRA la base de preproducción, vuelve a levantar (migra) y siembra
+# Pide confirmación (escribir «borrar»); sin terminal: CONFIRM=borrar.
+local/reset: check/local-images check/local-owner ## BORRA la base de preproducción (pide confirmación o CONFIRM=borrar), levanta, migra y siembra
+	@c="$(CONFIRM)"; if [ -z "$$c" ]; then printf "Se BORRAN los datos de la preproducción local. Escribe «borrar» para seguir: "; read -r c; fi; \
+	  [ "$$c" = borrar ] || { echo "Cancelado: no se borró nada."; exit 1; }
 	$(call L_IMAGES) $(LOCAL_COMPOSE) down -v
 	$(MAKE) local/up TAG=$(TAG) BUILD=$(BUILD)
 	$(MAKE) local/seed

@@ -48,13 +48,36 @@ migraciones hasta la 062.
 Las imágenes publicadas son `linux/amd64`. En un Mac Apple Silicon, Docker las
 ejecuta emuladas: funcionan, pero más lento. `BUILD=1` las construye nativas.
 
+## Una sola preproducción por máquina
+
+El proyecto de compose se llama siempre `capacitate-preprod` y usa puertos
+fijos, así que en cada máquina hay **una** preproducción. La levanta un
+checkout. Si ya corre desde **otro** checkout (de qa o de otro agente),
+`local/up`, `local/down`, `local/reset` y `local/seed` **abortan sin tocar
+nada** y dicen desde dónde corre. Para usarla desde aquí, quien la levantó hace
+antes `make local/down` en su checkout.
+
+`local/reset` además pide escribir `borrar` antes de borrar los datos. Sin
+terminal: `make local/reset BUILD=1 CONFIRM=borrar`.
+
+## Puertos (todos en 127.0.0.1)
+
+| Uso | Base | Backend | Frontend | Otros |
+|---|---|---|---|---|
+| Desarrollo (`docker-compose.yml`) | 5433 | 8080 | 3000 | — |
+| Tests (`TEST_DATABASE_URL`, base `*_test_<n>`) | 5434 | — | — | — |
+| **Preproducción (`deploy/local`)** | **5441** | **8180** | **3110** | Mailpit 8125 |
+| Pruebas ad hoc de qa | 5442 | 8190 | 3120 | — |
+
+No uses los puertos de otra fila: así nada choca.
+
 ## Comandos
 
 | Comando | Qué hace |
 |---|---|
 | `make local/up TAG=…` o `BUILD=1` | Levanta todo y espera a que esté sano |
-| `make local/seed` | Carga los datos sintéticos (`cmd/seed/demo`), idempotente. Usuarios `demo_admin`, `demo_enfermeria`, `demo_medicina`, `demo_pendiente` y `demo_esp_inactiva`, todos activos y con el tour completado; contraseñas `PREPROD_DEMO_*` de `preprod.vars`. **Pendiente**: lo está haciendo backend-dev (feature/seed-demo). Hasta entonces el comando avisa y sale con error |
-| `make local/reset TAG=…` o `BUILD=1` | **Borra** la base, vuelve a levantar (migra) y siembra |
+| `make local/seed` | Carga los datos sintéticos (`cmd/seed/demo`), idempotente. Usuarios `demo_admin`, `demo_enfermeria`, `demo_medicina`, `demo_pendiente` y `demo_esp_inactiva`, todos activos y con el tour completado; contraseñas `PREPROD_DEMO_*` de `preprod.vars` (valores falsos, solo de preproducción). Requiere `cmd/seed/demo` (#114) |
+| `make local/reset TAG=…` o `BUILD=1` | **Borra** la base (pide escribir `borrar`, o `CONFIRM=borrar`), vuelve a levantar (migra) y siembra |
 | `make local/logs` (`s=backend`) | Logs en vivo |
 | `make local/ps` | Estado de los contenedores |
 | `make local/psql` | Consola psql en la base de preproducción |

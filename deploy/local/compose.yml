@@ -11,7 +11,7 @@ name: capacitate-preprod
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16.14-alpine3.23
     # El contenedor arranca como root: copia el certificado autofirmado (lo
     # genera make local/certs), le da la propiedad a postgres y arranca con TLS.
     command:
