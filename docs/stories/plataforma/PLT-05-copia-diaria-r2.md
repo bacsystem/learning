@@ -26,8 +26,8 @@ La copia diaria está decidida en la [ADR 0004, Decisión 11](../../adr/0004-alo
 1. Servicio `copia_r2`:
    - `operativo`: última copia correcta hace ≤ 26 h.
    - `degradado` (`atrasado`): hace > 26 h, o la última ejecución falló pero hay una correcta dentro de las 26 h.
-   - `caido` (`atrasado`): última copia correcta hace > 50 h.
-   - `desconocido` (`sin_datos`): `copias_bd` no tiene ninguna fila.
+   - `caido` (`atrasado`): última copia correcta hace > 50 h, o hay ejecuciones registradas pero **ninguna correcta** (contrato `docs/api/plataforma-salud.md`).
+   - `desconocido` (`sin_datos`): **solo** cuando `copias_bd` no tiene ninguna fila.
 2. Datos visibles: fecha y hora de la última copia correcta (America/Lima), resultado de la última ejecución (correcta o fallida) y tamaño de la copia en MB.
 3. Nunca se muestran el nombre del bucket, la ruta o clave del objeto, el endpoint ni las credenciales de R2.
 
@@ -52,6 +52,11 @@ Escenario: Ejecución sin registro por base caída
   Dado la última copia correcta registrada fue hace 30 h y la ejecución de hoy no dejó fila porque la base no respondía
   Cuando un admin abre la pantalla
   Entonces «Copia diaria» está «Degradado — Atrasado»
+
+Escenario: Ejecuciones sin ninguna correcta
+  Dado copias_bd tiene 2 ejecuciones, ambas fallidas, y ninguna correcta
+  Cuando un admin abre la pantalla
+  Entonces «Copia diaria» está «Caído — Atrasado», no «Desconocido», y el estado global es «Caído»
 
 Escenario: Sin ejecuciones
   Dado copias_bd no tiene filas
@@ -82,4 +87,4 @@ Ni credenciales, ni bucket, ni rutas, ni endpoint. La copia contiene datos perso
 es/en: «Copia diaria», «Última copia correcta», «Última ejecución», «Correcta», «Fallida» y «Tamaño».
 
 ## Definición de terminado
-Tests de los 4 estados con tiempo simulado (incluida la ejecución sin fila) y de la respuesta sin datos de R2. `tsc`, `lint` y `build` en verde. Claves es/en. Review limpio.
+Tests de los 4 estados con tiempo simulado (incluidas la ejecución sin fila y las ejecuciones sin ninguna correcta) y de la respuesta sin datos de R2. `tsc`, `lint` y `build` en verde. Claves es/en. Review limpio.

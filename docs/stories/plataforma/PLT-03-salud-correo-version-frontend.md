@@ -21,8 +21,8 @@ Los correos se encolan en `email_queue` y los envía un worker por SMTP. Si no h
    - **Sin enviar:** estado `pending` o `sending`, o `failed` con reintentos restantes. La antigüedad se mide desde que se encoló.
    - **Fallido definitivo:** `failed` que agotó sus reintentos. Hoy son 5 intentos con backoff de 30 s a 1 h, unos 15 min en total.
    - **Enviado:** `sent`.
-2. Estados:
-   - `no_configurado`: no hay SMTP configurado (solo posible en desarrollo/test).
+2. Estados, evaluados en este orden (contrato `docs/api/plataforma-salud.md`):
+   - `no_configurado`: no hay SMTP configurado (solo posible en desarrollo/test). **Se evalúa primero y gana** aunque haya correos en cola o fallidos: sin SMTP nada se envía, y eso es lo esperado en ese entorno.
    - `operativo`: SMTP configurado, ningún correo sin enviar con más de 10 min y menos de 3 fallidos definitivos en las últimas 24 h.
    - `degradado` (categoría `atrasado`): el correo sin enviar más antiguo tiene > 10 min, o hay ≥ 3 fallidos definitivos en las últimas 24 h.
    - `caido` (categoría `sin_conexion`): en los últimos 30 min hay ≥ 3 fallidos definitivos y ningún enviado. Es la señal de un SMTP caído: como los reintentos se agotan en unos 15 min, un SMTP caído no deja correos «sin enviar» mucho tiempo, sino fallidos definitivos.
@@ -63,6 +63,11 @@ Escenario: SMTP no configurado en desarrollo
   Cuando un admin abre la pantalla
   Entonces «Correo» está «No configurado» y no empeora el estado global
 
+Escenario: Sin SMTP y con cola acumulada
+  Dado ENV=development sin SMTP y 5 correos sin enviar encolados hace 2 h
+  Cuando un admin abre la pantalla
+  Entonces «Correo» está «No configurado», no «Degradado» ni «Caído», y no empeora el estado global
+
 Escenario: Sin datos personales del correo
   Dado correos pendientes y fallidos con destinatario y error SMTP registrados
   Cuando un admin consulta el estado de salud
@@ -92,4 +97,4 @@ Solo conteos y antigüedades: ni destinatarios, ni asuntos, ni cuerpo, ni `last_
 Todo en es/en, bajo `dashboard.saludServicios.*`: «Correo», «Frontend», las etiquetas de pendientes, de antigüedad y de fallidos en 24 h, y la nota de versiones distintas.
 
 ## Definición de terminado
-Tests de API: operativo, degradado por antigüedad (incluido `failed` con reintentos restantes), caído por fallidos sin envíos en 30 min, degradado por ≥ 3 fallidos, fallo aislado que sigue operativo, `no_configurado`, y respuesta sin datos personales ni host SMTP. `tsc`, `lint` y `build` en verde. Claves es/en. Review limpio.
+Tests de API: operativo, degradado por antigüedad (incluido `failed` con reintentos restantes), caído por fallidos sin envíos en 30 min, degradado por ≥ 3 fallidos, fallo aislado que sigue operativo, `no_configurado` (también con cola acumulada), y respuesta sin datos personales ni host SMTP. `tsc`, `lint` y `build` en verde. Claves es/en. Review limpio.
