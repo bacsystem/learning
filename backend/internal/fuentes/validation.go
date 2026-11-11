@@ -20,6 +20,12 @@ const (
 	minAnio           = 1900
 	maxAnio           = 2100
 	maxEspecialidades = 50
+	minMotivo         = 5 // retirar and desmarcar (contract S5, S6)
+	maxMotivo         = 500
+	minEntidad        = 3 // oficial mark (contract S6)
+	maxEntidad        = 100
+	minNota           = 10
+	maxNota           = 500
 	extensionMD       = ".md"
 	reglaRequerido    = "requerido"
 	reglaMin          = "min"
@@ -81,14 +87,10 @@ type DatosFuente struct {
 // under the lock). Every broken field is reported.
 func validarFormulario(f FormularioFuente) (DatosFuente, error) {
 	campos := map[string]string{}
-	d := DatosFuente{Titulo: strings.TrimSpace(f.Titulo), Tipo: strings.TrimSpace(f.Tipo), EspecialidadIDs: []int64{}}
-	switch n := utf8.RuneCountInString(d.Titulo); {
-	case n == 0:
-		campos["titulo"] = reglaRequerido
-	case n < minTitulo:
-		campos["titulo"] = reglaMin
-	case n > maxTitulo:
-		campos["titulo"] = reglaMax
+	d := DatosFuente{Tipo: strings.TrimSpace(f.Tipo), EspecialidadIDs: []int64{}}
+	var regla string
+	if d.Titulo, regla = longitud(f.Titulo, minTitulo, maxTitulo); regla != "" {
+		campos["titulo"] = regla
 	}
 	if d.Tipo == "" {
 		campos["tipo"] = reglaRequerido
@@ -120,24 +122,159 @@ func validarFormulario(f FormularioFuente) (DatosFuente, error) {
 	return d, nil
 }
 
-// parsearIDs parses a repeated id field: ≤ 50 ids > 0 without repeats.
+// parsearIDs parses a repeated form field of ids with the rule of validarIDs.
 func parsearIDs(valores []string, ids *[]int64) string {
 	if len(valores) > maxEspecialidades {
 		return reglaMax
 	}
-	vistos := make(map[int64]bool, len(valores))
+	parseados := make([]int64, 0, len(valores))
 	for _, v := range valores {
 		id, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
-		if err != nil || id <= 0 {
+		if err != nil {
+			return reglaInvalido
+		}
+		parseados = append(parseados, id)
+	}
+	if regla := validarIDs(parseados); regla != "" {
+		return regla
+	}
+	*ids = append(*ids, parseados...)
+	return ""
+}
+
+// validarIDs: ≤ 50 especialidad ids, each > 0, without repeats.
+func validarIDs(ids []int64) string {
+	if len(ids) > maxEspecialidades {
+		return reglaMax
+	}
+	vistos := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
 			return reglaInvalido
 		}
 		if vistos[id] {
 			return reglaRepetido
 		}
 		vistos[id] = true
-		*ids = append(*ids, id)
 	}
 	return ""
+}
+
+// longitud trims s (README §6) and returns it with the rule its length in
+// runes breaks: requerido when empty, min or max; "" when it fits.
+func longitud(s string, min, max int) (string, string) {
+	s = strings.TrimSpace(s)
+	switch n := utf8.RuneCountInString(s); {
+	case n == 0:
+		return s, reglaRequerido
+	case n < min:
+		return s, reglaMin
+	case n > max:
+		return s, reglaMax
+	}
+	return s, ""
+}
+
+// opcional is longitud over an optional field; nil is requerido.
+func opcional(s *string, min, max int) (string, string) {
+	if s == nil {
+		return "", reglaRequerido
+	}
+	return longitud(*s, min, max)
+}
+
+// errorDeCampos is nil without broken fields, a ValidacionError otherwise.
+func errorDeCampos(campos map[string]string) error {
+	if len(campos) == 0 {
+		return nil
+	}
+	return &ValidacionError{Campos: campos}
+}
+
+// ── S5–S7 ─────────────────────────────────────────────────────────────────────
+
+// transicion is a validated S5 change: the target state and, to retire, the
+// trimmed motivo.
+type transicion struct {
+	Destino string
+	Motivo  string
+}
+
+// destinosS5 are the target states of S5: retirar, restaurar, reintentar.
+var destinosS5 = map[string]bool{EstadoRetirada: true, EstadoActiva: true, EstadoProcesando: true}
+
+// validarCambioEstado applies the shape rules of S5; a motivo for another
+// target is ignored.
+func validarCambioEstado(req CambioEstadoRequest) (transicion, error) {
+	t := transicion{Destino: req.Estado}
+	campos := map[string]string{}
+	switch {
+	case t.Destino == "":
+		campos["estado"] = reglaRequerido
+	case !destinosS5[t.Destino]:
+		campos["estado"] = reglaInvalido
+	case t.Destino == EstadoRetirada:
+		var regla string
+		if t.Motivo, regla = opcional(req.Motivo, minMotivo, maxMotivo); regla != "" {
+			campos["motivo"] = regla
+		}
+	}
+	return t, errorDeCampos(campos)
+}
+
+// marca is a validated S6 change; the fields of the other direction are ignored.
+type marca struct {
+	Marcar         bool
+	EntidadEmisora string
+	Nota           string
+	Motivo         string
+}
+
+// validarOficial applies the shape rules of S6 (contract S6, README §6).
+func validarOficial(req OficialRequest) (marca, error) {
+	campos := map[string]string{}
+	if req.OficialVerificada == nil {
+		campos["oficial_verificada"] = reglaRequerido
+		return marca{}, errorDeCampos(campos)
+	}
+	m := marca{Marcar: *req.OficialVerificada}
+	var regla string
+	if m.Marcar {
+		if m.EntidadEmisora, regla = opcional(req.EntidadEmisora, minEntidad, maxEntidad); regla != "" {
+			campos["entidad_emisora"] = regla
+		}
+		if m.Nota, regla = opcional(req.Nota, minNota, maxNota); regla != "" {
+			campos["nota"] = regla
+		}
+	} else if m.Motivo, regla = opcional(req.Motivo, minMotivo, maxMotivo); regla != "" {
+		campos["motivo"] = regla
+	}
+	return m, errorDeCampos(campos)
+}
+
+// edicion is a validated S7 change.
+type edicion struct {
+	Titulo          string
+	EspecialidadIDs []int64
+}
+
+// validarEdicion applies rule 1 of S7: titulo 3–150 after trimming and
+// especialidad_ids present, ≤ 50, > 0, without repeats (empty = all).
+func validarEdicion(req EditarRequest) (edicion, error) {
+	campos := map[string]string{}
+	var d edicion
+	var regla string
+	if d.Titulo, regla = longitud(req.Titulo, minTitulo, maxTitulo); regla != "" {
+		campos["titulo"] = regla
+	}
+	if req.EspecialidadIDs == nil {
+		campos["especialidad_ids"] = reglaRequerido
+	} else if regla = validarIDs(*req.EspecialidadIDs); regla != "" {
+		campos["especialidad_ids"] = regla
+	} else {
+		d.EspecialidadIDs = *req.EspecialidadIDs
+	}
+	return d, errorDeCampos(campos)
 }
 
 // parsearFuenteID parses the fuente_id of S2 (architect, README §4): a

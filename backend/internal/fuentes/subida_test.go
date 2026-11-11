@@ -44,7 +44,7 @@ func (citaTodo) VersionCitada(context.Context, sqlx.QueryerContext, int64) (bool
 	return true, nil
 }
 
-func nuevoSubidaEnv(t *testing.T, citantes fuentes.Citantes) *subidaEnv {
+func nuevoSubidaEnv(t *testing.T, citantes fuentes.Citantes, suscriptores ...fuentes.SuscriptorRetiro) *subidaEnv {
 	t.Helper()
 	db := dbtest.Open(t)
 	e := &subidaEnv{db: db, cat: dbtest.SeedCatalog(t, db), publicar: fuentes.NewPgSource(db)}
@@ -64,7 +64,7 @@ func nuevoSubidaEnv(t *testing.T, citantes fuentes.Citantes) *subidaEnv {
 	t.Cleanup(func() { limpiarFuentes(t, db, desde) })
 
 	mux := http.NewServeMux()
-	fuentes.Mount(mux, fuentes.NewService(fuentes.NewRepository(db), citantes), audit.New(db), dbtest.JWTSecret, dbtest.SessionChecker(t, db))
+	fuentes.Mount(mux, fuentes.NewService(fuentes.NewRepository(db), citantes, suscriptores...), audit.New(db), dbtest.JWTSecret, dbtest.SessionChecker(t, db))
 	e.h = middleware.MaxBodySize(middleware.DefaultJSONBodyLimit, middleware.DefaultMultipartBodyLimit, fuentes.RutasSubida...)(mux)
 	return e
 }
