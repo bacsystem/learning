@@ -8,3 +8,22 @@ package questions
 func PreguntaServible(alias string) string {
 	return alias + ".estado IN ('aprobada', 'activo')"
 }
+
+// Question life cycle (SIA-E3-02, contract §3).
+const (
+	EstadoBorrador   = "borrador"
+	EstadoEnRevision = "en_revision"
+	EstadoAprobada   = "aprobada"
+	EstadoRechazada  = "rechazada"
+	EstadoActivo     = "activo" // the inherited bank, served like aprobada
+	EstadoEliminada  = "eliminada"
+	OrigenManual     = "manual"
+)
+
+// EstadosListables are the values of the estado filter of GET /preguntas:
+// every state but eliminada, which is never listed.
+var EstadosListables = map[string]bool{EstadoBorrador: true, EstadoEnRevision: true, EstadoAprobada: true,
+	EstadoRechazada: true, EstadoActivo: true}
+
+// Origenes are the values of preguntas.origen.
+var Origenes = map[string]bool{OrigenManual: true, "balotario": true, "ia": true}

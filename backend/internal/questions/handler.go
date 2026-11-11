@@ -109,7 +109,14 @@ func (h *Handler) ListPreguntas(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "tema_id inválido.")
 		return
 	}
-	q.Estado = params.Get("estado")
+	if q.Estado = params.Get("estado"); q.Estado != "" && !EstadosListables[q.Estado] {
+		jsonError(w, http.StatusBadRequest, "estado inválido.")
+		return
+	}
+	if q.Origen = params.Get("origen"); q.Origen != "" && !Origenes[q.Origen] {
+		jsonError(w, http.StatusBadRequest, "origen inválido.")
+		return
+	}
 	q.Search = params.Get("search")
 	if s := params.Get("page"); s != "" {
 		if v, err := strconv.Atoi(s); err == nil {
