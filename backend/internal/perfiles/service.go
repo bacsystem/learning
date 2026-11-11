@@ -47,16 +47,19 @@ func (s *Service) Opciones(ctx context.Context, usuarioID int64) (Opciones, erro
 	return Opciones{Procesos: procesos, Preseleccion: pre}, nil
 }
 
-// preseleccion: the active profile if any; otherwise the persona's
-// especialidad, only if it is one of the offered ones (regla 2), with the
-// proceso when there is a single one (contract F1); otherwise nil.
+// preseleccion follows contract F1 (PR #85). Invariant: every id it returns
+// is in procesos, and the especialidad among that proceso's ones, so F3 would
+// accept it. First the active profile, if it still meets that (its
+// inscripción may have been revoked or its especialidad deactivated);
+// otherwise the persona's especialidad, if offered (regla 2), with the proceso
+// when there is a single one; otherwise nil. Never an especialidad_id null.
 func (s *Service) preseleccion(ctx context.Context, usuarioID int64, procesos []ProcesoOpcion) (*Preseleccion, error) {
 	perfil, err := s.repo.PerfilActivo(ctx, usuarioID)
-	if err == nil {
-		return &Preseleccion{ProcesoID: &perfil.ProcesoID, EspecialidadID: &perfil.EspecialidadID}, nil
-	}
-	if !errors.Is(err, ErrProfesionNoDefinida) {
+	if err != nil && !errors.Is(err, ErrProfesionNoDefinida) {
 		return nil, err
+	}
+	if err == nil && ofrecidaEn(procesos, perfil.ProcesoID, perfil.EspecialidadID) {
+		return &Preseleccion{ProcesoID: &perfil.ProcesoID, EspecialidadID: &perfil.EspecialidadID}, nil
 	}
 	esp, err := s.repo.EspecialidadDePersona(ctx, usuarioID)
 	if err != nil || esp == nil || !ofrecida(procesos, *esp) {
@@ -69,8 +72,22 @@ func (s *Service) preseleccion(ctx context.Context, usuarioID int64, procesos []
 	return pre, nil
 }
 
+// ofrecida reports whether the especialidad is offered in any proceso.
 func ofrecida(procesos []ProcesoOpcion, especialidadID int64) bool {
 	for _, p := range procesos {
+		if ofrecidaEn([]ProcesoOpcion{p}, p.ID, especialidadID) {
+			return true
+		}
+	}
+	return false
+}
+
+// ofrecidaEn reports whether the especialidad is offered in that proceso.
+func ofrecidaEn(procesos []ProcesoOpcion, procesoID, especialidadID int64) bool {
+	for _, p := range procesos {
+		if p.ID != procesoID {
+			continue
+		}
 		for _, e := range p.Especialidades {
 			if e.ID == especialidadID {
 				return true

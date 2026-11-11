@@ -332,3 +332,29 @@ func TestElegir_CarreraEsEstadoInvalido(t *testing.T) {
 		t.Errorf("rows = %v, want only the committed one", got)
 	}
 }
+
+// Contract F1 invariant (PR #85): a profile whose inscripción was revoked is
+// not preselected; the persona rule applies over the procesos offered.
+func TestOpciones_PerfilConInscripcionRevocada(t *testing.T) {
+	e := nuevoEntorno(t)
+	if status, b := e.elegir(t, e.token, e.proceso, e.obstetricia, false); status != http.StatusOK {
+		t.Fatalf("elegir: %d %v", status, b)
+	}
+	otro := dbtest.SeedProceso(t, e.db, e.cat, 2031, "activo")
+	e.inscribir(t, e.usuario.ID, otro, "aprobado")
+	if _, err := e.db.Exec(`UPDATE inscripciones SET estado = 'rechazado' WHERE usuario_id = $1 AND proceso_id = $2`, e.usuario.ID, e.proceso); err != nil {
+		t.Fatal(err)
+	}
+	_, body := e.do(t, "GET", "/serums-ia/profesion/opciones", e.token, ``)
+	pre, _ := body["preseleccion"].(map[string]any)
+	if pre == nil || nid(pre["proceso_id"]) != otro || nid(pre["especialidad_id"]) != e.enfermeria {
+		t.Errorf("preseleccion = %v, want the persona's Enfermería in the only approved proceso %d", body["preseleccion"], otro)
+	}
+	// With the persona's especialidad not valid either: null, never the stale profile.
+	if _, err := e.db.Exec(`UPDATE personas SET especialidad_id = $1 WHERE id = $2`, e.inactiva, e.usuario.PersonaID); err != nil {
+		t.Fatal(err)
+	}
+	if _, body := e.do(t, "GET", "/serums-ia/profesion/opciones", e.token, ``); body["preseleccion"] != nil {
+		t.Errorf("preseleccion = %v, want null", body["preseleccion"])
+	}
+}
