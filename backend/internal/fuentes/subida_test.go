@@ -472,6 +472,8 @@ func TestS2_EstadosYErrores(t *testing.T) {
 	}
 	propio := contenidoUnico()
 	activa := e.activa(t, propio)
+	contenidoProcesando := contenidoUnico()
+	e.crear(t, contenidoProcesando)
 
 	cases := []struct {
 		name   string
@@ -481,6 +483,7 @@ func TestS2_EstadosYErrores(t *testing.T) {
 		code   string
 	}{
 		{"fuente en procesando", fmt.Sprint(procesando), contenidoUnico(), 409, "estado_invalido"},
+		{"estado antes que duplicado", fmt.Sprint(procesando), contenidoProcesando, 409, "estado_invalido"},
 		{"fuente retirada", fmt.Sprint(retirada), contenidoUnico(), 409, "estado_invalido"},
 		{"fuente inexistente", "999999999", contenidoUnico(), 404, "no_encontrado"},
 		{"sin fuente_id", "", contenidoUnico(), 422, "validacion"},
