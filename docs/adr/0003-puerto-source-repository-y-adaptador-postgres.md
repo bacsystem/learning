@@ -291,9 +291,9 @@ Es determinista e idempotente: mismo contenido y misma `normalizador_version` da
 **Líneas (regla única).** `\r\n` cuenta como **un** salto; `\r` suelto y `\n`, como un salto cada uno.
 
 - Un salto al final no agrega una línea vacía, y el contenido vacío tiene 0 líneas. Ejemplos: `"a\r\nb"` → 2 líneas, `"a\r\rb"` → 3, `"a\n"` → 1.
-- La implementa **una sola** función, `fuentes.Lineas(contenido []byte) []string` (PR #92). `fuentes.ContarLineas` es `len(Lineas(…))`.
+- La implementa **una sola** función, `fuentes.DividirLineas(contenido []byte) []string` (PR #92). `fuentes.ContarLineas` es `len(DividirLineas(…))`.
   - `ContarLineas` la usan `Huella` (`fuente_versiones.lineas`) y la validación de ≤ 20 000 líneas de S1.
-  - `Normalizar` corta el contenido con `Lineas`.
+  - `Normalizar` corta el contenido con `DividirLineas`.
 - Así `linea_inicio` y `linea_fin` (base 1) siempre caen en `1..lineas` de su versión.
 
 **Palabras.** Antes de contar se quitan `<mark>` y `</mark>`. Después cuenta cada token de `strings.Fields` que tenga al menos una letra o un dígito (`unicode.IsLetter` o `unicode.IsDigit`).
