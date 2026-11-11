@@ -137,6 +137,14 @@ Descartada: el usuario eligió Railway. Además, sin PITR se pierden hasta 24 h 
      - Se despliega por tag inmutable `vX.Y.Z` o por digest, **nunca** `:latest`.
      - El backend se **promueve**: la misma imagen, con el mismo digest, que validó qa en `deploy/` es la que va a Railway.
      - **Quién publica:** el usuario construye y publica las imágenes **desde su máquina** con la cuenta `cbaciliod`, en repositorios **públicos** de Docker Hub. Las credenciales de Docker Hub quedan en esa máquina y nunca van al repo. Hoy no hay publicación desde el CI.
+       - **Orden del release** (diseño de devops):
+         1. tag `vX.Y.Z`;
+         2. CI del tag en verde;
+         3. build y `make docker/verify` desde un **checkout limpio del tag**: el Makefile falla si hay cambios sin commit o si HEAD no es el tag;
+         4. push hecho por el usuario;
+         5. cambio del tag en Railway.
+       - Ningún agente hace `docker login` ni `docker push`.
+       - Rollback: volver al tag anterior en Railway.
      - **Consecuencia de que sean públicas:** cualquiera puede descargarlas. Por eso **ninguna imagen lleva secretos, datos ni `.env`**:
        - toda la configuración sensible entra por variables en runtime;
        - en el frontend solo van los `NEXT_PUBLIC_*`, que de todos modos son públicos en el navegador;
