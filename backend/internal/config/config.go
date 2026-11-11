@@ -17,13 +17,13 @@ import (
 // least 256 bits to keep its security margin.
 const MinJWTSecretBytes = 32
 
-// LogLevels are the accepted LOG_LEVEL values. The list is closed on purpose:
+// logLevels are the accepted LOG_LEVEL values. The list is closed on purpose:
 // zerolog would also take "disabled", "panic" or numbers, which hide errors.
-var LogLevels = []string{"trace", "debug", "info", "warn", "error"}
+var logLevels = []string{"trace", "debug", "info", "warn", "error"}
 
-// SecureSSLModes are the sslmode values accepted outside development/test
+// secureSSLModes are the sslmode values accepted outside development/test
 // (ADR 0004 § Decisión 2): every one of them encrypts the connection.
-var SecureSSLModes = []pq.SSLMode{pq.SSLModeRequire, pq.SSLModeVerifyCA, pq.SSLModeVerifyFull}
+var secureSSLModes = []pq.SSLMode{pq.SSLModeRequire, pq.SSLModeVerifyCA, pq.SSLModeVerifyFull}
 
 type Config struct {
 	Port          string
@@ -102,8 +102,8 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("TRUSTED_PROXIES: %w", err)
 	}
 	cfg.LogLevel = strings.ToLower(strings.TrimSpace(cfg.LogLevel))
-	if cfg.LogLevel != "" && !slices.Contains(LogLevels, cfg.LogLevel) {
-		return nil, fmt.Errorf("LOG_LEVEL must be one of %s or empty (got %q)", strings.Join(LogLevels, "|"), cfg.LogLevel)
+	if cfg.LogLevel != "" && !slices.Contains(logLevels, cfg.LogLevel) {
+		return nil, fmt.Errorf("LOG_LEVEL must be one of %s or empty (got %q)", strings.Join(logLevels, "|"), cfg.LogLevel)
 	}
 
 	// CORS must be configured explicitly unless ENV says, exactly,
@@ -151,16 +151,17 @@ func Load() (*Config, error) {
 
 // requireSecureSSLMode checks the sslmode that lib/pq will actually use for
 // dsn (URL or key=value; a PGSSLMODE in the environment counts when the DSN
-// does not set it). It must be one of SecureSSLModes: an unset sslmode fails
+// does not set it). It must be one of secureSSLModes: an unset sslmode fails
 // too, so production never depends on the driver default. The errors never
 // quote the DSN, which carries the password.
 func requireSecureSSLMode(dsn string) error {
 	pgCfg, err := pq.NewConfig(dsn)
 	if err != nil {
-		return fmt.Errorf("DATABASE_URL is not a valid PostgreSQL connection string")
+		// pq's error is not wrapped: it may quote the DSN.
+		return fmt.Errorf("DATABASE_URL (with the PG* environment variables) is not a valid PostgreSQL connection string")
 	}
-	if !slices.Contains(SecureSSLModes, pgCfg.SSLMode) {
-		return fmt.Errorf("DATABASE_URL must set sslmode=require, verify-ca or verify-full unless ENV is development or test (got %q)", pgCfg.SSLMode)
+	if !slices.Contains(secureSSLModes, pgCfg.SSLMode) {
+		return fmt.Errorf("DATABASE_URL must set sslmode=require, verify-ca or verify-full (or PGSSLMODE, if the URL does not set it) unless ENV is development or test (got %q)", pgCfg.SSLMode)
 	}
 	return nil
 }
