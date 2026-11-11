@@ -1650,7 +1650,8 @@
         "api": "API",
         "base_datos": "Base de datos",
         "correo": "Correo",
-        "frontend": "Frontend"
+        "frontend": "Frontend",
+        "copia_r2": "Copia diaria"
       },
       "dato": {
         "version": "Versión",
@@ -1663,10 +1664,21 @@
         "antiguedadValor": "{valor, number} min",
         "fallidos24h": "Fallidos definitivos en 24 h",
         "ultimoEnviado": "Último enviado",
-        "nunca": "Nunca"
+        "nunca": "Nunca",
+        "ultimaCorrecta": "Última copia correcta",
+        "ninguna": "Ninguna",
+        "ultimaEjecucion": "Última ejecución",
+        "ejecucionValor": "{resultado} · {fecha}",
+        "tamano": "Tamaño",
+        "tamanoValor": "{valor} MB",
+        "tamanoMenor": "< {valor} MB"
       },
       "frontendNota": "La versión que estás viendo. No tiene estado: si el frontend estuviera caído, no verías este panel.",
-      "versionesDistintas": "El frontend y el backend tienen versiones distintas."
+      "versionesDistintas": "El frontend y el backend tienen versiones distintas.",
+      "ejecucion": {
+        "correcta": "Correcta",
+        "fallida": "Fallida"
+      }
     }
   }
 }

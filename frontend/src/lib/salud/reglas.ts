@@ -27,6 +27,14 @@ export interface DatosCorreo {
   fallidos_24h: number | null;
   ultimo_enviado_en: string | null;
 }
+export const RESULTADOS_COPIA = ["correcta", "fallida"] as const;
+export type ResultadoCopia = (typeof RESULTADOS_COPIA)[number];
+export interface DatosCopiaR2 {
+  ultima_correcta_en: string | null;
+  tamano_bytes: number | null;
+  ultima_ejecucion: ResultadoCopia | null;
+  ultima_ejecucion_en: string | null;
+}
 
 interface ServicioBase {
   estado: EstadoServicio;
@@ -35,7 +43,8 @@ interface ServicioBase {
 export type ServicioSalud =
   | (ServicioBase & { id: "api"; datos: DatosApi })
   | (ServicioBase & { id: "base_datos"; datos: DatosBaseDatos })
-  | (ServicioBase & { id: "correo"; datos: DatosCorreo });
+  | (ServicioBase & { id: "correo"; datos: DatosCorreo })
+  | (ServicioBase & { id: "copia_r2"; datos: DatosCopiaR2 });
 export type IdServicio = ServicioSalud["id"];
 
 export interface Salud {
@@ -78,6 +87,12 @@ const LECTORES_DATOS: { [K in IdServicio]: (d: Registro) => Extract<ServicioSalu
     fallidos_24h: numero(d.fallidos_24h),
     ultimo_enviado_en: fecha(d.ultimo_enviado_en),
   }),
+  copia_r2: (d) => ({
+    ultima_correcta_en: fecha(d.ultima_correcta_en),
+    tamano_bytes: numero(d.tamano_bytes),
+    ultima_ejecucion: deConjunto(RESULTADOS_COPIA, d.ultima_ejecucion),
+    ultima_ejecucion_en: fecha(d.ultima_ejecucion_en),
+  }),
 };
 
 const esIdConocido = (v: unknown): v is IdServicio => typeof v === "string" && Object.hasOwn(LECTORES_DATOS, v);
@@ -105,16 +120,39 @@ export function normalizarSalud(crudo: RespuestaSaludApi): Salud {
   };
 }
 
-/** «Último enviado» del correo: una fecha, «nunca» o sin dato. */
-export type UltimoEnvio = { tipo: "fecha"; iso: string } | { tipo: "nunca" } | { tipo: "sin_dato" };
+/** Un momento medido («Último enviado», «Última copia correcta»): una fecha, «nunca» o sin dato. */
+export type Momento = { tipo: "fecha"; iso: string } | { tipo: "nunca" } | { tipo: "sin_dato" };
 
 /**
  * El contrato usa `null` en `ultimo_enviado_en` tanto si nunca se envió como si la medición falló. Solo es «nunca»
  * si la medición sí llegó (los conteos vienen); si no, se muestra sin dato y no se afirma algo falso.
  */
-export function ultimoEnvio(datos: DatosCorreo): UltimoEnvio {
+export function ultimoEnvio(datos: DatosCorreo): Momento {
   if (datos.ultimo_enviado_en !== null) return { tipo: "fecha", iso: datos.ultimo_enviado_en };
   return datos.sin_enviar === null ? { tipo: "sin_dato" } : { tipo: "nunca" };
+}
+
+/**
+ * Igual para la copia (PLT-05): sin ninguna correcta es «nunca» solo si hay ejecuciones registradas. Sin filas en
+ * `copias_bd` o con la medición fallida, todos los datos llegan en `null` y no se afirma nada.
+ */
+export function ultimaCopiaCorrecta(datos: DatosCopiaR2): Momento {
+  if (datos.ultima_correcta_en !== null) return { tipo: "fecha", iso: datos.ultima_correcta_en };
+  return datos.ultima_ejecucion === null ? { tipo: "sin_dato" } : { tipo: "nunca" };
+}
+
+const BYTES_POR_MB = 1024 * 1024;
+/** Por debajo de esto una copia no vacía se muestra como «< 0,1 MB» y no como «0 MB» (hallazgo H1 del #145). */
+export const MB_MINIMO_VISIBLE = 0.1;
+
+/** Tamaño de la copia en MB (PLT-05 regla 2; 50 MB = 52 428 800 bytes, como el contrato), redondeado a un decimal. */
+export type TamanoCopia = { tipo: "cero" } | { tipo: "menor_al_minimo" } | { tipo: "mb"; valor: number };
+
+export function tamanoCopia(bytes: number): TamanoCopia {
+  if (bytes <= 0) return { tipo: "cero" };
+  const mb = bytes / BYTES_POR_MB;
+  if (mb < MB_MINIMO_VISIBLE) return { tipo: "menor_al_minimo" };
+  return { tipo: "mb", valor: Math.round(mb * 10) / 10 };
 }
 
 /** Versión del backend, la del servicio `api`, o `null` si no vino. */
