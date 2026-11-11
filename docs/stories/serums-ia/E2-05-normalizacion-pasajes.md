@@ -18,7 +18,7 @@ Los textos extraídos de PDF traen formato roto (alternativas pegadas, viñetas 
 
 ## Reglas de negocio
 1. Normalización: UTF-8, saltos de línea `\n`, colapso de espacios, unificación de viñetas, eliminación de caracteres de control. Las marcas `<mark>` se conservan.
-2. Segmentación por encabezados y párrafos; cada pasaje tiene 150–800 palabras (los de balotario se segmentan por pregunta, ver SIA-E3-01).
+2. Segmentación por encabezados y párrafos; cada pasaje tiene 150–800 palabras (los de balotario se segmentan por pregunta, ver SIA-E3-01). Un fragmento de menos de 150 palabras (sección corta o resto final) se une al pasaje anterior (si es el primero, al siguiente); si al unirse pasa de 800, el conjunto se divide en partes de 150–800. La unión no aplica a los pasajes de balotario, que van uno por pregunta. Única excepción (decisión PO, contrato MVP E1+E2): si el documento entero tiene de 1 a 149 palabras, se publica como un único pasaje.
 3. Cada pasaje guarda: orden, rango de líneas de origen, encabezado/sección y texto.
 4. Máx. 5 000 pasajes por fuente; si se excede, la ingesta falla sin publicar nada.
 5. El proceso es idempotente: mismo contenido, mismos pasajes y mismo orden.
@@ -29,6 +29,16 @@ Escenario: Segmentación
   Dado un .md de 40 000 palabras con encabezados
   Cuando se normaliza
   Entonces todos los pasajes tienen entre 150 y 800 palabras y conservan rango de líneas y sección
+
+Escenario: Sección corta
+  Dado un .md con una sección de 60 palabras entre dos secciones largas
+  Cuando se normaliza
+  Entonces esas 60 palabras quedan unidas al pasaje anterior y ningún pasaje tiene menos de 150 palabras
+
+Escenario: Documento corto
+  Dado un .md de 120 palabras
+  Cuando se normaliza
+  Entonces la fuente queda "activa" con un único pasaje de 120 palabras
 
 Escenario: Idempotencia
   Dado un contenido ya normalizado una vez

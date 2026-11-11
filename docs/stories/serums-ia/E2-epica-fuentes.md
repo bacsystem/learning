@@ -13,7 +13,7 @@
 | SIA-E2-04 | Ingesta de URL oficial | v2 | 5 | #18 |
 | SIA-E2-05 | Normalización y pasajes citables | MVP | 3 | #19 |
 | SIA-E2-06 | Versionado, ciclo de vida y marca «oficial verificada» | MVP | 5 | #20 |
-| SIA-E2-07 | Gestión de fuentes (admin) | MVP | 3 | #21 |
+| SIA-E2-07 | Gestión de fuentes (admin) | MVP | 5 | #21 |
 | SIA-E2-08 | Adaptador de búsqueda semántica (pgvector o NotebookLM) | v3 | 5 | #22 |
 
 **Dependencias:** E1 para vincular fuentes a profesión/área. Ninguna historia de MVP ni de v2 depende de SIA-E2-01 ni de SIA-E2-08.

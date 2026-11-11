@@ -49,6 +49,7 @@ flowchart TD
   E2-02 --> E2-03
   E2-05 --> E2-03
   E2-02 --> E2-04
+  E2-03 --> E2-04
   E2-05 --> E2-04
   E2-06 --> E2-04
   E2-02 --> E2-05
@@ -137,7 +138,7 @@ flowchart TD
 
 10. **Sin generación en vivo para el postulante:** el postulante nunca dispara una generación que llegue a él sin aprobación; solicita al equipo (SIA-E5-06 / SIA-E6-06) y recibe contenido solo tras aprobación de admin. La cuota de IA cuenta solo **acciones IA reales** (al menos una llamada al LLM): encolar una solicitud administrativa no descuenta cuota del postulante; la generación del admin descuenta de la cuota del admin (P3, SIA-E6-02).
 11. **Segundo revisor:** no es obligatorio en el MVP. Se gobierna con `revision.segundo_revisor_obligatorio` en `configuracion_sistema` (por defecto `false`, cambios auditados en `audit_log`). La verificación de cita y la nota para contenido incierto siguen obligatorias (P4, SIA-E6-05).
-12. **Fases:** MVP 32 historias / 135 pts, v2 16 historias / 58 pts, v3 5 historias / 20 pts (total 53 / 213 pts). Cambios por issue #65: SIA-E2-01 pasa de MVP a v3; SIA-E2-06, SIA-E3-05 y SIA-E7-01 suben de 3 a 5 pts. Cambios por la auditoría: SIA-E4-02 y SIA-E6-09 suben de 3 a 5 pts.
+12. **Fases:** MVP 32 historias / 141 pts, v2 16 historias / 58 pts, v3 5 historias / 20 pts (total 53 / 219 pts). Cambios por issue #65: SIA-E2-01 pasa de MVP a v3; SIA-E2-06, SIA-E3-05 y SIA-E7-01 suben de 3 a 5 pts. Cambios por la auditoría: SIA-E4-02 y SIA-E6-09 suben de 3 a 5 pts. Cambios por el contrato MVP E1+E2 (supuesto 23): SIA-E3-02 (recibe el efecto del retiro de fuentes), SIA-E2-07 (edición de metadatos) y SIA-E1-03 (pantalla de pesos) suben de 3 a 5 pts.
 13. **Preferencias de notificación** (activar/desactivar alertas, recordatorios y reporte semanal) se definen en SIA-E8-02 y se reutilizan en E8-03 y E8-05.
 14. **Repositorio de fuentes:** MVP y v2 operan al 100 % sobre el `SourceRepository` propio en PostgreSQL; no se crea cuenta ni proyecto de NotebookLM ($0 USD). La búsqueda semántica (pgvector o NotebookLM) se reevalúa en v3 (P1, SIA-E2-01, SIA-E2-08).
 15. **Calendario oficial:** los hitos los carga un admin a mano con enlace obligatorio a una fuente `.gob.pe`; el cambio de fecha del hito `examen` se propaga automáticamente a los planes con fecha de origen `oficial`, no a los de origen `manual` (P5, SIA-E8-01, SIA-E7-01).
@@ -148,6 +149,17 @@ flowchart TD
 20. **Clave retenida:** la clave, la explicación y la retroalimentación de una pregunta no se muestran en ninguna revisión ni en el cuaderno de errores mientras el usuario tenga otro intento en curso (práctica, simulacro o diagnóstico) con esa pregunta (SIA-E4-02, reutilizada en SIA-E6-08 y SIA-E9-02).
 21. **Reportes de contenido:** los reportes nunca ocultan contenido aprobado por un admin; a los 3 reportes de usuarios distintos lo priorizan en la cola y avisan a los admins. Solo el contenido heredado sin aprobación registrada se oculta a los 3. Solo pueden reportar una pregunta quienes la respondieron en un intento finalizado (SIA-E6-09).
 22. **SSRF en URLs:** la IP se valida al conectar, sobre la IP efectiva del socket y con IPv4 mapeadas en IPv6 normalizadas, en cada redirección (SIA-E2-04).
+23. **Decisiones del contrato MVP E1+E2** (dudas del architect, resueltas por el PO):
+    - (a) La profesión se preselecciona desde los datos de persona del usuario si es válida. El usuario la confirma y la elección no modifica esos datos (SIA-E1-04).
+    - (b) Los temas se reordenan por asignatura, solo los activos, con subir/bajar y guardando la lista completa. Hay 409 `orden_desactualizado` si la lista no coincide (SIA-E1-01, SIA-E1-02).
+    - (c) Los pesos se guardan de forma atómica y por reemplazo, sin borradores. `completa` significa que hay una configuración guardada (que siempre suma 100); `incompleta`, que no la hay (SIA-E1-03).
+    - (d) El hash duplicado es global contra todas las versiones de todas las fuentes, en cualquier estado, y responde 409 `fuente_duplicada` (SIA-E2-03, E2-04, E2-06). El título y las profesiones de una fuente se pueden editar (SIA-E2-07).
+    - (e) Límite de fuentes: cuentan `activa` y `procesando`, y una fuente sin profesiones cuenta para cada profesión. Se valida también al reintentar, restaurar y editar profesiones (SIA-E2-03).
+    - (f) Área y tema no filtran la búsqueda de pasajes en el MVP; van en el texto de la consulta (SIA-E2-02).
+    - (g) Los fragmentos de menos de 150 palabras se unen a un pasaje vecino. Un documento de 1–149 palabras es un único pasaje (SIA-E2-05).
+    - (h) Retirar una fuente emite el aviso «fuente retirada» (SIA-E2-06). El efecto sobre las preguntas lo implementa SIA-E3-02 y el efecto sobre el material lo implementa SIA-E6-06. En ambos casos el efecto es todo o nada junto con el retiro.
+    - (i) La carga de pesos tiene una pantalla simple de admin en el MVP, con suma en vivo y la misma validación que el servidor (SIA-E1-03, Q9).
+    - (j) El límite de 60 temas cuenta solo los activos. La unicidad de nombre incluye los archivados, y reactivar un tema revalida el límite (SIA-E1-01, SIA-E1-02, Q10).
 
 ## Límites (aplican donde se citan; los de IA, privacidad y cronograma aprobados en issue #65)
 
@@ -155,8 +167,8 @@ flowchart TD
 |---|---|
 | Archivo .md de fuente | 2 MiB, 20 000 líneas, solo UTF-8, extensión `.md` y tipo `text/markdown` o `text/plain` |
 | URL de fuente | solo HTTPS, 5 MiB de respuesta, 10 s de timeout, máx. 3 redirecciones, solo dominios de una lista permitida por admin, bloqueo de IP privadas/loopback/metadata |
-| Fuentes activas | máx. 100 por especialidad y 500 en total |
-| Pasajes | 150–800 palabras cada uno; máx. 5 000 por fuente |
+| Fuentes activas | máx. 100 por especialidad y 500 en total; cuentan `activa` y `procesando`; una fuente sin profesiones cuenta para cada una |
+| Pasajes | 150–800 palabras cada uno (un documento de 1–149 palabras es un único pasaje); máx. 5 000 por fuente |
 | Balotario importado | máx. 1 000 preguntas por archivo; alternativas 2–6 por pregunta |
 | Diagnóstico | 4 preguntas por área (mín. 3), máx. 40 preguntas en total, tiempo límite en servidor 45 min |
 | Generación de preguntas (admin) | máx. 20 preguntas por solicitud |

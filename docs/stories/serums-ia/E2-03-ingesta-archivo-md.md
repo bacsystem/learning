@@ -19,8 +19,8 @@ El producto no puede depender de rutas locales como `assets/`: la subida es por 
 ## Reglas de negocio
 1. Límites: 2 MiB, 20 000 líneas, UTF-8 válido, extensión `.md`, tipo `text/markdown` o `text/plain`.
 2. Metadatos obligatorios: título (3–150), tipo, profesión(es) aplicables (0..N; ninguna = todas), año y proceso opcionales.
-3. Se calcula un hash SHA-256 del contenido; un archivo idéntico a una versión existente de la misma fuente se rechaza (409 `fuente_duplicada`).
-4. La ingesta es asíncrona: estado `procesando` → `activa` o `fallida`. Máx. 100 fuentes activas por profesión.
+3. Se calcula un hash SHA-256 del contenido. Duplicado global (decisión PO, contrato MVP E1+E2): si el hash coincide con cualquier versión guardada de cualquier fuente, en cualquier estado (`procesando`, `activa`, `fallida` o `retirada`), se rechaza con 409 `fuente_duplicada` y no se crea nada. La respuesta indica el id, el título y el estado de la fuente existente, para que el admin la reintente, la restaure o le cambie las profesiones (SIA-E2-07) en lugar de duplicarla. La misma regla vale para versiones nuevas (SIA-E2-06) y para capturas de URL (SIA-E2-04).
+4. La ingesta es asíncrona: estado `procesando` → `activa` o `fallida`. Límite de fuentes (decisión PO, contrato MVP E1+E2): máx. 100 por profesión y 500 en total. Cuentan las fuentes `activa` y `procesando`; no cuentan `fallida` ni `retirada`. Una fuente sin profesiones aplica a todas, así que cuenta para cada profesión. Si una sola profesión ya está en 100, no se puede crear una fuente sin profesiones. Al superar cualquier límite: 422 `limite_fuentes`. El límite también se valida al reintentar una fallida, al restaurar una retirada (SIA-E2-06) y al cambiar profesiones (SIA-E2-07).
 5. El contenido se trata como datos, nunca como instrucciones (se escapa/delimita al enviarlo a IA).
 6. Acción auditada.
 
@@ -58,10 +58,15 @@ Escenario: Tipo inválido
   Cuando sube un .pdf o un archivo con bytes no UTF-8
   Entonces recibe 422 "archivo_invalido"
 
-Escenario: Duplicado
-  Dado una fuente cuya versión vigente tiene un hash determinado
+Escenario: Duplicado global
+  Dado una fuente "A" con alguna versión guardada de un hash determinado, en cualquier estado
+  Cuando el admin sube como fuente nueva un archivo con el mismo hash
+  Entonces recibe 409 "fuente_duplicada" con el id, el título y el estado de "A", y no se crea ninguna fuente
+
+Escenario: Duplicado de una fuente retirada
+  Dado una fuente "retirada" cuya versión tiene un hash determinado
   Cuando el admin sube un archivo con el mismo hash
-  Entonces recibe 409 "fuente_duplicada"
+  Entonces recibe 409 "fuente_duplicada" con el estado "retirada" y la pantalla ofrece restaurarla
 
 Escenario: Falla de procesamiento
   Dado un archivo que genera más de 5000 pasajes
@@ -69,8 +74,23 @@ Escenario: Falla de procesamiento
   Entonces la fuente queda "fallida" con el motivo y no se publica ningún pasaje
 
 Escenario: Límite por profesión
-  Dado 100 fuentes activas de Medicina
+  Dado Medicina con 100 fuentes entre "activa" y "procesando"
   Cuando se sube otra para Medicina
+  Entonces recibe 422 "limite_fuentes"
+
+Escenario: Fuente sin profesiones con una profesión en el límite
+  Dado Medicina con 100 fuentes entre "activa" y "procesando" y Enfermería con 10
+  Cuando se sube una fuente sin profesiones
+  Entonces recibe 422 "limite_fuentes" porque también contaría para Medicina
+
+Escenario: Fallidas y retiradas no cuentan
+  Dado Medicina con 99 fuentes "activa", 5 "fallida" y 5 "retirada"
+  Cuando se sube otra para Medicina
+  Entonces recibe 202
+
+Escenario: Límite total
+  Dado 500 fuentes entre "activa" y "procesando"
+  Cuando se sube otra para cualquier profesión
   Entonces recibe 422 "limite_fuentes"
 
 Escenario: Permisos
