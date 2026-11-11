@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -15,25 +16,42 @@ var (
 	trustedNets []*net.IPNet
 )
 
-// SetTrustedProxies parses a comma-separated list of CIDRs/IPs. Invalid
-// entries are ignored. An empty list means X-Forwarded-For is never trusted.
-func SetTrustedProxies(list string) {
+// ParseTrustedProxies parses a comma-separated list of CIDRs or IPs (an IP
+// without a mask is a single host: /32 for IPv4, /128 for IPv6). Empty
+// entries are skipped, so "" or a trailing comma mean no proxy. Any other
+// invalid entry is an error naming it, so config.Load can fail at startup
+// instead of silently trusting fewer proxies than configured.
+func ParseTrustedProxies(list string) ([]*net.IPNet, error) {
 	var nets []*net.IPNet
 	for _, entry := range strings.Split(list, ",") {
 		entry = strings.TrimSpace(entry)
 		if entry == "" {
 			continue
 		}
-		if !strings.Contains(entry, "/") {
-			if ip := net.ParseIP(entry); ip != nil && ip.To4() == nil {
-				entry += "/128"
+		cidr := entry
+		if !strings.Contains(cidr, "/") {
+			if ip := net.ParseIP(cidr); ip != nil && ip.To4() == nil {
+				cidr += "/128"
 			} else {
-				entry += "/32"
+				cidr += "/32"
 			}
 		}
-		if _, cidr, err := net.ParseCIDR(entry); err == nil {
-			nets = append(nets, cidr)
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid trusted proxy %q: want an IP or a CIDR", entry)
 		}
+		nets = append(nets, ipNet)
+	}
+	return nets, nil
+}
+
+// SetTrustedProxies configures the trusted proxies from a list already
+// validated by config.Load. An invalid list fails closed: no proxy is
+// trusted, so X-Forwarded-For is ignored.
+func SetTrustedProxies(list string) {
+	nets, err := ParseTrustedProxies(list)
+	if err != nil {
+		nets = nil
 	}
 	trustedMu.Lock()
 	trustedNets = nets

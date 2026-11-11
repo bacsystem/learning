@@ -3,14 +3,22 @@ package config
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/spf13/viper"
+
+	"github.com/cbaciliod/learning/internal/crypto"
+	"github.com/cbaciliod/learning/internal/middleware"
 )
 
 // MinJWTSecretBytes is the minimum JWT_SECRET length: HS256 needs a key of at
 // least 256 bits to keep its security margin.
 const MinJWTSecretBytes = 32
+
+// LogLevels are the accepted LOG_LEVEL values. The list is closed on purpose:
+// zerolog would also take "disabled", "panic" or numbers, which hide errors.
+var LogLevels = []string{"trace", "debug", "info", "warn", "error"}
 
 type Config struct {
 	Port          string
@@ -19,8 +27,10 @@ type Config struct {
 	JWTSecret     string
 	EncryptionKey string
 
-	CORSOrigins    string
-	TrustedProxies string // comma-separated CIDRs or IPs, e.g. "10.0.0.0/8,172.16.0.0/12"
+	CORSOrigins string
+	// TrustedProxies: comma-separated CIDRs or IPs, e.g. "10.0.0.0/8,172.16.0.0/12".
+	// Empty (default) trusts no proxy; an invalid entry fails Load.
+	TrustedProxies string
 
 	SMTPHost     string
 	SMTPPort     int
@@ -30,8 +40,10 @@ type Config struct {
 
 	FrontendBaseURL string
 
-	// LogLevel (trace|debug|info|warn|error) overrides the logger's default
-	// level. Read through viper so a value in .env applies too.
+	// LogLevel (trace|debug|info|warn|error, case-insensitive) overrides the
+	// logger's default level (debug in development, info otherwise); empty
+	// keeps the default and any other value fails Load. Read through viper so
+	// a value in .env applies too.
 	LogLevel string
 }
 
@@ -75,6 +87,18 @@ func Load() (*Config, error) {
 	}
 	if cfg.EncryptionKey == "" {
 		return nil, fmt.Errorf("ENCRYPTION_KEY is required")
+	}
+	// Same rule as crypto.NewCipher, checked before connecting to the
+	// database. The decode error is not wrapped: it quotes part of the key.
+	if _, err := crypto.NewCipher(cfg.EncryptionKey); err != nil {
+		return nil, fmt.Errorf("ENCRYPTION_KEY must be 64 hex characters (a 32-byte key)")
+	}
+	if _, err := middleware.ParseTrustedProxies(cfg.TrustedProxies); err != nil {
+		return nil, fmt.Errorf("TRUSTED_PROXIES: %w", err)
+	}
+	cfg.LogLevel = strings.ToLower(strings.TrimSpace(cfg.LogLevel))
+	if cfg.LogLevel != "" && !slices.Contains(LogLevels, cfg.LogLevel) {
+		return nil, fmt.Errorf("LOG_LEVEL must be one of %s or empty (got %q)", strings.Join(LogLevels, "|"), cfg.LogLevel)
 	}
 
 	// CORS must be configured explicitly unless ENV says, exactly,

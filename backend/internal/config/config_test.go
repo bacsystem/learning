@@ -21,6 +21,7 @@ func setBaseEnv(t *testing.T) {
 	t.Setenv("SMTP_PORT", "")
 	t.Setenv("SMTP_FROM", "")
 	t.Setenv("LOG_LEVEL", "")
+	t.Setenv("TRUSTED_PROXIES", "")
 }
 
 // setProductionEnv is setBaseEnv plus everything a non-development ENV needs.
@@ -181,5 +182,112 @@ func TestLoad_LogLevelFromDotEnv(t *testing.T) {
 	}
 	if cfg.LogLevel != "warn" {
 		t.Errorf("LogLevel %q, want warn", cfg.LogLevel)
+	}
+}
+
+// H-2 (PR #97): ENCRYPTION_KEY is validated in Load, before the database
+// connects, with an error that names the variable and never echoes the key.
+func TestLoad_EncryptionKeyFormat(t *testing.T) {
+	cases := []struct {
+		name, key string
+		wantErr   bool
+	}{
+		{"64 hex chars", strings.Repeat("ab", 32), false},
+		{"upper-case hex", strings.Repeat("AB", 32), false},
+		{"too short", strings.Repeat("0", 62), true},
+		{"too long", strings.Repeat("0", 66), true},
+		{"odd length", strings.Repeat("0", 63), true},
+		{"not hex", strings.Repeat("z", 64), true},
+		{"surrounding spaces", " " + strings.Repeat("0", 64) + " ", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv("ENCRYPTION_KEY", c.key)
+			_, err := Load()
+			if !c.wantErr {
+				if err != nil {
+					t.Fatalf("Load: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "ENCRYPTION_KEY") {
+				t.Fatalf("want ENCRYPTION_KEY error, got %v", err)
+			}
+			if strings.Contains(err.Error(), strings.TrimSpace(c.key)) {
+				t.Errorf("error echoes the key: %v", err)
+			}
+		})
+	}
+}
+
+// H-3 (PR #97): an invalid TRUSTED_PROXIES entry fails Load instead of being
+// dropped; empty or blank means no proxy.
+func TestLoad_TrustedProxies(t *testing.T) {
+	cases := []struct {
+		name, value string
+		wantErr     bool
+	}{
+		{"unset", "", false},
+		{"blank", "   ", false},
+		{"CIDR list", "10.0.0.0/8, 172.16.0.0/12", false},
+		{"single IPv4 and IPv6", "10.1.1.1,2001:db8::1", false},
+		{"trailing comma", "10.0.0.0/8,", false},
+		{"typo in IP", "10.0.0.256", true},
+		{"bad mask", "10.0.0.0/33", true},
+		{"hostname", "proxy.internal", true},
+		{"one bad entry among good ones", "10.0.0.0/8,nope", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv("TRUSTED_PROXIES", c.value)
+			_, err := Load()
+			if c.wantErr && (err == nil || !strings.Contains(err.Error(), "TRUSTED_PROXIES")) {
+				t.Fatalf("want TRUSTED_PROXIES error, got %v", err)
+			}
+			if !c.wantErr && err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+		})
+	}
+}
+
+// H-3 (PR #97): LOG_LEVEL accepts only the closed list, case-insensitive and
+// trimmed; anything else fails Load instead of falling back silently.
+func TestLoad_LogLevel(t *testing.T) {
+	cases := []struct {
+		value, want string
+		wantErr     bool
+	}{
+		{"", "", false},
+		{"debug", "debug", false},
+		{" INFO ", "info", false},
+		{"Warn", "warn", false},
+		{"trace", "trace", false},
+		{"error", "error", false},
+		{"warning", "", true},
+		{"disabled", "", true},
+		{"panic", "", true},
+		{"5", "", true},
+	}
+	for _, c := range cases {
+		t.Run(c.value, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv("LOG_LEVEL", c.value)
+			cfg, err := Load()
+			if c.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "LOG_LEVEL") {
+					t.Fatalf("want LOG_LEVEL error, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.LogLevel != c.want {
+				t.Errorf("LogLevel %q, want %q", cfg.LogLevel, c.want)
+			}
+		})
 	}
 }
