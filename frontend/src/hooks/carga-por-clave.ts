@@ -46,6 +46,20 @@ export class CargaPorClave<T> {
     }
   }
 
+  /**
+   * Vuelve a pedir los datos de `clave` sin marcar carga ni perder lo que se ve: si falla, se conservan los datos
+   * anteriores y no se muestra error (p. ej. el refresco periódico de un listado, que reintenta en el siguiente ciclo).
+   */
+  async refrescar(clave: string, pedir: () => Promise<T>): Promise<void> {
+    const id = ++this.ultima;
+    try {
+      const datos = await pedir();
+      if (id === this.ultima) this.actualizar({ clave, datos, error: null, cargando: false });
+    } catch {
+      // Se ignora a propósito: el refresco es silencioso y el siguiente ciclo lo reintenta.
+    }
+  }
+
   /** Sustituye los datos de `clave` sin pedirlos (p. ej. con la respuesta de un guardado). */
   reemplazar(clave: string, datos: T): void {
     this.actualizar({ clave, datos, error: null });

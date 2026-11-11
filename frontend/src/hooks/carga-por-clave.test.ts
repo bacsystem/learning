@@ -85,3 +85,32 @@ describe("vistaDeCarga", () => {
     await pendiente;
   });
 });
+
+describe("CargaPorClave.refrescar", () => {
+  it("replaces the data without marking loading", async () => {
+    const carga = new CargaPorClave<string>();
+    await carga.cargar("a", async () => "v1");
+    const pendiente = carga.refrescar("a", async () => "v2");
+    expect(carga.obtenerEstado().cargando).toBe(false);
+    await pendiente;
+    expect(vistaDeCarga(carga.obtenerEstado(), "a")).toEqual({ datos: "v2", error: null, cargando: false });
+  });
+
+  it("keeps the previous data and shows no error when it fails", async () => {
+    const carga = new CargaPorClave<string>();
+    await carga.cargar("a", async () => "v1");
+    await carga.refrescar("a", async () => Promise.reject(new Error("500")));
+    expect(vistaDeCarga(carga.obtenerEstado(), "a")).toEqual({ datos: "v1", error: null, cargando: false });
+  });
+
+  it("does not overwrite a newer load of another key", async () => {
+    const carga = new CargaPorClave<string>();
+    await carga.cargar("a", async () => "v1");
+    let terminar!: (v: string) => void;
+    const refresco = carga.refrescar("a", () => new Promise((r) => (terminar = r)));
+    await carga.cargar("b", async () => "datos de b");
+    terminar("tarde");
+    await refresco;
+    expect(carga.obtenerEstado()).toMatchObject({ clave: "b", datos: "datos de b" });
+  });
+});
