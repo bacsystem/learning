@@ -10,6 +10,7 @@ import {
   CoinsIcon,
   GearSixIcon,
   GraduationCapIcon,
+  HeartbeatIcon,
   HouseIcon,
   ListChecksIcon,
   ListMagnifyingGlassIcon,
@@ -71,6 +72,7 @@ export const NAVEGACION: GrupoDestinos[] = [
       { href: "/admin/ingresos", etiqueta: "menu-admin-ingresos", icono: CoinsIcon },
       { href: "/admin/testimonios", etiqueta: "menu-admin-testimonios", icono: StarIcon },
       { href: "/admin/audit-log", etiqueta: "menu-admin-audit-log", icono: ListMagnifyingGlassIcon },
+      { href: "/admin/salud", etiqueta: "saludServicios.menu", icono: HeartbeatIcon },
     ],
   },
   {

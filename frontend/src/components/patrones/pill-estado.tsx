@@ -1,6 +1,7 @@
 import type { Tono } from "./metricas";
 import type { ReactNode } from "react";
 
+import { type IconoComponente, PESO_ICONO } from "@/lib/iconos";
 import { cn } from "@/lib/utils";
 
 const ESTILOS: Record<Tono, string> = {
@@ -16,8 +17,22 @@ const PUNTOS: Record<Tono, string> = {
   neutro: "bg-muted-foreground/50",
 };
 
-/** Pill de estado: relleno tenue + punto sólido, sin borde. Verde = OK, ámbar = provisional, rojo = error, neutro = en proceso/inactivo. */
-export function PillEstado({ tono, children, className }: { tono: Tono; children: ReactNode; className?: string }) {
+/**
+ * Pill de estado: relleno tenue + punto sólido, sin borde. Verde = OK, ámbar = provisional, rojo = error, neutro = en proceso/inactivo.
+ * `icon` cambia el punto por un icono (p. ej. el estado de un servicio): toma el color del texto del tono y es decorativo
+ * (`aria-hidden`), así que el estado lo sigue diciendo el texto.
+ */
+export function PillEstado({
+  tono,
+  icon: Icono,
+  children,
+  className,
+}: {
+  tono: Tono;
+  icon?: IconoComponente;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
     <span
       className={cn(
@@ -26,7 +41,11 @@ export function PillEstado({ tono, children, className }: { tono: Tono; children
         className,
       )}
     >
-      <span className={cn("size-1.5 shrink-0 rounded-full", PUNTOS[tono])} />
+      {Icono ? (
+        <Icono aria-hidden weight={PESO_ICONO} className="size-3.5 shrink-0" />
+      ) : (
+        <span className={cn("size-1.5 shrink-0 rounded-full", PUNTOS[tono])} />
+      )}
       {children}
     </span>
   );

@@ -1617,6 +1617,56 @@
       }
     },
     "sesion-servidor-no-disponible-titulo": "The server is not responding",
-    "sesion-servidor-no-disponible-texto": "Your session is still open. We retry every few seconds; as soon as the server responds, you will see the app."
+    "sesion-servidor-no-disponible-texto": "Your session is still open. We retry every few seconds; as soon as the server responds, you will see the app.",
+    "saludServicios": {
+      "menu": "Service health",
+      "estadoGlobal": "Overall status",
+      "ultimaComprobacion": "Last check: {fecha}",
+      "actualizar": "Refresh",
+      "actualizando": "Refreshing…",
+      "desactualizado": "Outdated",
+      "ayuda": "This panel shows the status when you open it. It does not send alerts.",
+      "error": {
+        "titulo": "Could not check the status of the services",
+        "conDatos": "Showing the data from the last valid check ({fecha}). It will try again in the next cycle.",
+        "sinDatos": "It tries again automatically every {segundos, number} seconds."
+      },
+      "estado": {
+        "operativo": "Operational",
+        "degradado": "Degraded",
+        "caido": "Down",
+        "no_configurado": "Not configured",
+        "desconocido": "Unknown"
+      },
+      "estadoConCategoria": "{estado} — {categoria}",
+      "categoria": {
+        "sin_conexion": "No connection",
+        "tiempo_agotado": "Timed out",
+        "error_interno": "Internal error",
+        "atrasado": "Behind",
+        "sin_datos": "No data"
+      },
+      "servicio": {
+        "api": "API",
+        "base_datos": "Database",
+        "correo": "Email",
+        "frontend": "Frontend"
+      },
+      "dato": {
+        "version": "Version",
+        "enMarcha": "Uptime",
+        "enMarchaValor": "{dias, number} d {horas, number} h {minutos, number} min",
+        "latencia": "Latency",
+        "latenciaValor": "{valor, number} ms",
+        "sinEnviar": "Unsent",
+        "antiguedad": "Oldest unsent",
+        "antiguedadValor": "{valor, number} min",
+        "fallidos24h": "Permanent failures in 24 h",
+        "ultimoEnviado": "Last sent",
+        "nunca": "Never"
+      },
+      "frontendNota": "The version you are viewing. It has no status: if the frontend were down, you would not see this panel.",
+      "versionesDistintas": "The frontend and the backend have different versions."
+    }
   }
 }
