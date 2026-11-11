@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/lib/pq"
 	"github.com/spf13/viper"
 
 	"github.com/cbaciliod/learning/internal/crypto"
@@ -19,6 +20,10 @@ const MinJWTSecretBytes = 32
 // LogLevels are the accepted LOG_LEVEL values. The list is closed on purpose:
 // zerolog would also take "disabled", "panic" or numbers, which hide errors.
 var LogLevels = []string{"trace", "debug", "info", "warn", "error"}
+
+// SecureSSLModes are the sslmode values accepted outside development/test
+// (ADR 0004 § Decisión 2): every one of them encrypts the connection.
+var SecureSSLModes = []pq.SSLMode{pq.SSLModeRequire, pq.SSLModeVerifyCA, pq.SSLModeVerifyFull}
 
 type Config struct {
 	Port          string
@@ -110,6 +115,12 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("CORS_ORIGINS is required unless ENV is development or test (ENV=%q)", cfg.Env)
 	}
 
+	if !localEnv {
+		if err := requireSecureSSLMode(cfg.DatabaseURL); err != nil {
+			return nil, err
+		}
+	}
+
 	// Same rule for the e-mail settings: outside development/test the worker
 	// must be able to send, and the links in the e-mails must not fall back
 	// to http://localhost:3000 (cmd/server).
@@ -136,4 +147,20 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// requireSecureSSLMode checks the sslmode that lib/pq will actually use for
+// dsn (URL or key=value; a PGSSLMODE in the environment counts when the DSN
+// does not set it). It must be one of SecureSSLModes: an unset sslmode fails
+// too, so production never depends on the driver default. The errors never
+// quote the DSN, which carries the password.
+func requireSecureSSLMode(dsn string) error {
+	pgCfg, err := pq.NewConfig(dsn)
+	if err != nil {
+		return fmt.Errorf("DATABASE_URL is not a valid PostgreSQL connection string")
+	}
+	if !slices.Contains(SecureSSLModes, pgCfg.SSLMode) {
+		return fmt.Errorf("DATABASE_URL must set sslmode=require, verify-ca or verify-full unless ENV is development or test (got %q)", pgCfg.SSLMode)
+	}
+	return nil
 }

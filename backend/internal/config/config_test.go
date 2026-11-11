@@ -29,6 +29,7 @@ func setProductionEnv(t *testing.T) {
 	t.Helper()
 	setBaseEnv(t)
 	t.Setenv("ENV", "production")
+	t.Setenv("DATABASE_URL", "postgres://u:p@db.internal:5432/app?sslmode=require")
 	t.Setenv("CORS_ORIGINS", "https://app.example.com")
 	t.Setenv("SMTP_HOST", "smtp.example.com")
 	t.Setenv("SMTP_PORT", "587")
@@ -287,6 +288,58 @@ func TestLoad_LogLevel(t *testing.T) {
 			}
 			if cfg.LogLevel != c.want {
 				t.Errorf("LogLevel %q, want %q", cfg.LogLevel, c.want)
+			}
+		})
+	}
+}
+
+// H-5 (PR #97, ADR 0004 § Decisión 2): outside development/test the effective
+// sslmode of DATABASE_URL must encrypt; the error never quotes the DSN.
+func TestLoad_DatabaseSSLMode(t *testing.T) {
+	const secret = "s3cr3t-pass"
+	cases := []struct {
+		name, env, dsn, pgsslmode string
+		wantErr                   bool
+	}{
+		{"URL require", "production", "postgres://u:" + secret + "@db:5432/app?sslmode=require", "", false},
+		{"Railway URL with other params", "production", "postgresql://u:" + secret + "@db.railway.internal:5432/railway?connect_timeout=10&sslmode=require", "", false},
+		{"verify-full", "production", "postgres://u:" + secret + "@db/app?sslmode=verify-full", "", false},
+		{"key=value verify-ca", "production", "host=db user=u password=" + secret + " dbname=app sslmode=verify-ca", "", false},
+		{"unset", "production", "postgres://u:" + secret + "@db/app", "", true},
+		{"disable", "production", "postgres://u:" + secret + "@db/app?sslmode=disable", "", true},
+		{"prefer", "staging", "postgres://u:" + secret + "@db/app?sslmode=prefer", "", true},
+		{"allow, key=value", "", "host=db user=u password=" + secret + " sslmode=allow", "", true},
+		{"PGSSLMODE disable without DSN sslmode", "production", "postgres://u:" + secret + "@db/app", "disable", true},
+		{"DSN require wins over PGSSLMODE", "production", "postgres://u:" + secret + "@db/app?sslmode=require", "disable", false},
+		{"unknown sslmode", "production", "postgres://u:" + secret + "@db/app?sslmode=bogus", "", true},
+		{"malformed URL", "production", "postgres://u:" + secret + "@db:notaport/app?sslmode=require", "", true},
+		{"development keeps disable", "development", "postgres://u:" + secret + "@db/app?sslmode=disable", "", false},
+		{"test keeps unset", "test", "postgres://u:" + secret + "@db/app", "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			setProductionEnv(t)
+			t.Setenv("ENV", c.env)
+			t.Setenv("DATABASE_URL", c.dsn)
+			t.Setenv("PGSSLMODE", c.pgsslmode) // restores the variable after the test
+			if c.pgsslmode == "" {
+				// lib/pq rejects an empty PGSSLMODE, so "unset" must really unset it.
+				if err := os.Unsetenv("PGSSLMODE"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err := Load()
+			if !c.wantErr {
+				if err != nil {
+					t.Fatalf("Load: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "DATABASE_URL") {
+				t.Fatalf("want DATABASE_URL error, got %v", err)
+			}
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("error quotes the DSN: %v", err)
 			}
 		})
 	}
