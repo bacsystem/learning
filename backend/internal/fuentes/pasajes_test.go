@@ -59,6 +59,9 @@ func TestBuscarPasajes_Admin(t *testing.T) {
 	denso := e.crearCon(t, "Denso "+marca, "guia")
 	e.publicarTextos(t, denso, 1, marca+" "+marca+" "+marca+" "+marca)
 
+	conProfesion := e.crearCon(t, "ConProfesion "+marca, "guia", e.espA)
+	e.publicarTextos(t, conProfesion, 1, marca+" asociada a una profesión")
+
 	retirada := e.crearCon(t, "Retirada "+marca, "guia")
 	e.publicarTextos(t, retirada, 1, marca+" retirada")
 	if status, body := e.estado(t, retirada, `{"estado":"retirada","motivo":"Retirada de prueba"}`); status != http.StatusOK {
@@ -72,9 +75,9 @@ func TestBuscarPasajes_Admin(t *testing.T) {
 	}
 	got := titulos(body)
 	sort.Strings(got)
-	want := []string{"Activa " + marca, "ConV2 " + marca, "Denso " + marca}
+	want := []string{"Activa " + marca, "ConProfesion " + marca, "ConV2 " + marca, "Denso " + marca}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("fuentes %v, want %v (retired, processing and old versions out)", got, want)
+		t.Fatalf("fuentes %v, want %v (retired, processing and old versions out; fuentes of a profesión in)", got, want)
 	}
 
 	data := body["data"].([]any)
@@ -139,6 +142,8 @@ func TestBuscarPasajes_ErroresYPermisos(t *testing.T) {
 		{"2 after trimming", "  ab  ", e.admin, 422, "consulta_invalida"},
 		{"empty", "", e.admin, 422, "consulta_invalida"},
 		{"301 runes", strings.Repeat("é", 301), e.admin, 422, "consulta_invalida"},
+		{"NUL byte", "ab\x00cd", e.admin, 422, "consulta_invalida"},
+		{"invalid UTF-8", "ab\xffcd", e.admin, 422, "consulta_invalida"},
 		{"3 runes", "abc", e.admin, 200, ""},
 		{"300 runes", strings.Repeat("é", 300), e.admin, 200, ""},
 		{"not admin", "abc", e.usuario, 403, ""},

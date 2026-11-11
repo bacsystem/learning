@@ -206,8 +206,12 @@ type SourceRepository interface {
 	MarcarVersionFallida(ctx context.Context, fuenteID int64, version int, motivo string, aud Auditor) error
 }
 
-// NormalizarConsulta trims q and checks the 3–300 runes of a search text.
+// NormalizarConsulta trims q and checks a search text: valid UTF-8 without
+// NUL (Postgres rejects it) and 3–300 runes.
 func NormalizarConsulta(q string) (string, error) {
+	if !utf8.ValidString(q) || strings.ContainsRune(q, 0) {
+		return "", ErrConsultaInvalida
+	}
 	q = strings.TrimSpace(q)
 	if n := utf8.RuneCountInString(q); n < MinConsulta || n > MaxConsulta {
 		return "", ErrConsultaInvalida
