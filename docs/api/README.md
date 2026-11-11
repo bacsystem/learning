@@ -19,9 +19,9 @@ Un cambio a un contrato ya publicado se avisa directamente a backend-dev, fronte
 - **Montaje:** función `Mount(mux, svc, audLog *audit.Logger, jwtSecret, checkSession)`, con la misma firma que `inscripciones.Mount` (`cmd/server/main.go:124`). Se llama desde `cmd/server/main.go:123-131`. Los módulos nuevos reciben el `audLog` de `main` en vez de construir otro, que es la deuda anotada en `catalogs/routes.go:13-17` (H86).
 - **Rutas** con el `ServeMux` de Go 1.22+ (`"METHOD /ruta/{param}"`). Las rutas admin van bajo `/admin/…`. Las del postulante en el módulo van bajo `/serums-ia/…`. Las lecturas de catálogo para cualquier autenticado se quedan junto al recurso (p. ej. `GET /asignaturas/{id}/temas`, como `GET /asignaturas`, `catalogs/routes.go:44`).
 - **IDs de ruta:** enteros > 0. Si no, `400 parametro_invalido` (equivale a `pathID` de `catalogs/handler.go:85-89`).
-- **JSON:** `snake_case`. Las fechas y horas van en RFC 3339 UTC (`time.Time` serializado), p. ej. `"2026-11-11T15:04:05Z"`. Los decimales de peso y coeficiente van como número con ≤ 2 decimales (validación `dec2`, `catalogs/handler.go:21-36`). En `PUT`, los campos opcionales ausentes y `null` significan «sin valor».
+- **JSON:** `snake_case`. Las fechas y horas van en RFC 3339 UTC (`time.Time` serializado), p. ej. `"2026-11-11T15:04:05Z"`. Los decimales de peso y coeficiente van como número con ≤ 2 decimales (validación `dec2`, `catalogs/handler.go:21-36`). En `PUT`, los campos opcionales ausentes y `null` significan «sin valor», salvo que el endpoint diga otra cosa. Excepción vigente: `tema_id` en `PUT /preguntas/{id}`, donde ausente conserva el valor actual y `null` lo quita (E1 T8, como `etiqueta_ids`).
 - Los handlers decodifican con `DisallowUnknownFields`: un campo desconocido da `400 cuerpo_invalido`.
-- **Plegado de texto:** las comparaciones sin mayúsculas ni tildes (nombre de tema, búsqueda de pasajes) usan una única función `texto.Plegar` en un paquete neutro nuevo, `internal/texto`. La crea SIA-E1-01, que es la primera historia que la necesita, y la reutiliza SIA-E2-02. Las reglas de plegado están en la ADR 0003.
+- **Plegado de texto:** las comparaciones sin mayúsculas ni tildes (nombre de tema, búsqueda de pasajes) usan una única función, `texto.Plegar` (`internal/texto/texto.go`). La creó SIA-E1-01 y la reutiliza SIA-E2-02. Pliega igual una tilde compuesta (NFC) que una descompuesta (NFD) y conserva la `ñ`. Las reglas están en la ADR 0003 § Plegado.
 
 ## 2. Autenticación y roles
 
@@ -58,9 +58,15 @@ El repo tiene dos formatos:
 - **500:** siempre `{"error": "error_interno", "message": "Error interno del servidor."}`. La causa se registra con `op` y sin datos personales, como `httpx.InternalError` (`httpx.go:24-34`).
 - **Excepciones (respuestas que no salen del handler):**
   - `RequireAuth` y `RequireAdmin` responden `{"error": "No autenticado." | "Sesión revocada." | "Acceso denegado."}` (`auth/middleware.go:38,44,52,57,73`);
-  - `MaxBodySize` responde `413 {"error": "El cuerpo de la solicitud es demasiado grande."}` (`middleware/bodylimit.go:42-44`).
+  - `MaxBodySize` responde `413 {"error": "El cuerpo de la solicitud es demasiado grande."}` (`middleware/bodylimit.go:42-44`) cuando el `Content-Length` declarado ya supera el límite.
 
   El frontend trata esos tres status (401, 403 y 413 de middleware) **por status** y no por código. Si hay `message`, el código está en `error`; si no, `error` es texto.
+- **Cuerpo demasiado grande en el handler (convención):** sin `Content-Length` (p. ej. `Transfer-Encoding: chunked`), el middleware no rechaza la petición: envuelve el cuerpo en `http.MaxBytesReader` (`bodylimit.go:46`). Pasado el límite, la lectura falla dentro del handler con `*http.MaxBytesError`.
+  - **Regla:** todo handler del módulo que decodifica un cuerpo JSON comprueba `var mbe *http.MaxBytesError; errors.As(err, &mbe)` **antes** de responder `400 cuerpo_invalido`. Si es ese error, responde `413` con el formato 2: `{"error": "cuerpo_demasiado_grande", "message": "El cuerpo de la solicitud es demasiado grande."}`.
+  - Precedente: hoy solo `auth` hace este mapeo (`internal/auth/handler.go:58-65`), con el formato heredado. Los handlers de temas responden 400 (`internal/temas/handler.go:255-264`, `decodificar`) y deben corregirse (tarea de backend-dev).
+  - Las subidas multipart siguen usando su propio código, `413 archivo_demasiado_grande` (E2 S1 paso 1).
+  - Alcance: los endpoints nuevos del módulo con cuerpo. Los endpoints existentes fuera del módulo no cambian.
+  - El frontend trata `cuerpo_demasiado_grande` por código, con su clave i18n (§8). El 413 del middleware sigue tratándose por status.
 - **Frontend (tarea de frontend-dev):** los clientes usan **`body.message ?? body.error`** como texto y guardan el código aparte:
 
   ```ts
@@ -97,7 +103,7 @@ El repo tiene dos formatos:
 | 403 | Sin rol (middleware) o sin inscripción aprobada | `inscripcion_requerida` |
 | 404 | Recurso inexistente o ajeno | `no_encontrado` o uno específico (`profesion_no_definida`) |
 | 409 | Estado del recurso incompatible con la acción, duplicados de identidad, datos desactualizados | `estado_invalido`, `orden_desactualizado`, `peso_duplicado`, `fuente_duplicada`, `confirmacion_requerida`, `formato_no_configurado`, `tiempo_agotado` |
-| 413 | Archivo o cuerpo demasiado grande | `archivo_demasiado_grande` |
+| 413 | Archivo o cuerpo demasiado grande | `archivo_demasiado_grande` (multipart), `cuerpo_demasiado_grande` (JSON leído en el handler, §3), texto del middleware |
 | 422 | Validación semántica y límites de negocio | `validacion`, `referencia_invalida`, `limite_*`, más los específicos de cada épica |
 | 429 | Límite de uso (cuotas de IA, exportaciones; épicas posteriores) | `limite_uso` |
 | 500 | Error inesperado | `error_interno` |
@@ -120,6 +126,7 @@ Catálogo de códigos usados por E1 y E2:
 | `fuente_duplicada` | 409 | E2-03, E2-06 (`detalle`: `fuente_id`, `titulo`, `estado`, `version`) |
 | `formato_no_configurado` | 409 | E1-03 (lo expone E9-05) |
 | `archivo_demasiado_grande` | 413 | E2-03 |
+| `cuerpo_demasiado_grande` | 413 | todas (endpoints con cuerpo JSON) |
 | `validacion`, `referencia_invalida` | 422 | todas |
 | `tema_duplicado`, `limite_temas`, `orden_invalido`, `tema_invalido` | 422 | E1-01, E1-02 |
 | `pesos_no_suman_100`, `limite_preguntas` | 422 | E1-03 |
@@ -140,7 +147,7 @@ Catálogo de códigos usados por E1 y E2:
 
 | Límite | Valor | Dónde se aplica |
 |---|---|---|
-| Cuerpo JSON | 1 MB (413 del middleware) | `middleware/bodylimit.go:10`, global en `cmd/server/main.go:138-144` |
+| Cuerpo JSON | 1 MB: 413 del middleware si el `Content-Length` lo supera; `413 cuerpo_demasiado_grande` del handler si se supera al leer (§3) | `middleware/bodylimit.go:10,42-46`, global en `cmd/server/main.go:138-144` |
 | Subida multipart | techo global de 20 MB solo para rutas registradas; cada handler aplica su propio `http.MaxBytesReader` | `bodylimit.go:11,26-49`. Una ruta de subida nueva **debe** añadirse a la lista de `main.go:138-143`, que compara `r.URL.Path` exacto: no puede llevar `{id}` |
 | Archivo `.md` de fuente | 2 MiB, 20 000 líneas, UTF-8, `.md`, `text/markdown` o `text/plain` | E2 S1/S2 |
 | Texto libre (notas, motivos) | ≤ 500 caracteres; el mínimo lo fija cada regla | README de historias:174 |
@@ -224,6 +231,14 @@ TL1–TL3, resueltas por el tech-lead:
 
 | # | Decisión | Dónde se aplica |
 |---|---|---|
-| TL1 | Se mantiene `UNIQUE NULLS NOT DISTINCT` con el supuesto explícito «producción usa Postgres ≥ 15». No hay pipeline de deploy en el repo; compose y CI usan Postgres 16. El tech-lead se lo confirma al usuario | ADR 0001 § Supuesto |
+| TL1 | Se mantiene `UNIQUE NULLS NOT DISTINCT`. Actualizado el 2026-11-11: el usuario confirmó que aún no existe base de datos de producción, así que producción usará Postgres 16 (como compose y CI); el mínimo soportado es 15 | ADR 0001 § Versión de Postgres en producción |
 | TL2 | No se aprueba `unaccent` por ahora; el plegado se hace en Go. Si hiciera falta, se escribe un ADR nuevo y se pide aprobación al usuario | ADR 0003 |
-| TL3 | `tema_id` en `POST /preguntas` y `PUT /preguntas/{id}` va en E1-01, opcional y validado (tema activo de la misma asignatura) | E1 T8 |
+| TL3 | `tema_id` en `POST /preguntas` y `PUT /preguntas/{id}` va en E1-01, opcional y validado (tema activo de la misma asignatura). Precisado en el PR #74: en `PUT`, ausente conserva el tema (salvo cambio de área) y `null` lo quita | E1 T8 |
+
+Seguimiento de los reviews de E1-01/E1-02 (PRs #72–#75), 2026-11-11:
+
+| # | Decisión | Dónde se aplica | Tarea |
+|---|---|---|---|
+| R1 | T4 acepta las especialidades inactivas que el tema ya tenía; no deja agregar inactivas nuevas | E1 T4 | backend-dev (`temas.Editar`), frontend-dev (formulario de tema) |
+| R2 | `texto.Plegar` pliega también las formas NFD (vocal + marca combinante; `n` + U+0303 → `ñ`), sin dependencias nuevas | ADR 0003 § Plegado | backend-dev (`internal/texto`) |
+| R3 | Un `*http.MaxBytesError` en el handler da `413 cuerpo_demasiado_grande` con el formato 2 | §3, §4, §6 | backend-dev (`temas.decodificar`), frontend-dev (clave i18n) |
