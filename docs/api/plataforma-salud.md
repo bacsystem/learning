@@ -127,7 +127,7 @@ Lee `email_queue` (`backend/migrations/007_create_email_queue.sql:2-13`) sin con
 
 - Con `no_configurado`, `datos` puede seguir trayendo los conteos.
 - **Nunca** se leen ni devuelven `to_address`, `subject`, `body_html` ni `last_error`. Las consultas solo seleccionan agregados.
-- **Índice nuevo**, porque `sent` es la mayoría de las filas y hoy no tiene índice: `CREATE INDEX idx_email_queue_sent_updated ON email_queue (updated_at) WHERE status = 'sent'`. Va en la migración de PLT-03.
+- **Índice nuevo**, porque `sent` es la mayoría de las filas y hoy no tiene índice: `CREATE INDEX idx_email_queue_sent_updated ON email_queue (updated_at) WHERE status = 'sent'`. Va en la migración **063** (PLT-03).
 
 ### Servicio `worker_ingesta` (PLT-04, v2)
 
@@ -182,7 +182,9 @@ Contrato nuevo, que aplica a **todos** los endpoints autenticados:
 
 ## Modelo de datos
 
-### Migración `copias_bd` (PLT-05; número propuesto: la siguiente libre, hoy 063)
+### Migración 064 `copias_bd` (PLT-05)
+
+Número asignado por el tech-lead: **063** es el índice de correo (PLT-03) y **064** es `copias_bd` (PLT-05), en el orden de las historias.
 
 ```sql
 -- +goose Up
@@ -219,7 +221,7 @@ DROP TABLE IF EXISTS copias_bd;
 
 ### Índice de correo (PLT-03)
 
-`idx_email_queue_sent_updated` (ver «Servicio `correo`»), en una migración propia de PLT-03.
+`idx_email_queue_sent_updated` (ver «Servicio `correo`»), en la migración **063** (PLT-03).
 
 ## Seguridad
 
