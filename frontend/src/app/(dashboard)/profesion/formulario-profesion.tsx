@@ -8,12 +8,12 @@ import { SelectCampo } from "@/components/formularios/select-campo";
 import { DialogoConfirmacion } from "@/components/navegacion/dialogo-confirmacion";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { ACCION_PRINCIPAL } from "@/lib/estilos";
-import { apiErrorCode } from "@/lib/http/api-error";
 import type { OpcionesProfesion, Profesion } from "@/lib/serums-ia/profesion/api";
 import { mensajeErrorProfesion } from "@/lib/serums-ia/profesion/errores";
 import {
   cambiarProceso,
   especialidadesDe,
+  intentarGuardar,
   puedeGuardar,
   type Seleccion,
   seleccionInicial,
@@ -53,22 +53,26 @@ export function FormularioProfesion({
   const nombreEspecialidad = (id: number | null) => especialidades.find((e) => e.id === id)?.nombre ?? "";
 
   async function guardar(confirmarReinicio: boolean): Promise<string | null> {
-    if (seleccion.procesoId === null || seleccion.especialidadId === null) return null;
+    const { procesoId, especialidadId } = seleccion;
+    if (procesoId === null || especialidadId === null) return null;
     setError(null);
-    try {
-      await onGuardar({ procesoId: seleccion.procesoId, especialidadId: seleccion.especialidadId }, confirmarReinicio);
+    const resultado = await intentarGuardar(
+      (confirmar) => onGuardar({ procesoId, especialidadId }, confirmar),
+      confirmarReinicio,
+    );
+    if (resultado.tipo === "guardado") {
       setElegida(null);
       return null;
-    } catch (e) {
-      if (!confirmarReinicio && apiErrorCode(e) === "confirmacion_requerida") {
-        setConfirmando(true);
-        return null;
-      }
-      const mensaje = mensajeErrorProfesion(e, t, t("comun-error-guardar"));
-      if (confirmarReinicio) return mensaje;
-      setError(mensaje);
+    }
+    if (resultado.tipo === "confirmar") {
+      setConfirmando(true);
       return null;
     }
+    const mensaje = mensajeErrorProfesion(resultado.error, t, t("comun-error-guardar"));
+    // Dentro del diálogo, el error se muestra en él (DialogoConfirmacion lo recibe como texto); fuera, bajo el formulario.
+    if (confirmarReinicio) return mensaje;
+    setError(mensaje);
+    return null;
   }
 
   async function enviar() {

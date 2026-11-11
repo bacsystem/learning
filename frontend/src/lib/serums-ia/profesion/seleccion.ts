@@ -1,5 +1,7 @@
 import type { OpcionesProfesion, ProcesoOpcion } from "./api";
 
+import { apiErrorCode } from "@/lib/http/api-error";
+
 /** Lo elegido en el selector; `null` = sin elegir. */
 export interface Seleccion {
   procesoId: number | null;
@@ -46,4 +48,25 @@ export function puedeGuardar(
 ): boolean {
   if (seleccion.procesoId === null || seleccion.especialidadId === null) return false;
   return !activo || activo.procesoId !== seleccion.procesoId || activo.especialidadId !== seleccion.especialidadId;
+}
+
+/** Resultado de un intento de guardar (F3): guardado, hay que pedir confirmación del reinicio, o error. */
+export type ResultadoGuardado = { tipo: "guardado" } | { tipo: "confirmar" } | { tipo: "error"; error: unknown };
+
+/**
+ * Un intento de F3. Si ya había otra profesión y aún no se confirmó, el servidor responde 409
+ * `confirmacion_requerida`: se pide confirmar al usuario (el diálogo) y **no** se reenvía solo. Tras confirmar, se llama
+ * de nuevo con `confirmarReinicio = true`; un 409 a esa altura es un error, no otra confirmación.
+ */
+export async function intentarGuardar(
+  guardar: (confirmarReinicio: boolean) => Promise<void>,
+  confirmarReinicio: boolean,
+): Promise<ResultadoGuardado> {
+  try {
+    await guardar(confirmarReinicio);
+    return { tipo: "guardado" };
+  } catch (error) {
+    if (!confirmarReinicio && apiErrorCode(error) === "confirmacion_requerida") return { tipo: "confirmar" };
+    return { tipo: "error", error };
+  }
 }

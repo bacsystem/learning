@@ -1,6 +1,6 @@
 import type { ProcesoOpcion } from "./api";
-import { cambiarProceso, especialidadesDe, puedeGuardar, seleccionInicial } from "./seleccion";
-import { describe, expect, it } from "vitest";
+import { cambiarProceso, especialidadesDe, intentarGuardar, puedeGuardar, seleccionInicial } from "./seleccion";
+import { describe, expect, it, vi } from "vitest";
 
 const proceso = (id: number, especialidades: number[]): ProcesoOpcion => ({
   id,
@@ -93,5 +93,43 @@ describe("puedeGuardar", () => {
     expect(puedeGuardar({ procesoId: 12, especialidadId: 5 }, null)).toBe(true);
     expect(puedeGuardar({ procesoId: 12, especialidadId: 5 }, { procesoId: 12, especialidadId: 5 })).toBe(false);
     expect(puedeGuardar({ procesoId: 12, especialidadId: 2 }, { procesoId: 12, especialidadId: 5 })).toBe(true);
+  });
+});
+
+describe("intentarGuardar (409 confirmacion_requerida → diálogo → reenvío)", () => {
+  const confirmacion = () =>
+    Object.assign(new Error("Confirma."), {
+      status: 409,
+      code: "confirmacion_requerida",
+      detalle: { actual: { proceso_id: 12, especialidad_id: 2 } },
+    });
+
+  it("saves directly when the server accepts the first request", async () => {
+    const guardar = vi.fn(async () => {});
+    expect(await intentarGuardar(guardar, false)).toEqual({ tipo: "guardado" });
+    expect(guardar).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it("asks for confirmation on 409 without resending on its own", async () => {
+    const guardar = vi.fn(async () => Promise.reject(confirmacion()));
+    expect(await intentarGuardar(guardar, false)).toEqual({ tipo: "confirmar" });
+    expect(guardar).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it("after the user confirms, resends with confirmar_reinicio true", async () => {
+    const guardar = vi.fn(async (confirmar: boolean) => (confirmar ? undefined : Promise.reject(confirmacion())));
+    expect(await intentarGuardar(guardar, false)).toEqual({ tipo: "confirmar" });
+    expect(await intentarGuardar(guardar, true)).toEqual({ tipo: "guardado" });
+    expect(guardar.mock.calls).toEqual([[false], [true]]);
+  });
+
+  it("treats a 409 on the confirmed request as an error, not as another confirmation", async () => {
+    const error = confirmacion();
+    expect(await intentarGuardar(async () => Promise.reject(error), true)).toEqual({ tipo: "error", error });
+  });
+
+  it("returns any other error as is", async () => {
+    const error = Object.assign(new Error("x"), { status: 422, code: "especialidad_invalida" });
+    expect(await intentarGuardar(async () => Promise.reject(error), false)).toEqual({ tipo: "error", error });
   });
 });
