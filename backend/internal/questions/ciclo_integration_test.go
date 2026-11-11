@@ -89,10 +89,16 @@ func codigoDeRespuesta(t *testing.T, w *httptest.ResponseRecorder) string {
 	return e.Error
 }
 
+// esperar checks the status and, when code is not empty, the error code.
 func (c *cicloFx) esperar(t *testing.T, w *httptest.ResponseRecorder, status int, code string) {
 	t.Helper()
-	if w.Code != status || codigoDeRespuesta(t, w) != code && code != "" {
-		t.Fatalf("status/código = %d/%s, want %d/%s (%s)", w.Code, codigoDeRespuesta(t, w), status, code, w.Body.String())
+	if w.Code != status {
+		t.Fatalf("status = %d, want %d (%s)", w.Code, status, w.Body.String())
+	}
+	if code != "" {
+		if got := codigoDeRespuesta(t, w); got != code {
+			t.Fatalf("código = %s, want %s (%s)", got, code, w.Body.String())
+		}
 	}
 }
 
@@ -204,5 +210,40 @@ func TestPatchEstado_Parametros(t *testing.T) {
 	c.esperar(t, do(fmt.Sprintf("/preguntas/%d/estado", c.p.ID), `{`), 400, "cuerpo_invalido")
 	if w := qt.Do(c.mux, "PATCH", fmt.Sprintf("/preguntas/%d/estado", c.p.ID), c.f.Token(t, c.f.UsuarioID, "usuario"), `{"estado":"borrador"}`); w.Code != http.StatusForbidden {
 		t.Errorf("rol usuario: %d", w.Code)
+	}
+}
+
+// P2 of E3-02: DELETE only from aprobada, rechazada and activo.
+func TestDelete_SegunEstado(t *testing.T) {
+	tests := []struct {
+		estado string
+		status int
+		code   string
+	}{
+		{EstadoAprobada, http.StatusNoContent, ""},
+		{EstadoRechazada, http.StatusNoContent, ""},
+		{EstadoActivo, http.StatusNoContent, ""},
+		{EstadoBorrador, http.StatusConflict, CodigoEstadoInvalido},
+		{EstadoEnRevision, http.StatusConflict, CodigoEstadoInvalido},
+		{EstadoEliminada, http.StatusNotFound, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.estado, func(t *testing.T) {
+			c := newCicloFx(t)
+			c.poner(t, tt.estado, OrigenManual)
+			w := qt.Do(c.mux, "DELETE", fmt.Sprintf("/preguntas/%d", c.p.ID), c.admin, "")
+			c.esperar(t, w, tt.status, tt.code)
+			e, _ := c.estado(t)
+			aud := c.auditoria(t, accionEstado)
+			if tt.status == http.StatusNoContent {
+				if e != EstadoEliminada || len(aud) != 1 || aud[0]["estado_anterior"] != tt.estado || aud[0]["estado_nuevo"] != EstadoEliminada {
+					t.Errorf("estado=%s auditoría=%+v", e, aud)
+				}
+				return
+			}
+			if e != tt.estado || len(aud) != 0 {
+				t.Errorf("no debe cambiar ni auditar: estado=%s auditoría=%+v", e, aud)
+			}
+		})
 	}
 }

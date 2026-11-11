@@ -599,20 +599,6 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 	return r.GetPregunta(ctx, id)
 }
 
-// DeletePregunta soft-deletes a question by setting estado='eliminada'.
-func (r *Repository) DeletePregunta(ctx context.Context, id int64) error {
-	res, err := r.db.ExecContext(ctx,
-		`UPDATE preguntas SET estado = 'eliminada', updated_at = NOW() WHERE id = $1 AND estado != 'eliminada'`, id)
-	if err != nil {
-		return err
-	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return ErrNotFound
-	}
-	return nil
-}
-
 // ── Etiquetas ─────────────────────────────────────────────────────────────────
 
 // ListEtiquetas returns all tags, optionally filtered by asignatura_id and estado.

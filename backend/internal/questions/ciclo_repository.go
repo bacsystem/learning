@@ -247,3 +247,23 @@ func nonNil(ids []int64) []int64 {
 	}
 	return ids
 }
+
+// EliminarPregunta soft-deletes a pregunta from the states the state machine
+// allows (E3-02 §3, P2), under the same lock as the other transitions, and
+// audits it in the same transaction.
+func (r *Repository) EliminarPregunta(ctx context.Context, id int64, aud Auditor) error {
+	return r.enTx(ctx, func(tx *sqlx.Tx) error {
+		b, err := r.bloquear(ctx, tx, id, nil)
+		if err != nil {
+			return err
+		}
+		if !transicionPermitida(b.Estado, EstadoEliminada) {
+			return regla(CodigoEstadoInvalido, map[string]any{"estado_actual": b.Estado})
+		}
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE preguntas SET estado = 'eliminada', updated_at = NOW() WHERE id = $1`, id); err != nil {
+			return err
+		}
+		return auditarEstado(ctx, tx, aud, id, cambioEstado{Desde: b.Estado, Hacia: EstadoEliminada})
+	})
+}

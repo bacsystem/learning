@@ -200,7 +200,16 @@ func (h *Handler) DeletePregunta(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := h.svc.DeletePregunta(r.Context(), id); err != nil {
+	aud, ok := h.auditor(w, r)
+	if !ok {
+		return
+	}
+	if err := h.svc.DeletePregunta(r.Context(), id, aud); err != nil {
+		var re *ReglaError
+		if errors.As(err, &re) { // estado_invalido uses the coded format (E3-02 §7)
+			responderRegla(w, "questions.delete", err)
+			return
+		}
 		mapErr(w, err)
 		return
 	}

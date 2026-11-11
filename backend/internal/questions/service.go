@@ -118,9 +118,9 @@ func (s *Service) ReemplazarCitas(ctx context.Context, id int64, req ReemplazarC
 	return s.repo.GetPregunta(ctx, id)
 }
 
-// DeletePregunta soft-deletes a question.
-func (s *Service) DeletePregunta(ctx context.Context, id int64) error {
-	return s.repo.DeletePregunta(ctx, id)
+// DeletePregunta soft-deletes a question, only from the states of E3-02 §3.
+func (s *Service) DeletePregunta(ctx context.Context, id int64, aud Auditor) error {
+	return s.repo.EliminarPregunta(ctx, id, aud)
 }
 
 // ── Etiquetas ─────────────────────────────────────────────────────────────────
