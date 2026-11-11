@@ -3,6 +3,7 @@ import {
   desglosarDuracion,
   normalizarSalud,
   RespuestaSaludInvalida,
+  ultimoEnvio,
   versionBackend,
   versionesDistintas,
 } from "./reglas";
@@ -116,5 +117,24 @@ describe("desglosarDuracion", () => {
     [-5, { dias: 0, horas: 0, minutos: 0 }],
   ])("splits %i s", (segundos, esperado) => {
     expect(desglosarDuracion(segundos)).toEqual(esperado);
+  });
+});
+
+describe("ultimoEnvio (hallazgo H2 del #129)", () => {
+  const correo = { sin_enviar: 0, antiguedad_max_min: null, fallidos_24h: 0, ultimo_enviado_en: null };
+
+  it("is the date when one was sent", () => {
+    expect(ultimoEnvio({ ...correo, ultimo_enviado_en: "2026-11-11T14:50:00Z" })).toEqual({
+      tipo: "fecha",
+      iso: "2026-11-11T14:50:00Z",
+    });
+  });
+
+  it("is never when the measurement came but nothing was sent", () => {
+    expect(ultimoEnvio(correo)).toEqual({ tipo: "nunca" });
+  });
+
+  it("has no data when the measurement failed (all data null)", () => {
+    expect(ultimoEnvio({ ...correo, sin_enviar: null, fallidos_24h: null })).toEqual({ tipo: "sin_dato" });
   });
 });

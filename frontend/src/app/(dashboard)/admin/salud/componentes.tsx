@@ -10,8 +10,14 @@ import { PillEstado } from "@/components/patrones/pill-estado";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AYUDA_CAMPO } from "@/lib/estilos";
 import type { IconoComponente } from "@/lib/iconos";
-import { type CategoriaFallo, desglosarDuracion, type EstadoServicio, type ServicioSalud } from "@/lib/salud/reglas";
-import { cn } from "@/lib/utils";
+import {
+  type CategoriaFallo,
+  desglosarDuracion,
+  type EstadoServicio,
+  type ServicioSalud,
+  type UltimoEnvio,
+  ultimoEnvio,
+} from "@/lib/salud/reglas";
 import { CheckCircleIcon, MinusCircleIcon, QuestionIcon, WarningIcon, XCircleIcon } from "@phosphor-icons/react";
 
 /** Hora de Lima en toda la pantalla (PLT-02 regla 1, decisión 6 del PO). */
@@ -54,16 +60,14 @@ function TarjetaBase({
   estado,
   datos,
   nota,
-  desactualizada = false,
 }: {
   titulo: string;
   estado?: ReactNode;
   datos: DatoLista[];
   nota?: string;
-  desactualizada?: boolean;
 }) {
   return (
-    <Card className={cn(desactualizada && "opacity-60")}>
+    <Card>
       <CardHeader>
         <CardTitle>
           <h2>{titulo}</h2>
@@ -83,10 +87,20 @@ function useDatosServicio(servicio: ServicioSalud): DatoLista[] {
   const formato = useFormatter();
   const numero = (n: number | null, clave?: string) =>
     n === null ? SIN_DATO : clave ? t(clave, { valor: n }) : formato.number(n);
-  const fechaHora = (iso: string | null) =>
-    iso === null
-      ? t("saludServicios.dato.nunca")
-      : formato.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short", timeZone: ZONA_HORARIA });
+  const textoUltimoEnvio = (envio: UltimoEnvio) => {
+    switch (envio.tipo) {
+      case "fecha":
+        return formato.dateTime(new Date(envio.iso), {
+          dateStyle: "medium",
+          timeStyle: "short",
+          timeZone: ZONA_HORARIA,
+        });
+      case "nunca":
+        return t("saludServicios.dato.nunca");
+      case "sin_dato":
+        return SIN_DATO;
+    }
+  };
 
   switch (servicio.id) {
     case "api": {
@@ -119,21 +133,20 @@ function useDatosServicio(servicio: ServicioSalud): DatoLista[] {
           mono: true,
         },
         { etiqueta: t("saludServicios.dato.fallidos24h"), valor: numero(d.fallidos_24h), mono: true },
-        { etiqueta: t("saludServicios.dato.ultimoEnviado"), valor: fechaHora(d.ultimo_enviado_en), mono: true },
+        { etiqueta: t("saludServicios.dato.ultimoEnviado"), valor: textoUltimoEnvio(ultimoEnvio(d)), mono: true },
       ];
     }
   }
 }
 
 /** Tarjeta de un servicio conocido: nombre, estado con su categoría y sus datos (PLT-02 regla 2, PLT-03 regla 3). */
-export function TarjetaServicio({ servicio, desactualizada }: { servicio: ServicioSalud; desactualizada: boolean }) {
+export function TarjetaServicio({ servicio }: { servicio: ServicioSalud }) {
   const t = useTranslations("dashboard");
   return (
     <TarjetaBase
       titulo={t(`saludServicios.servicio.${servicio.id}`)}
       estado={<PillEstadoServicio estado={servicio.estado} categoria={servicio.categoria} />}
       datos={useDatosServicio(servicio)}
-      desactualizada={desactualizada}
     />
   );
 }

@@ -105,6 +105,18 @@ export function normalizarSalud(crudo: RespuestaSaludApi): Salud {
   };
 }
 
+/** «Último enviado» del correo: una fecha, «nunca» o sin dato. */
+export type UltimoEnvio = { tipo: "fecha"; iso: string } | { tipo: "nunca" } | { tipo: "sin_dato" };
+
+/**
+ * El contrato usa `null` en `ultimo_enviado_en` tanto si nunca se envió como si la medición falló. Solo es «nunca»
+ * si la medición sí llegó (los conteos vienen); si no, se muestra sin dato y no se afirma algo falso.
+ */
+export function ultimoEnvio(datos: DatosCorreo): UltimoEnvio {
+  if (datos.ultimo_enviado_en !== null) return { tipo: "fecha", iso: datos.ultimo_enviado_en };
+  return datos.sin_enviar === null ? { tipo: "sin_dato" } : { tipo: "nunca" };
+}
+
 /** Versión del backend, la del servicio `api`, o `null` si no vino. */
 export function versionBackend(salud: Salud): string | null {
   const api = salud.servicios.find((s) => s.id === "api");

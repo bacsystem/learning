@@ -77,7 +77,7 @@ export default function SaludServiciosPage() {
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             {salud.servicios.map((s) => (
-              <TarjetaServicio key={s.id} servicio={s} desactualizada={desactualizado} />
+              <TarjetaServicio key={s.id} servicio={s} />
             ))}
             <TarjetaFrontend version={pkg.version} />
           </div>
