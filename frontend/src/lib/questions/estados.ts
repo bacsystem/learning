@@ -25,7 +25,7 @@ export const ORIGENES_PREGUNTA: readonly OrigenPregunta[] = ["manual", "balotari
 
 /** Claves i18n (`dashboard.*`) del nombre de un estado y de un origen. */
 export const claveEstadoPregunta = (estado: EstadoPregunta) => `serumsIa.estadosPregunta.${estado}`;
-export const claveOrigenPregunta = (origen: OrigenPregunta) => `admin-preguntas-origen-${origen}`;
+export const claveOrigenPregunta = (origen: OrigenPregunta) => `serumsIa.revision.listado.origenes.${origen}`;
 
 /** P2 (decisión del PO): `DELETE` solo desde estos estados; un borrador o una en revisión se rechazan primero. */
 export const ESTADOS_ELIMINABLES: readonly EstadoPregunta[] = ["aprobada", "rechazada", "activo"];

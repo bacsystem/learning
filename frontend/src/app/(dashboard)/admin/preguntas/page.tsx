@@ -43,6 +43,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   ArrowClockwiseIcon,
+  BookOpenTextIcon,
   CheckIcon,
   ColumnsIcon,
   DownloadSimpleIcon,
@@ -274,13 +275,13 @@ export default function PreguntasPage() {
       },
       {
         id: "origen",
-        titulo: t("admin-preguntas-origen"),
+        titulo: t("serumsIa.revision.listado.columnaOrigen"),
         texto: (p) => (p.origen ? t(claveOrigenPregunta(p.origen)) : SIN_DATO),
         render: (p) => (p.origen ? <Chip>{t(claveOrigenPregunta(p.origen))}</Chip> : SIN_DATO),
       },
       {
         id: "citas",
-        titulo: t("admin-preguntas-citas"),
+        titulo: t("serumsIa.revision.listado.columnaCitas"),
         texto: (p) => (p.citas_count === undefined ? SIN_DATO : String(p.citas_count)),
         className: "text-right font-mono tabular-nums",
         render: (p) => (p.citas_count === undefined ? SIN_DATO : p.citas_count),
@@ -499,14 +500,14 @@ export default function PreguntasPage() {
         <div className="w-[calc(50%-4px)] sm:w-36">
           <SelectCampo
             id="filtro-origen"
-            etiqueta={t("admin-preguntas-origen")}
+            etiqueta={t("serumsIa.revision.listado.columnaOrigen")}
             valor={filterOrigen}
             onCambio={(v) => {
               setFilterOrigen(ORIGENES_PREGUNTA.find((o) => o === v) ?? "");
               setPage(0);
             }}
             opciones={[
-              { value: "", label: t("admin-preguntas-filtro-origen-todos") },
+              { value: "", label: t("serumsIa.revision.listado.filtroOrigenTodos") },
               ...ORIGENES_PREGUNTA.map((o) => ({ value: o, label: t(claveOrigenPregunta(o)) })),
             ]}
           />
@@ -558,6 +559,11 @@ export default function PreguntasPage() {
                         },
                         // P2 (SIA-E3-02): un borrador o una en revisión se rechazan antes de eliminarse.
                         {
+                          label: t("serumsIa.revision.listado.verDetalle"),
+                          icon: BookOpenTextIcon,
+                          onClick: () => router.push(`/admin/preguntas/${p.id}`),
+                        },
+                        {
                           label: t("comun-eliminar"),
                           icon: TrashIcon,
                           destructiva: true,
@@ -575,7 +581,7 @@ export default function PreguntasPage() {
                 <FilaVacia columnas={visibles.length + 1} icon={<ListChecksIcon className="size-6" />}>
                   {hayFiltros ? (
                     <>
-                      {t("admin-preguntas-sin-resultados-filtros")}{" "}
+                      {t("serumsIa.revision.listado.vacio")}{" "}
                       <button
                         type="button"
                         onClick={limpiarFiltros}
