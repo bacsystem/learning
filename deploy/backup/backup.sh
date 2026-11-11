@@ -25,6 +25,16 @@ case "$AGE_RECIPIENT" in age1*) ;; *) echo "backup: AGE_RECIPIENT no es una clav
 TIMEOUT="${BACKUP_TIMEOUT:-1800}"
 # Ninguna conexión espera indefinidamente (tampoco el INSERT final).
 export PGCONNECT_TIMEOUT=30
+set -o pipefail
+
+# La contraseña no va en argv de pg_dump/psql (se vería en la lista de procesos):
+# sale de la URL a PGPASSWORD, y a libpq se le pasa la URL sin ella. La
+# contraseña de backup_ro es hex (openssl rand -hex 24): no lleva caracteres
+# que haya que decodificar de la URL.
+PGPASSWORD=$(printf '%s' "$BACKUP_DATABASE_URL" | sed -nE 's#^[a-z]+://[^:/@]+:([^@]*)@.*#\1#p')
+export PGPASSWORD
+DB_URL=$(printf '%s' "$BACKUP_DATABASE_URL" | sed -E 's#^([a-z]+://[^:/@]+):[^@]*@#\1@#')
+unset BACKUP_DATABASE_URL
 
 iniciada=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 # Un objeto por ejecución (UTC): repetir el cron nunca choca con el bucket lock.
@@ -54,7 +64,7 @@ registrar() {
   rc=$?
   rm -f "$archivo" /tmp/pg_dump.err /tmp/psql.err /tmp/curl.err
   terminada=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  if ! psql "$BACKUP_DATABASE_URL" -X -q -v ON_ERROR_STOP=1 \
+  if ! psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 \
        -v ini="$iniciada" -v fin="$terminada" -v res="$resultado" -v bytes="$bytes" >/dev/null 2>/tmp/psql.err <<'SQL'
 INSERT INTO copias_bd (iniciada_en, terminada_en, resultado, tamano_bytes)
 VALUES (:'ini', :'fin', :'res', NULLIF(:'bytes', '')::bigint);
@@ -73,11 +83,17 @@ trap 'exit 143' TERM INT
 echo "backup: ${iniciada} inicio"
 
 # 1. Dump cifrado en tubería: al disco solo llega el archivo cifrado.
-export BACKUP_DATABASE_URL AGE_RECIPIENT archivo
-# Si pg_dump falla (permisos, conexión), pipefail hace fallar la tubería aunque
-# age haya escrito un archivo: no se sube nada y queda la fila «fallida».
-timeout "$TIMEOUT" sh -c 'set -o pipefail; pg_dump --format=custom --no-password "$BACKUP_DATABASE_URL" 2>/tmp/pg_dump.err | age -r "$AGE_RECIPIENT" -o "$archivo"' 2>/dev/null \
-  || { echo "backup: falló o superó ${TIMEOUT}s el dump/cifrado (motivo=$(categoria /tmp/pg_dump.err))" >&2; exit 1; }
+# timeout envuelve a pg_dump directamente (no a un sh -c): al vencer lo mata a
+# él, age recibe EOF y termina. Si pg_dump falla (permisos, conexión, timeout),
+# pipefail hace fallar la tubería aunque age haya escrito un archivo: no se sube
+# nada y queda la fila «fallida».
+if ! timeout "$TIMEOUT" pg_dump --format=custom --no-password "$DB_URL" 2>/tmp/pg_dump.err \
+     | age -r "$AGE_RECIPIENT" -o "$archivo"; then
+  m=$(categoria /tmp/pg_dump.err)
+  # timeout sale con 143 (TERM) y pg_dump no deja mensaje.
+  [ "$m" != sin_detalle ] || m=tiempo_agotado
+  echo "backup: falló o superó ${TIMEOUT}s el dump/cifrado (motivo=${m})" >&2; exit 1
+fi
 tamano=$(stat -c %s "$archivo")
 [ "$tamano" -gt 0 ] || { echo "backup: el archivo cifrado está vacío" >&2; exit 1; }
 

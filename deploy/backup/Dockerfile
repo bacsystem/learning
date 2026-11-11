@@ -5,7 +5,7 @@
 
 # age compilado desde el código fuente, versión fijada y verificada contra
 # sum.golang.org por el toolchain (mismo criterio que goose en backend/Dockerfile).
-FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.23 AS age
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.23@sha256:146e3b9c7c1e2ec3d3f5348c8a686151a75e1976e50efac9fc022ebe446a9a82 AS age
 ARG TARGETOS
 ARG TARGETARCH
 ARG AGE_VERSION=v1.3.2
@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
  && { mv "/go/bin/${os}_${arch}/age" /out/age 2>/dev/null || mv /go/bin/age /out/age; }
 
 # pg_dump/psql de la misma versión mayor que el servidor (Postgres 16).
-FROM postgres:16.14-alpine3.23
+FROM postgres:16.14-alpine3.23@sha256:42b8b8b29c8a4e933d88943e5b03001a78794905cf786e6e7634e9f2abd5a0d3
 
 # curl ≥ 7.75 firma con --aws-sigv4 (API S3 de R2): no hace falta otra herramienta.
 RUN apk add --no-cache curl ca-certificates
