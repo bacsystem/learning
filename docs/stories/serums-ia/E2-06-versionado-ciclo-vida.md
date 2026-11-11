@@ -30,7 +30,8 @@ stateDiagram-v2
 ## Reglas de negocio
 1. Subir un archivo nuevo para una fuente existente crea versión n+1; la anterior queda guardada y accesible para resolver citas.
 2. Máx. 20 versiones por fuente; al superar se archiva la más antigua sin pasajes citados.
-3. Retirar una fuente exige motivo (5–500 caracteres) y marca todo contenido que la cita como «requiere revisión»: pasa de aprobado a `en_revision` y deja de mostrarse al alumno hasta que un admin lo revalide (ver SIA-E6-05).
+3. Retirar una fuente exige motivo (5–500 caracteres). Efecto diferido (decisión PO, contrato MVP E1+E2): en esta historia todavía no existen preguntas con citas. Al retirar, el sistema avisa por un punto de extensión («fuente retirada», con el id de la fuente y el actor). Esta historia solo garantiza que el aviso se emite una vez por retiro, dentro de la misma operación. Si un suscriptor falla, el retiro no se aplica y se informa el error. Sin suscriptores, el retiro funciona igual. Quien consume el aviso: SIA-E3-02 (las preguntas que citan la fuente pasan a `en_revision`) y, cuando exista, el material de E6 (SIA-E6-06/E6-07).
+3a. Una versión nueva cuyo hash coincide con cualquier versión guardada de cualquier fuente se rechaza con 409 `fuente_duplicada` (SIA-E2-03, regla 3). Restaurar una fuente `retirada` y reintentar una `fallida` validan los límites de fuentes (SIA-E2-03, regla 4) y, si se superan, responden 422 `limite_fuentes` sin cambiar el estado.
 4. Una fuente `retirada` no aparece en búsquedas de pasajes.
 5. Restaurar no reaprueba contenido automáticamente.
 6. Toda transición se audita.
@@ -45,10 +46,25 @@ Escenario: Nueva versión
   Cuando el admin sube un archivo distinto para esa fuente
   Entonces existe la versión 2 activa y la versión 1 sigue resolviendo sus citas
 
-Escenario: Retirar fuente citada
-  Dado una fuente citada por 12 preguntas aprobadas
+Escenario: Retirar emite el aviso
+  Dado una fuente activa y un suscriptor de prueba al aviso «fuente retirada»
   Cuando el admin la retira con motivo
-  Entonces las 12 preguntas pasan a "en_revision" y dejan de mostrarse a alumnos en prácticas y simulacros nuevos
+  Entonces la fuente queda "retirada" y el suscriptor recibe una sola vez el id de la fuente y el actor
+
+Escenario: Retirar sin suscriptores
+  Dado una fuente activa y ningún suscriptor al aviso
+  Cuando el admin la retira con motivo
+  Entonces la fuente queda "retirada" y la operación termina sin error
+
+Escenario: Restaurar por encima del límite
+  Dado Medicina con 100 fuentes entre "activa" y "procesando" y una fuente "retirada" de Medicina
+  Cuando el admin la restaura
+  Entonces recibe 422 "limite_fuentes" y la fuente sigue "retirada"
+
+Escenario: Versión nueva duplicada
+  Dado una fuente "B" cuya versión tiene un hash determinado
+  Cuando el admin sube como versión nueva de la fuente "A" un archivo con ese hash
+  Entonces recibe 409 "fuente_duplicada" y "A" no cambia
 
 Escenario: Retirar sin motivo
   Dado una fuente activa
@@ -100,7 +116,7 @@ Escenario: Desmarcar
 Comparación visual entre versiones (diff).
 
 ## Dependencias
-SIA-E2-05; el comportamiento sobre preguntas se completa con SIA-E3-02, SIA-E3-05 (ruta de revisión según la marca oficial) y SIA-E6-05.
+SIA-E2-05; el efecto del retiro sobre preguntas lo implementa SIA-E3-02 como suscriptor del aviso «fuente retirada»; el resto del comportamiento sobre preguntas se completa con SIA-E3-05 (ruta de revisión según la marca oficial) y SIA-E6-05.
 
 ## Seguridad y privacidad
 Estado verificado en servidor. Solo admin.
@@ -109,4 +125,4 @@ Estado verificado en servidor. Solo admin.
 Estados, motivos y la etiqueta «Oficial verificada» visibles en es/en.
 
 ## Definición de terminado
-Tests de cada transición válida e inválida y de marcar/desmarcar; efecto en preguntas verificado; migración con Down; review limpio.
+Tests de cada transición válida e inválida y de marcar/desmarcar; aviso «fuente retirada» verificado con un suscriptor de prueba (el efecto en preguntas se verifica en SIA-E3-02); migración con Down; review limpio.

@@ -6,7 +6,7 @@ fase: v2
 prioridad: Media
 estimacion: 5
 roles: [admin]
-depende_de: [SIA-E2-02, SIA-E2-05, SIA-E2-06]
+depende_de: [SIA-E2-02, SIA-E2-03, SIA-E2-05, SIA-E2-06]
 ---
 
 # SIA-E2-04 Ingesta de URL oficial
@@ -27,6 +27,7 @@ El servidor descarga la página, extrae el texto principal y lo trata como una f
 8. Se guarda la URL final, fecha y hash de captura. Recapturar con contenido distinto crea nueva versión (SIA-E2-06).
 9. Máx. 20 capturas de URL por admin por día.
 10. Auditoría de alta y recaptura.
+11. Duplicado global (SIA-E2-03, regla 3): si el contenido capturado tiene el mismo hash que la versión vigente de la misma fuente, se informa `sin_cambios` (sin versión nueva). Si coincide con una versión de otra fuente, o con una versión anterior de la misma: (a) en el alta de una URL nueva, la fuente nueva queda `fallida` con motivo `fuente_duplicada` y el id de la fuente existente, sin guardar el contenido ni crear versión (el motivo se guarda en la propia fuente); (b) en una recaptura, no se crea versión nueva, la fuente sigue en su estado actual (no pasa a `fallida`) y la recaptura informa `fuente_duplicada` con el id de la fuente existente. La captura es asíncrona, por eso no responde 409. Los límites de fuentes de SIA-E2-03 (regla 4) también se aplican al registrar una URL.
 
 ```mermaid
 flowchart TD
@@ -100,6 +101,16 @@ Escenario: Sin cambios
   Dado una fuente de URL ya capturada con un hash determinado
   Cuando el admin recaptura y el contenido tiene el mismo hash
   Entonces no se crea nueva versión y se informa "sin_cambios"
+
+Escenario: Contenido duplicado de otra fuente
+  Dado una fuente "A" con una versión de un hash determinado
+  Cuando el admin registra una URL nueva cuyo contenido tiene ese mismo hash
+  Entonces la captura queda "fallida" con motivo "fuente_duplicada", el id de "A" y sin pasajes publicados
+
+Escenario: Recaptura duplicada de otra fuente
+  Dado una fuente de URL "B" activa y una fuente "A" con una versión de un hash determinado
+  Cuando el admin recaptura "B" y el contenido tiene ese hash
+  Entonces "B" sigue "activa" en su versión actual y la recaptura informa "fuente_duplicada" con el id de "A"
 
 Escenario: Límite diario
   Dado un admin con 20 capturas hoy

@@ -27,7 +27,7 @@ sequenceDiagram
   A->>API: POST generar con área, tema, cantidad y tipo
   API->>C: verifica límites y presupuesto
   C-->>API: ok
-  API->>R: busca pasajes por área, tema y profesión
+  API->>R: busca pasajes por profesión con área y tema en la consulta
   R-->>API: hasta 20 pasajes con ids
   API->>IA: generar preguntas con pasajes delimitados como datos
   IA-->>API: preguntas con clave, citas e incertidumbre

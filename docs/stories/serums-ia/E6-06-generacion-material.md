@@ -38,6 +38,7 @@ stateDiagram-v2
 5. Solicitudes de postulantes: máx. 1 abierta por (usuario, área, tema); el admin las ve en una cola con conteo de solicitantes (sin nombres ni datos personales, solo número). Crear la solicitud no llama al LLM y no descuenta cuota del postulante (SIA-E5-06).
 6. Aprobar exige casilla de verificación; se audita todo.
 7. Límites de admin: 200 acciones IA reales por día y presupuesto global de 40 USD/mes con corte al 100 % (SIA-E6-02, decisión P3, issue #65). Generar material para atender una solicitud descuenta del límite del admin, no del postulante.
+8. Fuente retirada: esta historia se suscribe al aviso «fuente retirada» de SIA-E2-06. Todo material `aprobado` con al menos una cita a esa fuente pasa a `en_revision` y deja de mostrarse al postulante (SIA-E6-07). El cambio va en la misma operación que el retiro (todo o nada) y se audita. Restaurar la fuente no reaprueba nada.
 
 ## Criterios de aceptación
 ```gherkin
@@ -70,6 +71,11 @@ Escenario: Atender solicitud descuenta del admin
   Dado una solicitud abierta de un postulante y un admin con 10 acciones IA reales hoy
   Cuando el admin genera el material para atenderla
   Entonces el admin queda con 11 acciones IA reales hoy y el consumo del postulante no cambia
+
+Escenario: Fuente retirada
+  Dado un material aprobado que cita una fuente activa
+  Cuando el admin retira la fuente con motivo
+  Entonces el material pasa a "en_revision", deja de mostrarse al postulante y el cambio queda en audit_log
 
 Escenario: Longitud inválida
   Dado un admin autenticado

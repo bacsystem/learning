@@ -4,7 +4,7 @@ titulo: Estado borrador y trazabilidad pregunta-fuente
 epica: E3
 fase: MVP
 prioridad: Alta
-estimacion: 3
+estimacion: 5
 roles: [admin, usuario]
 depende_de: [SIA-E1-01, SIA-E2-06]
 ---
@@ -22,6 +22,7 @@ stateDiagram-v2
   borrador --> aprobada: admin aprueba con cita
   borrador --> rechazada: admin rechaza con motivo
   aprobada --> en_revision: fuente retirada o admin tras reportes
+  activo --> en_revision: fuente retirada o 3 reportes (heredada)
   en_revision --> aprobada: admin revalida
   en_revision --> rechazada: admin rechaza
   rechazada --> borrador: admin reabre
@@ -37,6 +38,7 @@ stateDiagram-v2
 5. Rechazar exige motivo (5–500 caracteres).
 6. Las preguntas ya usadas en intentos se conservan al cambiar de estado; los intentos en curso no se alteran.
 7. Toda transición se audita (actor, estado anterior/nuevo).
+8. Fuente retirada (efecto que se pasó aquí desde SIA-E2-06, decisión PO, contrato MVP E1+E2): esta historia se suscribe al aviso «fuente retirada» de SIA-E2-06. Toda pregunta `aprobada` o `activo` con al menos una cita a cualquier versión de esa fuente pasa a `en_revision` y deja de servirse hasta que un admin la revalide (SIA-E6-05). Cada cambio se audita con el actor del retiro y el motivo «fuente retirada». Restaurar la fuente no reaprueba nada (SIA-E2-06, regla 5). Las preguntas en `borrador` o `rechazada` no cambian de estado. El cambio va en la misma operación que el retiro (todo o nada): si falla, la fuente no queda retirada y el admin recibe el error, de modo que nunca se sirve una pregunta que cita una fuente retirada.
 
 ## Criterios de aceptación
 ```gherkin
@@ -59,6 +61,16 @@ Escenario: Transición inválida
   Dado una pregunta "rechazada"
   Cuando el admin intenta aprobarla directamente
   Entonces recibe 409 "estado_invalido"
+
+Escenario: Retirar fuente citada
+  Dado una fuente citada por 12 preguntas aprobadas y 3 en borrador
+  Cuando el admin la retira con motivo
+  Entonces las 12 preguntas pasan a "en_revision", dejan de mostrarse a alumnos en prácticas y simulacros nuevos, cada cambio queda en audit_log y las 3 en borrador no cambian
+
+Escenario: Restaurar no reaprueba
+  Dado una fuente retirada cuyas preguntas pasaron a "en_revision"
+  Cuando el admin la restaura
+  Entonces las preguntas siguen en "en_revision"
 
 Escenario: Compatibilidad con el banco existente
   Dado preguntas existentes en estado "activo"
@@ -89,4 +101,4 @@ El estado se valida siempre en servidor; el alumno nunca puede pedir preguntas p
 Nombres de estados en es/en para las UI de admin.
 
 ## Definición de terminado
-Migración con Down; tests de cada transición y de selección de preguntas; review limpio.
+Migración con Down; tests de cada transición, de selección de preguntas y del efecto del aviso «fuente retirada»; review limpio.

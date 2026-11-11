@@ -9,7 +9,7 @@
 |---|---|---|---|---|
 | SIA-E1-01 | Modelo de temas bajo asignatura | MVP | 5 | #11 |
 | SIA-E1-02 | Administración de temas | MVP | 5 | #12 |
-| SIA-E1-03 | Pesos por profesión y proceso SERUMS | MVP | 3 | #13 |
+| SIA-E1-03 | Pesos por profesión y proceso SERUMS | MVP | 5 | #13 |
 | SIA-E1-04 | Profesión del postulante para SERUMS | MVP | 2 | #14 |
 
 **Fases:** todo MVP.
