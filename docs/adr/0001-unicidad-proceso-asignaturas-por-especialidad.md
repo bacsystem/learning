@@ -1,6 +1,6 @@
 # ADR 0001: unicidad de `proceso_asignaturas` con `especialidad_id` nulo
 
-- **Estado:** propuesto (pendiente de revisión del tech-lead). Decisiones de producto confirmadas por el PO el 2026-11-11.
+- **Estado:** aceptado (2026-11-11). Decisiones de producto confirmadas por el PO el 2026-11-11. Revisado el 2026-11-11: la versión de Postgres de producción pasa de supuesto a decisión (Postgres 16).
 - **Fecha:** 2026-11-11
 - **Historias:** SIA-E1-03 (#13); la consumen SIA-E1-04, E4-01, E5-04, E5-05, E7-02 y E9-05
 - **Decisión de producto de origen:** P6 (issue #65), supuesto 1 de `docs/stories/serums-ia/README.md:128`
@@ -51,7 +51,7 @@ Cuando existan filas con especialidad, cada uno de estos puntos devuelve duplica
 - Una sola restricción cubre las dos reglas: con `NULLS NOT DISTINCT`, dos filas `(P, NULL, A)` chocan.
 - `ON CONFLICT (proceso_id, especialidad_id, asignatura_id)` usa esa restricción como árbitro tanto para filas con especialidad como sin ella. Así se mantiene una sola forma de insertar.
 - Un único nombre de restricción para mapear la violación 23505 a `peso_duplicado` (ya existe un helper con nombre de restricción: `internal/examen/examen.go:124-127`).
-- Requiere Postgres ≥ 15. Todos los entornos conocidos usan 16. Si producción tuviera una versión menor, la migración fallaría al aplicarse: no se corrompe nada en silencio.
+- Requiere Postgres ≥ 15. Producción usará Postgres 16, igual que compose y CI (ver «Versión de Postgres en producción»). Con una versión menor, la migración fallaría al aplicarse: no se corrompe nada en silencio.
 
 ### B. Dos índices únicos parciales
 
@@ -63,6 +63,7 @@ CREATE UNIQUE INDEX … (proceso_id, asignatura_id) WHERE especialidad_id IS NUL
 - Funciona en cualquier versión de Postgres.
 - Hay dos nombres de índice que mapear.
 - `ON CONFLICT` necesita inferir el índice parcial con su predicado (`ON CONFLICT (proceso_id, asignatura_id) WHERE especialidad_id IS NULL`). Eso da dos formas de insertar, y es fácil equivocarse al copiar código.
+- Descartada: su única ventaja era funcionar en Postgres < 15, y ningún entorno lo usa ni lo usará (ver «Versión de Postgres en producción»).
 
 ### C. Valor centinela `especialidad_id = 0 NOT NULL`
 
@@ -78,11 +79,13 @@ Descartada: rompe la FK a `especialidades(id)` o obliga a crear una especialidad
 
 **Opción A.** La restricción se llama `uq_proceso_asignaturas_proceso_esp_asig`.
 
-### Supuesto: producción usa Postgres ≥ 15
+### Versión de Postgres en producción
 
-El repo no tiene pipeline de deploy. Los únicos entornos definidos (compose y CI) usan `postgres:16-alpine`. Esta decisión **supone** que producción usa Postgres ≥ 15. El tech-lead la mantiene (TL1) y se la confirma al usuario.
+El usuario confirmó (vía tech-lead, 2026-11-11) que todavía **no existe** base de datos de producción. Por eso esto pasa de supuesto a decisión:
 
-Si el supuesto fallara, la migración 060 falla al aplicarse, sin dejar datos a medias. La alternativa es la opción B (dos índices parciales), que cambia solo la migración y el target del `ON CONFLICT`.
+- **Producción usará Postgres 16**, la misma versión que `docker-compose.yml:24` y el CI (`.github/workflows/backend.yml:31`).
+- **Mínimo soportado: Postgres 15**, por `UNIQUE NULLS NOT DISTINCT`. Cualquier entorno nuevo (staging, producción) se crea con 16; bajar de 15 exige un ADR nuevo.
+- Si por error se aplicara la migración 060 sobre Postgres < 15, falla al aplicarse y no deja datos a medias.
 
 ### Nivel de resolución: por conjunto, nunca por fila
 
@@ -146,7 +149,8 @@ Los flujos nuevos del módulo SERUMS IA usan la especialidad del perfil del post
 Tests obligatorios:
 
 - unicidad de los dos tipos de fila (violación 23505 en `uq_proceso_asignaturas_proceso_esp_asig` → 409 `peso_duplicado`);
-- una fila de compatibilidad duplicada (con `especialidad_id` `NULL`) por `AsignarAsignatura`. El `ON CONFLICT (proceso_id, especialidad_id, asignatura_id) DO NOTHING` debe usar la restricción `NULLS NOT DISTINCT` como árbitro y devolver 409, no insertar una segunda fila. Este comportamiento no se ejecutó al escribir el ADR: el test es la verificación;- resolución por conjunto: una especialidad con conjunto propio no hereda filas de compatibilidad;
+- una fila de compatibilidad duplicada (con `especialidad_id` `NULL`) por `AsignarAsignatura`. El `ON CONFLICT (proceso_id, especialidad_id, asignatura_id) DO NOTHING` debe usar la restricción `NULLS NOT DISTINCT` como árbitro y devolver 409, no insertar una segunda fila. Verificado en SIA-E1-03 (PR #78): con `especialidad_id` `NULL` no se inserta la segunda fila (comprobado en psql y cubierto por un test);
+- resolución por conjunto: una especialidad con conjunto propio no hereda filas de compatibilidad;
 - creación de simulacro con conjunto de especialidad y sin él;
 - un proceso sin filas con especialidad se comporta igual que hoy (escenario «Compatibilidad» de E1-03).
 
@@ -190,7 +194,7 @@ ALTER TABLE proceso_asignaturas
 
 - **Positivas:** una sola restricción, una sola forma de `ON CONFLICT`, y un estado `completa` que no puede desincronizarse porque no se guarda. El simulacro nunca recibe dos filas de la misma asignatura.
 - **Negativas:**
-  - Requiere Postgres ≥ 15 en todo entorno (ver «Supuesto»).
+  - Requiere Postgres ≥ 15 en todo entorno; producción se crea con Postgres 16 (ver «Versión de Postgres en producción»).
   - El Down pierde las configuraciones por especialidad (inevitable: el esquema anterior no las representa).
   - Un proceso SERUMS no se puede activar sin una configuración de compatibilidad al 100 %.
 - **Riesgo de orden:** la migración 060 debe aplicarse después de cualquier migración que ya esté en `develop`. goose falla ante versiones faltantes, así que el número definitivo lo fija el tech-lead al mergear.

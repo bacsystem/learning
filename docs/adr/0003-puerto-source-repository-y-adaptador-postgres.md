@@ -1,6 +1,6 @@
 # ADR 0003: puerto `SourceRepository` y adaptador propio sobre PostgreSQL
 
-- **Estado:** propuesto (pendiente de revisión del tech-lead)
+- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD).
 - **Fecha:** 2026-11-11
 - **Historias:** SIA-E2-02 (#16); la usan SIA-E2-03, E2-05, E2-06, E2-07 y, más adelante, E3-01, E6-03, E6-04 y E6-08
 - **Decisión de producto de origen:** P1 (issue #65). MVP y v2 usan el 100 % del `SourceRepository` propio en PostgreSQL, a $0 USD. La búsqueda semántica (pgvector o NotebookLM) se reevalúa en v3 (SIA-E2-01, SIA-E2-08).
@@ -79,7 +79,7 @@ var (
 
 ### Recuperación de pasajes (adaptador Postgres)
 
-1. **Plegado en Go** (`texto.Plegar(s)`, paquete neutro nuevo `internal/texto`, creado por SIA-E1-01): pasar a minúsculas y quitar las tildes `á é í ó ú ü à è ì ò ù` (y sus mayúsculas). La `ñ` se conserva para no confundir «año» con «ano». La implementación es una tabla de reemplazo en Go (`strings.NewReplacer`), sin dependencias nuevas. La misma función sirve para la clave de nombre de los temas (`docs/api/serums-ia-e1-taxonomia.md`).
+1. **Plegado en Go** con `texto.Plegar(s)` (`backend/internal/texto/texto.go`, creado por SIA-E1-01). Las reglas están en la sección «Plegado», más abajo. La misma función sirve para la clave de nombre de los temas (`docs/api/serums-ia-e1-taxonomia.md`).
 2. **Al publicar un pasaje** se guarda `tsv = to_tsvector('spanish', plegar(texto))` en `pasajes.tsv`, con índice GIN. El texto original se guarda sin plegar en `pasajes.texto`, que es el que se cita. Los pasajes son inmutables, así que `tsv` no puede desincronizarse.
 3. **Consulta:**
 
@@ -105,6 +105,42 @@ LIMIT $3;
 - `websearch_to_tsquery` no falla con entrada arbitraria (comillas, guiones, `or`). Si la consulta queda vacía (solo stopwords), el resultado es una lista vacía, no un error.
 - Desempate por `p.id` para que el orden sea estable y testeable.
 - Todo va parametrizado. El texto de la consulta y de los pasajes no se registra en logs, solo ids (SIA-E2-02, sección Seguridad).
+
+### Plegado
+
+`texto.Plegar` (`backend/internal/texto/texto.go:10-19`) produce la forma de comparación sin mayúsculas ni tildes. La usan la clave de nombre de los temas (`temas.nombre_clave`, E1) y el `tsv` y la consulta de los pasajes (E2).
+
+**Reglas:**
+
+1. Pasar a minúsculas (`strings.ToLower`).
+2. Quitar las tildes `á é í ó ú ü à è ì ò ù`, venga la letra **compuesta** (NFC, un solo code point, p. ej. U+00E1) o **descompuesta** (NFD: vocal + marca combinante U+0301 aguda, U+0300 grave o U+0308 diéresis).
+3. La `ñ` se conserva para no confundir «año» con «ano». La forma descompuesta `n` + U+0303 se convierte en la `ñ` compuesta (U+00F1), **no** se le quita la marca.
+4. No recorta ni colapsa espacios: lo hace quien compara nombres.
+
+**Problema detectado (review de E1-01):** la primera versión solo reemplaza las letras compuestas. Un nombre en NFD (frecuente al pegar desde un PDF o desde macOS) da otra clave que su forma NFC. Así, «Epidemiología» escrita de las dos formas no se detecta como duplicado, y una consulta en NFD no encuentra pasajes en NFC (E2).
+
+**Opciones consideradas:**
+
+| Opción | Evaluación |
+|---|---|
+| A. Normalizar a NFC con `golang.org/x/text/unicode/norm` antes de plegar | Cubre todo Unicode. `golang.org/x/text v0.43.0` ya está en `backend/go.mod:44`, pero solo como dependencia **indirecta**: usarla la vuelve directa, y por las reglas del equipo eso requiere aprobación del usuario. Más de lo que hace falta para el conjunto de letras que define `Plegar` |
+| B. Añadir las secuencias descompuestas a la tabla de `strings.NewReplacer` | **Elegida.** Sin dependencias. Son 12 secuencias más, en minúscula porque el reemplazo corre después de `ToLower`: 5 vocales × 2 marcas (U+0301 y U+0300), más `u` + U+0308, más `n` + U+0303 → `ñ`. Da el mismo resultado que A para todas las letras que `Plegar` pliega |
+| C. Quitar toda marca combinante (rango U+0300–U+036F) | Descartada: borraría la U+0303 de la `ñ` descompuesta («año» en NFD acabaría como «ano») y trataría distinto las letras fuera del conjunto según vengan en NFC o NFD |
+
+**Decisión: opción B.** La implementa backend-dev en `internal/texto`:
+
+- Tabla de reemplazo con las letras compuestas y las secuencias descompuestas. Como se aplica después de `ToLower`, basta con las minúsculas: `ToLower` no toca las marcas combinantes y baja la vocal base.
+- Tests obligatorios (tabla en `texto_test.go`):
+  - para cada letra del conjunto, en mayúscula y minúscula, `Plegar(NFC) == Plegar(NFD)`;
+  - `Plegar("año" en NFD) == Plegar("año" en NFC) == "año"`, y distinto de `Plegar("ano")`;
+  - en `internal/temas`, un nombre en NFD da `422 tema_duplicado` frente al mismo nombre en NFC.
+- El texto original (`temas.nombre`, `pasajes.texto`) se guarda **tal como llega**. Solo la clave y el `tsv` se pliegan.
+
+**Consecuencias:**
+
+- Sin backfill: no existe base de datos de producción (confirmado por el usuario) y E2 aún no escribió pasajes. En una base local con temas creados antes del cambio, una `nombre_clave` antigua solo puede diferir si el nombre vino en NFD; basta con recrear la base de desarrollo.
+- Límite aceptado: las letras fuera del conjunto (`ç`, `â`, `ã`…) no se pliegan, y su forma NFC y su forma NFD siguen dando claves distintas. En nombres de temas y pasajes en español es un caso marginal. Si alguna vez hiciera falta, la opción A se reabre con un ADR nuevo y con la aprobación del usuario (igual que `unaccent`, TL2).
+- `Plegar` es la única función de plegado. Cualquier cambio a sus reglas cambia las claves guardadas, así que va con su propio ADR.
 
 ### Área y tema
 
@@ -156,7 +192,7 @@ Es determinista e idempotente: mismo contenido y misma `normalizador_version` da
 ## Consecuencias
 
 - **Positivas:**
-  - $0 USD y sin dependencias ni extensiones nuevas.
+  - $0 USD y sin dependencias ni extensiones nuevas (el plegado NFD tampoco agrega ninguna; ver «Plegado»).
   - Las citas no dependen de la búsqueda, así que un adaptador v3 no puede romperlas.
   - Ingesta segura con varias réplicas, publicación atómica y una suite de contrato que fija el comportamiento.
 - **Negativas:**
