@@ -203,6 +203,7 @@ Rol admin. Request con `estado` destino. Mismo patrón que `PATCH /…/estado` d
 | `{"estado": "procesando"}` (reintentar) | `fallida`, o `activa` cuya última versión está `fallida` | La última versión fallida vuelve a `procesando` (`intentos = 0`, `claimed_at = NULL`, `motivo_fallo = NULL`). La fuente `fallida` pasa a `procesando` tras validar el límite; la `activa` sigue `activa` (ya contaba) | 409 `estado_invalido`; 422 `limite_fuentes` (solo desde `fallida`), sin cambiar el estado |
 | Otro valor de `estado` | — | — | 422 `validacion` |
 
+- `motivo` se recorta con `TrimSpace` antes de medir los 5–500 caracteres (runes) y se guarda recortado (README §6).
 - `200` con `FuenteDetalle`. Al retirar, la respuesta incluye además `"contenidos_marcados": n`: la suma de lo que devuelven los suscriptores, 0 sin suscriptores.
 - Si un suscriptor devuelve error, responde `500 error_interno`, se registra en el log `op` y el nombre del suscriptor (sin datos personales), y la fuente sigue `activa`.
 - Auditoría: `fuente.retirar`, `fuente.restaurar` o `fuente.reintentar`, siempre con `detalle = {"estado_anterior", "estado_nuevo", …}`. Al retirar también lleva `motivo` y `contenidos_marcados`; al reintentar, `version` (escenario «Auditoría»).
@@ -217,6 +218,7 @@ Rol admin. Actúa sobre la **versión vigente**.
 | `{"oficial_verificada": true, "entidad_emisora": "MINSA", "nota": "…"}` | Fuente `activa` y versión vigente sin marca | `entidad_emisora` fuera de 3–100 o `nota` fuera de 10–500 → **422 `validacion`**, y la marca no cambia (escenario «Marcar sin entidad o nota»). Fuente `procesando`, `fallida` o `retirada` → **409 `estado_invalido`** (escenario «Marcar una fuente no activa»). Ya marcada → 409 `estado_invalido` |
 | `{"oficial_verificada": false, "motivo": "…"}` | Fuente `activa` o `retirada` con la versión vigente marcada | `motivo` fuera de 5–500 → 422 `validacion`; sin marca → 409 `estado_invalido` |
 
+- `entidad_emisora`, `nota` y `motivo` se recortan con `TrimSpace` antes de medir sus rangos (3–100, 10–500 y 5–500 caracteres, en runes) y se guardan recortados (README §6). Un texto que solo tiene espacios no llega al mínimo: 422 `validacion`.
 - **Marcar:** `oficial_verificada = true`, `oficial_entidad`, `oficial_nota`, `oficial_por` (id del admin) y `oficial_at`.
 - **Desmarcar:** pone `false` y borra esos cuatro campos. El historial queda en `audit_log`.
 - Se permite marcar cualquier `tipo`. El caso típico es `balotario`, pero la regla 7 no lo restringe.
@@ -236,11 +238,17 @@ Rol admin. Edita los metadatos editables **sin** crear versión nueva (E2-07 reg
 | # | Regla | Error |
 |---|---|---|
 | 1 | `titulo` 3–150 tras `TrimSpace`; `especialidad_ids` 0–50 sin repetidos (vacío = todas). `tipo`, `anio` y `proceso_id` no se editan: si vienen, es un campo desconocido | 400 `cuerpo_invalido` / 422 `validacion` |
-| 2 | Especialidades existentes y `activo` | 422 `referencia_invalida` |
+| 2 | Cada especialidad existe y está `activo`, **o** la fuente ya la tenía asociada antes de la edición, aunque hoy esté inactiva (misma regla que T4 de temas, contrato E1) | 422 `referencia_invalida` (inexistente, o inactiva y nueva para la fuente) |
 | 3 | La fuente existe | 404 `no_encontrado` |
 | 4 | Estado `activa`, `fallida` o `retirada`; en `procesando` no se puede | 409 `estado_invalido` |
 | 5 | Si la fuente cuenta para el límite (`activa`), el nuevo conjunto de profesiones no supera el límite. Pasar a «todas» cuenta para todas las profesiones | 422 `limite_fuentes`, y nada cambia (escenario «Editar profesiones por encima del límite») |
 
+- **Especialidades inactivas ya asociadas** (aclaración del 2026-11-11, consulta de frontend-dev):
+  - Se aceptan las que la fuente ya tenía, para que editar solo el título no falle porque una especialidad se desactivó después (mismo caso que el H2 del PR #73).
+  - Se pueden quitar siempre.
+  - Agregar una inactiva que la fuente no tenía da `422 referencia_invalida`.
+  - Implementación: con la fila de la fuente bloqueada se leen las especialidades actuales y se valida `estado = 'activo' OR id = ANY(actuales)`, igual que `temas.Editar`.
+  - UI: la especialidad se muestra marcada con «(inactiva)» y no bloquea el envío.
 - `200` con `FuenteDetalle`. La versión vigente y la marca oficial no cambian (escenario «Editar profesiones»).
 - Auditoría: `fuente.editar`, `detalle = {"antes": {"titulo", "especialidad_ids"}, "despues": {…}}`.
 
@@ -449,6 +457,7 @@ Notas:
 | E2-07 | Subida sin marca automática | S1 (siempre `false`) |
 | E2-07 | Editar profesiones (misma versión, audit `fuente.editar`) | S7 |
 | E2-07 | Editar profesiones por encima del límite → 422 | S7 regla 5 |
+| E2-07 | Editar una fuente con una especialidad asociada que se desactivó | S7 regla 2: acepta las ya asociadas; una inactiva nueva → 422 `referencia_invalida` |
 | E2-07 | Regla 7: editar en `procesando` → 409 | S7 regla 4 |
 | E2-07 | Subida duplicada (aviso con título, estado y enlace) | S1 paso 8 `detalle` + UI |
 | E2-07 | Acceso (redirección + 403) | guard admin del layout + `RequireAdmin` |
