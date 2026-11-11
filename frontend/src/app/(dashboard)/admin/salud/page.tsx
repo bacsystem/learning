@@ -11,11 +11,12 @@ import { Chip } from "@/components/patrones/pill-estado";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_SECUNDARIA, AYUDA_CAMPO, CONTENEDOR_PAGINA, ROTULO } from "@/lib/estilos";
 import { PESO_ICONO_FUNCIONAL } from "@/lib/iconos";
-import { versionBackend, versionesDistintas } from "@/lib/salud/reglas";
+import { REFRESCO_SALUD_MS, versionBackend, versionesDistintas } from "@/lib/salud/reglas";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
 
 /** Tarjetas de la carga inicial: API, base de datos, correo y frontend. */
 const TARJETAS_EN_CARGA = 4;
+const MS_POR_SEGUNDO = 1000;
 
 export default function SaludServiciosPage() {
   const { token } = useAuth();
@@ -31,9 +32,9 @@ export default function SaludServiciosPage() {
     <div className={CONTENEDOR_PAGINA}>
       <section aria-labelledby="salud-titulo" className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid gap-1">
-          <h1 id="salud-titulo" className={ROTULO}>
+          <h2 id="salud-titulo" className={ROTULO}>
             {t("saludServicios.estadoGlobal")}
-          </h1>
+          </h2>
           <div className="flex flex-wrap items-center gap-2">
             {salud ? <PillEstadoServicio estado={salud.estado} /> : null}
             {salud ? (
@@ -61,7 +62,7 @@ export default function SaludServiciosPage() {
         <Alerta tono="error" titulo={t("saludServicios.error.titulo")}>
           {salud
             ? t("saludServicios.error.conDatos", { fecha: hora(salud.comprobadoEn) })
-            : t("saludServicios.error.sinDatos")}
+            : t("saludServicios.error.sinDatos", { segundos: REFRESCO_SALUD_MS / MS_POR_SEGUNDO })}
         </Alerta>
       ) : null}
 
