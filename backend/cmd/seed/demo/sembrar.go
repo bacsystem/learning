@@ -6,13 +6,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/cbaciliod/learning/cmd/seed/internal/persona"
 	"github.com/cbaciliod/learning/internal/catalogs"
 	"github.com/cbaciliod/learning/internal/inscripciones"
 	"github.com/cbaciliod/learning/internal/questions"
 	"github.com/cbaciliod/learning/internal/simulations"
+	"github.com/cbaciliod/learning/internal/temas"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -39,8 +42,12 @@ type sembrador struct {
 	preg   *questions.Service
 	sim    *simulations.Service
 	ins    *inscripciones.Service
+	temas  *temas.Service
 	creado map[string]int    // created rows per kind, for the summary
 	hashes map[string][]byte // bcrypt hash per rol, computed once per run
+	// instDemo are the ids of the demo institutions: a persona outside them
+	// is never written, and its user never gets a demo password.
+	instDemo []int64
 }
 
 // sembrar runs every step under a session advisory lock, so two runs never
@@ -64,6 +71,7 @@ func sembrar(ctx context.Context, conn *sqlx.DB, gcm cipher.AEAD, rawKey []byte,
 		cat: catalogs.NewService(catalogs.NewRepository(conn)), preg: qSvc,
 		sim:    simulations.NewService(simulations.NewRepository(conn), simulations.NewQuestionsAdapter(qSvc)),
 		ins:    inscripciones.NewService(inscripciones.NewRepository(conn, gcm, rawKey)),
+		temas:  temas.NewService(temas.NewRepository(conn)),
 		creado: map[string]int{}, hashes: map[string][]byte{}}
 	if err := s.todo(ctx); err != nil {
 		return "", err
@@ -73,18 +81,19 @@ func sembrar(ctx context.Context, conn *sqlx.DB, gcm cipher.AEAD, rawKey []byte,
 
 func (s *sembrador) todo(ctx context.Context) error {
 	inst := map[string]int64{}
-	for _, nombre := range []string{institucionSalud, institucionCompat} {
+	for _, nombre := range institucionesDemo {
 		id, err := s.institucion(ctx, nombre)
 		if err != nil {
 			return err
 		}
 		inst[nombre] = id
+		s.instDemo = append(s.instDemo, id)
 	}
 	grado, err := s.grado(ctx, inst[institucionSalud])
 	if err != nil {
 		return err
 	}
-	esp, err := s.especialidades(ctx, inst[institucionSalud])
+	esp, err := s.especialidades(ctx, inst)
 	if err != nil {
 		return err
 	}
@@ -92,12 +101,15 @@ func (s *sembrador) todo(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if err := s.temasGenerales(ctx, asig); err != nil {
+		return err
+	}
 	if err := s.pago(ctx); err != nil {
 		return err
 	}
 	procesos := map[string]int64{}
 	for _, p := range procesosDemo {
-		id, err := s.proceso(ctx, inst[p.Institucion], p, asig, esp)
+		id, err := s.proceso(ctx, inst[p.Institucion], p, asig, esp[p.Institucion])
 		if err != nil {
 			return fmt.Errorf("proceso %q: %w", p.Nombre, err)
 		}
@@ -105,18 +117,21 @@ func (s *sembrador) todo(ctx context.Context) error {
 	}
 	usuarios := map[string]int64{}
 	for _, u := range usuariosDemo {
-		id, err := s.usuario(ctx, u, inst[institucionSalud], grado, esp[u.Especialidad])
+		id, err := s.usuario(ctx, u, inst[institucionSalud], grado, esp[institucionSalud][u.Especialidad])
 		if err != nil {
 			return fmt.Errorf("usuario %s: %w", u.Username, err)
 		}
 		usuarios[u.Username] = id
 	}
 	for _, u := range usuariosDemo {
-		if u.Inscripcion == "" {
-			continue
-		}
-		if err := s.inscripcion(ctx, usuarios[u.Username], procesos[procesoSERUMS], u.Inscripcion, usuarios["demo_admin"]); err != nil {
-			return fmt.Errorf("inscripción de %s: %w", u.Username, err)
+		for _, p := range procesosDemo { // dataset order, so runs are deterministic
+			estado, ok := u.Inscripciones[p.Nombre]
+			if !ok {
+				continue
+			}
+			if err := s.inscripcion(ctx, usuarios[u.Username], procesos[p.Nombre], estado, usuarios["demo_admin"]); err != nil {
+				return fmt.Errorf("inscripción de %s en %q: %w", u.Username, p.Nombre, err)
+			}
 		}
 	}
 	return nil
@@ -169,9 +184,11 @@ func (s *sembrador) grado(ctx context.Context, institucionID int64) (int64, erro
 // have, only when it differs: deactivating is refused once active users have
 // that especialidad, so the inactive one is deactivated before the users are
 // created and left alone afterwards.
-func (s *sembrador) especialidades(ctx context.Context, institucionID int64) (map[string]int64, error) {
-	ids := map[string]int64{}
+// The result is keyed by institution name, then code.
+func (s *sembrador) especialidades(ctx context.Context, inst map[string]int64) (map[string]map[string]int64, error) {
+	ids := map[string]map[string]int64{}
 	for _, e := range especialidadesDemo {
+		institucionID := inst[e.Institucion]
 		var fila struct {
 			ID     int64  `db:"id"`
 			Estado string `db:"estado"`
@@ -198,7 +215,10 @@ func (s *sembrador) especialidades(ctx context.Context, institucionID int64) (ma
 				return nil, fmt.Errorf("estado de la especialidad %s: %w", e.Codigo, err)
 			}
 		}
-		ids[e.Codigo] = fila.ID
+		if ids[e.Institucion] == nil {
+			ids[e.Institucion] = map[string]int64{}
+		}
+		ids[e.Institucion][e.Codigo] = fila.ID
 	}
 	return ids, nil
 }
@@ -222,6 +242,27 @@ func (s *sembrador) asignaturas(ctx context.Context) (map[string]int64, error) {
 	}
 	return ids, nil
 }
+
+// temasGenerales creates the missing demo temas, for every especialidad.
+func (s *sembrador) temasGenerales(ctx context.Context, asig map[string]int64) error {
+	for _, t := range temasDemo {
+		existe, err := s.buscar(ctx, `SELECT id FROM temas WHERE asignatura_id = $1 AND nombre = $2`, asig[t.Asignatura], t.Nombre)
+		if err != nil {
+			return err
+		}
+		if existe != 0 {
+			continue
+		}
+		if _, err := s.temas.Crear(ctx, temas.CrearTemaRequest{AsignaturaID: asig[t.Asignatura], Nombre: t.Nombre}, sinAuditoriaTemas); err != nil {
+			return fmt.Errorf("tema %q: %w", t.Nombre, err)
+		}
+		s.creado["temas"]++
+	}
+	return nil
+}
+
+// sinAuditoriaTemas: like sinAuditoria, for the temas service.
+func sinAuditoriaTemas(context.Context, sqlx.ExecerContext, temas.Evento) error { return nil }
 
 // pago gives the demo year a price (0.00) unless it already has one: an
 // existing configuration is never overwritten.
@@ -356,9 +397,15 @@ func (s *sembrador) configuracion(ctx context.Context, procesoID int64, totalPre
 // ── Usuarios e inscripciones ──────────────────────────────────────────────────
 
 // usuario keeps the demo account verified, active, with the tour done and the
-// password of the variables, tied to its synthetic persona. A username held
-// by another persona is never adopted (same rule as seed/admin, H96).
+// password of the variables, tied to its synthetic persona. Only a demo
+// account is ever written: its username carries the demo prefix, its persona
+// (locked) is already in a demo institution, and a username held by another
+// persona is never adopted (same rule as seed/admin, H96). Any of them
+// failing rolls the whole account back.
 func (s *sembrador) usuario(ctx context.Context, u usuarioDemo, institucionID, gradoID, especialidadID int64) (int64, error) {
+	if !strings.HasPrefix(u.Username, prefijoUsuario) {
+		return 0, fmt.Errorf("el username no lleva el prefijo %q; no se toca", prefijoUsuario)
+	}
 	hash, err := s.hash(u.Rol)
 	if err != nil {
 		return 0, err
@@ -375,7 +422,7 @@ func (s *sembrador) usuario(ctx context.Context, u usuarioDemo, institucionID, g
 	defer tx.Rollback()
 
 	var personaID int64
-	err = tx.GetContext(ctx, &personaID, `SELECT id FROM personas WHERE dni_hmac = $1`, e.DNIHMAC)
+	err = tx.GetContext(ctx, &personaID, `SELECT id FROM personas WHERE dni_hmac = $1 FOR UPDATE`, e.DNIHMAC)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		if err := tx.GetContext(ctx, &personaID, `
@@ -390,9 +437,11 @@ func (s *sembrador) usuario(ctx context.Context, u usuarioDemo, institucionID, g
 	case err != nil:
 		return 0, err
 	default:
-		if _, err := tx.ExecContext(ctx, `UPDATE personas SET grado_id = $2, especialidad_id = $3, institucion_id = $4 WHERE id = $1`,
-			personaID, gradoID, especialidadID, institucionID); err != nil {
-			return 0, fmt.Errorf("persona: %w", err)
+		res, err := tx.ExecContext(ctx, `UPDATE personas SET grado_id = $2, especialidad_id = $3, institucion_id = $4
+			WHERE id = $1 AND institucion_id = ANY($5)`,
+			personaID, gradoID, especialidadID, institucionID, pq.Array(s.instDemo))
+		if err := unaFila(res, err); err != nil {
+			return 0, fmt.Errorf("persona fuera de las instituciones demo (id=%d); no se toca: %w", personaID, err)
 		}
 	}
 
@@ -424,6 +473,20 @@ func (s *sembrador) usuario(ctx context.Context, u usuarioDemo, institucionID, g
 		}
 	}
 	return id, tx.Commit()
+}
+
+// errNoEsDemo: a guarded write matched no row, so the row is not demo data.
+var errNoEsDemo = errors.New("la fila no es de la demo")
+
+// unaFila turns a guarded UPDATE into an error unless it changed one row.
+func unaFila(res sql.Result, err error) error {
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil || n != 1 {
+		return errors.Join(errNoEsDemo, err)
+	}
+	return nil
 }
 
 // hash returns the bcrypt hash of the password of rol, computed once per run:

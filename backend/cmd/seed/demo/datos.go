@@ -11,22 +11,29 @@ const (
 	procesoSERUMS         = "SERUMS 2026-I"
 	procesoCompatibilidad = "Proceso de compatibilidad demo"
 	montoInscripcion      = 0.00
+	prefijoUsuario        = "demo_"         // every demo username; production ones never carry it
 	dominioEmail          = "@demo.invalid" // RFC 6761: never delivered
 	tiempoSimulacroSeg    = 3600
-	preguntasPorArea      = 3 // servable questions seeded per area and proceso
-	preguntasExamen       = 2 // numero_preguntas per area (≤ preguntasPorArea)
+	preguntasPorArea      = 10 // servable questions seeded per area and proceso
+	preguntasExamen       = 2  // numero_preguntas per area (≤ preguntasPorArea)
 )
 
+var institucionesDemo = []string{institucionSalud, institucionCompat}
+
 type especialidadDemo struct {
+	Institucion    string
 	Codigo, Nombre string
 	Activa         bool
 }
 
+// The compatibility institution has its own Enfermería: it is what
+// demo_enfermeria picks in that proceso, and it is not valid in SERUMS.
 var especialidadesDemo = []especialidadDemo{
-	{"DEMO-MED", "Medicina", true},
-	{"DEMO-ENF", "Enfermería", true},
-	{"DEMO-OBS", "Obstetricia", true},
-	{"DEMO-ODO", "Odontología", false},
+	{institucionSalud, "DEMO-MED", "Medicina", true},
+	{institucionSalud, "DEMO-ENF", "Enfermería", true},
+	{institucionSalud, "DEMO-OBS", "Obstetricia", true},
+	{institucionSalud, "DEMO-ODO", "Odontología", false},
+	{institucionCompat, "DEMO-ENF", "Enfermería", true},
 }
 
 type asignaturaDemo struct{ Codigo, Nombre string }
@@ -62,8 +69,9 @@ var procesosDemo = []procesoDemo{
 		Compatibilidad: []areaDemo{
 			{"DEMO-SP", 20}, {"DEMO-EPI", 20}, {"DEMO-GES", 20}, {"DEMO-ETI", 20}, {"DEMO-MI", 10}, {"DEMO-CE", 10},
 		},
+		// Medicina is complete; Enfermería and Obstetricia stay estimated.
 		Pesos: map[string][]areaDemo{
-			"DEMO-MED": {{"DEMO-SP", 30}, {"DEMO-EPI", 30}, {"DEMO-MI", 40}},
+			"DEMO-MED": {{"DEMO-SP", 20}, {"DEMO-EPI", 15}, {"DEMO-GES", 15}, {"DEMO-ETI", 10}, {"DEMO-MI", 30}, {"DEMO-CE", 10}},
 		},
 	},
 	{
@@ -72,19 +80,26 @@ var procesosDemo = []procesoDemo{
 	},
 }
 
-// usuarioDemo is a synthetic, verified and active account with the tour done.
+// temasDemo are general temas (every especialidad) of one asignatura.
+var temasDemo = []struct{ Asignatura, Nombre string }{
+	{"DEMO-SP", "Atención primaria de salud"},
+	{"DEMO-SP", "Promoción de la salud"},
+}
+
+// usuarioDemo is a synthetic, verified and active account with the tour done,
+// whose persona belongs to the health institution.
 type usuarioDemo struct {
-	Username     string
-	Rol          string // admin | usuario
-	Especialidad string // code of the persona's especialidad
-	Nombres      string
-	Inscripcion  string // estado in SERUMS 2026-I: "" (none), aprobado, pendiente
+	Username      string
+	Rol           string // admin | usuario
+	Especialidad  string // code of the persona's especialidad
+	Nombres       string
+	Inscripciones map[string]string // proceso name → estado (aprobado | pendiente)
 }
 
 var usuariosDemo = []usuarioDemo{
-	{"demo_admin", "admin", "DEMO-MED", "Admin", ""},
-	{"demo_enfermeria", "usuario", "DEMO-ENF", "Enfermera", "aprobado"},
-	{"demo_medicina", "usuario", "DEMO-MED", "Médico", "aprobado"},
-	{"demo_pendiente", "usuario", "DEMO-OBS", "Obstetra", "pendiente"},
-	{"demo_esp_inactiva", "usuario", "DEMO-ODO", "Odontólogo", "aprobado"},
+	{"demo_admin", "admin", "DEMO-MED", "Admin", nil},
+	{"demo_enfermeria", "usuario", "DEMO-ENF", "Enfermera", map[string]string{procesoSERUMS: "aprobado", procesoCompatibilidad: "aprobado"}},
+	{"demo_medicina", "usuario", "DEMO-MED", "Médico", map[string]string{procesoSERUMS: "aprobado"}},
+	{"demo_pendiente", "usuario", "DEMO-OBS", "Obstetra", map[string]string{procesoSERUMS: "pendiente"}},
+	{"demo_esp_inactiva", "usuario", "DEMO-ODO", "Odontólogo", map[string]string{procesoSERUMS: "aprobado"}},
 }
