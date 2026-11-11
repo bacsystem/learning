@@ -6,7 +6,7 @@ fase: MVP
 prioridad: Alta
 estimacion: 5
 roles: [admin]
-depende_de: [SIA-E3-03, SIA-E6-01]
+depende_de: [SIA-E3-03, SIA-E6-01, SIA-E6-02]
 ---
 
 # SIA-E3-04 Clasificación por área y tema con IA
@@ -17,12 +17,15 @@ depende_de: [SIA-E3-03, SIA-E6-01]
 Clasificación masiva y barata. La IA solo propone; nunca aplica una clasificación sin revisión (SIA-E3-05). Entrada a la IA: enunciado y alternativas; sin datos personales.
 
 ## Reglas de negocio
-1. Se clasifica por lotes de máx. 25 preguntas por llamada y máx. 500 preguntas por ejecución.
+1. Se clasifica por lotes de máx. 20 preguntas por llamada al LLM y máx. 500 preguntas por ejecución (25 lotes). Un balotario mayor se clasifica en varias ejecuciones (ej. 580 preguntas = 500 + 80).
 2. La salida es estructurada: `asignatura_id`, `tema_id` (o nulo), `confianza` 0–1 y `justificacion` (≤300 caracteres). Si el id no existe en la taxonomía de la profesión, la propuesta se descarta y la pregunta queda «sin clasificar».
 3. Confianza < 0,70 o respuesta inválida marca la pregunta como `incierta` (revisión obligatoria y prioritaria).
 4. La IA no recibe ni devuelve la clave como si fuera su decisión: la clave oficial no se modifica.
-5. Se registra el uso (tokens, costo, operación) y se descuenta del presupuesto de admin definido en SIA-E6-02.
-6. Cada ejecución se audita (actor, nº de preguntas, resultado).
+5. Cuota (decisión del tech-lead sobre P3, issue #65): cada llamada al LLM, es decir cada lote, cuenta 1 acción IA real contra el límite de 200 por día del admin (SIA-E6-02). Clasificar 580 preguntas son 29 lotes y 29 acciones. Se registra el uso (tokens, costo en USD, operación) y el gasto se descuenta del presupuesto global de 40 USD/mes.
+6. Antes de empezar, el servidor calcula los lotes necesarios (preguntas ÷ 20, redondeado hacia arriba). Si las acciones que le quedan hoy al admin no alcanzan, responde 429 `limite_ia` con cuántas preguntas sí caben y no llama a la IA.
+7. Si el presupuesto global llega al 100 % a mitad de una ejecución, se detiene antes del siguiente lote. Las propuestas de los lotes terminados se conservan, el resto queda sin propuesta y la respuesta indica cuántas preguntas faltan (`parcial: presupuesto_agotado`).
+8. Un lote que falla no consume acción (SIA-E6-02, regla 6) y sus preguntas quedan sin propuesta.
+9. Cada ejecución se audita (actor, nº de preguntas, nº de lotes, acciones consumidas, resultado).
 
 ```mermaid
 sequenceDiagram
@@ -33,13 +36,19 @@ sequenceDiagram
   participant DB as Base de datos
   A->>API: POST clasificar borradores
   API->>API: valida rol y máximo de 500 preguntas
-  API->>C: verifica límite y presupuesto
+  API->>C: verifica que quedan acciones para todos los lotes y presupuesto
   C-->>API: ok
-  loop lotes de 25 preguntas
-    API->>IA: clasificar enunciados y alternativas como datos
-    IA-->>API: área, tema, confianza y justificación
-    API->>API: valida ids contra la taxonomía
-    API->>DB: guarda propuesta o marca incierta
+  loop lotes de 20 preguntas
+    API->>C: reserva 1 acción y verifica presupuesto
+    alt presupuesto agotado
+      C-->>API: 429 presupuesto agotado
+      API->>API: detiene la ejecución y conserva lotes terminados
+    else ok
+      API->>IA: clasificar enunciados y alternativas como datos
+      IA-->>API: área, tema, confianza y justificación
+      API->>API: valida ids contra la taxonomía
+      API->>DB: guarda propuesta o marca incierta
+    end
   end
   API->>DB: registra uso y audit_log
   API-->>A: 200 resumen de propuestas, inciertas y sin clasificar
@@ -67,10 +76,35 @@ Escenario: Límite por ejecución
   Cuando pide clasificar 501 preguntas
   Entonces recibe 422 "limite_lote"
 
+Escenario: Lotes de 20 y acciones consumidas
+  Dado un admin con 0 acciones IA reales hoy y 80 preguntas en borrador
+  Cuando ejecuta la clasificación
+  Entonces se hacen 4 llamadas a la IA de 20 preguntas y el admin queda con 4 acciones consumidas
+
+Escenario: Balotario de 580 preguntas
+  Dado un admin con 0 acciones IA reales hoy y 580 preguntas en borrador
+  Cuando clasifica 500 y luego las 80 restantes
+  Entonces se consumen 25 y 4 acciones, 29 en total
+
+Escenario: Acciones insuficientes
+  Dado un admin con 195 acciones IA reales hoy y 200 preguntas en borrador
+  Cuando pide clasificar las 200
+  Entonces recibe 429 "limite_ia" indicando que caben 100 preguntas y no se llama a la IA
+
 Escenario: Presupuesto agotado
   Dado el presupuesto de IA agotado
   Cuando el admin ejecuta la clasificación
   Entonces recibe 429 "presupuesto_agotado" y no se llama a la IA
+
+Escenario: Presupuesto agotado a mitad de ejecución
+  Dado una ejecución de 10 lotes en la que el presupuesto llega al 100 % tras el lote 6
+  Cuando el servicio va a enviar el lote 7
+  Entonces se detiene, conserva las propuestas de los 6 lotes y responde con "parcial: presupuesto_agotado" y 80 preguntas pendientes
+
+Escenario: Lote fallido
+  Dado una ejecución en la que la IA falla en un lote
+  Cuando termina la ejecución
+  Entonces ese lote no consume acción y sus 20 preguntas quedan sin propuesta
 
 Escenario: Sin datos personales
   Dado una ejecución de clasificación en curso
@@ -87,7 +121,7 @@ Escenario: Permisos
 Aplicar la clasificación (SIA-E3-05); crear temas nuevos automáticamente.
 
 ## Dependencias
-SIA-E3-03, SIA-E6-01.
+SIA-E3-03, SIA-E6-01, SIA-E6-02 (límite de acciones y presupuesto).
 
 ## Seguridad y privacidad
 Los enunciados se envían delimitados como datos (mitigación de inyección de instrucciones). Sin datos personales en prompts ni logs.
@@ -96,4 +130,4 @@ Los enunciados se envían delimitados como datos (mitigación de inyección de i
 Estados y errores en es/en.
 
 ## Definición de terminado
-Tests con IA simulada (propuesta válida, inválida, baja confianza); uso registrado; review limpio.
+Tests con IA simulada (propuesta válida, inválida, baja confianza, lote fallido, corte por presupuesto, acciones insuficientes); uso registrado; review limpio.

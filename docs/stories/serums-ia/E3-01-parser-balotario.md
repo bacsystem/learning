@@ -24,6 +24,7 @@ Formato observado: preguntas numeradas, alternativas A–D, clave dentro de `<ma
 5. Límite: 1 000 preguntas por archivo; enunciado máx. 2 000 caracteres, alternativa máx. 500.
 6. El resultado guarda el rango de líneas de origen de cada pregunta (trazabilidad).
 7. Se excluye cualquier texto fuera de las preguntas (encabezados, pies de página).
+8. Cada pregunta válida lleva una lista de `alertas_estructura` cuando el parser tuvo que intervenir: `alternativas_separadas` (venían pegadas en una línea), `vinetas_normalizadas`, `html_eliminado`. Sirve para que el admin revise la consistencia estructural en SIA-E3-05 (decisión P2, issue #65); una pregunta sin intervención lleva la lista vacía.
 
 ## Criterios de aceptación
 ```gherkin
@@ -60,7 +61,17 @@ Escenario: Conservación del texto
 Escenario: Resumen
   Dado un archivo con preguntas válidas y con problemas
   Cuando termina el parseo
-  Entonces devuelve totales: válidas, con problemas y tipo unica/multiple
+  Entonces devuelve totales: válidas, con problemas, tipo unica/multiple y número de preguntas con alertas de estructura
+
+Escenario: Alerta de estructura
+  Dado "A) Uno B) Dos C) Tres D) Cuatro" en una sola línea
+  Cuando se parsea
+  Entonces la pregunta es válida y lleva la alerta "alternativas_separadas"
+
+Escenario: Sin intervención
+  Dado una pregunta con una alternativa por línea, etiquetas A–D y sin HTML
+  Cuando se parsea
+  Entonces la pregunta lleva alertas_estructura vacía
 ```
 
 ## Fuera de alcance

@@ -17,11 +17,12 @@ depende_de: [SIA-E2-06]
 Pantalla nueva en el panel admin con khipu (`TablaListado`, formulario con formik/yup).
 
 ## Reglas de negocio
-1. Listado paginado (20 por defecto, máx. 100) con título, tipo, profesión, versión vigente, estado, nº de pasajes y fecha.
-2. Filtros: estado, tipo y profesión; búsqueda por título (máx. 100 caracteres).
-3. Detalle: historial de versiones, nº de contenidos que la citan y motivo de fallo si lo hay.
-4. Acciones: subir, nueva versión, reintentar, retirar (con motivo), restaurar.
-5. Estados de UI: carga, vacío, error; el estado `procesando` se refresca cada 5 s.
+1. Listado paginado (20 por defecto, máx. 100) con título, tipo, profesión, versión vigente, estado, insignia «Oficial verificada», nº de pasajes y fecha.
+2. Filtros: estado, tipo, profesión y oficial verificada (sí/no); búsqueda por título (máx. 100 caracteres).
+3. Detalle: historial de versiones (con la marca oficial de cada una), entidad emisora y nota de verificación si está marcada, nº de contenidos que la citan y motivo de fallo si lo hay.
+4. Acciones: subir, nueva versión, reintentar, retirar (con motivo), restaurar, marcar como oficial verificada (entidad emisora + nota) y desmarcar (con motivo), según SIA-E2-06.
+5. Marcar como oficial verificada es una acción explícita con diálogo de confirmación que explica su efecto: las preguntas pendientes de ese balotario sin conflicto de clave se aprueban revisando solo clasificación y estructura (SIA-E3-05). Al subir una fuente nunca se marca sola.
+6. Estados de UI: carga, vacío, error; el estado `procesando` se refresca cada 5 s.
 
 ## Criterios de aceptación
 ```gherkin
@@ -49,6 +50,21 @@ Escenario: Retirar con confirmación
   Dado una fuente activa citada por varios contenidos
   Cuando pulsa Retirar
   Entonces debe escribir un motivo y ve cuántos contenidos se marcarán «en revisión» antes de confirmar
+
+Escenario: Marcar como oficial verificada
+  Dado una fuente activa de tipo balotario sin marca
+  Cuando el admin pulsa «Marcar como oficial verificada», escribe entidad y nota y confirma
+  Entonces la fila muestra la insignia «Oficial verificada» y el detalle muestra entidad y nota
+
+Escenario: Validación del diálogo de marca
+  Dado el diálogo de marca abierto
+  Cuando deja vacía la entidad emisora o la nota
+  Entonces ve el error en el campo y el botón confirmar está deshabilitado
+
+Escenario: Subida sin marca automática
+  Dado el formulario de subida de una fuente nueva
+  Cuando el admin sube el archivo
+  Entonces la fuente se crea sin la insignia «Oficial verificada»
 
 Escenario: Acceso
   Dado un usuario con rol usuario

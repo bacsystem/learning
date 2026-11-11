@@ -35,9 +35,9 @@ stateDiagram-v2
 2. Salida estructurada: secciones con título y párrafos; cada párrafo o afirmación clave lleva ≥1 cita (pasaje + extracto) validada según SIA-E6-04; párrafos sin cita válida se eliminan.
 3. Se requieren ≥3 pasajes relevantes (422 `fuentes_insuficientes`).
 4. Marca de incertidumbre por párrafo; el material con párrafos inciertos exige revisión explícita con nota (misma regla que SIA-E6-05).
-5. Solicitudes de postulantes: máx. 1 abierta por (usuario, área, tema); el admin las ve en una cola con conteo de solicitantes (sin nombres ni datos personales, solo número).
+5. Solicitudes de postulantes: máx. 1 abierta por (usuario, área, tema); el admin las ve en una cola con conteo de solicitantes (sin nombres ni datos personales, solo número). Crear la solicitud no llama al LLM y no descuenta cuota del postulante (SIA-E5-06).
 6. Aprobar exige casilla de verificación; se audita todo.
-7. Límites de admin: 200 operaciones de IA por día (SIA-E6-02).
+7. Límites de admin: 200 acciones IA reales por día y presupuesto global de 40 USD/mes con corte al 100 % (SIA-E6-02, decisión P3, issue #65). Generar material para atender una solicitud descuenta del límite del admin, no del postulante.
 
 ## Criterios de aceptación
 ```gherkin
@@ -65,6 +65,11 @@ Escenario: Solicitud de postulante
   Dado una solicitud abierta de 3 postulantes sobre el mismo tema
   Cuando el admin abre la cola de solicitudes
   Entonces la cola muestra el tema con "3 solicitudes" y sin datos personales
+
+Escenario: Atender solicitud descuenta del admin
+  Dado una solicitud abierta de un postulante y un admin con 10 acciones IA reales hoy
+  Cuando el admin genera el material para atenderla
+  Entonces el admin queda con 11 acciones IA reales hoy y el consumo del postulante no cambia
 
 Escenario: Longitud inválida
   Dado un admin autenticado

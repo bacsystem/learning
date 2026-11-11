@@ -23,6 +23,7 @@ Detección determinista en dos niveles: exacta (hash del enunciado normalizado) 
 4. La comparación es contra preguntas del banco en cualquier estado excepto `eliminada`, dentro de la misma especialidad.
 5. El sistema nunca elimina ni fusiona solo: marca el candidato y el admin decide (mantener ambas, rechazar la nueva, marcar como variante).
 6. Si la clave difiere entre duplicados exactos, se señala «conflicto de clave» y bloquea la aprobación hasta decidir.
+7. Al resolver un conflicto de clave, la pregunta que se mantiene conserva la marca histórica `tuvo_conflicto_clave = true` (no se borra). Con esa marca, SIA-E3-05 exige verificación explícita de la clave aunque la fuente sea oficial verificada (decisión P2, issue #65).
 
 ```mermaid
 flowchart TD
@@ -34,7 +35,8 @@ flowchart TD
   C -- No --> G{Similitud mayor o igual a 0,85}
   G -- Si --> H[Marca casi duplicado con hasta 5 candidatos]
   G -- No --> I[Marca como nueva]
-  E --> J[Admin decide]
+  E --> E2[Guarda marca historica tuvo conflicto de clave]
+  E2 --> J[Admin decide]
   F --> J
   H --> J
   J --> K[Mantener ambas o rechazar la nueva o marcar variante]
@@ -61,6 +63,11 @@ Escenario: Conflicto de clave
   Dado dos preguntas con igual enunciado y distinta clave
   Cuando se ejecuta la deduplicación
   Entonces se marca "conflicto_clave" y no puede aprobarse la nueva hasta resolver
+
+Escenario: Marca histórica tras resolver el conflicto
+  Dado una pregunta nueva marcada "conflicto_clave" de un balotario oficial verificado
+  Cuando el admin resuelve el conflicto eligiendo "mantener ambas"
+  Entonces la nueva deja de estar bloqueada, conserva tuvo_conflicto_clave = true y en la cola de revisión exige verificación explícita de clave
 
 Escenario: Decisión del admin
   Dado una pregunta marcada como duplicado exacto

@@ -20,6 +20,7 @@ depende_de: [SIA-E7-02]
 4. Progreso: % de minutos hechos en la semana y total del plan.
 5. Estados de UI: carga, vacío (sin plan: llamada a configurar), error.
 6. Solo el dueño ve y modifica su plan.
+7. Si el plan tiene la bandera `desactualizado = true` porque se propagó una nueva fecha oficial de examen (SIA-E7-01, decisión P5, issue #65), se muestra el aviso «La fecha del examen cambió» con la fecha anterior, la nueva y el botón «Regenerar plan» (ejecuta SIA-E7-02 desde hoy, conservando lo hecho). El plan sigue usable mientras tanto.
 
 ## Criterios de aceptación
 ```gherkin
@@ -47,6 +48,16 @@ Escenario: Sin plan
   Dado un usuario sin plan activo
   Cuando abre la vista del plan
   Entonces ve «Aún no tienes un plan» y el botón «Crear mi plan»
+
+Escenario: Plan desactualizado por fecha oficial
+  Dado un plan activo con desactualizado = true tras propagarse una nueva fecha oficial de examen
+  Cuando el usuario abre la vista del plan
+  Entonces ve «La fecha del examen cambió» con ambas fechas y el botón «Regenerar plan»
+
+Escenario: Regenerar tras cambio de fecha
+  Dado el aviso de fecha cambiada visible y 4 bloques marcados hechos
+  Cuando pulsa «Regenerar plan»
+  Entonces se genera un plan hasta la nueva fecha, el anterior queda "reemplazado" y los 4 bloques hechos se conservan
 
 Escenario: Bloque ajeno
   Dado un bloque del plan de otro usuario

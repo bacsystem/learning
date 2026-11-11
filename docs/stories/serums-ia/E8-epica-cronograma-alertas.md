@@ -13,5 +13,6 @@
 | SIA-E8-04 | Exportación del plan a .ics | v2 | 2 | #55 |
 | SIA-E8-05 | Reporte semanal por email | v3 | 5 | #56 |
 
+**Decisión P5 (issue #65):** carga manual de hitos por admin con enlace de fuente oficial obligatorio en dominio `.gob.pe`; el cambio de fecha del hito `examen` se propaga a los planes con fecha oficial (SIA-E7-01) y se avisa en un único mensaje (SIA-E8-02).
 **Existente que se reutiliza:** notificaciones in-app, `email_queue` con worker, `audit_log`.
 **Dependencias:** E1-03, E7-03, E4-03.

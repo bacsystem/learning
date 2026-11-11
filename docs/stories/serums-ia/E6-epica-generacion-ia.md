@@ -19,3 +19,4 @@
 
 **Regla maestra:** sin cita a pasaje de fuente activa Y sin aprobación de admin, nada llega al alumno; lo incierto exige revisión explícita.
 **Dependencias:** E2 (pasajes), E3-02 (estado borrador).
+**Decisiones (issue #65):** P3: 5 acciones IA reales/día y 60/mes por postulante, 200/día por admin, 20 preguntas por solicitud, presupuesto global 40 USD/mes con alerta al 80 % y corte al 100 %; encolar una solicitud sin llamada al LLM no descuenta cuota (SIA-E6-02, SIA-E5-06). P4: segundo revisor desactivado por defecto, gobernado por `revision.segundo_revisor_obligatorio` en `configuracion_sistema` y auditado; la verificación de cita y la nota para lo incierto siguen obligatorias (SIA-E6-05). P8: contadores de cuota IA bajo `HMAC(usuario_id)` (SIA-E6-02).

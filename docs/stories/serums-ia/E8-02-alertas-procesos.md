@@ -6,7 +6,7 @@ fase: MVP
 prioridad: Alta
 estimacion: 3
 roles: [usuario]
-depende_de: [SIA-E8-01]
+depende_de: [SIA-E8-01, SIA-E7-01]
 ---
 
 # SIA-E8-02 Alertas de próximos procesos
@@ -18,9 +18,10 @@ depende_de: [SIA-E8-01]
 2. Canales: notificación in-app siempre y email vía `email_queue` salvo que el usuario lo desactive en preferencias.
 3. Destinatarios: usuarios con inscripción aprobada en el proceso.
 4. Idempotencia: una alerta por (usuario, hito, anticipación); no se reenvía.
-5. Si el hito cambia de fecha, las alertas ya enviadas no se repiten para la misma anticipación salvo que la nueva fecha esté dentro de esa ventana; se envía un aviso «La fecha cambió».
-6. El email no incluye datos sensibles: solo nombre del hito, fecha y enlace a la plataforma.
-7. Preferencia de email: activar/desactivar por tipo (alertas de procesos, plan, reporte semanal); toda alerta de email incluye cómo desactivarlas.
+5. Si el hito cambia de fecha, las alertas ya enviadas no se repiten para la misma anticipación salvo que la nueva fecha esté dentro de esa ventana; se envía un aviso «La fecha cambió» con la fecha anterior, la nueva y el enlace a la fuente oficial `.gob.pe` del hito (SIA-E8-01).
+6. Si el hito que cambió es el `examen` y el plan del postulante usa la fecha oficial, el aviso añade «Actualizamos la fecha de tu plan» (la propagación ocurre en SIA-E7-01); si su plan tiene fecha manual, añade «Tu plan conserva la fecha que elegiste». Un solo aviso por cambio, no dos (decisión P5, issue #65).
+7. El email no incluye datos sensibles: solo nombre del hito, fechas, enlace a la fuente oficial y enlace a la plataforma.
+8. Preferencia de email: activar/desactivar por tipo (alertas de procesos, plan, reporte semanal); toda alerta de email incluye cómo desactivarlas.
 
 ```mermaid
 sequenceDiagram
@@ -75,7 +76,17 @@ Escenario: Hito creado tarde
 Escenario: Cambio de fecha
   Dado un hito con alertas enviadas
   Cuando el admin cambia la fecha del hito
-  Entonces el usuario recibe «La fecha cambió» con la nueva fecha
+  Entonces el usuario recibe «La fecha cambió» con la fecha anterior, la nueva y el enlace a la fuente oficial
+
+Escenario: Cambio del examen con plan en fecha oficial
+  Dado un usuario cuyo plan usa la fecha oficial del examen
+  Cuando el admin cambia la fecha del hito "examen"
+  Entonces recibe un único aviso «La fecha cambió» que incluye «Actualizamos la fecha de tu plan»
+
+Escenario: Cambio del examen con plan en fecha manual
+  Dado un usuario cuyo plan tiene una fecha de examen fijada manualmente
+  Cuando el admin cambia la fecha del hito "examen"
+  Entonces recibe «La fecha cambió» con «Tu plan conserva la fecha que elegiste»
 
 Escenario: Usuario no inscrito
   Dado un usuario sin inscripción aprobada en el proceso
@@ -92,7 +103,7 @@ Escenario: Contenido del email
 SMS, push móvil, WhatsApp.
 
 ## Dependencias
-SIA-E8-01; notificaciones in-app y `email_queue` existentes.
+SIA-E8-01; SIA-E7-01 (origen de la fecha del plan, para el texto del aviso de cambio de examen); notificaciones in-app y `email_queue` existentes.
 
 ## Seguridad y privacidad
 Sin datos personales en el cuerpo del email salvo el nombre de pila; sin PII en logs.
