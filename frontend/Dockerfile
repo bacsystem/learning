@@ -1,5 +1,7 @@
+# Imagen base fijada a la versión de parche de .nvmrc (la misma que usa el CI).
+# Al subir Node, cambia .nvmrc y las tres líneas FROM juntas.
 # ── Stage 1: Dependencies ───────────────────────────────────────────────────
-FROM node:22-alpine AS deps
+FROM node:22.14.0-alpine3.21 AS deps
 
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
@@ -9,7 +11,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
 # ── Stage 2: Build ───────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:22.14.0-alpine3.21 AS builder
 
 WORKDIR /app
 
@@ -24,11 +26,15 @@ ENV NEXT_PUBLIC_STORAGE_PREFIX=$NEXT_PUBLIC_STORAGE_PREFIX
 ENV NEXT_PUBLIC_CONTACT_EMAIL=$NEXT_PUBLIC_CONTACT_EMAIL
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# La URL de la API se incrusta en el bundle: si llega vacía, el frontend
+# llamaría a rutas relativas sin avisar. Se falla aquí con un error claro.
+RUN test -n "$NEXT_PUBLIC_API_URL" || (echo "ERROR: falta el build-arg NEXT_PUBLIC_API_URL (p. ej. https://api.dominio)" >&2 && exit 1)
+
 RUN --mount=type=cache,target=/app/.next/cache \
     npx next build
 
 # ── Stage 3: Runtime ─────────────────────────────────────────────────────────
-FROM node:22-alpine AS runner
+FROM node:22.14.0-alpine3.21 AS runner
 
 WORKDIR /app
 

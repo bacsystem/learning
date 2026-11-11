@@ -7,9 +7,22 @@ DATABASE_URL := $(if $(filter prod,$(DB)),$(DB_PROD),$(DB_LOCAL))
 ENC_KEY_LOCAL := $(shell grep -E '^ENCRYPTION_KEY=' backend/.env 2>/dev/null | cut -d'=' -f2-)
 ENCRYPTION_KEY ?= $(ENC_KEY_LOCAL)
 
+# ── Versiones de herramientas: las mismas que .github/workflows/ ──────────────
+# Si cambias una, cámbiala también en el workflow (docs/ops/paridad-ci-local.md).
+GOOSE_VERSION         := v3.21.1
+GOVULNCHECK_VERSION   := v1.9.0
+GOLANGCI_LINT_VERSION := v2.15.0
+GOOSE := go run github.com/pressly/goose/v3/cmd/goose@$(GOOSE_VERSION)
+
+# Base de tests de integración (la misma que usa el CI). `make test` la exige:
+# sin ella los tests de integración se saltan y el resultado no es el del CI.
+# OJO: `make test` hace `down-to 0` sobre esta base; usa una base desechable.
+TEST_DATABASE_URL ?=
+
 # ── Docker Hub ────────────────────────────────────────────────────────────────
 DOCKER_USER  ?= cbaciliod
-DOCKER_TAG   ?= v1.0.0
+# Sin valor por defecto: la versión se pasa siempre (make docker/release DOCKER_TAG=v1.2.0).
+DOCKER_TAG   ?=
 BACKEND_IMG  := $(DOCKER_USER)/learning-backend:$(DOCKER_TAG)
 FRONTEND_IMG := $(DOCKER_USER)/learning-frontend:$(DOCKER_TAG)
 
@@ -33,7 +46,7 @@ s          ?=
 
 .PHONY: dev dev/backend dev/frontend \
         test test/backend test/frontend \
-        lint build \
+        lint fmt build check/test-db check/docker-tag \
         migrate/up migrate/down migrate/status migrate/create \
         fix-encrypt-personas \
         docker/build docker/push docker/release \
@@ -53,10 +66,19 @@ dev/backend:
 dev/frontend:
 	cd frontend && npm run dev
 
-# ── Tests ─────────────────────────────────────────────────────────────────────
-test:
-	cd backend && go test ./... -race
-	cd frontend && npm run test:coverage
+# ── Tests (= jobs test de backend.yml y check de frontend.yml) ────────────────
+# Uso: make test TEST_DATABASE_URL=postgres://...@localhost:5432/learning_test?sslmode=disable
+check/test-db:
+	@test -n "$(TEST_DATABASE_URL)" || (echo "ERROR: set TEST_DATABASE_URL=postgres://... (base desechable: se hace down-to 0)" && exit 1)
+
+test: check/test-db
+	cd backend && go mod tidy && git diff --exit-code -- go.mod go.sum
+	cd backend && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
+	cd backend && $(GOOSE) -dir migrations postgres "$(TEST_DATABASE_URL)" up
+	cd backend && $(GOOSE) -dir migrations postgres "$(TEST_DATABASE_URL)" down-to 0
+	cd backend && $(GOOSE) -dir migrations postgres "$(TEST_DATABASE_URL)" up
+	cd backend && TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -race -count=1 ./...
+	cd frontend && npm test
 
 test/backend:
 	cd backend && go test ./... -v -race -coverprofile=coverage.out
@@ -64,30 +86,39 @@ test/backend:
 test/frontend:
 	cd frontend && npm run test:coverage
 
-# ── Lint ──────────────────────────────────────────────────────────────────────
+# ── Lint (= job lint de backend.yml y check de frontend.yml) ──────────────────
+# No reescribe archivos; para formatear usa `make fmt`.
 lint:
-	cd backend && go vet ./... && go fmt ./...
+	cd backend && go vet ./...
+	cd backend && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --timeout=5m ./...
+	cd frontend && npx tsc --noEmit
 	cd frontend && npm run lint
+	cd frontend && node scripts/check-i18n.mjs
 
-# ── Build ─────────────────────────────────────────────────────────────────────
+fmt:
+	cd backend && go fmt ./...
+	cd frontend && npm run lint:fix
+
+# ── Build (= pasos Build de backend.yml y frontend.yml) ───────────────────────
 build:
+	cd backend && go build ./...
 	cd backend && CGO_ENABLED=0 go build -o bin/server ./cmd/server
 	cd frontend && npm run build
 
 # ── Migraciones (DB de backend/.env, o DB=prod con PROD_DATABASE_URL) ────────
 migrate/up:
-	cd backend && goose -dir migrations postgres "$(DATABASE_URL)" up
+	cd backend && $(GOOSE) -dir migrations postgres "$(DATABASE_URL)" up
 
 migrate/down:
-	cd backend && goose -dir migrations postgres "$(DATABASE_URL)" down
+	cd backend && $(GOOSE) -dir migrations postgres "$(DATABASE_URL)" down
 
 migrate/status:
-	cd backend && goose -dir migrations postgres "$(DATABASE_URL)" status
+	cd backend && $(GOOSE) -dir migrations postgres "$(DATABASE_URL)" status
 
 # Uso: make migrate/create name=add_algo
 migrate/create:
 	@test -n "$(name)" || (echo "ERROR: set name=nombre_de_la_migracion" && exit 1)
-	cd backend && goose -dir migrations create $(name) sql
+	cd backend && $(GOOSE) -dir migrations create $(name) sql
 
 # Genera los UPDATE para cifrar personas con DNI en texto plano. Uso: make fix-encrypt-personas [DB=prod]
 fix-encrypt-personas:
@@ -96,10 +127,13 @@ fix-encrypt-personas:
 	@cd backend && DATABASE_URL="$(DATABASE_URL)" ENCRYPTION_KEY="$(ENCRYPTION_KEY)" go run ./cmd/fix-encrypt-personas/
 
 # ── Docker (imágenes para Docker Hub) ─────────────────────────────────────────
-docker/build/backend:
+check/docker-tag:
+	@echo "$(DOCKER_TAG)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' || (echo "ERROR: set DOCKER_TAG=vX.Y.Z (el tag del release)" && exit 1)
+
+docker/build/backend: check/docker-tag
 	docker build --platform linux/amd64 --no-cache -t $(BACKEND_IMG) backend/
 
-docker/build/frontend:
+docker/build/frontend: check/docker-tag
 	@test -n "$(NEXT_PUBLIC_API_URL)" || (echo "ERROR: set NEXT_PUBLIC_API_URL" && exit 1)
 	docker build --platform linux/amd64 \
 		--build-arg "NEXT_PUBLIC_API_URL=$(NEXT_PUBLIC_API_URL)" \
@@ -109,7 +143,7 @@ docker/build/frontend:
 
 docker/build: docker/build/backend docker/build/frontend
 
-docker/push:
+docker/push: check/docker-tag
 	docker push $(BACKEND_IMG)
 	docker push $(FRONTEND_IMG)
 
