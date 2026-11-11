@@ -39,7 +39,7 @@ NEXT_PUBLIC_STORAGE_PREFIX ?=
 NEXT_PUBLIC_CONTACT_EMAIL  ?=
 
 # ── Docker Compose (local) ────────────────────────────────────────────────────
-# Lee la configuración del .env de la raíz (ver .env.example).
+# Lee la configuración del .env de la raíz (ver env.example).
 COMPOSE    := docker compose
 root_env    = $(shell grep -E '^$(1)=' .env 2>/dev/null | cut -d'=' -f2-)
 C_PG_USER  := $(or $(call root_env,POSTGRES_USER),learning)
@@ -167,12 +167,12 @@ docker/release: docker/build docker/push ## build + verify + push (solo el usuar
 # Uso: make compose/init → make compose/up → http://localhost:3000
 # s=<servicio> limita logs/restart/rebuild a db | backend | frontend
 
-# Crea .env desde .env.example: JWT_SECRET y POSTGRES_PASSWORD aleatorios y ENCRYPTION_KEY
+# Crea .env desde env.example: JWT_SECRET y POSTGRES_PASSWORD aleatorios y ENCRYPTION_KEY
 # de backend/.env (si es válida, para que los datos cifrados sean compatibles) o aleatoria.
 # No pisa un .env existente. ENV_EXAMPLE/ENV_OUT permiten probarlo sobre otros archivos.
-ENV_EXAMPLE ?= .env.example
+ENV_EXAMPLE ?= env.example
 ENV_OUT     ?= .env
-compose/init: ## Crea .env desde .env.example con secretos aleatorios (no pisa uno existente)
+compose/init: ## Crea .env desde env.example con secretos aleatorios (no pisa uno existente)
 	@if [ -f "$(ENV_OUT)" ]; then echo "$(ENV_OUT) ya existe — no se modifica"; exit 0; fi; \
 	key=$$(grep -E '^ENCRYPTION_KEY=[0-9a-fA-F]{64}$$' backend/.env 2>/dev/null | cut -d= -f2-); src="backend/.env"; \
 	[ -n "$$key" ] || { key=$$(openssl rand -hex 32); src="generada"; }; \

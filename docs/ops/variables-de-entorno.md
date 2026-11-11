@@ -9,9 +9,9 @@ Inventario sacado del código de `develop` (613b7a9). Fuentes:
 El valor por defecto se indica **por capa** porque difiere entre ellas. Por
 ejemplo, `SMTP_PORT` vale 0 en el código y 587 en compose.
 
-> Pendiente: no se cruzó con `.env.example` porque el archivo está bloqueado
-> para el rol devops por una regla de denegación (ver la sección
-> [Hallazgos](#hallazgos-para-el-tech-lead)).
+> Cruzado con la plantilla `env.example` de la raíz (11-11-2026): están todas las
+> variables de `docker-compose.yml`, con valores por defecto coherentes.
+> `ANTIFRAUD_HMAC_KEY` no figura porque todavía no está implementada.
 
 En producción (Railway) cada variable se carga como variable de servicio, y
 los secretos van sellados. Ver [railway.md](railway.md) §5. Los secretos van **solo** en el gestor de secretos del entorno. Nunca en el
@@ -115,11 +115,9 @@ solo en `127.0.0.1`.
 
 Todos son de código de la app, así que no se cambian en este PR:
 
-- **H-1. `.env.example` sin verificar.** El rol devops no puede leerlo por una
-  regla de denegación, aunque es el dueño de la plantilla. El usuario aprobó
-  la lectura; el tech-lead cambia el permiso y entonces se cruza. Hace falta permitir
-  la lectura de `.env.example` en `.claude/settings.json` (vía
-  `setup-team.sh`), o que otro rol cruce este inventario con la plantilla.
+- **H-1. Resuelto.** Las plantillas pasan a llamarse `env.example` (sin punto),
+  fuera del bloqueo general de `.env*`. El inventario ya se cruzó con la de la
+  raíz.
 - **H-2 (en curso, backend-dev-2). `ENCRYPTION_KEY` se valida tarde.** `config.Load` solo comprueba que
   no esté vacía. Que sean 64 caracteres hex se comprueba después de conectar a
   la base, y el error no nombra la variable

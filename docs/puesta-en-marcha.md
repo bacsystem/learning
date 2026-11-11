@@ -9,8 +9,8 @@ nuevo). Todavía no existe un entorno productivo: no hay datos que migrar.
 Para desarrollo sin Docker, copiarlos desde las plantillas y completarlos:
 
 ```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
+cp backend/env.example backend/.env
+cp frontend/env.example frontend/.env
 ```
 
 El historial de git **ya se limpió** con
@@ -28,13 +28,13 @@ requiere ninguna acción.
 ## 1. Configuración (Docker Compose)
 
 ```bash
-make compose/init     # crea .env desde .env.example
+make compose/init     # crea .env desde env.example
 ```
 
 `make compose/init` no pisa un `.env` existente. Genera `JWT_SECRET` y
 `POSTGRES_PASSWORD` aleatorios y toma `ENCRYPTION_KEY` de `backend/.env` si es
 válida (para que los datos cifrados sean compatibles) o genera una nueva. Sin
-`make`: `cp .env.example .env` y completar los obligatorios (`JWT_SECRET`,
+`make`: `cp env.example .env` y completar los obligatorios (`JWT_SECRET`,
 `ENCRYPTION_KEY`, `POSTGRES_PASSWORD`); `docker compose` falla si falta alguno.
 
 `POSTGRES_PASSWORD` no tiene valor por defecto. Postgres solo lo aplica al
