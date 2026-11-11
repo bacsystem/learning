@@ -14,12 +14,18 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { Alerta } from "@/components/feedback/alerta";
 import { Skeleton } from "@/components/feedback/skeleton";
+import { DialogoConfirmacion } from "@/components/navegacion/dialogo-confirmacion";
 import { CabeceraPagina, EnlaceVolver } from "@/components/patrones/cabecera-pagina";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, Especialidad, Grado, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
 import { CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { Etiqueta, Pregunta, questionsApi, UpdatePreguntaPayload } from "@/lib/questions/api";
-import { claveErrorPregunta, editarContenidoLaRetira } from "@/lib/questions/estados";
+import {
+  cambiaElContenido,
+  claveErrorPregunta,
+  contenidoDePregunta,
+  editarContenidoLaRetira,
+} from "@/lib/questions/estados";
 
 /** Renumbers orden after a move/removal; ids stay attached to their text. */
 const renumber = (rows: RespuestaRow[]) => rows.map((r, i) => ({ ...r, orden: i + 1 }));
@@ -81,6 +87,7 @@ export default function EditPreguntaPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmarRevision, setConfirmarRevision] = useState(false);
 
   useEffect(() => {
     if (!token || !preguntaID) return;
@@ -196,8 +203,25 @@ export default function EditPreguntaPage() {
     [tipo],
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /** Pide confirmación solo si guardar sacaría de circulación una pregunta publicada (E3-02 §4.5). */
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!pregunta) return;
+    const editado = {
+      enunciado,
+      tipo,
+      respuestas,
+      explicacion: retroExplicacion,
+      referencia: retroReferencia,
+    };
+    if (editarContenidoLaRetira(pregunta.estado) && cambiaElContenido(contenidoDePregunta(pregunta), editado)) {
+      setConfirmarRevision(true);
+      return;
+    }
+    void guardar();
+  };
+
+  const guardar = async () => {
     if (!token || !pregunta) return;
     setSubmitting(true);
     setError(null);
@@ -289,12 +313,18 @@ export default function EditPreguntaPage() {
         acciones={<PillEstadoPregunta estado={pregunta.estado} />}
       />
 
-      {editarContenidoLaRetira(pregunta.estado) ? (
-        <Alerta tono="aviso" titulo={t("admin-preguntas-aviso-edicion-titulo")}>
-          {t("admin-preguntas-aviso-edicion-texto")}
-          {pregunta.origen === "balotario" ? ` ${t("admin-preguntas-aviso-clave-oficial")}` : null}
-        </Alerta>
-      ) : null}
+      <DialogoConfirmacion
+        open={confirmarRevision}
+        onOpenChange={setConfirmarRevision}
+        destructiva={false}
+        titulo={t("serumsIa.avisosPregunta.confirmarEdicion.titulo")}
+        descripcion={t("serumsIa.avisosPregunta.confirmarEdicion.texto")}
+        textoConfirmar={t("serumsIa.avisosPregunta.confirmarEdicion.confirmar")}
+        textoCancelar={t("serumsIa.avisosPregunta.confirmarEdicion.cancelar")}
+        textoPendiente={t("comun-guardando")}
+        etiquetaCerrar={t("comun-cerrar")}
+        onConfirmar={guardar}
+      />
 
       <EditorPregunta
         proceso={{ modo: "fijo", nombre: pregunta.proceso }}

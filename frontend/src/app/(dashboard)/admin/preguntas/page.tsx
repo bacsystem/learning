@@ -221,6 +221,12 @@ export default function PreguntasPage() {
       const err = e as { message?: string };
       const clave = claveErrorPregunta(e);
       toast.error(clave ? t(clave) : (err.message ?? t("comun-error-eliminar")));
+      if (clave) {
+        // El estado cambió mientras tanto: se cierra el diálogo y se muestra el actual.
+        setConfirmDelete({ open: false, row: null, submitting: false });
+        load();
+        return;
+      }
       setConfirmDelete((d) => ({ ...d, submitting: false }));
     }
   };
@@ -551,17 +557,15 @@ export default function PreguntasPage() {
                           onClick: () => router.push(`/admin/preguntas/${p.id}/edit`),
                         },
                         // P2 (SIA-E3-02): un borrador o una en revisión se rechazan antes de eliminarse.
-                        ...(puedeEliminar(p.estado)
-                          ? [
-                              {
-                                label: t("comun-eliminar"),
-                                icon: TrashIcon,
-                                destructiva: true,
-                                separador: true,
-                                onClick: () => setConfirmDelete({ open: true, row: p, submitting: false }),
-                              },
-                            ]
-                          : []),
+                        {
+                          label: t("comun-eliminar"),
+                          icon: TrashIcon,
+                          destructiva: true,
+                          separador: true,
+                          disabled: !puedeEliminar(p.estado),
+                          title: puedeEliminar(p.estado) ? undefined : t("serumsIa.avisosPregunta.eliminarAyuda"),
+                          onClick: () => setConfirmDelete({ open: true, row: p, submitting: false }),
+                        },
                       ]}
                     />
                   </TableCell>

@@ -162,7 +162,7 @@ export default function NuevaPreguntaPage() {
           : null,
       });
       // P1 (SIA-E3-02): toda pregunta nueva nace en borrador y no se sirve hasta aprobarla.
-      toast.ok(t("admin-preguntas-creada-borrador"));
+      toast.ok(t("serumsIa.avisosPregunta.creadaBorrador"));
       router.push("/admin/preguntas");
     } catch (e: unknown) {
       const err = e as { message?: string };

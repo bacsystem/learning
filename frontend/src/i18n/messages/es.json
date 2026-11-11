@@ -559,7 +559,6 @@
     "admin-preguntas-import-unidad-filas": "filas",
     "admin-preguntas-import-importando": "Importando…",
     "admin-preguntas-import-confirmar": "Confirmar importación ({n, plural, one {# pregunta} other {# preguntas}})",
-    "admin-preguntas-import-resultado-importadas": "{n, plural, one {# pregunta importada} other {# preguntas importadas}}",
     "admin-preguntas-import-sin-registros": "Sin registros nuevos",
     "admin-preguntas-import-pill-importadas": "{n, plural, one {# importada} other {# importadas}}",
     "admin-preguntas-import-pill-errores": "{n, plural, one {# error} other {# errores}}",
@@ -1321,7 +1320,8 @@
         "estado_invalido": "El tema ya está en ese estado. Recarga la lista.",
         "no_encontrado": "El tema ya no existe. Recarga la lista.",
         "error_interno": "Error interno del servidor. Inténtalo de nuevo.",
-        "cuerpo_demasiado_grande": "Los datos enviados son demasiado grandes. Reduce el texto e inténtalo de nuevo."
+        "cuerpo_demasiado_grande": "Los datos enviados son demasiado grandes. Reduce el texto e inténtalo de nuevo.",
+        "clave_oficial": "La clave oficial de una pregunta de balotario no se puede cambiar."
       },
       "pesos": {
         "titulo": "Pesos de {especialidad}",
@@ -1614,6 +1614,17 @@
           "referencia_invalida": "Una profesión o el proceso ya no está activo. Recarga y vuelve a intentarlo.",
           "no_encontrado": "La fuente ya no existe."
         }
+      },
+      "avisosPregunta": {
+        "creadaBorrador": "Guardada como borrador. Añade una cita y apruébala para que la vean los postulantes.",
+        "importadasBorrador": "{n, plural, one {# pregunta importada como borrador} other {# preguntas importadas como borrador}}",
+        "confirmarEdicion": {
+          "titulo": "Esta pregunta pasará a En revisión",
+          "texto": "Al guardar, la pregunta pasará a En revisión y dejará de mostrarse hasta revalidarla con una cita.",
+          "confirmar": "Guardar y pasar a revisión",
+          "cancelar": "Seguir editando"
+        },
+        "eliminarAyuda": "Recházala primero para poder eliminarla"
       }
     },
     "sesion-servidor-no-disponible-titulo": "El servidor no responde",
@@ -1689,12 +1700,6 @@
     "admin-preguntas-origen-balotario": "Balotario",
     "admin-preguntas-origen-ia": "IA",
     "admin-preguntas-filtro-origen-todos": "Origen: todos",
-    "admin-preguntas-citas": "Citas",
-    "admin-preguntas-creada-borrador": "Pregunta creada en borrador. Se publica cuando se aprueba.",
-    "admin-preguntas-aviso-edicion-titulo": "Esta pregunta está publicada",
-    "admin-preguntas-aviso-edicion-texto": "Si cambias el enunciado, el tipo, las alternativas, la clave o la retroalimentación, pasará a «En revisión» y dejará de mostrarse a los postulantes hasta que se vuelva a aprobar. Los demás datos no cambian su estado.",
-    "admin-preguntas-aviso-clave-oficial": "Viene de un balotario: su clave oficial no se puede cambiar.",
-    "admin-preguntas-error-estado-invalido": "La pregunta no se puede eliminar en su estado actual. Recarga la lista.",
-    "admin-preguntas-error-clave-oficial": "La clave oficial de una pregunta de balotario no se puede cambiar."
+    "admin-preguntas-citas": "Citas"
   }
 }

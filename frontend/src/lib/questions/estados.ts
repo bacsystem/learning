@@ -1,4 +1,4 @@
-import type { EstadoPregunta, OrigenPregunta } from "./api";
+import type { EstadoPregunta, OrigenPregunta, Pregunta } from "./api";
 
 import { apiErrorCode } from "@/lib/http/api-error";
 
@@ -39,10 +39,47 @@ export function editarContenidoLaRetira(estado: EstadoPregunta): boolean {
   return estado === "aprobada" || estado === "activo";
 }
 
+/** Lo que el §4.5 llama «contenido»: cambiarlo en una publicada la pasa a revisión; la clasificación no. */
+export type ContenidoPregunta = Pick<Pregunta, "enunciado" | "tipo"> & {
+  respuestas: { texto: string; es_correcta: boolean }[];
+  explicacion: string;
+  referencia: string;
+};
+
+export function contenidoDePregunta(p: Pregunta): ContenidoPregunta {
+  return {
+    enunciado: p.enunciado,
+    tipo: p.tipo,
+    respuestas: p.respuestas,
+    explicacion: p.retroalimentacion?.explicacion ?? "",
+    referencia: p.retroalimentacion?.referencia ?? "",
+  };
+}
+
+const huellaRespuestas = (c: ContenidoPregunta) =>
+  c.respuestas
+    .map((r) => `${r.es_correcta ? 1 : 0}${r.texto.trim()}`)
+    .sort()
+    .join("\n");
+
+/**
+ * Solo para avisar antes de guardar: el servidor compara con lo guardado y decide el estado (E3-02 §4.5).
+ * Reordenar alternativas no es cambiar el contenido.
+ */
+export function cambiaElContenido(guardado: ContenidoPregunta, editado: ContenidoPregunta): boolean {
+  return (
+    guardado.enunciado.trim() !== editado.enunciado.trim() ||
+    guardado.tipo !== editado.tipo ||
+    guardado.explicacion.trim() !== editado.explicacion.trim() ||
+    guardado.referencia.trim() !== editado.referencia.trim() ||
+    huellaRespuestas(guardado) !== huellaRespuestas(editado)
+  );
+}
+
 /** Claves i18n (`dashboard.*`) de los errores con código de E3-02 (§7) que llegan a estas pantallas. */
 const CLAVE_ERROR: Record<string, string> = {
-  estado_invalido: "admin-preguntas-error-estado-invalido",
-  clave_oficial: "admin-preguntas-error-clave-oficial",
+  estado_invalido: "serumsIa.avisosPregunta.eliminarAyuda",
+  clave_oficial: "serumsIa.errores.clave_oficial",
 };
 
 /** Clave i18n del error, si tiene una propia; si no, `undefined` y la pantalla usa su mensaje habitual. */
