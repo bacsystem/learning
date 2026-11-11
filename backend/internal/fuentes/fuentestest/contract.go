@@ -44,6 +44,7 @@ func RunContract(t *testing.T, nuevo func(t *testing.T) Entorno) {
 	t.Run("CitaQueNoCoincide", func(t *testing.T) { citaQueNoCoincide(t, nuevo(t)) })
 	t.Run("PublicacionAtomica", func(t *testing.T) { publicacionAtomica(t, nuevo(t)) })
 	t.Run("VersionFallida", func(t *testing.T) { versionFallida(t, nuevo(t)) })
+	t.Run("PublicarEnRetiradaNoLaReactiva", func(t *testing.T) { publicarEnRetirada(t, nuevo(t)) })
 	t.Run("ObtenerPasajesPaginado", func(t *testing.T) { obtenerPasajes(t, nuevo(t)) })
 	t.Run("HashDuplicado", func(t *testing.T) { hashDuplicado(t, nuevo(t)) })
 }
@@ -395,5 +396,29 @@ func hashDuplicado(t *testing.T, e Entorno) {
 	}
 	if _, err := e.NuevaVersion(ctx, id, contenido); !errors.Is(err, fuentes.ErrFuenteDuplicada) {
 		t.Errorf("same content as a new version: err = %v, want ErrFuenteDuplicada", err)
+	}
+}
+
+// Publishing a new version of a retired fuente keeps it retired: only S5
+// restores it (contract E2 § Estados). Its passages stay out of the search,
+// but the new version's citations resolve.
+func publicarEnRetirada(t *testing.T, e Entorno) {
+	ctx := context.Background()
+	mk := marcador()
+	s := activa(t, e, nil, mk+" antes de retirar")
+	if err := e.Retirar(ctx, s.fuenteID); err != nil {
+		t.Fatal(err)
+	}
+	n, err := e.NuevaVersion(ctx, s.fuenteID, []byte("tras retirar "+marcador()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nueva := sembrada{fuenteID: s.fuenteID, version: n}.publicar(t, e, mk+" después de retirar")
+	if got := buscar(t, e, fuentes.Busqueda{Consulta: mk, EspecialidadID: e.Especialidades[0]}); len(got) != 0 {
+		t.Errorf("a retired fuente is searchable after publishing: %v", ids(got))
+	}
+	c, err := e.Repo.ResolverCita(ctx, fuentes.Cita{FuenteID: s.fuenteID, Version: n, PasajeID: nueva.pasajes[0]})
+	if err != nil || c.EstadoFuente != fuentes.EstadoRetirada {
+		t.Errorf("cita of the new version = %+v, %v; want estado retirada", c, err)
 	}
 }
