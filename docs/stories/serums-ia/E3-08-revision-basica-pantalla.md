@@ -28,9 +28,13 @@ Las pantallas usan componentes y tokens de khipu.
    - Insignia de estado (icono + texto, nunca solo color) para `borrador`, `en_revision`, `aprobada`, `rechazada` y `activo`, más el origen y el nº de citas.
    - Filtros por estado y por origen. Por defecto se ve todo, como hoy.
    - Los nombres de estado reutilizan las claves de SIA-E3-02 (`dashboard.serumsIa.estadosPregunta.*`) y no se duplican.
-2. **Detalle, citas actuales:** cada cita muestra fuente, versión y extracto, con la opción de quitarla.
+2. **Detalle, citas actuales:**
+   - Cada cita muestra fuente, versión y extracto, con la opción de quitarla.
+   - Cada cita se puede expandir para ver el **texto completo del pasaje** (SIA-E3-07), para verificar la clave contra la cita. Se muestra como texto plano escapado, sin HTML, con los saltos de línea conservados.
+   - El expandible usa un componente colapsable existente de khipu. Si khipu no tiene uno adecuado, primero va un PR a khipu y se reestima la historia.
+   - Sin resaltado ni virtualización de textos largos.
 3. **Detalle, buscador de pasajes:**
-   - Búsqueda por texto con hasta 20 resultados (SIA-E3-07). Cada uno muestra título de la fuente, versión y extracto, y se añade como cita con una acción.
+   - Búsqueda por texto con hasta 20 resultados (SIA-E3-07). Cada uno muestra título de la fuente, versión y extracto (300 caracteres), y se añade como cita con una acción.
    - «Sin resultados» si no hay coincidencias.
    - Nunca muestra rutas de archivo.
 4. **Errores de citas:** `fuente_no_activa`, `limite_citas` y `ultima_cita_activa` se muestran con un texto traducido, nunca con el código crudo. Tras el error la lista de citas se recarga. Un error desconocido muestra un texto genérico traducido.
@@ -66,6 +70,16 @@ Escenario: Añadir una cita
   Cuando el admin busca "hipertensión" y añade un pasaje
   Entonces la cita aparece en el detalle con fuente, versión y extracto, y el nº de citas del listado pasa a 1
 
+Escenario: Ver el texto completo de una cita
+  Dado una pregunta con una cita a un pasaje de 600 palabras
+  Cuando el admin expande la cita
+  Entonces ve el texto completo del pasaje como texto plano, con sus saltos de línea, y puede volver a contraerlo
+
+Escenario: Texto del pasaje sin HTML
+  Dado un pasaje cuyo texto contiene "<b>dosis</b>"
+  Cuando el admin expande la cita
+  Entonces ve los caracteres "<b>dosis</b>" tal cual, sin que se interpreten como HTML
+
 Escenario: Búsqueda sin resultados
   Dado ningún pasaje que contenga "zzzz"
   Cuando el admin busca "zzzz"
@@ -95,13 +109,13 @@ Escenario: Acceso
 ## Fuera de alcance
 - Acciones de revisión, «Se revisa en su cola», errores de transición y recarga ante 409 de transición: SIA-E3-09.
 - Avisos en alta, Excel, edición y eliminación: SIA-E3-10.
-- Aprobación masiva, visor completo del pasaje con resaltado y colas especializadas (SIA-E3-05, SIA-E6-05).
+- Aprobación masiva, resaltado y virtualización del texto del pasaje, y colas especializadas (SIA-E3-05, SIA-E6-05).
 
 ## Dependencias
 SIA-E3-07. Las insignias de estado son de khipu; si falta un componente, va primero un PR a khipu.
 
 ## Seguridad y privacidad
-Guard de rol admin. La pantalla no muestra rutas de archivo ni códigos de error crudos.
+Guard de rol admin. La pantalla no muestra rutas de archivo ni códigos de error crudos. El texto del pasaje se escapa siempre: nunca se renderiza como HTML.
 
 ## i18n
 Todo en es/en. Esta historia es dueña de:
