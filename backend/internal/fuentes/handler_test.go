@@ -27,6 +27,7 @@ type fakeServicio struct {
 	form    FormularioFuente
 	filtro  FiltroListado
 	id      int64
+	cambios int // calls of S5–S7
 }
 
 func (f *fakeServicio) Crear(_ context.Context, a ArchivoSubido, fm FormularioFuente, _ *int64, _ Auditor) (FuenteDetalle, error) {
@@ -49,6 +50,21 @@ func (f *fakeServicio) Obtener(_ context.Context, id int64) (FuenteDetalle, erro
 	return FuenteDetalle{ResumenFuente: ResumenFuente{ID: id}}, f.err
 }
 
+func (f *fakeServicio) CambiarEstado(_ context.Context, id int64, _ CambioEstadoRequest, _ int64, _ Auditor) (FuenteDetalle, error) {
+	f.id, f.cambios = id, f.cambios+1
+	return FuenteDetalle{}, f.err
+}
+
+func (f *fakeServicio) Oficial(_ context.Context, id int64, _ OficialRequest, _ int64, _ Auditor) (FuenteDetalle, error) {
+	f.id, f.cambios = id, f.cambios+1
+	return FuenteDetalle{}, f.err
+}
+
+func (f *fakeServicio) Editar(_ context.Context, id int64, _ EditarRequest, _ Auditor) (FuenteDetalle, error) {
+	f.id, f.cambios = id, f.cambios+1
+	return FuenteDetalle{}, f.err
+}
+
 // subidaMux is the handler behind the real MaxBodySize with the routes of
 // RutasSubida (the list cmd/server/main.go passes) and admin claims.
 func subidaMux(svc servicio) http.Handler {
@@ -63,6 +79,9 @@ func subidaMux(svc servicio) http.Handler {
 	mux.Handle(RutaNuevaVersion, conClaims(h.NuevaVersion))
 	mux.Handle(RutaListar, conClaims(h.Listar))
 	mux.Handle(RutaObtener, conClaims(h.Obtener))
+	mux.Handle(RutaCambiarEstado, conClaims(h.CambiarEstado))
+	mux.Handle(RutaOficial, conClaims(h.Oficial))
+	mux.Handle(RutaEditar, conClaims(h.Editar))
 	return middleware.MaxBodySize(middleware.DefaultJSONBodyLimit, middleware.DefaultMultipartBodyLimit, RutasSubida...)(mux)
 }
 
@@ -249,5 +268,46 @@ func TestObtener_ID(t *testing.T) {
 				t.Errorf("got %d %v (id %d), want %d", status, body, svc.id, c.status)
 			}
 		})
+	}
+}
+
+// S5–S7 read the path id and a strict JSON body before the service runs:
+// a bad id is 400 parametro_invalido, an unknown field (tipo in S7, say) 400
+// cuerpo_invalido and a body over 1 MB 413. That 413 comes from the shared
+// MaxBodySize middleware, whose body has no code yet (same on every JSON
+// route), so only the status is checked.
+func TestCambios_IDYCuerpo(t *testing.T) {
+	rutas := map[string]string{
+		"S5": "PATCH /admin/fuentes/%s/estado",
+		"S6": "PATCH /admin/fuentes/%s/oficial",
+		"S7": "PUT /admin/fuentes/%s",
+	}
+	cases := []struct {
+		name   string
+		id     string
+		body   string
+		status int
+		code   string
+	}{
+		{"válido llega al servicio", "9", `{}`, 200, ""},
+		{"id no numérico", "abc", `{}`, 400, "parametro_invalido"},
+		{"id cero", "0", `{}`, 400, "parametro_invalido"},
+		{"campo desconocido", "9", `{"tipo":"guia"}`, 400, "cuerpo_invalido"},
+		{"JSON roto", "9", `{`, 400, "cuerpo_invalido"},
+		{"cuerpo de más de 1 MB", "9", `{"titulo":"` + strings.Repeat("a", 1<<20) + `"}`, 413, ""},
+	}
+	for nombre, ruta := range rutas {
+		for _, c := range cases {
+			t.Run(nombre+" "+c.name, func(t *testing.T) {
+				svc := &fakeServicio{}
+				status, body := enviar(t, subidaMux(svc), fmt.Sprintf(ruta, c.id), bytes.NewBufferString(c.body), "application/json")
+				if status != c.status || (c.code != "" && body["error"] != c.code) {
+					t.Fatalf("got %d %v, want %d %s", status, body, c.status, c.code)
+				}
+				if want := map[bool]int{true: 1, false: 0}[c.status == 200]; svc.cambios != want || (want == 1 && svc.id != 9) {
+					t.Errorf("service calls = %d (id %d), want %d", svc.cambios, svc.id, want)
+				}
+			})
+		}
 	}
 }

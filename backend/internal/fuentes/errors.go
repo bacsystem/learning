@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Errors of the admin upload (S1, S2; contract E2). The handler maps them to
+// Errors of the admin endpoints (S1–S7; contract E2). The handler maps them to
 // status and code; the texts are the Spanish fallback message.
 var (
 	ErrArchivoDemasiadoGrande = errors.New("El archivo supera el máximo de 2 MiB.")
@@ -15,7 +15,7 @@ var (
 	ErrValidacion             = errors.New("Datos de la fuente inválidos.")
 	ErrReferenciaInvalida     = errors.New("Alguna especialidad o el proceso no existe o está inactivo.")
 	ErrLimiteFuentes          = errors.New("Se alcanzó el máximo de fuentes.")
-	ErrEstadoInvalido         = errors.New("La fuente no admite una versión nueva en su estado actual.")
+	ErrEstadoInvalido         = errors.New("La fuente no admite esta operación en su estado actual.")
 	ErrLimiteVersiones        = errors.New("La fuente ya tiene 20 versiones y ninguna se puede archivar.")
 )
 

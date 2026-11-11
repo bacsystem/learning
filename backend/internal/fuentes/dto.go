@@ -96,6 +96,34 @@ type FuenteDetalle struct {
 	Oficial            *Oficial         `json:"oficial"`
 	ContenidosCitantes int              `json:"contenidos_citantes"`
 	Versiones          []VersionDetalle `json:"versiones"`
+	// ContenidosMarcados is only in the answer of a retirement (S5), where 0
+	// is still sent; nil leaves it out of every other answer.
+	ContenidosMarcados *int `json:"contenidos_marcados,omitempty"`
+}
+
+// ── Admin changes (S5–S7) ─────────────────────────────────────────────────────
+
+// CambioEstadoRequest is the body of S5: retirar (with motivo), restaurar
+// (activa) or reintentar (procesando).
+type CambioEstadoRequest struct {
+	Estado string  `json:"estado"`
+	Motivo *string `json:"motivo"`
+}
+
+// OficialRequest is the body of S6: mark with entidad and nota, or unmark
+// with motivo.
+type OficialRequest struct {
+	OficialVerificada *bool   `json:"oficial_verificada"`
+	EntidadEmisora    *string `json:"entidad_emisora"`
+	Nota              *string `json:"nota"`
+	Motivo            *string `json:"motivo"`
+}
+
+// EditarRequest is the body of S7: it replaces both fields; an empty
+// especialidad_ids means every especialidad, a missing one is invalid.
+type EditarRequest struct {
+	Titulo          string   `json:"titulo"`
+	EspecialidadIDs *[]int64 `json:"especialidad_ids"`
 }
 
 // ── Listing (S3) ──────────────────────────────────────────────────────────────
