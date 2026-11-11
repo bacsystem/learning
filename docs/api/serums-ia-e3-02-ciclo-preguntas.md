@@ -164,7 +164,7 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 }
 ```
 
-`citas` va ordenado por `fuente_id, version, pasaje_id`. No incluye el texto completo del pasaje, que se resuelve con `ResolverCita` del puerto (ADR 0003). **SIA-E3-07 §5** suma a cada cita `seccion`, `linea_inicio`, `linea_fin` y `extracto` (≤ 300 runes, `texto.Extracto`).
+`citas` va ordenado por `fuente_id, version, pasaje_id`. No incluye el texto completo del pasaje, que se resuelve con `ResolverCita` del puerto (ADR 0003). **SIA-E3-07 §5** suma a cada cita `seccion`, `linea_inicio`, `linea_fin`, `extracto` (≤ 300 runes, `texto.Extracto`) y `texto`, el pasaje completo de la versión citada (decisión del PO).
 
 ### 4.5 `PUT /preguntas/{id}`: efecto sobre el estado (P3, decidida por el PO)
 
@@ -264,4 +264,4 @@ Los códigos de esta tabla usan el **formato 2** (`{"error": "<codigo>", "messag
 | B6b | §4.5: `PUT` con contenido → `en_revision` (comparando con lo guardado) y `422 clave_oficial` en `balotario` | 2 |
 | B7 | §5, `SuscriptorRetiro`: registro en `main` y tests de «Retirar fuente citada» (12 aprobadas y 3 en borrador), «Restaurar no reaprueba» y «todo o nada» con un fallo provocado | 3 |
 | B8 | I12 (vía acordada con backend-dev):<br>• **seed de demo:** siembra una fuente activa titulada **«Fuente demo (no oficial)»** por el puerto (`GuardarFuente` + `PublicarVersion`). Usa texto sintético, nunca de `assets/`, y va **sin** marca de oficial verificada. **Nunca** se siembra en producción: el comando se niega a correr con `ENV=production` (condiciones del PO). Después cita cada pregunta (uno o pocos pasajes) y la aprueba con la transición de B4, sin crear ninguna en `activo`.<br>• **fixture `questionstest/seed.go:198`:** lleva `estado` **explícito** en el INSERT (`activo`, que representa el banco heredado), más casos aparte con `aprobada`, para no depender del DEFAULT | 2 |
-| F1 | frontend-dev: tipos de `questions/api.ts`, estado visible en el listado admin y claves i18n es/en de los 6 estados y del origen | 2 |
+| F1 | frontend-dev: tipos de `questions/api.ts`, estado visible en el listado admin y claves i18n es/en de los 6 estados y del origen. La rama adelanta además eliminar según el estado y el aviso al editar: se aceptan contra E3-10 (alcance y reparto en SIA-E3-07 §9) | 2 |

@@ -34,5 +34,6 @@ Varias historias necesitan «el servicio de IA». El proveedor, el modelo y los 
   - Los costos y el uso quedan auditados.
 - **Negativas:**
   - Rechazar por patrón tiene falsos positivos, por ejemplo una fecha `20261111` (8 dígitos) o el teléfono de contacto de una norma. Decisión del PO (contrato §7): el servicio rechaza y nunca enmascara por su cuenta. Los consumidores que arman entradas con contenido de fuentes o preguntas enmascaran antes de llamar, con la función exportada `ia.Enmascarar`.
+  - La detección pliega los dígitos Unicode (`Nd`) a ASCII antes de buscar, pero no aplica NFKC, para no sumar `golang.org/x/text` como dependencia directa. **Riesgo aceptado:** un correo con letras o `＠` de ancho completo, o un número con caracteres invisibles entre los dígitos, puede pasar sin detectarse. Es una ofuscación deliberada, poco probable en contenido que carga un admin (contrato §4, plegado de dígitos). Si hiciera falta NFKC, se pide aprobación para la dependencia.
   - Cada consumidor necesita infraestructura asíncrona (job y estado), y eso aumenta el costo de E3-04 y E6-03.
   - Hasta E6-02, con `IA_PROVEEDOR` vacío, ninguna función de IA está disponible en producción.

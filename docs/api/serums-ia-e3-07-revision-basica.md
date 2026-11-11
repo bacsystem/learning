@@ -1,6 +1,6 @@
 # Contrato API — SERUMS IA, SIA-E3-07 Revisión básica de preguntas
 
-- **Historia:** [SIA-E3-07](../stories/serums-ia/E3-07-revision-basica-preguntas.md). La pantalla es [SIA-E3-08](../stories/serums-ia/E3-08-revision-basica-pantalla.md). Las dos historias llegan con el PR #153 (rama `docs/sia-e3-02-decisiones`); hasta su merge, los enlaces no resuelven en esta rama.
+- **Historia:** [SIA-E3-07](../stories/serums-ia/E3-07-revision-basica-preguntas.md). Issue #155. Las pantallas son SIA-E3-08 (listado y detalle con citas, #156), SIA-E3-09 (acciones, #157) y SIA-E3-10 (avisos, #158). Las historias llegan con el PR #153 (rama `docs/sia-e3-02-decisiones`) y el próximo PR de historias del PO; hasta su merge, los enlaces no resuelven en esta rama.
 - **Estado:** borrador para revisión del tech-lead (2026-11-11). Reglas acordadas entre el PO y el tech-lead el 2026-11-11.
 - **Extiende:** el contrato de [SIA-E3-02](serums-ia-e3-02-ciclo-preguntas.md). Donde los dos difieran, **manda este**. E3-02 §4.1, §4.2, §4.4 y §7 ya remiten aquí.
 - **ADR:** [0007](../adr/0007-busqueda-pasajes-admin-fuera-del-puerto.md), búsqueda de pasajes para el admin.
@@ -16,11 +16,13 @@
 | R1 | Búsqueda de pasajes | Solo existe el puerto `BuscarPasajes` (`fuentes/source.go:188-190`; `pgsource.go:165-191`). Exige `EspecialidadID > 0` (`source.go:207`) y no devuelve el título de la fuente. No hay ruta HTTP (`fuentes/routes.go:21-43`) | Ruta admin nueva `GET /admin/pasajes` (§2), con una consulta admin fuera del puerto que comparte el SQL del adaptador ([ADR 0007](../adr/0007-busqueda-pasajes-admin-fuera-del-puerto.md)) |
 | R2 | `PATCH /preguntas/{id}/estado` (E3-02 §4.1) | Sin guardas por origen ni confirmación | Cuerpo definitivo con `verificado` y `nota`. Guardas `revision_especializada`, `verificacion_requerida` y `nota_obligatoria`, con un orden total de validación (§3) |
 | R3 | `PUT /preguntas/{id}/citas` (E3-02 §4.2) | `409 estado_invalido` en `aprobada`; se puede citar una fuente retirada; más de 20 da `422 validacion` | Se permite en `aprobada`, con la guarda `ultima_cita_activa`. Las citas **nuevas** exigen una fuente `activa` (`fuente_no_activa`). Más de 20 da `limite_citas` (§4) |
-| R4 | Objeto pregunta, `citas[]` (E3-02 §4.4; `questions/dto.go:112-118`, `CitaResponse`) | Sin texto del pasaje | Suma `extracto`, `seccion`, `linea_inicio` y `linea_fin`, para que E3-08 muestre las citas actuales sin otra llamada (§5) |
+| R4 | Objeto pregunta, `citas[]` (E3-02 §4.4; `questions/dto.go:112-118`, `CitaResponse`) | Sin texto del pasaje | Suma `seccion`, `linea_inicio`, `linea_fin`, `extracto` y `texto` (el pasaje completo), para que E3-08 muestre y el admin verifique las citas sin otra llamada (§5) |
 | R5 | `internal/texto` (`texto.go:35`, `Plegar`) | — | Función nueva `texto.Extracto(s string) string`, única regla del extracto para R1 y R4 (§5) |
 
 - **Sin cambios:** la máquina de estados (E3-02 §3), el `DELETE` (E3-02 P2), el `PUT /preguntas/{id}` (E3-02 §4.5) y el suscriptor de retiro (E3-02 §5).
-- **`conflicto_clave` (regla 4 de la historia): diferido a SIA-E3-01/E3-03.** El código `409 conflicto_clave` queda **reservado**, con su lugar en el orden de §3 (paso 8), pero **no se implementa** en E3-07. El dato que lo dispara (una clave en conflicto sin resolver, de SIA-E3-06) lo crean E3-01/E3-03, y la regla se activa con ellas, sin columna nueva ahora. El escenario «Conflicto de clave» y su test de la DoD se validan con esas historias.
+- **Importación Excel (confirmado, 2026-11-11):** `POST /preguntas/import` crea cada fila con `svc.CreatePregunta` (`questions/importer.go:238-259`), igual que el alta manual. Las preguntas importadas nacen con **`estado = 'borrador'` y `origen = 'manual'`** (E3-02 regla 2 y P1; E3-02 I8). El Excel no es un balotario: el origen `balotario` lo fija solo la importación de SIA-E3-01. Así, una pregunta del Excel se aprueba por esta vía básica (§3.2, paso 7).
+- **Listado (necesidad de E3-08):** `GET /preguntas` ya trae, por E3-02 §4.3, los filtros exactos `estado` y `origen` y `citas_count` en cada item. E3-07 no lo cambia.
+- **`conflicto_clave` (regla 4 de la historia): diferido a SIA-E3-01/E3-03** (confirmado por el PO, 2026-11-11). El código `409 conflicto_clave` queda **reservado**, con su lugar en el orden de §3 (paso 8), pero **no se implementa** en E3-07. El dato que lo dispara (una clave en conflicto sin resolver, de SIA-E3-06) lo crean E3-01/E3-03, y la regla se activa con ellas, sin columna nueva ahora. El escenario «Conflicto de clave» y su test de la DoD se validan con esas historias; qa cierra E3-07 sin ese escenario.
 - **No hay `falta_area` ni `falta_tema`:** `asignatura_id` es obligatoria (`014_create_preguntas.sql`) y el tema es opcional en el MVP.
 
 ## 2. `GET /admin/pasajes` (nuevo; admin)
@@ -146,7 +148,7 @@ Sean `actuales` las citas de la pregunta tras el bloqueo, `nuevas = pasaje_ids �
 
 - **`fuente_no_activa` solo mira las citas nuevas.** Una cita que ya estaba se puede conservar aunque su fuente se haya retirado: el cliente reenvía la lista completa. Es lo que pide «Revalidar tras fuente retirada»: el admin envía `[cita_retirada, cita_nueva_activa]` y solo se valida la nueva. La cita retirada no cuenta para aprobar (§3.2, paso 9).
 - **`ultima_cita_activa` solo mira las quitas.** En una `aprobada`, agregar siempre se permite, y una sustitución en un solo `PUT` (quitar A y poner B activa) también. «Quitar la última cita de una aprobada»: `[A] → []` da `409`; `[A] → [A, B]` y después `[A, B] → [B]` dan `200`.
-- **`activo` heredado no tiene la guarda:** el banco heredado se sirve sin citas (E3-02 §2, Compatibilidad), así que quitarle una no lo deja peor que hoy. La regla de la historia y la tabla acordada hablan solo de `aprobada`.
+- **`activo` heredado no tiene la guarda** (confirmado por el PO, 2026-11-11): el banco heredado se sirve sin citas (E3-02 §2, Compatibilidad), así que puede quedarse sin ellas, como hoy. Si se edita su contenido, pasa a `en_revision` (E3-02 §4.5) y entonces necesita una cita activa para revalidarse.
 - **El origen `balotario`** sigue la excepción de E3-02 (regla 3, P4): su cita es a la propia fuente del balotario y cuenta solo si está `activa`. No hay rama especial en el código.
 - **Lista idéntica a la actual:** `200` sin escribir nada y **sin** fila de auditoría («cada cambio se audita»; no cambió nada).
 
@@ -161,15 +163,18 @@ Sean `actuales` las citas de la pregunta tras el bloqueo, `nuevas = pasaje_ids �
   2. si quedan más de **300 runes**, corta en 300 y agrega `…` (U+2026).
 
   Es texto plano: la UI lo muestra como texto, sin interpretar Markdown.
-- **`citas[]` del objeto pregunta** (E3-02 §4.4) suma cuatro campos. Valen para `GET /preguntas/{id}` y para las respuestas de `PATCH …/estado`, `PUT …/citas` y `PUT /preguntas/{id}`:
+- **`citas[]` del objeto pregunta** (E3-02 §4.4) suma cinco campos. Valen para `GET /preguntas/{id}` y para las respuestas de `PATCH …/estado`, `PUT …/citas` y `PUT /preguntas/{id}`:
 
   ```json
   { "pasaje_id": 9012, "fuente_id": 9, "version": 2, "fuente_titulo": "NTS de vigilancia del dengue",
     "fuente_estado": "activa", "seccion": "3.2 Definición de caso", "linea_inicio": 120, "linea_fin": 148,
-    "extracto": "Caso probable de dengue sin signos de alarma: …" }
+    "extracto": "Caso probable de dengue sin signos de alarma: …",
+    "texto": "Caso probable de dengue sin signos de alarma: toda persona con fiebre de hasta siete días…(pasaje completo)" }
   ```
 
-  - Se leen en la misma consulta que ya resuelve `fuente_titulo` y `fuente_estado`, con un `JOIN` a `pasajes`. No se llama a `ResolverCita` por cada cita.
+  - **`texto` es el pasaje completo** (decisión del PO, 2026-11-11): el extracto sirve para elegir un pasaje, pero no para verificar la clave contra la cita. Lo acota la regla de pasajes (≤ 800 palabras, ADR 0003 § Normalización): con 20 citas, la respuesta queda en el orden de 100–150 KB en el peor caso. E3-08 lo muestra como texto plano expandible; el visor con resaltado sigue fuera de alcance.
+  - `texto` va solo en `citas[]` del objeto pregunta. La búsqueda (§2) **no** lo trae: solo `extracto`.
+  - Se leen en la misma consulta que ya resuelve `fuente_titulo` y `fuente_estado`, con un `JOIN` a `pasajes`. No se llama a `ResolverCita` por cada cita. El texto es el de la versión citada (inmutable, ADR 0003), aunque la fuente tenga versiones nuevas o esté retirada.
   - El listado `GET /preguntas` sigue con `citas_count` y sin `citas` (E3-02 §4.3).
 
 ## 6. Seguridad
@@ -192,7 +197,7 @@ Sean `actuales` las citas de la pregunta tras el bloqueo, `nuevas = pasaje_ids �
 | `fuente_no_activa` | 422 | §4.2, paso 7 |
 | `ultima_cita_activa` | 409 | §4.2, paso 8 |
 
-Se suman a los de E3-02 §7 (`estado_invalido`, `falta_cita`, `validacion`, `referencia_invalida`, `no_encontrado`…). E3-08 los traduce con `dashboard.serumsIa.errores.<codigo>` (README §8). Ante cualquier `409`, la pantalla recarga la pregunta.
+Se suman a los de E3-02 §7 (`estado_invalido`, `falta_cita`, `validacion`, `referencia_invalida`, `no_encontrado`…). E3-08 y E3-09 los traducen con `dashboard.serumsIa.errores.<codigo>` (README §8; reparto de claves en §9). Ante cualquier `409`, la pantalla recarga la pregunta.
 
 ## 8. Trazabilidad con los criterios de aceptación
 
@@ -219,7 +224,7 @@ Se suman a los de E3-02 §7 (`estado_invalido`, `falta_cita`, `validacion`, `ref
 
 | # | Tarea | Depende de | h |
 |---|---|---|---|
-| B3b | §5: los cuatro campos nuevos de `CitaResponse` (`questions/dto.go:112-118`) en la consulta de citas, con `texto.Extracto` | B3, `texto.Extracto` de B9 | 1 |
+| B3b | §5: los cinco campos nuevos de `CitaResponse` (incluido `texto`, el pasaje completo) (`questions/dto.go:112-118`) en la consulta de citas, con `texto.Extracto` | B3, `texto.Extracto` de B9 | 1 |
 | B4a | E3-02 §4.1 con el cuerpo definitivo de §3.1: DTO con los cuatro campos, pasos 1–6, transiciones de E3-02 §3, motivo, orden de bloqueo y auditoría (§3.3). Un test por fila de E3-02 §3, más «Rechazar y reabrir» y «Concurrencia» | B3 | 3 |
 | B4b | §3.2, pasos 7–11, en el service: `revision_especializada`, `falta_cita`, `nota_obligatoria` y `verificacion_requerida`. Un test por escenario y uno que fije el orden (p. ej. una `ia` en `en_revision`, sin nota ni casilla, da `nota_obligatoria`) | B4a | 2 |
 | B5 | §4: `PUT …/citas` con `limite_citas`, `referencia_invalida` tras el bloqueo, `fuente_no_activa` solo en las nuevas, `ultima_cita_activa` solo en `aprobada`, lista idéntica sin auditoría, y la implementación de `Citantes` (E3-02 §5). Tests de «Cita a fuente retirada», «Quitar la última cita» (con la sustitución), «Límite» y «Revalidar tras fuente retirada» | B3 | 3 |
@@ -229,15 +234,27 @@ Se suman a los de E3-02 §7 (`estado_invalido`, `falta_cita`, `validacion`, `ref
 - B9 vive en `internal/fuentes` e `internal/texto` y no toca `internal/questions`: el tech-lead puede dársela a **backend-dev-2**, en paralelo y sin dependencias. Si `texto.Extracto` todavía no está en develop cuando backend-dev llegue a B3b, B3b lo toma de la rama de B9 o lo escribe con la regla de §5 y B9 lo reutiliza: una sola función.
 - Orden sugerido para backend-dev: B3 → B4a → B4b → B5 → B3b → B8.
 
-### frontend-dev (SIA-E3-08; después de F1 de E3-02 y contra este contrato, sin esperar al backend)
+### frontend-dev (contra este contrato, sin esperar al backend)
 
-| # | Tarea | h |
-|---|---|---|
-| F2 | Clientes en `src/lib/questions/api.ts` (`cambiarEstado`, `reemplazarCitas`) y un `src/lib/serums-ia/pasajes/api.ts` (`buscarPasajes`), con el manejo de errores del README §3 (`code`, `detalle`). Tipos de §2, §3.1 y §5. Claves `dashboard.serumsIa.errores.*` es/en de los 8 códigos de §7, más `estado_invalido` y `falta_cita` | 2 |
-| F3 | Listado: insignia de estado (icono + texto, de khipu), origen, nº de citas y filtros por estado y origen (E3-08 regla 1). Estado vacío «No hay preguntas con ese filtro» | 2 |
-| F4 | Detalle / revisión, citas: citas actuales con fuente, versión, `fuente_estado` y extracto, con «quitar»; buscador de pasajes con «Sin resultados». Añadir y quitar envían la lista completa (§4) | 3 |
-| F5 | Detalle / revisión, acciones según estado y origen: Aprobar (solo `borrador` + `manual`, con casilla), Revalidar (casilla y nota de 10–500 si el origen es `balotario`/`ia`), Rechazar (motivo de 5–500), Reabrir y «Se revisa en su cola». Ante un 409, recarga la pregunta | 3 |
-| F6 | Avisos en las pantallas existentes (E3-08 regla 3): alta y Excel en borrador, confirmación al editar el contenido de una `aprobada`/`activo` y «Eliminar» deshabilitado en `borrador`/`en_revision` | 2 |
+El PO dividió la pantalla en tres historias (review del PR #153, H4): **SIA-E3-08** (listado y detalle con citas, issue #156), **SIA-E3-09** (acciones de revisión, #157) y **SIA-E3-10** (avisos en las pantallas existentes, #158).
 
+**F1 de E3-02, alcance actualizado.** La rama `feature/sia-e3-02-estados-preguntas` entrega:
+- los tipos de `questions/api.ts` (estados, `origen`, `citas`, `citas_count`);
+- en el listado, la insignia de estado, el origen y el nº de citas;
+- las claves i18n es/en de los estados (`dashboard.serumsIa.estadosPregunta.*`) y del origen;
+- y adelanta además **eliminar según el estado** y el **aviso al editar contenido**.
+
+Lo que F1 adelanta **no se rehace**. Se acepta contra los criterios de la historia que es su dueña: el listado contra E3-08 y eliminar y el aviso de edición contra E3-10. F1 se revisa contra E3-02 solo en lo que es suyo (tipos, estado visible e i18n de los estados).
+
+| # | Historia | Tarea | Depende de | h |
+|---|---|---|---|---|
+| F2 | E3-08 | Clientes: `cambiarEstado` y `reemplazarCitas` en `src/lib/questions/api.ts`, `buscarPasajes` en `src/lib/serums-ia/pasajes/api.ts`, con el manejo de errores del README §3 (`code`, `detalle`). Tipos de §2, §3.1 y §5 (incluido `texto`). Claves i18n es/en de los errores de citas y búsqueda: `fuente_no_activa`, `limite_citas`, `ultima_cita_activa`, `consulta_invalida`, `referencia_invalida` y el genérico | F1 | 2 |
+| F3 | E3-08 | Listado: filtros por estado y por origen (`GET /preguntas?estado=&origen=`, E3-02 §4.3), sobre las insignias, el origen y el nº de citas de F1. Estados de carga, vacío («No hay preguntas con ese filtro») y error | F1 | 2 |
+| F4 | E3-08 | Detalle, citas: citas actuales con fuente, versión, `fuente_estado`, extracto y el **texto completo como texto plano expandible**, con «quitar»; buscador de pasajes con carga, «Sin resultados» y error. Añadir y quitar envían la lista completa (§4) y, tras un error, la lista se recarga. Deja visible la zona de acciones para E3-09 | F2 | 3 |
+| F5 | E3-09 | Acciones según estado y origen: Aprobar (solo `borrador` + `manual`, con casilla), Revalidar (casilla, más nota de 10–500 si el origen es `balotario`/`ia`), Rechazar (motivo de 5–500), Reabrir y «Se revisa en su cola». Ante un 409, recarga y muestra «Esta pregunta cambió de estado…». Claves i18n es/en de `falta_cita`, `verificacion_requerida`, `nota_obligatoria`, `conflicto_clave`, `revision_especializada` y `estado_invalido` | F4 | 3 |
+| F6 | E3-10 | Avisos: alta y Excel en borrador; completar lo que F1 no haya cubierto de la confirmación al editar contenido de una `aprobada`/`activo`, de «Eliminar» deshabilitado en `borrador`/`en_revision` y del 409 al eliminar; `422 clave_oficial` traducido. Solo consume el contrato de E3-02, así que puede ir en paralelo con F2–F5 | F1 | 2 |
+
+- Orden sugerido: F1 → F2 → F3 → F4 → F5, con F6 en cualquier hueco después de F1.
+- **Claves de error:** van en `dashboard.serumsIa.errores.<codigo>`, la convención única del módulo (README §8), y no en `dashboard.serumsIa.revision.errores.*` como dicen E3-08 y E3-09. Así un mismo código (p. ej. `estado_invalido`) tiene una sola traducción en todas las pantallas. Ya se lo pedí al PO para su próximo PR de historias. Las claves de UI propias (`revision.listado.*`, `revision.citas.*`) siguen como en las historias.
 - Todo con componentes y tokens de khipu. Si falta un componente (p. ej. la insignia de estado con icono), va primero el PR a khipu (CLAUDE.md).
 - La validación del cliente (casilla, nota, motivo, ≤ 20 citas, 3–300 caracteres en la búsqueda) replica la del servidor; el servidor sigue siendo la fuente de verdad.

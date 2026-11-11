@@ -115,6 +115,14 @@ Se **rechaza**, no se enmascara: la entrada que coincida no sale del servidor.
   2. Si `loc` cumple la frontera de dígito, es una detección: se registra (o se enmascara) y `pos` avanza al **final** de la coincidencia.
   3. Si no la cumple, `pos` avanza **un rune** desde el **inicio** del candidato (`inicio + 1`) y se vuelve al paso 1.
 
+- **Plegado de dígitos (decisión del architect, 2026-11-11):** en Go, `\d` solo reconoce los dígitos ASCII. Sin plegado, `１２３４５６７８` (ancho completo) o `١٢٣٤٥٦٧٨` (arábigo-índico) pasarían sin detectarse. Por eso, **antes** de detectar, cada rune de la categoría Unicode `Nd` se reemplaza por su dígito ASCII.
+  - Con la librería estándar (`unicode.Nd`), **sin NFKC** y sin dependencias nuevas. `golang.org/x/text` es solo indirecta (`go.mod:44`), y hacerla directa necesita aprobación.
+  - El valor es `(r − Lo) % 10` del rango de `unicode.Nd` que contiene `r`. Unicode garantiza que los dígitos `Nd` van en bloques contiguos de 0 a 9.
+  - La frontera de dígito y la búsqueda de abajo corren sobre el texto plegado, así que la comprobación ASCII de la frontera ya cubre los demás sistemas.
+  - `Enmascarar` devuelve el texto plegado y enmascarado: los dígitos no ASCII salen como ASCII, lo que no cambia el contenido académico.
+  - **Riesgo aceptado** (ADR 0006): no se pliegan las letras ni `＠` de ancho completo, ni se quitan los caracteres invisibles (p. ej. U+200B entre dígitos). Un correo o un DNI ofuscados a propósito pueden pasar. La entrada viene de fuentes y preguntas que carga un admin, no de un atacante.
+  - Tests: `１２３４５６７８`, `٩٨٧٦٥٤٣٢١` y `𝟗𝟖𝟕𝟔𝟓𝟒𝟑𝟐𝟏` se detectan, y la frontera vale con dígitos mixtos (`1２345678` es DNI; `１２３４５６７８９` no lo es).
+
   Detectar y `Enmascarar` usan esta misma función. No se usa la alternativa de capturar la frontera dentro del patrón (`(?:^|\D)(…)(?:\D|$)`), porque consume el separador y perdería el segundo de dos números separados por un solo carácter, como `987654321 987654322`.
 
 | Entrada | ¿Se detecta? |
