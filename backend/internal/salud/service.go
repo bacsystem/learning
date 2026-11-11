@@ -139,18 +139,15 @@ func gravedad(estado string) (nivel int, cuenta bool) {
 	}
 }
 
-// estadoGlobal is the worst individual state; on a tie between degradado and
-// desconocido, degradado. With no counting service it is operativo.
+// estadoGlobal is the worst individual state. desconocido counts as degradado
+// (decisión 1 del PO), so the global is only operativo, degradado or caido;
+// with no counting service it is operativo.
 func estadoGlobal(servicios []Servicio) string {
-	peor, nivelPeor := EstadoOperativo, 0
+	nivelPeor := 0
 	for _, sv := range servicios {
-		nivel, cuenta := gravedad(sv.Estado)
-		if !cuenta {
-			continue
-		}
-		if nivel > nivelPeor || (nivel == nivelPeor && sv.Estado == EstadoDegradado) {
-			peor, nivelPeor = sv.Estado, nivel
+		if nivel, cuenta := gravedad(sv.Estado); cuenta && nivel > nivelPeor {
+			nivelPeor = nivel
 		}
 	}
-	return peor
+	return [...]string{EstadoOperativo, EstadoDegradado, EstadoCaido}[nivelPeor]
 }

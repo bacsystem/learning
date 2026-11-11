@@ -58,7 +58,8 @@ func TestEstadoGlobal(t *testing.T) {
 	}{
 		{[]string{EstadoOperativo, EstadoOperativo}, EstadoOperativo},
 		{[]string{EstadoOperativo, EstadoDegradado}, EstadoDegradado},
-		{[]string{EstadoOperativo, EstadoDesconocido}, EstadoDesconocido},
+		{[]string{EstadoOperativo, EstadoDesconocido}, EstadoDegradado}, // desconocido counts as degradado
+		{[]string{EstadoDesconocido}, EstadoDegradado},
 		{[]string{EstadoDesconocido, EstadoDegradado}, EstadoDegradado},
 		{[]string{EstadoDegradado, EstadoCaido, EstadoOperativo}, EstadoCaido},
 		{[]string{EstadoNoConfigurado, EstadoOperativo}, EstadoOperativo},
