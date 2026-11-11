@@ -32,8 +32,8 @@ aprovisionamiento.
 - **El healthcheck solo se usa durante el despliegue.** Railway no vigila el
   endpoint una vez que el despliegue está activo.
   ([healthchecks](https://docs.railway.com/guides/healthchecks))
-  - Para tener alertas hace falta un monitor externo de `/health`. Es un
-    servicio nuevo: **pendiente de decisión del usuario**.
+  - El usuario aprobó **Uptime Kuma** dentro del proyecto para vigilar `/health`
+    de forma continua (§7.1).
 - **Despliegue por imagen** (decisión del usuario). `backend` y `frontend`
   usan como fuente una **imagen de Docker Hub**, no un build desde el repo. Con
   una imagen como fuente, Railway se salta el build
@@ -244,10 +244,63 @@ El usuario decidió habilitar lo que ofrece Railway, sin servicios externos.
   corta un cron colgado
   ([cron-jobs](https://docs.railway.com/reference/cron-jobs)).
 
-Por eso el cron de R2 lleva su propio `timeout` y su propio aviso (C13). Las
-alternativas para el hueco de `/health` (la plantilla de Uptime Kuma dentro del
-proyecto, o que el backend salga con error si pierde la base) están
-pendientes de decisión del usuario.
+Por eso el cron de R2 lleva su propio `timeout` y su propio aviso (C13).
+
+### 7.1 Uptime Kuma: vigilancia continua de `/health` (aprobado por el usuario)
+
+Cubre el hueco: un servicio más **dentro del proyecto de Railway**, sin
+servicios externos. **No se crea hasta que el usuario apruebe este diseño**;
+lo crea el usuario y cada ajuste se anota aquí.
+
+| Ajuste | Valor | Por qué |
+|---|---|---|
+| Servicio | `uptime-kuma`, en el mismo proyecto y entorno `production` | Lo aprobó el usuario |
+| Fuente | Imagen oficial **`louislam/uptime-kuma:2.5.9`**, versión fijada y nunca `latest` o `2` | Probada en local el 11-11-2026: arranca, escucha en 3001 y guarda en `/app/data`. Corre como root, así que el volumen de Railway no necesita ajustes de permisos |
+| Volumen | Montado en **`/app/data`** | Ahí guarda su base SQLite con los monitores, el historial y la configuración. Sin volumen, cada redeploy los pierde |
+| `PORT` | `3001` | El puerto en el que escucha la imagen |
+| Acceso | Por defecto **sin dominio público**. El usuario decide si genera uno para entrar a la interfaz | Railway no tiene VPN: sin dominio, no hay forma de abrir la interfaz. Si se genera, se protege con usuario admin, contraseña fuerte y **2FA** (Settings → Security), y se puede quitar el dominio una vez configurado |
+| Réplicas | 1 | SQLite en el volumen |
+| Restart policy | `ON_FAILURE` | Si el propio monitor se cae, Railway avisa por su lado (§7) |
+
+**Monitores** (en la interfaz de Uptime Kuma):
+
+| Monitor | Tipo | Destino | Intervalo | Alerta |
+|---|---|---|---|---|
+| `backend /health (público)` | HTTP(s), espera 200 | `https://<dominio del backend>/health` | **60 s**, 2 reintentos antes de marcarlo caído | Email |
+| `backend /health (red privada)` | HTTP, espera 200 | `http://backend.railway.internal:<PORT>/health` | 120 s | Email |
+| `frontend` | HTTP(s), espera 200 | `https://<dominio del frontend>/` | 120 s | Email |
+
+El monitor público comprueba lo que ven los usuarios: dominio, TLS y backend.
+El privado separa un problema de dominio o proxy de uno del backend o de la
+base, porque `/health` hace ping a Postgres. Así se cubre justo el caso que
+Railway no ve: proceso vivo pero `/health` en 503.
+
+**Notificación por email:** Settings → Notifications → «SMTP». Usa el mismo
+proveedor de correo que el backend, con un remitente propio, y avisa **al
+usuario**. La contraseña SMTP se guarda en la configuración de Uptime Kuma
+(en su volumen), no en el repositorio. Se activa «Default enabled» para que se
+aplique a todos los monitores.
+
+**Probar la alerta** (antes del lanzamiento y después de cada cambio de
+configuración; se anota en
+[condiciones-lanzamiento.md](condiciones-lanzamiento.md), C14):
+
+1. Crear un monitor temporal `prueba-alerta` hacia
+   `https://<dominio del backend>/health-prueba-alerta`, que da 404, con
+   intervalo de 20 s.
+2. Comprobar que llega el email de **caído** en uno o dos minutos.
+3. Pausar el monitor: tiene que llegar el email de **recuperado** o, si no
+   aplica, se borra.
+4. Anotar la hora del fallo y la del email recibido, y borrar el monitor.
+
+No se apaga el backend de producción para probarlo.
+
+**Opcional, para el cron de R2 (C13):** un monitor de tipo **Push**
+(heartbeat) con 26 h sin señal = caído. El cron llamaría a su URL privada
+`http://uptime-kuma.railway.internal:3001/api/push/<token>` al terminar bien.
+Así se avisa también cuando el cron **no corre**. Requiere una variable
+opcional más en `deploy/backup/backup.sh` (`BACKUP_PUSH_URL`, sellada): se
+propone al tech-lead en un PR aparte.
 
 ## 8. Pendiente de confirmar al aprovisionar (con aprobación del usuario)
 
