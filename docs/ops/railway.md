@@ -1,7 +1,11 @@
 # Despliegue en Railway (runbook)
 
 Decisión del usuario (11-11-2026): por ahora los despliegues van a Railway. La
-base de producción se documenta en el ADR 0004 (architect).
+base de producción se documenta en el
+[ADR 0004](../adr/0004-alojamiento-base-de-datos-produccion.md) (architect,
+propuesto). Railway es el punto de partida y la app no depende de él: la
+configuración va solo por variables de entorno, y las referencias `${{…}}`
+viven solo en el panel de Railway.
 
 Este runbook dice **cómo se configura**. Hasta que el usuario lo apruebe, **no
 se crea ni se configura nada en Railway**. Todo lo que se configure en el panel
@@ -52,7 +56,7 @@ Un proyecto, el entorno `production` y tres servicios:
 
 | Servicio | Origen | Root Directory | Build |
 |---|---|---|---|
-| `Postgres` | Plantilla Postgres de Railway (imagen «SSL-enabled», basada en la oficial `postgres`, con un volumen) | — | — |
+| `Postgres` | Plantilla **oficial** de PostgreSQL de Railway, **sin cambiar la imagen ni el start command**: si se cambian, Railway deja de gestionarla ([point-in-time-recovery](https://docs.railway.com/volumes/point-in-time-recovery)). La imagen es «SSL-enabled», basada en la oficial `postgres`, con un volumen | — | — |
 | `backend` | Repo GitHub `bacsystem/learning`, rama `main` | `/backend` | `backend/Dockerfile` |
 | `frontend` | Repo GitHub `bacsystem/learning`, rama `main` | `/frontend` | `frontend/Dockerfile` |
 
@@ -66,7 +70,8 @@ Un proyecto, el entorno `production` y tres servicios:
   plantilla. La guía de PITR usa `postgres-ssl:16` como ejemplo de tag
   ([point-in-time-recovery](https://docs.railway.com/volumes/point-in-time-recovery)).
   Al aprovisionar se comprueba con `SELECT version();`, que debe dar 16.x
-  (mínimo 15).
+  (mínimo 15), y se anota aquí. Si no es 16, se avisa al architect para
+  alinear el CI.
 - **`pg_trgm`**: la documentación no lo menciona
   ([postgresql](https://docs.railway.com/guides/postgresql)). La imagen se
   basa en la oficial, que incluye `contrib`. Se comprueba al aprovisionar con
@@ -103,7 +108,11 @@ Un proyecto, el entorno `production` y tres servicios:
   tráfico de salida facturado.
 - El backend se conecta por la **red privada**
   (`postgres.railway.internal`), cifrada con WireGuard
-  ([private-networking](https://docs.railway.com/networking/private-networking/how-it-works)).
+  ([private-networking](https://docs.railway.com/networking/private-networking/how-it-works)),
+  con `sslmode=require`. `verify-full` no es posible: el certificado lo
+  genera la propia imagen (ADR 0004, R5 «parcial»).
+- Sin TCP Proxy (acceso público) y sin pooler. Así `cmd/migrate` y su
+  advisory lock de sesión funcionan sin cambios.
 - Backups y PITR: §5.
 
 ## 4. Variables en Railway
@@ -115,8 +124,8 @@ En Railway se cargan como **variables de servicio**. Los secretos van
 
 | Servicio | Variable | Valor en Railway |
 |---|---|---|
-| backend | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}`, una variable de referencia. El `sslmode` se decide en el ADR 0004 (§6) |
-| backend | `JWT_SECRET`, `ENCRYPTION_KEY` | Sellados. Se generan con `openssl rand -hex 32` y nunca se pegan en mensajes ni en el PR |
+| backend | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}?sslmode=require`: la URL privada, por referencia. Con H-5 (backend-dev-2), el backend exigirá un `sslmode` explícito en producción. Comprobar que la URL de referencia no traiga ya parámetros (si trae `?`, hay que agregar `&sslmode=require`) |
+| backend | `JWT_SECRET`, `ENCRYPTION_KEY`, `ANTIFRAUD_HMAC_KEY` (cuando exista) | Sellados. Se generan con `openssl rand -hex 32` y nunca se pegan en mensajes ni en el PR. **El usuario** guarda una copia de `ENCRYPTION_KEY` fuera de Railway antes de sellarla |
 | backend | `ENV` | `production` |
 | backend | `CORS_ORIGINS`, `FRONTEND_BASE_URL` | El dominio público del frontend |
 | backend | `TRUSTED_PROXIES` | El rango del proxy de Railway, sin confirmar: la documentación consultada no lo publica. Mientras no se confirme, el rate limit y la auditoría ven la IP del proxy. **Pendiente**, ver H-3 |
@@ -136,53 +145,54 @@ con `SHOW max_connections;` al aprovisionar.
 ## 5. Backups y restauración en Railway
 
 Según [backups](https://docs.railway.com/reference/backups) y
-[point-in-time-recovery](https://docs.railway.com/volumes/point-in-time-recovery):
+[point-in-time-recovery](https://docs.railway.com/volumes/point-in-time-recovery).
+Configuración (ADR 0004):
 
-- **Backups del volumen**: diarios (se guardan 6 días), semanales (27 días) y
-  mensuales (89 días); se pueden combinar. Los manuales se limitan al 50 % del
-  tamaño del volumen.
-- **Restaurar un backup** crea un volumen nuevo montado en la misma ruta y deja
-  el viejo desmontado. Solo funciona **dentro del mismo proyecto y entorno**.
-  **Borrar un volumen borra sus backups.**
-- **PITR** (pgBackRest con archivado de WAL): se activa desde la pestaña
-  Backups, con una ventana de unas 4 semanas. Restaurar a un instante crea un
-  **servicio hermano nuevo** sin tocar el original.
-  - Con PITR no se puede fijar una versión menor de Postgres; se mantiene el
-    tag mayor (16).
-- **Planes**: la documentación no dice qué plan incluye backups o PITR. Las
-  imágenes para hacer rollback se conservan 72 h en Hobby y 120 h en Pro
-  ([plans](https://docs.railway.com/pricing/plans)). Se confirma con el plan
-  que contrate el usuario.
+- **PITR activado** (pgBackRest con archivado de WAL a un bucket de Railway).
+  La ventana es de unas 4 semanas. Restaurar a un instante crea un **servicio
+  nuevo** sin tocar el original. Con PITR no se puede fijar una versión menor;
+  se mantiene el tag mayor (16).
+- **Backups de volumen diario y semanal.** Los diarios se guardan 6 días y los
+  semanales 27. Los manuales se limitan al 50 % del tamaño del volumen.
+  - Restaurar uno crea un volumen nuevo, montado en la misma ruta, **dentro del
+    mismo proyecto y entorno**. No se puede restaurar en otro entorno.
+  - **Borrar un volumen borra sus backups.**
+- **Planes:** la documentación no dice qué plan incluye backups, PITR o HA. La
+  imagen para hacer rollback se conserva 72 h en Hobby y 120 h en Pro
+  ([plans](https://docs.railway.com/pricing/plans)).
 
-**Hueco frente al ADR 0004:** los backups de Railway viven en el mismo proyecto.
-Si se pierde el proyecto o la cuenta, se pierden también los backups.
+**Dos restauraciones de prueba antes del lanzamiento** (con aprobación del
+usuario; cada una se mide y se anota aquí):
 
-- **Propuesta:** un `pg_dump -Fc` diario **fuera de Railway**, cifrado. El
-  destino es una decisión del usuario y del architect.
-- Lo ejecutaría un servicio cron de Railway con la imagen oficial `postgres:16`
-  (`deploy.cronSchedule` existe, pero en config as code, que está obsoleto).
-  Es un servicio más: lo aprueba el tech-lead.
+1. **PITR a un servicio nuevo**, a un instante reciente.
+   - Comprobar la versión de goose y el conteo de filas de las tablas
+     principales.
+   - Medir el **RPO real**: diferencia entre el instante pedido y la última
+     escritura recuperada.
+2. **Backup de volumen**, restaurado en el mismo entorno `production`, porque
+   Railway no restaura en otro.
+   - Se hace **antes** de abrir a usuarios, cuando la base todavía no tiene
+     datos reales.
+   - Después, el backend tiene que arrancar y `GET /health` responder 200.
 
-**Restauración de prueba en Railway**, antes de abrir a usuarios y luego de
-forma periódica:
+En las dos se borra lo restaurado al terminar si contiene datos personales.
 
-1. Restaurar con PITR a un instante reciente. Esto crea un servicio hermano.
-2. Apuntar a ese servicio un backend de prueba temporal, en un entorno aparte
-   y con la `ENCRYPTION_KEY` de producción.
-3. Comprobar la versión de goose, `GET /health` y que un login descifra.
-4. Medir el tiempo, anotarlo y borrar el servicio de prueba, porque contiene
-   datos personales.
+Sigue abierto para el usuario (U4): si hace falta además una copia **fuera** de
+Railway, porque los backups viven en el mismo proyecto.
 
 ## 6. Pendiente de confirmar al aprovisionar (con aprobación del usuario)
 
 - [ ] `SELECT version();` → 16.x
 - [ ] `CREATE EXTENSION IF NOT EXISTS pg_trgm;` funciona
 - [ ] `SHOW max_connections;` ≥ 2 × 25 × réplicas + margen
-- [ ] TLS hacia Postgres por la red privada. La documentación no dice qué
-      certificado usa la imagen «SSL-enabled» (posiblemente autofirmado, sin
-      confirmar). Si es autofirmado, `verify-full` no es posible sin su CA.
-      El `sslmode` final lo fija el ADR 0004
+- [ ] `sslmode=require` funciona por la URL privada, y cómo se agrega el
+      parámetro a la variable de referencia
+- [ ] Qué hace el pooling de Railway, si lo hay, con `DATABASE_URL`
+- [ ] Región y cifrado en reposo de los backups y del bucket de PITR
+- [ ] Cómo correr `cmd/seed/admin` y `cmd/rehash-emails` contra producción:
+      las variables selladas no salen en `railway run`. Opción a confirmar:
+      un servicio o un pre-deploy de un solo uso con las mismas variables
 - [ ] El Root Directory `/backend` y `/frontend` detecta el `Dockerfile`
 - [ ] `PORT` inyectado frente al `ENV PORT=3000` de la imagen del frontend
 - [ ] El rango de IP del proxy de Railway, para `TRUSTED_PROXIES`
-- [ ] Qué plan incluye backups y PITR
+- [ ] Qué plan incluye backups, PITR y HA (en el panel o con soporte)

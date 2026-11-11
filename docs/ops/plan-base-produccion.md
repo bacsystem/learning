@@ -1,7 +1,9 @@
 # Plan de la base de producción (propuesta)
 
-Estado: **propuesta**. Dónde se aloja la base (proveedor y arquitectura) no lo
-decide devops: se pidió un ADR al architect (`docs/adr/`). Este documento fija
+Estado: **propuesta**. El alojamiento lo fija el
+[ADR 0004](../adr/0004-alojamiento-base-de-datos-produccion.md): Railway,
+con la plantilla oficial de Postgres, PITR y backups de volumen. La
+configuración concreta está en [railway.md](railway.md). Este documento fija
 los requisitos que salen del código, las opciones y los procedimientos de
 backup y restauración que valen para cualquiera de ellas.
 
@@ -18,11 +20,11 @@ red privada) y lo que falta comprobar al aprovisionar está en
 | Extensión `pg_trgm` | La migración 013 hace `CREATE EXTENSION IF NOT EXISTS pg_trgm`. El usuario que migra necesita permiso para crearla, o hay que crearla una vez por adelantado |
 | Conexión **directa** (sin pooler en modo transaction) para migrar | `cmd/migrate` toma `pg_advisory_lock` de **sesión** para que solo una réplica migre. Un PgBouncer en modo transaction lo rompe. El servidor puede ir por un pooler en modo session |
 | `CREATE INDEX CONCURRENTLY` | Las migraciones 054 y 058 van sin transacción. Si un proveedor limita la duración de las sentencias, hay que tenerlo en cuenta |
-| TLS en `DATABASE_URL` | `lib/pq` v1.12.3 usa `sslmode=require` por defecto (cifra pero no verifica el certificado). En producción, `verify-full`: con el CA del proveedor (`sslrootcert=<ruta>`) o con `sslrootcert=system` |
+| TLS en `DATABASE_URL` | `lib/pq` v1.12.3 usa `sslmode=require` por defecto (cifra pero no verifica el certificado). En Railway: `sslmode=require` explícito por la red privada. `verify-full` no es posible, porque el certificado lo genera la imagen (ADR 0004) |
 | Usuarios separados | Un **propietario** del esquema, para migrar, y un usuario de la **aplicación**. Hoy `entrypoint.sh` migra con la misma `DATABASE_URL` que usa el servidor: separarlos exige un cambio en el arranque, que se decide en el ADR |
 | `ENCRYPTION_KEY` custodiada **aparte** del backup | Los datos personales van cifrados con AES-GCM. Un backup sin su clave no sirve, y la clave junto al backup anula el cifrado |
 
-## 2. Opciones para el ADR
+## 2. Opciones evaluadas (contexto del ADR 0004; elegida: Railway)
 
 | | A. Postgres gestionado con PITR | B. Postgres 16 propio en una VM | C. Postgres en el mismo host que la app |
 |---|---|---|---|

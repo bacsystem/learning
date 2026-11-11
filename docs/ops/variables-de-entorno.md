@@ -124,10 +124,13 @@ Todos son de código de la app, así que no se cambian en este PR:
   también lee las variables `PG*` estándar (`PGSSLMODE`, `PGHOST`…), que no
   deben quedar definidas por accidente en el entorno del contenedor. El nivel de producción
   (`require` o `verify-full` con `sslrootcert`) depende del ADR de la base.
-  Ver [plan-base-produccion.md](plan-base-produccion.md).
+  Ver [plan-base-produccion.md](plan-base-produccion.md). Decidido en el ADR 0004:
+  en producción, `sslmode=require` explícito, y el backend lo exigirá
+  (backend-dev-2).
 - **H-6. La versión de `/health` está fija.** `GET /health` devuelve
   `"version":"1.0.0"` desde `const version` en `cmd/server/main.go`, mientras
   que `frontend/package.json` dice 1.1.0 y todavía no hay tags. Propuesta:
   `var version = "dev"` y que el Dockerfile la inyecte con
   `-ldflags "-X main.version=$VERSION"` desde el tag. Requiere cambiar el
-  código; el lado Docker lo hace devops.
+  código; el lado Docker lo hace devops. Decidido: `-X main.version=1.2.0`, sin
+  la «v» del tag; fuera de un release, `0.0.0-dev`. Asignado a backend-dev-2.

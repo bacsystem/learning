@@ -18,7 +18,9 @@ esa aprobación explícita.
 - [ ] Changelog: lista de PRs desde el último tag. Si es el primer release, desde
       `1326a43`, la raíz pública de `main`:
       `git log --merges --oneline <último-tag>..HEAD`.
-- [ ] Versión: el número de `frontend/package.json` coincide con `X.Y.Z`.
+- [ ] Versión: el número de `frontend/package.json` coincide con `X.Y.Z`. Cuando
+      entre H-6, la imagen del backend recibe `X.Y.Z` (sin la «v») y
+      `GET /health` la devuelve.
 - [ ] **Orden de las migraciones** (sección 2).
 - [ ] Inventario de variables al día
       ([variables-de-entorno.md](variables-de-entorno.md)). Si hay variables

@@ -68,10 +68,10 @@ dev/frontend:
 
 # ── Tests (= jobs test de backend.yml y check de frontend.yml) ────────────────
 # Uso: make test TEST_DATABASE_URL=postgres://...@localhost:5432/learning_test?sslmode=disable
-# (o exportada en el entorno). El nombre de la base debe terminar en _test.
+# (o exportada en el entorno). El nombre de la base debe terminar en _test o _test_<n>.
 check/test-db:
 	@test -n "$(TEST_DATABASE_URL)" || (echo "ERROR: set TEST_DATABASE_URL=postgres://... (base desechable: se hace down-to 0)" && exit 1)
-	@echo "$(TEST_DATABASE_URL)" | grep -qE '/[^/?]+_test([?]|$$)' || (echo "ERROR: el nombre de la base de TEST_DATABASE_URL debe terminar en _test (make test hace down-to 0)" && exit 1)
+	@echo "$(TEST_DATABASE_URL)" | grep -qE '/[^/?]+_test(_[0-9]+)?([?]|$$)' || (echo "ERROR: el nombre de la base de TEST_DATABASE_URL debe terminar en _test o _test_<n> (make test hace down-to 0)" && exit 1)
 
 test: check/test-db
 	cd backend && go mod tidy && git diff --exit-code -- go.mod go.sum

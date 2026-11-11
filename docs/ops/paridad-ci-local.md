@@ -15,7 +15,7 @@ solo con tags `v*`) es lo mismo que corre un developer con `make lint`,
 | `go vet ./...` | `make lint` | `make lint` |
 | govulncheck v1.9.0 | no estaba | `make test` (misma versión, con `go run`) |
 | goose v3.21.1: `up` → `down-to 0` → `up` | no estaba (y `migrate/*` usaba el goose instalado, en cualquier versión) | `make test`. `migrate/*` usa ahora goose v3.21.1 |
-| `go test -race -count=1 ./...` con `TEST_DATABASE_URL` sobre Postgres 16 | `go test -race` **sin** `TEST_DATABASE_URL`: los tests de integración se saltaban y el resultado salía en verde | `make test` exige `TEST_DATABASE_URL`, por argumento o exportada en el entorno, y que el nombre de la base termine en `_test`, porque hace `down-to 0` |
+| `go test -race -count=1 ./...` con `TEST_DATABASE_URL` sobre Postgres 16 | `go test -race` **sin** `TEST_DATABASE_URL`: los tests de integración se saltaban y el resultado salía en verde | `make test` exige `TEST_DATABASE_URL`, por argumento o exportada en el entorno, y que el nombre de la base termine en `_test` o `_test_<n>` (p. ej. `learning_test_2`), porque hace `down-to 0` |
 | golangci-lint v2.15.0 | no estaba. `make lint` corría `go fmt`, que **reescribe** archivos en vez de fallar | `make lint` (misma versión, con `go run`). `go fmt` pasa a `make fmt` |
 
 ### Frontend
