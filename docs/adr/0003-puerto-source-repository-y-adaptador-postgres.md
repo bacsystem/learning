@@ -1,6 +1,6 @@
 # ADR 0003: puerto `SourceRepository` y adaptador propio sobre PostgreSQL
 
-- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD).
+- **Estado:** aceptado (2026-11-11). `texto.Plegar` ya está implementado (E1-01); el resto se implementa con E2. Revisado el 2026-11-11: la sección «Plegado» añade las formas descompuestas (NFD); «El puerto» define los tipos que faltaban (`NuevaFuente`, `FiltroFuentes`, `Pagina`, `FuenteResumen`, `Pasaje`), agrega `auditFn` a `GuardarFuente` y fija el error de `EspecialidadID ≤ 0`.
 - **Fecha:** 2026-11-11
 - **Historias:** SIA-E2-02 (#16); la usan SIA-E2-03, E2-05, E2-06, E2-07 y, más adelante, E3-01, E6-03, E6-04 y E6-08
 - **Decisión de producto de origen:** P1 (issue #65). MVP y v2 usan el 100 % del `SourceRepository` propio en PostgreSQL, a $0 USD. La búsqueda semántica (pgvector o NotebookLM) se reevalúa en v3 (SIA-E2-01, SIA-E2-08).
@@ -30,7 +30,7 @@ Paquete nuevo `backend/internal/fuentes` con la convención del repo (`handler.g
 
 - `source.go`: el **puerto** `SourceRepository` y sus tipos. No importa nada de HTTP ni de `auth`.
 - `pgsource.go`: el **adaptador propio** sobre Postgres (`*sqlx.DB`).
-- `fuentestest/contract.go`: la **suite de contrato** `RunContract(t, nuevo func(t) SourceRepository)`. Se ejecuta sobre el adaptador Postgres y sobre `fuentestest/memoria.go` (adaptador en memoria de prueba). Cubre el escenario «Intercambiabilidad» de SIA-E2-02. Siembra sus datos solo a través del puerto (`GuardarFuente` y luego `PublicarVersion`), así los dos adaptadores parten del mismo estado. Para «Fuente inactiva excluida», el retiro se simula con un hook de prueba del adaptador (`fuentestest.Retirar`), porque el ciclo de vida admin no está en el puerto.
+- `fuentestest/contract.go`: la **suite de contrato** `RunContract(t, nuevo func(t *testing.T) Entorno)`, donde `Entorno{Repo SourceRepository; EspecialidadA, EspecialidadB int64}`. Con Postgres las especialidades deben existir por la FK, así que la fábrica las siembra y entrega sus ids; el adaptador en memoria no valida que existan. Se ejecuta sobre el adaptador Postgres y sobre `fuentestest/memoria.go` (adaptador en memoria de prueba). Cubre el escenario «Intercambiabilidad» de SIA-E2-02. Siembra sus datos solo a través del puerto (`GuardarFuente` y luego `PublicarVersion`), así los dos adaptadores parten del mismo estado. Para «Fuente inactiva excluida», el retiro se simula con un hook de prueba del adaptador (`fuentestest.Retirar`), porque el ciclo de vida admin no está en el puerto.
 - `normalizar.go`: normalización y segmentación deterministas (SIA-E2-05), sin IA y sin E/S.
 - `worker.go`: worker de ingesta (abajo).
 - El ciclo de vida admin (retirar, restaurar, reintentar, marca oficial) vive en `service.go` y `repository.go`, **fuera** del puerto: no es intercambiable por proveedor. Un adaptador v3 (SIA-E2-08) solo reemplazaría `BuscarPasajes`. Las citas se resuelven siempre con el adaptador propio (SIA-E2-08, regla 3).
@@ -47,16 +47,64 @@ type Cita struct {
 
 type Busqueda struct {
     Consulta       string // 3–300 caracteres (runes) tras TrimSpace; si no, ErrConsultaInvalida
-    EspecialidadID int64  // obligatorio (> 0)
+    EspecialidadID int64  // obligatorio (> 0); ≤ 0 → ErrConsultaInvalida
     AsignaturaID   *int64 // aceptado; el adaptador MVP no lo usa para filtrar (ver «Área y tema»)
     TemaID         *int64 // ídem
     Limite         int    // 1..20; 0 = 20; > 20 se recorta a 20
 }
 
+// NuevaFuente: quien llama ya validó los metadatos y saneó NombreArchivo (S1 del contrato E2).
+type NuevaFuente struct {
+    Titulo          string
+    Tipo            string   // balotario | guia | norma | otro
+    Anio            *int
+    ProcesoID       *int64
+    EspecialidadIDs []int64  // vacío = aplica a todas
+    NombreArchivo   string
+    Contenido       []byte   // original UTF-8; el adaptador calcula sha256, tamaño y líneas con Huella
+    CreadoPor       *int64   // nil = sistema / prueba
+}
+
+// Huella calcula sha256 (hex), tamaño en bytes y líneas del contenido. Es la única
+// implementación: la usan los adaptadores y E2-03 (duplicado por hash).
+func Huella(contenido []byte) (sha256 string, tamanoBytes, lineas int)
+
+type Pagina[T any] struct {
+    Data    []T
+    Total   int
+    Page    int
+    PerPage int
+}
+
+// FiltroFuentes. Valores cero = sin filtro. Page ≥ 1; PerPage 1..100 (0 → 20, > 100 → 100), como README §5.
+type FiltroFuentes struct {
+    EspecialidadID int64  // > 0: fuentes de esa especialidad más las que aplican a todas
+    Estado         string // procesando | activa | fallida | retirada
+    Tipo           string // balotario | guia | norma | otro
+    Page, PerPage  int
+}
+
+// FuenteResumen: mínimo que cualquier adaptador puede dar (sin nombres de catálogo).
+type FuenteResumen struct {
+    ID              int64
+    Titulo, Tipo    string
+    Estado          string
+    Anio            *int
+    ProcesoID       *int64
+    EspecialidadIDs []int64 // vacío = aplica a todas; orden ascendente
+    VersionVigente  *int    // número de versión; nil si no hay vigente
+    CreatedAt       time.Time
+    UpdatedAt       time.Time
+}
+
+// Pasaje: mismos campos que PasajeEncontrado (abajo).
+type Pasaje = PasajeEncontrado
+
 type SourceRepository interface {
-    GuardarFuente(ctx context.Context, f NuevaFuente) (fuenteID int64, version int, err error) // crea la fuente y su versión 1 en 'procesando'
-    ListarFuentes(ctx context.Context, f FiltroFuentes) (Pagina[FuenteResumen], error)
-    ObtenerPasajes(ctx context.Context, fuenteID int64, version int, page, perPage int) (Pagina[Pasaje], error)
+    // Crea la fuente y su versión 1 en 'procesando'. auditFn (fuente.crear) va en la misma transacción.
+    GuardarFuente(ctx context.Context, f NuevaFuente, auditFn audit.TxFunc) (fuenteID int64, version int, err error)
+    ListarFuentes(ctx context.Context, f FiltroFuentes) (Pagina[FuenteResumen], error) // UpdatedAt DESC, ID DESC
+    ObtenerPasajes(ctx context.Context, fuenteID int64, version int, page, perPage int) (Pagina[Pasaje], error) // Orden ASC
     BuscarPasajes(ctx context.Context, b Busqueda) ([]PasajeEncontrado, error) // ≤ 20, por relevancia
     ResolverCita(ctx context.Context, c Cita) (PasajeCitado, error)
 
@@ -76,6 +124,9 @@ var (
 
 - `PasajeEncontrado` y `PasajeCitado` llevan: `FuenteID`, `Version`, `PasajeID`, `Orden`, `LineaInicio`, `LineaFin`, `Seccion`, `Texto` y, en `PasajeCitado`, además `TituloFuente`, `EstadoFuente` y `OficialVerificada` de esa versión. No llevan ningún dato de usuario (regla 4).
 - `ResolverCita` **no** filtra por estado de la fuente: una cita histórica a la versión 1 devuelve el texto exacto de la versión 1 aunque la fuente vaya por la 3 o esté `retirada` (escenario «Resolver cita histórica»). El consumidor decide qué hacer con `EstadoFuente`.
+- **`ObtenerPasajes`** tampoco filtra por estado de la fuente. Si la fuente o la versión no existen, devuelve `ErrNoEncontrado`. Una versión sin pasajes (`procesando` o `fallida`) devuelve `Data` vacío. Usa la misma paginación que `FiltroFuentes`.
+- **`ListarFuentes` en el puerto, en versión mínima** (decisión del 2026-11-11, consulta de backend-dev al empezar E2-02). La historia SIA-E2-02 (§Contexto, línea 17) pone «listar fuentes» entre las operaciones del puerto, así que no se saca. Pero `FuenteResumen` solo lleva lo que cualquier adaptador puede dar: ids y no nombres de especialidad, y el número de la versión vigente. El listado de admin S3 del contrato E2 (nombres de especialidad, `version_en_proceso`, filtros `oficial` y `q`) es una consulta de `repository.go` fuera del puerto, que implementa E2-07, igual que el ciclo de vida admin.
+- **`GuardarFuente`** recibe `auditFn`, como `PublicarVersion`, para que `fuente.crear` se escriba en la misma transacción (README §7). El adaptador en memoria la ignora. Calcula `sha256`, `tamano_bytes` y `lineas` con `Huella`. E2-02 no valida ni el duplicado por hash ni el límite de fuentes. Los agrega E2-03 dentro de esa misma transacción, bajo el advisory lock del contrato E2 (S1, «Límite de fuentes»), y mapea la violación 23505 de `uq_fuente_versiones_sha256` a `fuente_duplicada`.
 
 ### Recuperación de pasajes (adaptador Postgres)
 
