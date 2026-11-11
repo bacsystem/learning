@@ -27,8 +27,11 @@ pg_dump -Fc (rol backup_ro, sslmode=require)  →  age -r <clave PÚBLICA>  → 
 - **Registro**: un `INSERT` por ejecución en `copias_bd`, correcta o fallida.
   Si la base no responde, no queda fila y el panel la marca atrasada por
   antigüedad.
-- **Logs**: solo fecha, tamaño y resultado (`http=…`, `curl=…` si falla).
-  Nunca URL, host, bucket ni credenciales.
+- **Logs**: solo fecha, tamaño y resultado. Si falla: `http=…` y `curl=…` en la
+  subida, o `motivo=` en Postgres, de una lista cerrada (`tiempo_agotado`,
+  `autenticacion`, `permisos`, `tls`, `conexion`, `no_existe`, `otro`). El
+  texto de libpq o de curl nunca se registra: podría llevar host, IP, usuario
+  o el ACCOUNT_ID de R2.
 - **Timeouts**: `BACKUP_TIMEOUT` (1800 s por defecto) para el dump y para la
   subida, más 30 s de conexión a Postgres y a R2. Railway **no** corta un cron
   colgado ([cron-jobs](https://docs.railway.com/reference/cron-jobs)).
@@ -100,9 +103,13 @@ En un Postgres 16 **efímero y aislado**, nunca en `deploy/` ni en producción.
 La clave privada se carga solo durante la prueba.
 
 ```bash
-# 1. Bajar el objeto (credenciales del token, nunca en el historial):
-curl -K - --fail --aws-sigv4 'aws:amz:auto:s3' -o copia.dump.age \
-  "https://<ACCOUNT_ID>.r2.cloudflarestorage.com/<bucket>/pg/AAAA-MM-DD.dump.age" <<< 'user = "<key>:<secret>"'
+# 1. Bajar el objeto. Las credenciales se leen sin eco a un archivo 0600:
+#    no quedan en el historial ni en `ps`.
+umask 077; read -r -p 'R2 key: ' K; read -rs -p 'R2 secret: ' S; echo
+printf 'user = "%s:%s"\n' "$K" "$S" > r2.curl; unset K S
+curl -K r2.curl --fail --aws-sigv4 'aws:amz:auto:s3' -o copia.dump.age \
+  "https://<ACCOUNT_ID>.r2.cloudflarestorage.com/<bucket>/pg/AAAA-MM-DD.dump.age"
+rm -f r2.curl
 # 2. Descifrar con la clave privada:
 age -d -i capacitate-backup.key -o copia.dump copia.dump.age
 # 3. Restaurar en una base nueva (sin dueños ni GRANT: backup_ro no existe ahí):
