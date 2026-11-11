@@ -54,7 +54,7 @@ El frontend no tiene runner de tests todavía; la verificación es `tsc`, `lint`
 Roles (definidos en .claude/agents/): po, architect, tech-lead (sesión principal), backend-dev, frontend-dev, qa.
 Flujo: po escribe historias en docs/stories/ -> architect revisa su impacto, define el contrato en docs/api/ y los ADR en docs/adr/ -> tech-lead reparte tareas ->
 backend-dev (backend/) y frontend-dev (frontend/) trabajan en paralelo, cada uno dueño de sus archivos ->
-qa valida contra criterios de aceptación -> cada developer crea su PR a develop -> tech-lead lo revisa con el skill /pr-review ->
+qa valida contra criterios de aceptación -> cada developer crea su PR a develop -> tech-lead revisa todo PR (sin excepción) con el skill /pr-review y publica el reporte en el PR ->
 si hay hallazgos, los corrige el developer autor y el tech-lead vuelve a revisar, hasta que quede limpio.
 Ninguna tarea se cierra sin ese review limpio. El merge requiere aprobación del usuario.
 Comunicación siempre activa: cada integrante avisa al empezar, al terminar, al bloquearse y cuando su cambio afecta a otro.
