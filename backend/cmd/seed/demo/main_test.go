@@ -313,7 +313,8 @@ func TestSembrar_DatosUsables(t *testing.T) {
 		}
 	}
 
-	// Profession options: two procesos leave proceso_id open; one fills it.
+	// Profession options: two procesos leave proceso_id open; one fills it;
+	// an inactive persona especialidad leaves no preselection (esp 0).
 	opcionesCases := []struct {
 		usuario  string
 		procesos int
@@ -322,13 +323,15 @@ func TestSembrar_DatosUsables(t *testing.T) {
 	}{
 		{"demo_enfermeria", 2, nil, esp(institucionSalud, "DEMO-ENF")},
 		{"demo_medicina", 1, &serums, esp(institucionSalud, "DEMO-MED")},
+		{"demo_esp_inactiva", 1, nil, 0},
 	}
 	for _, c := range opcionesCases {
 		status, body := pedir("GET", "/serums-ia/profesion/opciones", tokens[c.usuario], "")
 		var op perfiles.Opciones
 		_ = json.Unmarshal(body, &op)
-		if status != http.StatusOK || len(op.Procesos) != c.procesos || op.Preseleccion == nil ||
-			!mismoID(op.Preseleccion.ProcesoID, c.proceso) || op.Preseleccion.EspecialidadID != c.esp {
+		sinPreseleccion := c.esp == 0
+		if status != http.StatusOK || len(op.Procesos) != c.procesos || (op.Preseleccion == nil) != sinPreseleccion ||
+			!sinPreseleccion && (!mismoID(op.Preseleccion.ProcesoID, c.proceso) || op.Preseleccion.EspecialidadID != c.esp) {
 			t.Errorf("%s opciones: %d %s", c.usuario, status, body)
 		}
 	}
