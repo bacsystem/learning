@@ -67,7 +67,9 @@ export class CargaPorClave<T> {
 
   /** Sustituye los datos de `clave` sin pedirlos (p. ej. con la respuesta de un guardado). */
   reemplazar(clave: string, datos: T): void {
-    this.actualizar({ clave, datos, error: null });
+    // Toma el turno: un refresco (o carga) que empezó antes trae datos anteriores a este reemplazo y no debe pisarlo.
+    this.ultima++;
+    this.actualizar({ clave, datos, error: null, cargando: false });
   }
 
   private actualizar(cambio: Partial<EstadoCarga<T>>): void {

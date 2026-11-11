@@ -137,3 +137,16 @@ describe("CargaPorClave.refrescar durante un cargar en curso (review #99 H1)", (
     expect(vistaDeCarga(c.obtenerEstado(), "p2")).toEqual({ datos: "datos p2", error: null, cargando: false });
   });
 });
+
+describe("CargaPorClave.reemplazar con un refresco en vuelo (seguimiento del review #99)", () => {
+  it("a refresh that started before a save does not bring back the old data", async () => {
+    const c = new CargaPorClave<string>();
+    await c.cargar("f1", async () => "antes");
+    let terminarRefresco!: (v: string) => void;
+    const refresco = c.refrescar("f1", () => new Promise<string>((r) => (terminarRefresco = r)));
+    c.reemplazar("f1", "guardado");
+    terminarRefresco("antes (respuesta vieja)");
+    await refresco;
+    expect(vistaDeCarga(c.obtenerEstado(), "f1").datos).toBe("guardado");
+  });
+});
