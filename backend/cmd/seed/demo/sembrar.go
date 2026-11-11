@@ -356,27 +356,66 @@ func (s *sembrador) areasCompatibilidad(ctx context.Context, procesoID int64, p 
 // sinAuditoria: the seed is not an admin action; nothing goes to audit_log.
 func sinAuditoria(context.Context, sqlx.ExecerContext, map[string]any) error { return nil }
 
-// preguntas keeps preguntasPorArea active questions of the area in the proceso.
+// preguntas keeps preguntasPorArea approved questions of the area in the
+// proceso. A question is created as a draft (as everywhere), cited to a
+// passage of the demo fuente and approved through the service, with the same
+// rules as an admin's review. One that a failed run left half done is finished.
 func (s *sembrador) preguntas(ctx context.Context, procesoID, asignaturaID int64, codigo string) error {
+	pasajes, err := s.fuenteDemo(ctx)
+	if err != nil {
+		return err
+	}
 	for i := 1; i <= preguntasPorArea; i++ {
 		enunciado := fmt.Sprintf("Pregunta demo %d de %s: ¿cuál es la opción correcta?", i, codigo)
-		existe, err := s.buscar(ctx, `SELECT id FROM preguntas
-			WHERE proceso_id = $1 AND asignatura_id = $2 AND enunciado = $3 AND estado <> 'eliminada'`, procesoID, asignaturaID, enunciado)
+		id, estado, err := s.preguntaDemo(ctx, procesoID, asignaturaID, enunciado)
 		if err != nil {
-			return err
-		}
-		if existe != 0 {
-			continue
-		}
-		if _, err := s.preg.CreatePregunta(ctx, questions.CreatePreguntaRequest{ProcesoID: procesoID, AsignaturaID: asignaturaID,
-			Enunciado: enunciado, Tipo: "unica", Dificultad: "medio",
-			Respuestas: []questions.CreateRespuestaItem{
-				{Texto: "Opción correcta", EsCorrecta: true, Orden: 1},
-				{Texto: "Opción incorrecta", EsCorrecta: false, Orden: 2},
-			}}); err != nil {
 			return fmt.Errorf("pregunta %d de %s: %w", i, codigo, err)
 		}
-		s.creado["preguntas"]++
+		if id == 0 {
+			creada, err := s.preg.CreatePregunta(ctx, questions.CreatePreguntaRequest{ProcesoID: procesoID, AsignaturaID: asignaturaID,
+				Enunciado: enunciado, Tipo: "unica", Dificultad: "medio",
+				Respuestas: []questions.CreateRespuestaItem{
+					{Texto: "Opción correcta", EsCorrecta: true, Orden: 1},
+					{Texto: "Opción incorrecta", EsCorrecta: false, Orden: 2},
+				}})
+			if err != nil {
+				return fmt.Errorf("pregunta %d de %s: %w", i, codigo, err)
+			}
+			id, estado = creada.ID, creada.Estado
+			s.creado["preguntas"]++
+		}
+		if estado != questions.EstadoBorrador {
+			continue // already reviewed: the seed never overrides an admin's decision
+		}
+		if err := s.aprobar(ctx, id, pasajes[i%len(pasajes)]); err != nil {
+			return fmt.Errorf("aprobar la pregunta %d de %s: %w", i, codigo, err)
+		}
+	}
+	return nil
+}
+
+// preguntaDemo looks a demo question up by its statement: 0 when missing.
+func (s *sembrador) preguntaDemo(ctx context.Context, procesoID, asignaturaID int64, enunciado string) (int64, string, error) {
+	var id int64
+	var estado string
+	err := s.db.QueryRowContext(ctx, `SELECT id, estado FROM preguntas
+		WHERE proceso_id = $1 AND asignatura_id = $2 AND enunciado = $3 AND estado <> 'eliminada'`,
+		procesoID, asignaturaID, enunciado).Scan(&id, &estado)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, "", nil
+	}
+	return id, estado, err
+}
+
+// aprobar cites the passage and approves the draft. The seed is not an admin
+// action, so nothing goes to audit_log (nil Auditor).
+func (s *sembrador) aprobar(ctx context.Context, preguntaID, pasajeID int64) error {
+	if _, err := s.preg.ReemplazarCitas(ctx, preguntaID, questions.ReemplazarCitasRequest{PasajeIDs: &[]int64{pasajeID}}, nil); err != nil {
+		return fmt.Errorf("citar: %w", err)
+	}
+	verificado := true
+	if _, err := s.preg.CambiarEstado(ctx, preguntaID, questions.CambiarEstadoRequest{Estado: questions.EstadoAprobada, Verificado: &verificado}, nil); err != nil {
+		return fmt.Errorf("aprobar: %w", err)
 	}
 	return nil
 }
