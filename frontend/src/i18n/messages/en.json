@@ -1650,7 +1650,8 @@
         "api": "API",
         "base_datos": "Database",
         "correo": "Email",
-        "frontend": "Frontend"
+        "frontend": "Frontend",
+        "copia_r2": "Daily backup"
       },
       "dato": {
         "version": "Version",
@@ -1663,10 +1664,20 @@
         "antiguedadValor": "{valor, number} min",
         "fallidos24h": "Permanent failures in 24 h",
         "ultimoEnviado": "Last sent",
-        "nunca": "Never"
+        "nunca": "Never",
+        "ultimaCorrecta": "Last successful backup",
+        "ninguna": "None",
+        "ultimaEjecucion": "Last run",
+        "ejecucionValor": "{resultado} · {fecha}",
+        "tamano": "Size",
+        "tamanoValor": "{valor} MB"
       },
       "frontendNota": "The version you are viewing. It has no status: if the frontend were down, you would not see this panel.",
-      "versionesDistintas": "The frontend and the backend have different versions."
+      "versionesDistintas": "The frontend and the backend have different versions.",
+      "ejecucion": {
+        "correcta": "Successful",
+        "fallida": "Failed"
+      }
     }
   }
 }

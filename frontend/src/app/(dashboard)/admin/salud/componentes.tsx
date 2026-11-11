@@ -14,8 +14,10 @@ import {
   type CategoriaFallo,
   desglosarDuracion,
   type EstadoServicio,
+  megabytes,
+  type Momento,
   type ServicioSalud,
-  type UltimoEnvio,
+  ultimaCopiaCorrecta,
   ultimoEnvio,
 } from "@/lib/salud/reglas";
 import { CheckCircleIcon, MinusCircleIcon, QuestionIcon, WarningIcon, XCircleIcon } from "@phosphor-icons/react";
@@ -87,16 +89,15 @@ function useDatosServicio(servicio: ServicioSalud): DatoLista[] {
   const formato = useFormatter();
   const numero = (n: number | null, clave?: string) =>
     n === null ? SIN_DATO : clave ? t(clave, { valor: n }) : formato.number(n);
-  const textoUltimoEnvio = (envio: UltimoEnvio) => {
-    switch (envio.tipo) {
+  const fechaHora = (iso: string) =>
+    formato.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short", timeZone: ZONA_HORARIA });
+  /** `claveNunca`: «Nunca» para el correo, «Ninguna» para la copia. */
+  const textoMomento = (momento: Momento, claveNunca: string) => {
+    switch (momento.tipo) {
       case "fecha":
-        return formato.dateTime(new Date(envio.iso), {
-          dateStyle: "medium",
-          timeStyle: "short",
-          timeZone: ZONA_HORARIA,
-        });
+        return fechaHora(momento.iso);
       case "nunca":
-        return t("saludServicios.dato.nunca");
+        return t(claveNunca);
       case "sin_dato":
         return SIN_DATO;
     }
@@ -133,7 +134,42 @@ function useDatosServicio(servicio: ServicioSalud): DatoLista[] {
           mono: true,
         },
         { etiqueta: t("saludServicios.dato.fallidos24h"), valor: numero(d.fallidos_24h), mono: true },
-        { etiqueta: t("saludServicios.dato.ultimoEnviado"), valor: textoUltimoEnvio(ultimoEnvio(d)), mono: true },
+        {
+          etiqueta: t("saludServicios.dato.ultimoEnviado"),
+          valor: textoMomento(ultimoEnvio(d), "saludServicios.dato.nunca"),
+          mono: true,
+        },
+      ];
+    }
+    case "copia_r2": {
+      const d = servicio.datos;
+      return [
+        {
+          etiqueta: t("saludServicios.dato.ultimaCorrecta"),
+          valor: textoMomento(ultimaCopiaCorrecta(d), "saludServicios.dato.ninguna"),
+          mono: true,
+        },
+        {
+          etiqueta: t("saludServicios.dato.ultimaEjecucion"),
+          valor:
+            d.ultima_ejecucion === null
+              ? SIN_DATO
+              : t("saludServicios.dato.ejecucionValor", {
+                  resultado: t(`saludServicios.ejecucion.${d.ultima_ejecucion}`),
+                  fecha: d.ultima_ejecucion_en === null ? SIN_DATO : fechaHora(d.ultima_ejecucion_en),
+                }),
+          mono: true,
+        },
+        {
+          etiqueta: t("saludServicios.dato.tamano"),
+          valor:
+            d.tamano_bytes === null
+              ? SIN_DATO
+              : t("saludServicios.dato.tamanoValor", {
+                  valor: formato.number(megabytes(d.tamano_bytes), { maximumFractionDigits: 1 }),
+                }),
+          mono: true,
+        },
       ];
     }
   }

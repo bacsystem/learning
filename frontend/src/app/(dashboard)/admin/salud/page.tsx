@@ -14,8 +14,8 @@ import { PESO_ICONO_FUNCIONAL } from "@/lib/iconos";
 import { REFRESCO_SALUD_MS, versionBackend, versionesDistintas } from "@/lib/salud/reglas";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
 
-/** Tarjetas de la carga inicial: API, base de datos, correo y frontend. */
-const TARJETAS_EN_CARGA = 4;
+/** Tarjetas de la carga inicial: API, base de datos, correo, copia diaria y frontend. */
+const TARJETAS_EN_CARGA = 5;
 const MS_POR_SEGUNDO = 1000;
 
 export default function SaludServiciosPage() {

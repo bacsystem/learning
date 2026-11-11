@@ -1,8 +1,11 @@
 import type { RespuestaSaludApi } from "./api";
 import {
+  type DatosCopiaR2,
   desglosarDuracion,
+  megabytes,
   normalizarSalud,
   RespuestaSaludInvalida,
+  ultimaCopiaCorrecta,
   ultimoEnvio,
   versionBackend,
   versionesDistintas,
@@ -43,7 +46,7 @@ describe("normalizarSalud", () => {
     const salud = normalizarSalud(
       respuesta({
         servicios: [
-          { id: "copia_r2", estado: "caido", categoria: "atrasado", datos: {} },
+          { id: "worker_ingesta", estado: "caido", categoria: "atrasado", datos: {} },
           { id: "toString", estado: "operativo", categoria: null, datos: {} },
           "basura",
           null,
@@ -136,5 +139,38 @@ describe("ultimoEnvio (hallazgo H2 del #129)", () => {
 
   it("has no data when the measurement failed (all data null)", () => {
     expect(ultimoEnvio({ ...correo, sin_enviar: null, fallidos_24h: null })).toEqual({ tipo: "sin_dato" });
+  });
+});
+
+describe("copia_r2 (PLT-05)", () => {
+  const copia: DatosCopiaR2 = {
+    ultima_correcta_en: "2026-11-11T05:00:40Z",
+    tamano_bytes: 52_428_800,
+    ultima_ejecucion: "fallida",
+    ultima_ejecucion_en: "2026-11-11T05:00:40Z",
+  };
+
+  it("reads its data and drops a result outside the closed set", () => {
+    const leer = (datos: unknown) =>
+      normalizarSalud(respuesta({ servicios: [{ id: "copia_r2", estado: "degradado", categoria: "atrasado", datos }] }))
+        .servicios[0];
+    expect(leer(copia)).toMatchObject({ id: "copia_r2", datos: copia });
+    expect(leer({ ...copia, ultima_ejecucion: "s3://bucket/clave", tamano_bytes: "50 MB" }).datos).toMatchObject({
+      ultima_ejecucion: null,
+      tamano_bytes: null,
+    });
+  });
+
+  it("gives the last correct backup, never when runs exist without one, and no data otherwise", () => {
+    expect(ultimaCopiaCorrecta(copia)).toEqual({ tipo: "fecha", iso: "2026-11-11T05:00:40Z" });
+    expect(ultimaCopiaCorrecta({ ...copia, ultima_correcta_en: null })).toEqual({ tipo: "nunca" });
+    expect(
+      ultimaCopiaCorrecta({ ...copia, ultima_correcta_en: null, ultima_ejecucion: null, ultima_ejecucion_en: null }),
+    ).toEqual({ tipo: "sin_dato" });
+  });
+
+  it("converts bytes to MB like the contract example", () => {
+    expect(megabytes(52_428_800)).toBe(50);
+    expect(megabytes(0)).toBe(0);
   });
 });
