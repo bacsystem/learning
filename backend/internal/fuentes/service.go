@@ -3,7 +3,12 @@ package fuentes
 import (
 	"context"
 	"errors"
+	"strings"
+	"unicode/utf8"
 )
+
+// maxConsultaTitulo bounds the S3 title search (contract S3, q).
+const maxConsultaTitulo = 100
 
 // almacen is what the Service needs from the admin repository.
 type almacen interface {
@@ -11,10 +16,11 @@ type almacen interface {
 	NuevaVersion(ctx context.Context, fuenteID int64, nombre string, contenido []byte, creadoPor *int64, citantes Citantes, aud Auditor) (int, error)
 	Detalle(ctx context.Context, id int64, citantes Citantes) (FuenteDetalle, error)
 	DuplicadoDe(ctx context.Context, sha string) error
+	Listar(ctx context.Context, f FiltroListado) (ListaFuentes, error)
 }
 
-// Service holds the upload rules of SIA-E2-03 (S1) and the new version of
-// SIA-E2-06 (S2).
+// Service holds the upload rules of SIA-E2-03 (S1), the new version of
+// SIA-E2-06 (S2) and the admin listing and detail of SIA-E2-07 (S3, S4).
 type Service struct {
 	repo     almacen
 	citantes Citantes
@@ -63,6 +69,21 @@ func (s *Service) NuevaVersion(ctx context.Context, fuenteID string, archivo Arc
 	if _, err := s.repo.NuevaVersion(ctx, id, nombre, archivo.Contenido, actor, s.citantes, aud); err != nil {
 		return FuenteDetalle{}, s.conDetalleDuplicado(ctx, err, archivo.Contenido)
 	}
+	return s.repo.Detalle(ctx, id, s.citantes)
+}
+
+// Listar returns one page of S3. The title search is trimmed and, past 100
+// characters, is 422 validacion (campos.q).
+func (s *Service) Listar(ctx context.Context, f FiltroListado) (ListaFuentes, error) {
+	f.Q = strings.TrimSpace(f.Q)
+	if utf8.RuneCountInString(f.Q) > maxConsultaTitulo {
+		return ListaFuentes{}, &ValidacionError{Campos: map[string]string{"q": reglaMax}}
+	}
+	return s.repo.Listar(ctx, f)
+}
+
+// Obtener returns the FuenteDetalle of S4, or ErrNoEncontrado.
+func (s *Service) Obtener(ctx context.Context, id int64) (FuenteDetalle, error) {
 	return s.repo.Detalle(ctx, id, s.citantes)
 }
 

@@ -18,8 +18,14 @@ const (
 // the 2 MiB file is not cut by the 1 MB JSON limit.
 var RutasSubida = []string{RutaCrear, RutaNuevaVersion}
 
-// Mount registers the fuentes admin routes (contract E2). For now S1 and S2;
-// S3–S7 come with E2-06 and E2-07.
+// Route patterns of the admin listing and detail (S3, S4).
+const (
+	RutaListar  = "GET /admin/fuentes"
+	RutaObtener = "GET /admin/fuentes/{id}"
+)
+
+// Mount registers the fuentes admin routes (contract E2). For now S1–S4;
+// S5–S7 come with E2-06 and E2-07.
 func Mount(mux *http.ServeMux, svc *Service, audLog *audit.Logger, jwtSecret string, checkSession auth.SessionChecker) {
 	h := NewHandler(svc, audLog)
 	authn := auth.RequireAuth(jwtSecret, checkSession)
@@ -27,4 +33,6 @@ func Mount(mux *http.ServeMux, svc *Service, audLog *audit.Logger, jwtSecret str
 
 	mux.Handle(RutaCrear, authn(admin(http.HandlerFunc(h.Crear))))
 	mux.Handle(RutaNuevaVersion, authn(admin(http.HandlerFunc(h.NuevaVersion))))
+	mux.Handle(RutaListar, authn(admin(http.HandlerFunc(h.Listar))))
+	mux.Handle(RutaObtener, authn(admin(http.HandlerFunc(h.Obtener))))
 }
