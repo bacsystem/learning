@@ -1,8 +1,7 @@
+import { API_BASE } from "@/lib/http/api-base";
 import { apiErrorFrom } from "@/lib/http/api-error";
 
 /** Cliente de la profesión del postulante (docs/api/serums-ia-e1-taxonomia.md §3, F1–F3). Sin `usuario_id`: la sesión. */
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 async function req<T>(path: string, token: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
