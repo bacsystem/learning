@@ -4,7 +4,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 )
 
@@ -63,11 +62,15 @@ func (p patronDatoPersonal) buscar(texto string) []coincidencia {
 	return res
 }
 
+// esDigitoASCII is the digit of \d in RE2. The boundary uses the same
+// definition: a non-ASCII digit beside the number must not hide it.
+func esDigitoASCII(r rune) bool { return r >= '0' && r <= '9' }
+
 func sinDigitosAlLado(texto string, ini, fin int) bool {
-	if r, _ := utf8.DecodeLastRuneInString(texto[:ini]); ini > 0 && unicode.IsDigit(r) {
+	if r, _ := utf8.DecodeLastRuneInString(texto[:ini]); ini > 0 && esDigitoASCII(r) {
 		return false
 	}
-	if r, _ := utf8.DecodeRuneInString(texto[fin:]); fin < len(texto) && unicode.IsDigit(r) {
+	if r, _ := utf8.DecodeRuneInString(texto[fin:]); fin < len(texto) && esDigitoASCII(r) {
 		return false
 	}
 	return true

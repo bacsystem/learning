@@ -20,6 +20,8 @@ func TestTipoDatoPersonal(t *testing.T) {
 		{"Ref 12345678901 987654321", TipoTelefono},
 		{"987654321 987654322", TipoTelefono},
 		{"1987654321", ""},
+		{"٣12345678", TipoDNI}, // a non-ASCII digit does not hide the number
+		{"12345678٣", TipoDNI},
 		{"9876543210", ""},
 		{"+51987654321", TipoTelefono},
 		{"51987654321", TipoTelefono},
@@ -116,6 +118,7 @@ func TestRunesDeDatos(t *testing.T) {
 // out-of-range alternatives and foreign citations are invalid.
 func TestSalidas_Validar(t *testing.T) {
 	pasajes := []Pasaje{{ID: 11}}
+	taxo := EntradaClasificar{Items: []ItemTexto{{ID: 1}}, Taxonomia: []OpcionTaxonomia{{AsignaturaID: 5, TemaID: ptr(7)}}}
 	cases := []struct {
 		name string
 		err  error
@@ -125,6 +128,9 @@ func TestSalidas_Validar(t *testing.T) {
 		{"more questions than asked", invertir(SalidaGenerarPreguntas{Preguntas: make([]PreguntaGenerada, 2)}.validar(EntradaGenerarPreguntas{Cantidad: 1}))},
 		{"foreign citation", invertir(SalidaGenerarMaterial{PasajeIDs: []int64{99}}.validar(EntradaGenerarMaterial{Pasajes: pasajes}))},
 		{"citation of a given passage", SalidaGenerarExplicacion{PasajeIDs: []int64{11}}.validar(EntradaGenerarExplicacion{Pasajes: pasajes})},
+		{"classification inside the taxonomy", SalidaClasificar{Resultados: []Clasificacion{{ID: 1, AsignaturaID: 5, TemaID: ptr(7)}}}.validar(taxo)},
+		{"invented subject", invertir(SalidaClasificar{Resultados: []Clasificacion{{ID: 1, AsignaturaID: 9}}}.validar(taxo))},
+		{"invented topic", invertir(SalidaClasificar{Resultados: []Clasificacion{{ID: 1, AsignaturaID: 5, TemaID: ptr(8)}}}.validar(taxo))},
 		{"repeated item", invertir(SalidaClasificar{Resultados: []Clasificacion{{ID: 1}, {ID: 1}}}.validar(EntradaClasificar{Items: []ItemTexto{{ID: 1}, {ID: 2}}}))},
 	}
 	for _, c := range cases {
@@ -142,3 +148,5 @@ func invertir(err error) error {
 	}
 	return nil
 }
+
+func ptr(v int64) *int64 { return &v }

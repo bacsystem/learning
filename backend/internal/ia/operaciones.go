@@ -149,15 +149,45 @@ func (in EntradaClasificar) solicitud() Solicitud {
 }
 
 // validar: one result per input item, each id of the input once.
+type taxonomiaOfrecida map[[2]int64]bool
+
+// sinTema marks "no topic" in a taxonomiaOfrecida key; ids are positive.
+const sinTema int64 = 0
+
+func opcionesOfrecidas(opciones []OpcionTaxonomia) taxonomiaOfrecida {
+	t := make(taxonomiaOfrecida, len(opciones))
+	for _, o := range opciones {
+		t[[2]int64{o.AsignaturaID, temaOCero(o.TemaID)}] = true
+	}
+	return t
+}
+
+func temaOCero(id *int64) int64 {
+	if id == nil {
+		return sinTema
+	}
+	return *id
+}
+
+// contiene reports whether the model chose an option it was given: the model
+// output is untrusted, so an invented subject or topic is rejected.
+func (t taxonomiaOfrecida) contiene(asignaturaID int64, temaID *int64) bool {
+	return t[[2]int64{asignaturaID, temaOCero(temaID)}]
+}
+
 func (s SalidaClasificar) validar(in EntradaClasificar) error {
 	items := make(map[int64]bool, len(in.Items))
 	for _, it := range in.Items {
 		items[it.ID] = false
 	}
+	ofrecidas := opcionesOfrecidas(in.Taxonomia)
 	for _, r := range s.Resultados {
 		visto, existe := items[r.ID]
 		if !existe || visto {
 			return fmt.Errorf("%w: resultado de un item ajeno o repetido", errSalida)
+		}
+		if !ofrecidas.contiene(r.AsignaturaID, r.TemaID) {
+			return fmt.Errorf("%w: clasificación fuera de la taxonomía ofrecida", errSalida)
 		}
 		items[r.ID] = true
 	}
