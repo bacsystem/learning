@@ -14,6 +14,7 @@
     "menu-admin-grados": "Grados",
     "menu-admin-especialidades": "Especialidades",
     "menu-admin-asignaturas": "Asignaturas",
+    "menu-admin-temas": "Temas",
     "menu-admin-procesos": "Procesos (Admin)",
     "menu-admin-preguntas": "Preguntas",
     "menu-admin-etiquetas": "Etiquetas",
@@ -1208,6 +1209,101 @@
     "simulacros-sin-inscripcion-aprobada": "Necesitas una inscripción aprobada en un proceso para rendir simulacros.",
     "simulacros-error-cargar-procesos": "No se pudieron cargar tus procesos. Recarga la página para intentarlo de nuevo.",
     "practicas-error-eliminar-no-encontrada": "Alguna práctica ya no existe. Actualiza la lista e inténtalo de nuevo.",
-    "practicas-error-eliminar-limite": "Puedes eliminar como máximo {max} prácticas a la vez."
+    "practicas-error-eliminar-limite": "Puedes eliminar como máximo {max} prácticas a la vez.",
+    "serumsIa": {
+      "temas": {
+        "titulo": "Temas",
+        "unidad": "temas",
+        "buscar": "Buscar tema…",
+        "crear": "Crear tema",
+        "nuevo": "Nuevo tema",
+        "editar": "Editar tema",
+        "acciones": "Acciones de {nombre}",
+        "creado": "Tema creado.",
+        "actualizado": "Tema actualizado.",
+        "archivado": "Tema archivado.",
+        "reactivado": "Tema reactivado.",
+        "aplicaATodas": "Todas las profesiones",
+        "archivar": "Archivar",
+        "archivarTitulo": "Archivar tema",
+        "archivarConfirm": "{n, plural, =0 {Este tema no tiene preguntas.} one {Este tema tiene # pregunta: la conserva, pero ya no se podrá clasificar nada nuevo en él.} other {Este tema tiene # preguntas: las conserva, pero ya no se podrá clasificar nada nuevo en él.}}",
+        "reactivar": "Reactivar",
+        "reactivarTitulo": "Reactivar tema",
+        "reactivarConfirm": "El tema vuelve a estar activo, al final del orden, con sus preguntas y especialidades.",
+        "errorCargar": "No se pudieron cargar los temas.",
+        "errorCatalogos": "No se pudieron cargar las asignaturas y especialidades.",
+        "vacioFiltros": "Ningún tema coincide con los filtros.",
+        "vacio": {
+          "titulo": "Aún no hay temas en esta área",
+          "texto": "Crea el primer tema para empezar a clasificar las preguntas de esta asignatura."
+        },
+        "sinAsignatura": {
+          "titulo": "Elige una asignatura",
+          "texto": "Los temas se administran por asignatura. Elige una para ver sus temas."
+        },
+        "estado": {
+          "activo": "Activo",
+          "archivado": "Archivado"
+        },
+        "col": {
+          "orden": "Orden",
+          "nombre": "Nombre",
+          "especialidades": "Especialidades",
+          "preguntas": "Preguntas",
+          "estado": "Estado"
+        },
+        "filtro": {
+          "asignatura": "Asignatura",
+          "asignaturaElegir": "Elige una asignatura",
+          "especialidad": "Especialidad",
+          "especialidadTodas": "Todas las especialidades",
+          "todos": "Todos"
+        },
+        "campo": {
+          "nombre": "Nombre",
+          "descripcion": "Descripción (opcional)",
+          "descripcionAyuda": "{n} / {max} caracteres",
+          "especialidades": "Especialidades",
+          "especialidadesAyuda": "Sin selección, el tema aplica a todas las profesiones.",
+          "sinEspecialidades": "No hay especialidades activas.",
+          "especialidadInactiva": "{nombre} (inactiva)",
+          "especialidadInactivaAyuda": "Ya no está activa: desmárcala para guardar."
+        },
+        "validacion": {
+          "nombreRequerido": "El nombre es obligatorio.",
+          "nombreLongitud": "El nombre debe tener entre {min} y {max} caracteres.",
+          "descripcionLongitud": "La descripción admite hasta {max} caracteres.",
+          "especialidadesMax": "Elige como máximo {max} especialidades.",
+          "especialidadInactiva": "Desmarca las especialidades inactivas para guardar."
+        },
+        "reordenar": {
+          "boton": "Reordenar",
+          "titulo": "Reordenar temas activos",
+          "ayuda": "Mueve los temas con Subir y Bajar, y guarda el orden.",
+          "subir": "Subir",
+          "bajar": "Bajar",
+          "subirTema": "Subir {nombre}",
+          "bajarTema": "Bajar {nombre}",
+          "anuncio": "{nombre}: posición {posicion} de {total}.",
+          "guardar": "Guardar orden",
+          "guardado": "Orden guardado.",
+          "recargar": "Recargar",
+          "sinActivos": "No hay temas activos para ordenar.",
+          "minimo": "Se necesitan al menos 2 temas activos.",
+          "mover": "Mover"
+        }
+      },
+      "errores": {
+        "validacion": "Revisa los datos del formulario.",
+        "referencia_invalida": "Una de las especialidades o la asignatura ya no está activa. Recarga y vuelve a intentarlo.",
+        "tema_duplicado": "Ya existe un tema con ese nombre en esta asignatura (puede estar archivado: reactívalo).",
+        "limite_temas": "Esta asignatura ya tiene 60 temas activos. Archiva uno para liberar cupo.",
+        "orden_invalido": "La lista de orden no es válida.",
+        "orden_desactualizado": "Los temas cambiaron mientras ordenabas. Recarga la lista y vuelve a ordenar.",
+        "estado_invalido": "El tema ya está en ese estado. Recarga la lista.",
+        "no_encontrado": "El tema ya no existe. Recarga la lista.",
+        "error_interno": "Error interno del servidor. Inténtalo de nuevo."
+      }
+    }
   }
 }
