@@ -12,6 +12,7 @@ const CLAVES_PESOS: ClavesDeError = {
   pesos_no_suman_100: "serumsIa.pesos.errores.pesos_no_suman_100",
   no_encontrado: "serumsIa.pesos.errores.no_encontrado",
   error_interno: "serumsIa.errores.error_interno",
+  cuerpo_demasiado_grande: "serumsIa.errores.cuerpo_demasiado_grande",
 };
 
 /** Texto a mostrar para un error de la API de pesos (ver `mensajeDeError`). */

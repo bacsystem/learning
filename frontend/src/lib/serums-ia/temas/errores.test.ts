@@ -13,6 +13,13 @@ describe("claveErrorTema", () => {
     expect(claveErrorTema(apiError(422, "x", "limite_temas"))).toBe("serumsIa.errores.limite_temas");
   });
 
+  it("translates 413 cuerpo_demasiado_grande by code, but not the middleware 413 (plain text)", () => {
+    expect(claveErrorTema(apiError(413, "x", "cuerpo_demasiado_grande"))).toBe(
+      "serumsIa.errores.cuerpo_demasiado_grande",
+    );
+    expect(claveErrorTema(apiError(413, "El cuerpo de la solicitud es demasiado grande."))).toBeNull();
+  });
+
   it("returns null for unknown codes and legacy errors", () => {
     expect(claveErrorTema(apiError(422, "x", "codigo_nuevo"))).toBeNull();
     expect(claveErrorTema(apiError(403, "Acceso denegado."))).toBeNull();
