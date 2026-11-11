@@ -7,7 +7,7 @@ Convenciones transversales para todos los endpoints del módulo «Aprendizaje as
 | [serums-ia-e1-taxonomia.md](serums-ia-e1-taxonomia.md) | E1-01, E1-02, E1-03, E1-04 (MVP) | vigente (2026-11-11) |
 | [serums-ia-e2-fuentes.md](serums-ia-e2-fuentes.md) | E2-02, E2-03, E2-05, E2-06, E2-07 (MVP) | aprobado, pendiente de implementación (2026-11-11) |
 
-ADRs: [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones).
+ADRs: [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones), [0005](../adr/0005-estado-operativo-panel-salud.md) estado operativo del panel de salud. Contrato de la épica de plataforma PLT-E1: [plataforma-salud.md](plataforma-salud.md).
 
 Un cambio a un contrato ya publicado se avisa directamente a backend-dev, frontend-dev y al tech-lead.
 
@@ -58,9 +58,10 @@ El repo tiene dos formatos:
 - **500:** siempre `{"error": "error_interno", "message": "Error interno del servidor."}`. La causa se registra con `op` y sin datos personales, como `httpx.InternalError` (`httpx.go:24-34`).
 - **Excepciones (respuestas que no salen del handler):**
   - `RequireAuth` y `RequireAdmin` responden `{"error": "No autenticado." | "Sesión revocada." | "Acceso denegado."}` (`auth/middleware.go:38,44,52,57,73`);
+  - `RequireAuth` responde `503 {"error": "Servicio no disponible."}` cuando la comprobación de la sesión falla por un error de la BD. El 401 queda solo para una sesión inexistente, expirada o revocada ([ADR 0005](../adr/0005-estado-operativo-panel-salud.md); cambio pendiente de implementar);
   - `MaxBodySize` responde `413 {"error": "El cuerpo de la solicitud es demasiado grande."}` (`middleware/bodylimit.go:42-44`) cuando el `Content-Length` declarado ya supera el límite.
 
-  El frontend trata esos tres status (401, 403 y 413 de middleware) **por status** y no por código. Si hay `message`, el código está en `error`; si no, `error` es texto.
+  El frontend trata esos status (401, 403, 413 y 503 de middleware) **por status** y no por código. Solo el 401 dispara `auth:expired`. Si hay `message`, el código está en `error`; si no, `error` es texto.
 - **Cuerpo demasiado grande en el handler (convención):** sin `Content-Length` (p. ej. `Transfer-Encoding: chunked`), el middleware no rechaza la petición: envuelve el cuerpo en `http.MaxBytesReader` (`bodylimit.go:46`). Pasado el límite, la lectura falla dentro del handler con `*http.MaxBytesError`.
   - **Regla:** todo handler del módulo que decodifica un cuerpo JSON comprueba `var mbe *http.MaxBytesError; errors.As(err, &mbe)` **antes** de responder `400 cuerpo_invalido`. Si es ese error, responde `413` con el formato 2: `{"error": "cuerpo_demasiado_grande", "message": "El cuerpo de la solicitud es demasiado grande."}`.
   - Precedente: hoy solo `auth` hace este mapeo (`internal/auth/handler.go:58-65`), con el formato heredado. Los handlers de temas responden 400 (`internal/temas/handler.go:255-264`, `decodificar`) y deben corregirse (tarea de backend-dev).
