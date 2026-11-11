@@ -262,13 +262,13 @@ func Huella(contenido []byte) (sha string, tamanoBytes, lineas int) {
 	return hex.EncodeToString(suma[:]), len(contenido), ContarLineas(contenido)
 }
 
-// Lineas splits the content into lines with the single line rule of ADR 0003
+// DividirLineas splits the content into lines with the single line rule of ADR 0003
 // § Normalización, paso 1, shared by Huella, the 20 000-line check of S1 and
 // the normaliser (E2-05), so linea_inicio and linea_fin always fall in
-// 1..len(Lineas): "\r\n", a lone "\r" and "\n" are one break each, a final
+// 1..len(DividirLineas): "\r\n", a lone "\r" and "\n" are one break each, a final
 // break does not add an empty line, and empty content has no lines. The
 // returned lines do not include their break.
-func Lineas(contenido []byte) []string {
+func DividirLineas(contenido []byte) []string {
 	var lineas []string
 	inicio := 0
 	for i := 0; i < len(contenido); i++ {
@@ -290,7 +290,7 @@ func Lineas(contenido []byte) []string {
 	return lineas
 }
 
-// ContarLineas is len(Lineas(contenido)).
+// ContarLineas is len(DividirLineas(contenido)).
 func ContarLineas(contenido []byte) int {
-	return len(Lineas(contenido))
+	return len(DividirLineas(contenido))
 }

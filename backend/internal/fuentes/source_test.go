@@ -84,8 +84,8 @@ func TestHuella(t *testing.T) {
 	}
 }
 
-// Lineas: one rule for splitting and counting; \r\n is one break, not two.
-func TestLineas(t *testing.T) {
+// DividirLineas: one rule for splitting and counting; \r\n is one break, not two.
+func TestDividirLineas(t *testing.T) {
 	cases := []struct {
 		in   string
 		want []string
@@ -99,11 +99,12 @@ func TestLineas(t *testing.T) {
 		{"a\r\n\r\nb", []string{"a", "", "b"}},
 		{"\n", []string{""}},
 		{"x\n\ny\r", []string{"x", "", "y"}},
+		{"a\r\nb\r", []string{"a", "b"}},
 	}
 	for _, c := range cases {
-		got := Lineas([]byte(c.in))
+		got := DividirLineas([]byte(c.in))
 		if fmt.Sprintf("%q", got) != fmt.Sprintf("%q", c.want) || ContarLineas([]byte(c.in)) != len(c.want) {
-			t.Errorf("Lineas(%q) = %q, want %q", c.in, got, c.want)
+			t.Errorf("DividirLineas(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }
