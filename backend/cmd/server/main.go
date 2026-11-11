@@ -130,6 +130,7 @@ func run() int {
 		salud.ComprobarBD(database),
 		// SMTP is only optional in development/test (config.Load).
 		salud.ComprobarCorreo(database, notifier.MaxRetries, cfg.SMTPHost != ""),
+		salud.ComprobarCopia(database, time.Now),
 	}, time.Now), cfg.JWTSecret, checkSession)
 	simulations.Mount(mux, simSvc, cfg.JWTSecret, checkSession)
 	notifications.Mount(mux, database, audLog, cfg.JWTSecret, checkSession)
