@@ -185,9 +185,9 @@ func TestSembrar_Idempotente(t *testing.T) {
 	db, cfg := preparar(t)
 	correr(t, db, cfg)
 	despues := conteos(t, db)
-	want := map[string]int{"instituciones": 2, "especialidades": 5, "asignaturas": 6, "procesos": 2,
-		"proceso_asignaturas": 6 + 2 + 6, "preguntas": (6 + 2) * 10, "configuracion_examen": 2,
-		"temas": 2, "usuarios": 5, "inscripciones": 5}
+	want := map[string]int{"instituciones": 2, "especialidades": 5, "asignaturas": 6, "procesos": 3,
+		"proceso_asignaturas": 6 + 3 + 2 + 6, "preguntas": (6 + 3 + 2) * 10, "configuracion_examen": 3,
+		"temas": 2, "usuarios": 5, "inscripciones": 6}
 	if fmt.Sprint(despues) != fmt.Sprint(want) {
 		t.Fatalf("counts = %v, want %v", despues, want)
 	}
@@ -292,7 +292,7 @@ func TestSembrar_DatosUsables(t *testing.T) {
 		WHERE u.username LIKE 'demo\_%' ORDER BY 1`); err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(inscripciones, ", "); got != "demo_enfermeria/Proceso de compatibilidad demo=aprobado, demo_enfermeria/SERUMS 2026-I=aprobado, "+
+	if got := strings.Join(inscripciones, ", "); got != "demo_enfermeria/Proceso de compatibilidad demo=aprobado, demo_enfermeria/SERUMS 2026-I=aprobado, demo_enfermeria/SERUMS 2026-II=aprobado, "+
 		"demo_esp_inactiva/SERUMS 2026-I=aprobado, demo_medicina/SERUMS 2026-I=aprobado, demo_pendiente/SERUMS 2026-I=pendiente" {
 		t.Errorf("inscripciones = %s", got)
 	}
@@ -313,17 +313,19 @@ func TestSembrar_DatosUsables(t *testing.T) {
 		}
 	}
 
-	// Profession options: two procesos leave proceso_id open; one fills it;
-	// an inactive persona especialidad leaves no preselection (esp 0).
+	// Profession options: several procesos leave proceso_id open (#103: two
+	// of them in the same institution offer the persona's Enfermería); one
+	// fills it; an inactive persona especialidad leaves no preselection (esp 0).
 	opcionesCases := []struct {
 		usuario  string
 		procesos int
+		conEsp   int // procesos that offer esp
 		proceso  *int64
 		esp      int64
 	}{
-		{"demo_enfermeria", 2, nil, esp(institucionSalud, "DEMO-ENF")},
-		{"demo_medicina", 1, &serums, esp(institucionSalud, "DEMO-MED")},
-		{"demo_esp_inactiva", 1, nil, 0},
+		{"demo_enfermeria", 3, 2, nil, esp(institucionSalud, "DEMO-ENF")},
+		{"demo_medicina", 1, 1, &serums, esp(institucionSalud, "DEMO-MED")},
+		{"demo_esp_inactiva", 1, 0, nil, 0},
 	}
 	for _, c := range opcionesCases {
 		status, body := pedir("GET", "/serums-ia/profesion/opciones", tokens[c.usuario], "")
@@ -333,6 +335,17 @@ func TestSembrar_DatosUsables(t *testing.T) {
 		if status != http.StatusOK || len(op.Procesos) != c.procesos || (op.Preseleccion == nil) != sinPreseleccion ||
 			!sinPreseleccion && (!mismoID(op.Preseleccion.ProcesoID, c.proceso) || op.Preseleccion.EspecialidadID != c.esp) {
 			t.Errorf("%s opciones: %d %s", c.usuario, status, body)
+		}
+		conEsp := 0
+		for _, p := range op.Procesos {
+			for _, e := range p.Especialidades {
+				if e.ID == c.esp {
+					conEsp++
+				}
+			}
+		}
+		if conEsp != c.conEsp {
+			t.Errorf("%s: %d procesos offer especialidad %d, want %d", c.usuario, conEsp, c.esp, c.conEsp)
 		}
 	}
 	ajena := fmt.Sprintf(`{"proceso_id":%d,"especialidad_id":%d}`, serums, esp(institucionCompat, "DEMO-ENF"))

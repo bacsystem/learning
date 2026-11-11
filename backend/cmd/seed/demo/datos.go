@@ -9,6 +9,7 @@ const (
 	gradoDemo             = "Grado Demo"
 	nivelDemo             = "suboficial"
 	procesoSERUMS         = "SERUMS 2026-I"
+	procesoSERUMS2        = "SERUMS 2026-II" // second proceso of the same institution
 	procesoCompatibilidad = "Proceso de compatibilidad demo"
 	montoInscripcion      = 0.00
 	prefijoUsuario        = "demo_"         // every demo username; production ones never carry it
@@ -75,6 +76,10 @@ var procesosDemo = []procesoDemo{
 		},
 	},
 	{
+		Institucion: institucionSalud, Nombre: procesoSERUMS2, Tipo: "admision",
+		Compatibilidad: []areaDemo{{"DEMO-SP", 40}, {"DEMO-EPI", 30}, {"DEMO-CE", 30}},
+	},
+	{
 		Institucion: institucionCompat, Nombre: procesoCompatibilidad, Tipo: "ascenso",
 		Compatibilidad: []areaDemo{{"DEMO-SP", 50}, {"DEMO-EPI", 50}},
 	},
@@ -98,7 +103,7 @@ type usuarioDemo struct {
 
 var usuariosDemo = []usuarioDemo{
 	{"demo_admin", "admin", "DEMO-MED", "Admin", nil},
-	{"demo_enfermeria", "usuario", "DEMO-ENF", "Enfermera", map[string]string{procesoSERUMS: "aprobado", procesoCompatibilidad: "aprobado"}},
+	{"demo_enfermeria", "usuario", "DEMO-ENF", "Enfermera", map[string]string{procesoSERUMS: "aprobado", procesoSERUMS2: "aprobado", procesoCompatibilidad: "aprobado"}},
 	{"demo_medicina", "usuario", "DEMO-MED", "Médico", map[string]string{procesoSERUMS: "aprobado"}},
 	{"demo_pendiente", "usuario", "DEMO-OBS", "Obstetra", map[string]string{procesoSERUMS: "pendiente"}},
 	{"demo_esp_inactiva", "usuario", "DEMO-ODO", "Odontólogo", map[string]string{procesoSERUMS: "aprobado"}},
