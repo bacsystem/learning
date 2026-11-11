@@ -156,6 +156,8 @@ func responderError(w http.ResponseWriter, op string, err error) {
 		httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codigoArchivoInvalido, ErrArchivoInvalido.Error(), map[string]any{"motivo": archivo.Motivo})
 	case errors.As(err, &verr):
 		httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codigoValidacion, ErrValidacion.Error(), map[string]any{"campos": verr.Campos})
+	case errors.Is(err, ErrCuerpoInvalido):
+		httpx.JSONErrorCode(w, http.StatusBadRequest, codigoCuerpoInvalido, err.Error(), nil)
 	case errors.Is(err, ErrReferenciaInvalida):
 		httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codigoReferencia, err.Error(), nil)
 	case errors.As(err, &dup):

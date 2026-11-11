@@ -156,6 +156,7 @@ func TestResponderError(t *testing.T) {
 		{&ArchivoInvalidoError{Motivo: MotivoTipo}, 422, "archivo_invalido", "map[motivo:tipo]"},
 		{&ValidacionError{Campos: map[string]string{"titulo": "min"}}, 422, "validacion", "map[campos:map[titulo:min]]"},
 		{ErrReferenciaInvalida, 422, "referencia_invalida", "<nil>"},
+		{ErrCuerpoInvalido, 400, "cuerpo_invalido", "<nil>"},
 		{&DuplicadaError{FuenteID: 9, Titulo: "A", Estado: "retirada", Version: 2}, 409, "fuente_duplicada", "map[estado:retirada fuente_id:9 titulo:A version:2]"},
 		{ErrFuenteDuplicada, 409, "fuente_duplicada", "<nil>"},
 		{&LimiteError{Limite: 100, EspecialidadID: &esp}, 422, "limite_fuentes", "map[especialidad_id:2 limite:100]"},

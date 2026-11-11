@@ -486,6 +486,8 @@ func TestS2_EstadosYErrores(t *testing.T) {
 		{"fuente retirada", fmt.Sprint(retirada), contenidoUnico(), 409, "estado_invalido"},
 		{"fuente inexistente", "999999999", contenidoUnico(), 404, "no_encontrado"},
 		{"sin fuente_id", "", contenidoUnico(), 422, "validacion"},
+		{"fuente_id cero", "0", contenidoUnico(), 422, "validacion"},
+		{"fuente_id no numérico", "abc", contenidoUnico(), 400, "cuerpo_invalido"},
 		{"archivo antes que fuente_id", "", []byte{0xff}, 422, "archivo_invalido"},
 		{"mismo hash que su propia vigente", fmt.Sprint(activa), propio, 409, "fuente_duplicada"},
 	}

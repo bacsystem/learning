@@ -11,6 +11,7 @@ import (
 var (
 	ErrArchivoDemasiadoGrande = errors.New("El archivo supera el máximo de 2 MiB.")
 	ErrArchivoInvalido        = errors.New("El archivo no es un .md de texto UTF-8 válido.")
+	ErrCuerpoInvalido         = errors.New("El formulario multipart es inválido.")
 	ErrValidacion             = errors.New("Datos de la fuente inválidos.")
 	ErrReferenciaInvalida     = errors.New("Alguna especialidad o el proceso no existe o está inactivo.")
 	ErrLimiteFuentes          = errors.New("Se alcanzó el máximo de fuentes.")

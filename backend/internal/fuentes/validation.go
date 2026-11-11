@@ -140,11 +140,20 @@ func parsearIDs(valores []string, ids *[]int64) string {
 	return ""
 }
 
-// parsearFuenteID parses the fuente_id of S2.
+// parsearFuenteID parses the fuente_id of S2 (architect, README §4): a
+// non-numeric value is syntax (ErrCuerpoInvalido, 400); absent or ≤ 0 is
+// validation (422, campos.fuente_id).
 func parsearFuenteID(s string) (int64, error) {
-	id, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
-	if err != nil || id <= 0 {
+	s = strings.TrimSpace(s)
+	if s == "" {
 		return 0, &ValidacionError{Campos: map[string]string{"fuente_id": reglaRequerido}}
+	}
+	id, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, ErrCuerpoInvalido
+	}
+	if id <= 0 {
+		return 0, &ValidacionError{Campos: map[string]string{"fuente_id": reglaInvalido}}
 	}
 	return id, nil
 }
