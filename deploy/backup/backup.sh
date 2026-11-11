@@ -33,18 +33,21 @@ archivo="/tmp/${dia}.dump.age"
 resultado=fallida
 bytes=""
 
+# Errores de libpq sin host ni puerto (connection to server at "<host>", port N).
+sin_host() { sed -E 's/server at "[^"]*"/server at <host>/g; s/, port [0-9]+//g; s#postgres(ql)?://[^ ]*#<url>#g' | head -c 300; }
+
 # Al salir, pase lo que pase: registra la ejecución y borra el archivo cifrado.
 registrar() {
   rc=$?
   rm -f "$archivo"
   terminada=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   if ! psql "$BACKUP_DATABASE_URL" -X -q -v ON_ERROR_STOP=1 \
-       -v ini="$iniciada" -v fin="$terminada" -v res="$resultado" -v bytes="$bytes" >/dev/null <<'SQL'
+       -v ini="$iniciada" -v fin="$terminada" -v res="$resultado" -v bytes="$bytes" >/dev/null 2>/tmp/psql.err <<'SQL'
 INSERT INTO copias_bd (iniciada_en, terminada_en, resultado, tamano_bytes)
 VALUES (:'ini', :'fin', :'res', NULLIF(:'bytes', '')::bigint);
 SQL
   then
-    echo "backup: no se pudo registrar la ejecución en copias_bd" >&2
+    echo "backup: no se pudo registrar la ejecución en copias_bd ($(sin_host </tmp/psql.err))" >&2
     [ "$rc" -ne 0 ] || rc=3
   fi
   echo "backup: ${terminada} resultado=${resultado}${bytes:+ tamano_bytes=${bytes}}"
@@ -53,12 +56,15 @@ SQL
 trap registrar EXIT
 trap 'exit 143' TERM INT
 
+: > /tmp/pg_dump.err; : > /tmp/psql.err
 echo "backup: ${iniciada} inicio"
 
 # 1. Dump cifrado en tubería: al disco solo llega el archivo cifrado.
 export BACKUP_DATABASE_URL AGE_RECIPIENT archivo
-timeout "$TIMEOUT" sh -c 'set -o pipefail; pg_dump --format=custom --no-password "$BACKUP_DATABASE_URL" | age -r "$AGE_RECIPIENT" -o "$archivo"' \
-  || { echo "backup: falló o superó ${TIMEOUT}s el dump/cifrado" >&2; exit 1; }
+# Si pg_dump falla (permisos, conexión), pipefail hace fallar la tubería aunque
+# age haya escrito un archivo: no se sube nada y queda la fila «fallida».
+timeout "$TIMEOUT" sh -c 'set -o pipefail; pg_dump --format=custom --no-password "$BACKUP_DATABASE_URL" 2>/tmp/pg_dump.err | age -r "$AGE_RECIPIENT" -o "$archivo"' 2>/dev/null \
+  || { echo "backup: falló o superó ${TIMEOUT}s el dump/cifrado ($(sin_host </tmp/pg_dump.err))" >&2; exit 1; }
 tamano=$(stat -c %s "$archivo")
 [ "$tamano" -gt 0 ] || { echo "backup: el archivo cifrado está vacío" >&2; exit 1; }
 
