@@ -93,16 +93,22 @@ export default function TemasPage() {
     () => asignaturas.map((a) => ({ value: String(a.id), label: a.nombre })),
     [asignaturas],
   );
+  // Las especialidades son por institución: un nombre repetido entre instituciones se distingue con la institución.
+  const especialidadesTema = useMemo(() => {
+    const repetidos = new Set(
+      especialidades.map((e) => e.nombre).filter((nombre, i, todos) => todos.indexOf(nombre) !== i),
+    );
+    return especialidades.map((e) => ({
+      id: e.id,
+      nombre: repetidos.has(e.nombre) ? `${e.nombre} (${e.institucion})` : e.nombre,
+    }));
+  }, [especialidades]);
   const opcionesEspecialidad = useMemo(
     () => [
       { value: "0", label: t("serumsIa.temas.filtro.especialidadTodas") },
-      ...especialidades.map((e) => ({ value: String(e.id), label: e.nombre })),
+      ...especialidadesTema.map((e) => ({ value: String(e.id), label: e.nombre })),
     ],
-    [especialidades, t],
-  );
-  const especialidadesTema = useMemo(
-    () => especialidades.map((e) => ({ id: e.id, nombre: e.nombre })),
-    [especialidades],
+    [especialidadesTema, t],
   );
 
   const etiquetaEstado = useCallback((estado: EstadoTema) => t(`serumsIa.temas.estado.${estado}`), [t]);
@@ -315,7 +321,7 @@ export default function TemasPage() {
             </Alerta>
           ) : null}
 
-          {sinTemas ? (
+          {error ? null : sinTemas ? (
             <EstadoVacio icon={TreeStructureIcon} titulo={t("serumsIa.temas.vacio.titulo")} accion={botonCrear}>
               {t("serumsIa.temas.vacio.texto")}
             </EstadoVacio>
