@@ -473,6 +473,14 @@ func TestS2_EstadosYErrores(t *testing.T) {
 	activa := e.activa(t, propio)
 	contenidoProcesando := contenidoUnico()
 	e.crear(t, contenidoProcesando)
+	// An active fuente whose v2 is still in process: the state check must
+	// reject it before the duplicate check, not just the partial index.
+	vigenteConV2 := contenidoUnico()
+	activaConV2 := e.activa(t, vigenteConV2)
+	enProcesoV2 := contenidoUnico()
+	if status, body := e.version(t, activaConV2, enProcesoV2); status != http.StatusAccepted {
+		t.Fatalf("seed v2 in process: %d %v", status, body)
+	}
 
 	cases := []struct {
 		name   string
@@ -483,6 +491,9 @@ func TestS2_EstadosYErrores(t *testing.T) {
 	}{
 		{"fuente en procesando", fmt.Sprint(procesando), contenidoUnico(), 409, "estado_invalido"},
 		{"estado antes que duplicado", fmt.Sprint(procesando), contenidoProcesando, 409, "estado_invalido"},
+		{"activa con versión en procesando", fmt.Sprint(activaConV2), contenidoUnico(), 409, "estado_invalido"},
+		{"activa en procesando, hash de su vigente", fmt.Sprint(activaConV2), vigenteConV2, 409, "estado_invalido"},
+		{"activa en procesando, hash de su versión en proceso", fmt.Sprint(activaConV2), enProcesoV2, 409, "estado_invalido"},
 		{"fuente retirada", fmt.Sprint(retirada), contenidoUnico(), 409, "estado_invalido"},
 		{"fuente inexistente", "999999999", contenidoUnico(), 404, "no_encontrado"},
 		{"sin fuente_id", "", contenidoUnico(), 422, "validacion"},

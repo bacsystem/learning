@@ -179,6 +179,7 @@ Descartada: el usuario eligió Railway. Además, sin PITR se pierden hasta 24 h 
       - `deploy/railway/`: guía y lista de variables sin secretos, sin archivos de configuración de Railway;
       - una carpeta por destino, `deploy/<nube>/`, todas con las mismas imágenes.
       - La base es `postgres:16-alpine` oficial con `ssl=on`, no la imagen de Railway. `ENV=preprod`.
+      - Implementación: [PR #115](https://github.com/bacsystem/learning/pull/115) (`deploy/`, de devops).
     - Para que la validación de qa valga para producción, la preproducción usa **Postgres 16**, el mismo `entrypoint.sh` con migraciones y `ENV` distinto de development/test. Con eso aplica la validación de `sslmode` de producción (hallazgo H-5 del PR #97), así que la base local de preproducción se levanta con TLS.
     - Los datos de preproducción son sintéticos o semilla, **nunca** copias de producción ni de `assets/`, porque contienen datos personales.
     - **Producción:** Railway, entorno `production`.
