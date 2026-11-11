@@ -104,7 +104,7 @@ SIA-E3-02 (estados y guardas de editar y eliminar). Si khipu no tiene el diálog
 Las guardas viven en el servidor; el cliente solo avisa. No se muestran códigos de error crudos.
 
 ## i18n
-Todo en es/en. Esta historia es dueña de `dashboard.serumsIa.avisosPregunta.*`: alta, Excel (con plural), confirmación de edición y la ayuda de eliminar, que también se muestra ante el 409 al eliminar. El error `clave_oficial` va en `dashboard.serumsIa.errores.clave_oficial`, con la convención de `docs/api/README.md` §8 (una clave por código, compartida). Si la clave ya existe, se reutiliza y no se duplica. Cada clave existe en ambos archivos.
+Todo en es/en. Esta historia es dueña de `dashboard.serumsIa.avisosPregunta.*`: alta, Excel (con plural), confirmación de edición y la ayuda de eliminar, que también se muestra ante el 409 al eliminar. El error `clave_oficial` va en `dashboard.serumsIa.errores.clave_oficial`, con la convención de `docs/api/README.md` §8 (una clave por código, compartida). Si la clave ya existe, se reutiliza y no se duplica. Para un código sin clave se usa el genérico del módulo, `dashboard.serumsIa.errores.generico`, nunca el `message` de la API. Cada clave existe en ambos archivos.
 
 ## Definición de terminado
 - `tsc`, `lint` y `build` en verde.

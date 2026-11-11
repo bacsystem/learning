@@ -122,7 +122,7 @@ Todo en es/en. Esta historia es dueña de:
 - `dashboard.serumsIa.revision.listado.*`: filtros, origen, nº de citas y estados de UI;
 - `dashboard.serumsIa.revision.citas.*`: citas, buscador y «Sin resultados»;
 - `dashboard.serumsIa.errores.<codigo>` para `fuente_no_activa`, `limite_citas` y `ultima_cita_activa`: una clave por código, compartida por todas las pantallas (convención de `docs/api/README.md` §8). Si la clave ya existe, se reutiliza y no se duplica;
-- `dashboard.serumsIa.revision.errores.generico`: el texto genérico para un código sin clave.
+- `dashboard.serumsIa.errores.generico`: el texto genérico del módulo para un código sin clave (nunca se muestra el `message` de la API). Es una sola clave para todas las pantallas (`docs/api/README.md` §8). Si ya existe, se reutiliza.
 
 Los nombres de estado van en `dashboard.serumsIa.estadosPregunta.*` (de SIA-E3-02). Cada clave existe en ambos archivos.
 
