@@ -24,6 +24,7 @@ Pantalla nueva en el área de admin de `(dashboard)`, con entrada en la navegaci
 5. Si la consulta falla (backend caído, red o 5xx), la pantalla muestra el aviso «No se pudo consultar el estado de los servicios». Si había datos, los conserva marcados como «desactualizados», con la hora de su última comprobación válida. Sigue reintentando en el siguiente ciclo. Un 503 (la base de datos está caída y la autenticación no puede verificar, PLT-01 regla 9) se trata igual: **no** cierra la sesión ni redirige al login.
 6. Estados de UI: carga inicial, datos, error sin datos previos y error con datos previos (regla 5).
 7. Texto fijo de ayuda: «Este panel muestra el estado al abrirlo. No envía alertas.»
+8. **Base de datos caída al abrir o recargar** (decisión del PO, consulta de frontend-dev): también falla la carga del perfil (`/auth/me`), así que en lugar del aviso de la regla 5 se muestra el **aviso general del panel** (PR #111): «El servidor no responde. Tu sesión sigue abierta…». Se acepta porque cumple lo esencial: no se cierra la sesión, no se redirige al login y no hay tarjetas con estados inventados. Cuando la base vuelve y se recarga, la pantalla carga normal.
 
 ## Criterios de aceptación
 ```gherkin
@@ -62,6 +63,16 @@ Escenario: Base de datos totalmente caída
   Cuando se refresca el estado
   Entonces ve «No se pudo consultar el estado de los servicios», sigue en la pantalla con su sesión y no es redirigido al login
 
+Escenario: Base de datos caída al abrir
+  Dado un admin con sesión válida y la base de datos totalmente caída
+  Cuando abre o recarga «Salud de servicios»
+  Entonces ve el aviso general del panel «El servidor no responde. Tu sesión sigue abierta…», no es redirigido al login, su sesión se conserva y no ve ninguna tarjeta con estado
+
+Escenario: Recuperación tras la caída
+  Dado el admin vio el aviso general por la base de datos caída
+  Cuando la base de datos vuelve y recarga la pantalla
+  Entonces la pantalla carga normal con el estado de los servicios, sin volver a iniciar sesión
+
 Escenario: Backend inalcanzable al abrir
   Dado el backend no responde
   Cuando un admin abre la pantalla
@@ -91,4 +102,4 @@ Guard de rol admin en el layout y entrada de navegación visible solo para admin
 Todo en es/en, bajo `dashboard.saludServicios.*`: título, entrada de navegación, estado global, los 5 estados, las 5 categorías de fallo, los nombres de servicio, «Última comprobación», «Actualizar», «desactualizado», aviso de error y texto de ayuda. Cada clave existe en ambos archivos.
 
 ## Definición de terminado
-`tsc`, `lint` y `build` en verde. Estados de UI verificados (carga, datos, error con y sin datos previos). Refresco y pausa en segundo plano verificados. Claves es/en. Accesibilidad: el estado no depende solo del color. Review limpio.
+`tsc`, `lint` y `build` en verde. Estados de UI verificados (carga, datos, error con y sin datos previos, base de datos caída al abrir y recuperación al recargar). Refresco y pausa en segundo plano verificados. Claves es/en. Accesibilidad: el estado no depende solo del color. Review limpio.
