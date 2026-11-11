@@ -1,4 +1,4 @@
-import { aPayload, esquemaTema, mover, normalizarNombre } from "./reglas";
+import { aPayload, esquemaTema, mover, normalizarNombre, opcionesEspecialidad } from "./reglas";
 import { describe, expect, it } from "vitest";
 
 const esquema = esquemaTema({
@@ -6,6 +6,7 @@ const esquema = esquemaTema({
   nombreLongitud: "longitud",
   descripcionLongitud: "descripcion",
   especialidadesMax: "max",
+  especialidadInactiva: "inactiva",
 });
 
 const valido = { nombre: "Vigilancia epidemiológica", descripcion: "", especialidad_ids: [2, 5] };
@@ -85,5 +86,46 @@ describe("mover", () => {
     expect(mover(lista, 1, "bajar")).toEqual(["A", "B"]);
     expect(mover(lista, 5, "subir")).toEqual(["A", "B"]);
     expect(lista).toEqual(["A", "B"]);
+  });
+});
+
+describe("opcionesEspecialidad", () => {
+  const activas = [
+    { id: 2, nombre: "Medicina" },
+    { id: 5, nombre: "Enfermería" },
+  ];
+
+  it("lists the active ones and appends associated ones that are no longer active, marked as inactive", () => {
+    expect(
+      opcionesEspecialidad(activas, [
+        { id: 5, nombre: "Enfermería" },
+        { id: 9, nombre: "Odontología" },
+      ]),
+    ).toEqual([
+      { id: 2, nombre: "Medicina", inactiva: false },
+      { id: 5, nombre: "Enfermería", inactiva: false },
+      { id: 9, nombre: "Odontología", inactiva: true },
+    ]);
+  });
+
+  it("has no inactive options when creating", () => {
+    expect(opcionesEspecialidad(activas, []).some((o) => o.inactiva)).toBe(false);
+  });
+});
+
+describe("esquemaTema with inactive especialidades", () => {
+  it("rejects a checked inactive especialidad and accepts the form once it is unchecked", async () => {
+    const conInactiva = esquemaTema(
+      {
+        nombreRequerido: "requerido",
+        nombreLongitud: "longitud",
+        descripcionLongitud: "descripcion",
+        especialidadesMax: "max",
+        especialidadInactiva: "inactiva",
+      },
+      [9],
+    );
+    await expect(conInactiva.validate({ ...valido, especialidad_ids: [2, 9] })).rejects.toThrow("inactiva");
+    await expect(conInactiva.validate({ ...valido, especialidad_ids: [2] })).resolves.toBeTruthy();
   });
 });

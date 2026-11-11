@@ -1265,13 +1265,16 @@
           "descripcionAyuda": "{n} / {max} characters",
           "especialidades": "Specialties",
           "especialidadesAyuda": "With none selected, the topic applies to all professions.",
-          "sinEspecialidades": "There are no active specialties."
+          "sinEspecialidades": "There are no active specialties.",
+          "especialidadInactiva": "{nombre} (inactive)",
+          "especialidadInactivaAyuda": "No longer active: uncheck it to save."
         },
         "validacion": {
           "nombreRequerido": "The name is required.",
           "nombreLongitud": "The name must have between {min} and {max} characters.",
           "descripcionLongitud": "The description allows up to {max} characters.",
-          "especialidadesMax": "Choose at most {max} specialties."
+          "especialidadesMax": "Choose at most {max} specialties.",
+          "especialidadInactiva": "Uncheck the inactive specialties to save."
         },
         "reordenar": {
           "boton": "Reorder",

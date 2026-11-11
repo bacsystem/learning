@@ -1265,13 +1265,16 @@
           "descripcionAyuda": "{n} / {max} caracteres",
           "especialidades": "Especialidades",
           "especialidadesAyuda": "Sin selección, el tema aplica a todas las profesiones.",
-          "sinEspecialidades": "No hay especialidades activas."
+          "sinEspecialidades": "No hay especialidades activas.",
+          "especialidadInactiva": "{nombre} (inactiva)",
+          "especialidadInactivaAyuda": "Ya no está activa: desmárcala para guardar."
         },
         "validacion": {
           "nombreRequerido": "El nombre es obligatorio.",
           "nombreLongitud": "El nombre debe tener entre {min} y {max} caracteres.",
           "descripcionLongitud": "La descripción admite hasta {max} caracteres.",
-          "especialidadesMax": "Elige como máximo {max} especialidades."
+          "especialidadesMax": "Elige como máximo {max} especialidades.",
+          "especialidadInactiva": "Desmarca las especialidades inactivas para guardar."
         },
         "reordenar": {
           "boton": "Reordenar",

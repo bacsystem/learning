@@ -17,6 +17,7 @@ import {
   esquemaTema,
   NOMBRE_MAX,
   NOMBRE_MIN,
+  opcionesEspecialidad,
   type ValoresTema,
 } from "@/lib/serums-ia/temas/reglas";
 import { TreeStructureIcon } from "@phosphor-icons/react";
@@ -55,15 +56,25 @@ export function FormularioTema({
   const t = useTranslations("dashboard");
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
 
+  const opciones = useMemo(
+    () => opcionesEspecialidad(especialidades, tema?.especialidades ?? []),
+    [especialidades, tema],
+  );
+  const inactivas = useMemo(() => opciones.filter((o) => o.inactiva).map((o) => o.id), [opciones]);
+
   const validationSchema = useMemo(
     () =>
-      esquemaTema({
-        nombreRequerido: t("serumsIa.temas.validacion.nombreRequerido"),
-        nombreLongitud: t("serumsIa.temas.validacion.nombreLongitud", { min: NOMBRE_MIN, max: NOMBRE_MAX }),
-        descripcionLongitud: t("serumsIa.temas.validacion.descripcionLongitud", { max: DESCRIPCION_MAX }),
-        especialidadesMax: t("serumsIa.temas.validacion.especialidadesMax", { max: ESPECIALIDADES_MAX }),
-      }),
-    [t],
+      esquemaTema(
+        {
+          nombreRequerido: t("serumsIa.temas.validacion.nombreRequerido"),
+          nombreLongitud: t("serumsIa.temas.validacion.nombreLongitud", { min: NOMBRE_MIN, max: NOMBRE_MAX }),
+          descripcionLongitud: t("serumsIa.temas.validacion.descripcionLongitud", { max: DESCRIPCION_MAX }),
+          especialidadesMax: t("serumsIa.temas.validacion.especialidadesMax", { max: ESPECIALIDADES_MAX }),
+          especialidadInactiva: t("serumsIa.temas.validacion.especialidadInactiva"),
+        },
+        inactivas,
+      ),
+    [t, inactivas],
   );
 
   const formik = useFormik<ValoresTema>({
@@ -81,12 +92,6 @@ export function FormularioTema({
       }
     },
   });
-
-  // Las ya asociadas siguen visibles aunque la especialidad ya no esté activa, para poder quitarlas.
-  const opciones = useMemo(() => {
-    const ids = new Set(especialidades.map((e) => e.id));
-    return [...especialidades, ...(tema?.especialidades.filter((e) => !ids.has(e.id)) ?? [])];
-  }, [especialidades, tema]);
 
   const error = (campo: keyof ValoresTema) => {
     const mensaje = formik.touched[campo] ? formik.errors[campo] : undefined;
@@ -169,7 +174,8 @@ export function FormularioTema({
                 key={e.id}
                 id={`tema-especialidad-${e.id}`}
                 name="especialidad_ids"
-                etiqueta={e.nombre}
+                etiqueta={e.inactiva ? t("serumsIa.temas.campo.especialidadInactiva", { nombre: e.nombre }) : e.nombre}
+                descripcion={e.inactiva ? t("serumsIa.temas.campo.especialidadInactivaAyuda") : undefined}
                 checked={formik.values.especialidad_ids.includes(e.id)}
                 onCheckedChange={(v) => alternar(e.id, v)}
               />
