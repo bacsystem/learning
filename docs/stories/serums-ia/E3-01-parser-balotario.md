@@ -26,7 +26,9 @@ Formato observado: preguntas numeradas, alternativas A–D, clave dentro de `<ma
 7. Se excluye cualquier texto fuera de las preguntas (encabezados, pies de página).
 8. Cada pregunta válida lleva una lista de `alertas_estructura` cuando el parser tuvo que intervenir: `alternativas_separadas` (venían pegadas en una línea), `vinetas_normalizadas`, `html_eliminado`. Sirve para que el admin revise la consistencia estructural en SIA-E3-05 (decisión P2, issue #65); una pregunta sin intervención lleva la lista vacía. `vinetas_normalizadas` se marca solo cuando la pregunta tiene alternativas con viñetas sin letra (`-`, `*`, `•`) o mezcla estilos de etiqueta. Un estilo uniforme con letra (`a)`, `A.`, `a.`) se normaliza en silencio y no genera la alerta (decisión del PO P-B5, 12-nov: así no se mete ruido en la revisión de SIA-E3-05).
 9. **Entrada** (decisión del PO, 12-nov): el parser lee el `contenido` original de la versión vigente de la fuente, no los pasajes. Los números de línea son los del archivo original, los mismos de `pasajes.linea_inicio/linea_fin` (ADR 0003).
-10. **Motivos de «con problemas»** (lista cerrada): `sin_clave`, `enunciado_vacio`, `alternativas_insuficientes` (menos de 2), `alternativas_excedidas` (más de 6), `alternativas_duplicadas`, `numeracion_rota`, `enunciado_largo` (más de 2 000 caracteres) y `alternativa_larga` (más de 500). Si una pregunta tiene varios motivos, se informan todos.
+10. **Motivos de «con problemas»** (lista cerrada de nueve): `sin_clave`, `enunciado_vacio`, `alternativas_insuficientes` (menos de 2), `alternativas_excedidas` (más de 6), `alternativas_duplicadas`, `alternativa_vacia` (etiqueta sin texto, por ejemplo «B)» sola; nunca se descarta en silencio), `numeracion_rota`, `enunciado_largo` (más de 2 000 caracteres) y `alternativa_larga` (más de 500). Si una pregunta tiene varios motivos, se informan todos.
+    - Etiquetas fuera de orden (A, B, D): se reetiquetan por posición, cada una con su texto y su marca, y la pregunta lleva la alerta `vinetas_normalizadas`. No es un problema.
+    - `<mark>` sin cerrar: no marca clave. Se elimina como HTML (alerta `html_eliminado`) y, si no queda ninguna clave, el motivo es `sin_clave`.
 11. **Numeración rota:** se compara solo con la pregunta inmediatamente anterior. Si su número no es el anterior + 1 (salto o repetición), va a «con problemas» con `numeracion_rota` y el parseo sigue contando desde ese número. Una numeración que vuelve a 1 tras un encabezado de sección cuenta como inicio de secuencia nueva, no como numeración rota.
 12. **Límite de 1 000:** cuentan todos los bloques de pregunta detectados, válidos y con problemas. El parser devuelve el error `limite_preguntas` y no produce resultado; SIA-E3-03 lo traduce a 422.
 13. **Marca de clave:** una alternativa es correcta si cualquier parte de su texto, incluida la etiqueta, está dentro de `<mark>…</mark>`. Las etiquetas `<mark>` no quedan en el texto guardado.
@@ -121,6 +123,21 @@ Escenario: Alerta de estructura
   Cuando se parsea
   Entonces la pregunta es válida y lleva la alerta "alternativas_separadas"
 
+Escenario: Alternativa vacía
+  Dado una pregunta con "A) Uno", "B)" y "C) Tres", con C marcada
+  Cuando se parsea
+  Entonces se lista como "con problemas" con motivo "alternativa_vacia"
+
+Escenario: Etiquetas fuera de orden
+  Dado una pregunta con alternativas "A) Uno", "B) Dos" y "<mark>D) Tres</mark>"
+  Cuando se parsea
+  Entonces queda válida con A–C, "Tres" como la correcta y la alerta "vinetas_normalizadas"
+
+Escenario: Marca sin cerrar
+  Dado una pregunta cuya única marca es "<mark>C) Tres" sin cierre
+  Cuando se parsea
+  Entonces se lista como "con problemas" con motivo "sin_clave"
+
 Escenario: Etiquetas uniformes con letra
   Dado una pregunta con alternativas "a.", "b.", "c." y "d.", una por línea
   Cuando se parsea
@@ -147,7 +164,7 @@ SIA-E3-02 (modelo de borrador), SIA-E2-05.
 El contenido se trata como datos; el HTML residual se elimina (regla 16), y `<mark>` solo se usa para detectar la clave.
 
 ## i18n
-Los ocho motivos de la regla 10 y las tres alertas de la regla 8 se muestran en la UI de SIA-E3-03 con claves es/en; el parser solo devuelve los códigos.
+Los nueve motivos de la regla 10 y las tres alertas de la regla 8 se muestran en la UI de SIA-E3-03 con claves es/en; el parser solo devuelve los códigos.
 
 ## Definición de terminado
 Suite de pruebas con fixtures sintéticos (sin datos de assets/) cubriendo cada regla; review limpio.
