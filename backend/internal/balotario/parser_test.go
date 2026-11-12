@@ -484,3 +484,24 @@ func TestParsear_MarcasPorElemento(t *testing.T) {
 		comprobarValidas(t, r.Validas, []esperada{{1, 1, 3, "P", "unica", alts("Uno", "*Dos y tres"), []string{AlertaAlternativasSeparadas}}})
 	})
 }
+
+func TestParsear_FixtureReglasDeGramatica(t *testing.T) {
+	md, err := os.ReadFile("testdata/reglas_gramatica.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := parsear(t, string(md))
+	comprobarValidas(t, r.Validas, []esperada{
+		{1, 3, 8, "Un paciente con diarrea sanguinolenta. E. coli enterohemorrágica?", "unica", alts("Uno", "Dos", "*Tres", "Cuatro"), sinAlertas()},
+		{2, 10, 14, "Viñetas y letras mezcladas", "unica", alts("Uno", "Dos", "Tres", "*Cuatro"), []string{AlertaVinetasNormalizadas}},
+		{3, 16, 20, "Dosis de 2.5 mg de X 0.9% NaCl", "unica", alts("Uno", "*Dos"), sinAlertas()},
+		{4, 22, 26, "Marca que abre en la alternativa y cierra en su continuación", "unica", alts("Uno", "*Dos y tres", "Cuatro"), sinAlertas()},
+		{5, 28, 31, "Marca que cruza dos alternativas", "unica", alts("*Uno", "Dos", "Tres"), []string{AlertaHTMLEliminado}},
+		{6, 33, 34, "Pegadas con marca en medio", "unica", alts("Uno", "*Dos", "Tres"), []string{AlertaAlternativasSeparadas}},
+		{8, 37, 39, "Pregunta siguiente", "unica", alts("Uno", "*Dos"), sinAlertas()},
+	})
+	// The 7 has no alternatives: the 8 is the next expected number (rule c).
+	if got := fmt.Sprint(motivosDe(r)); got != "[7@36-36:alternativas_insuficientes+sin_clave]" {
+		t.Errorf("problemas = %s", got)
+	}
+}
