@@ -11,6 +11,7 @@ import (
 
 	"github.com/cbaciliod/learning/internal/auth"
 	"github.com/cbaciliod/learning/internal/crypto"
+	"github.com/cbaciliod/learning/internal/db/testlock"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
@@ -27,6 +28,7 @@ func TestRehash_DryRunThenApply(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { conn.Close() }) // registered first → runs after the data cleanup below
+	testlock.Hold(t, conn)             // released after the data cleanup below, before the pool closes
 	gcm, _ := crypto.NewCipher(testHexKey)
 	key, _ := hex.DecodeString(testHexKey)
 	ctx := context.Background()

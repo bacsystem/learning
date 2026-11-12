@@ -43,19 +43,8 @@ func Open(t *testing.T) *sqlx.DB {
 	if err != nil {
 		t.Fatalf("db connect: %v", err)
 	}
-	ctx := context.Background()
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		t.Fatalf("db conn: %v", err)
-	}
-	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, testlock.Key); err != nil {
-		t.Fatalf("advisory lock: %v", err)
-	}
-	t.Cleanup(func() {
-		_, _ = conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, testlock.Key)
-		_ = conn.Close()
-		_ = db.Close()
-	})
+	t.Cleanup(func() { _ = db.Close() }) // runs after the lock is released
+	testlock.Hold(t, db)
 	return db
 }
 

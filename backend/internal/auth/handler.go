@@ -60,7 +60,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
 		var mbe *http.MaxBytesError
 		if errors.As(err, &mbe) {
-			jsonError(w, http.StatusRequestEntityTooLarge, "El cuerpo de la solicitud es demasiado grande.")
+			httpx.JSONErrorCode(w, http.StatusRequestEntityTooLarge, httpx.CodeBodyTooLarge, httpx.MsgBodyTooLarge, nil)
 		} else {
 			jsonError(w, http.StatusBadRequest, "Cuerpo de solicitud inválido.")
 		}

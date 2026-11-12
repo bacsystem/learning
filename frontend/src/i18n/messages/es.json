@@ -1364,7 +1364,10 @@
         "tipo_fuente_invalido": "Solo se importan fuentes de tipo balotario.",
         "especialidad_invalida": "Esa profesión no está activa o no es de la institución del proceso. Elige otra.",
         "especialidad_no_corresponde": "Esa profesión no está entre las de la fuente: {profesiones}. Elige una de ellas.",
-        "sin_validas": "No hay preguntas válidas que importar."
+        "sin_validas": "No hay preguntas válidas que importar.",
+        "presupuesto_agotado": "El presupuesto mensual de IA se agotó. Se restablece el {reinicia}.",
+        "limite_ia": "Llegaste al límite diario de acciones de IA ({limite, number}). Se restablece el {reinicia}.",
+        "limite_ia_mensual": "Llegaste al límite mensual de acciones de IA ({limite, number}). Se restablece el {reinicia}."
       },
       "pesos": {
         "titulo": "Pesos de {especialidad}",
@@ -1873,6 +1876,92 @@
           "referencia_invalida": "El proceso o el área ya no son válidos. Recarga y vuelve a elegirlos.",
           "limite_preguntas": "El balotario tiene más de {maximo, number} preguntas ({detectadas, number} detectadas). Divídelo en partes y sube cada una como una versión."
         }
+      },
+      "ia": {
+        "titulo": "IA: límites y gasto",
+        "descripcion": "Controla cuánto pueden usar la IA los usuarios y cuánto se gasta al mes.",
+        "menu": "IA",
+        "gasto": {
+          "titulo": "Gasto del mes",
+          "mes": "Mes de {mes}",
+          "presupuesto": "Presupuesto",
+          "gastado": "Gastado",
+          "porcentaje": "{porcentaje} % del presupuesto",
+          "reinicia": "Se reinicia el {fecha}.",
+          "estado": {
+            "normal": "Dentro del presupuesto.",
+            "alerta": "Se llegó al 80 % del presupuesto el {fecha}.",
+            "agotado": "Presupuesto agotado: la IA queda detenida hasta el {fecha}."
+          },
+          "porOperacion": "Por operación",
+          "operacion": "Operación",
+          "invocaciones": "Invocaciones",
+          "desdeCache": "Desde caché",
+          "costo": "Costo",
+          "vacio": "Aún no hay invocaciones este mes.",
+          "errorCarga": "No se pudo cargar el gasto del mes.",
+          "operaciones": {
+            "clasificar": "Clasificar preguntas"
+          },
+          "sinCifrasPorUsuario": "No se muestran cifras por usuario: cada quien ve solo su consumo.",
+          "avance": "Avance del presupuesto"
+        },
+        "configuracion": {
+          "titulo": "Límites y presupuesto",
+          "ayuda": "Bajar un límite no afecta lo ya consumido: las siguientes acciones se rechazan hasta que se reinicie la ventana.",
+          "guardar": "Guardar",
+          "guardando": "Guardando…",
+          "guardada": "Configuración guardada.",
+          "errorCarga": "No se pudo cargar la configuración.",
+          "actualizada": "Última actualización: {fecha}",
+          "campos": {
+            "limite_usuario_dia": {
+              "etiqueta": "Acciones por día (usuario)",
+              "ayuda": "De 0 a 50. 0 desactiva la IA para los usuarios."
+            },
+            "limite_usuario_mes": {
+              "etiqueta": "Acciones por mes (usuario)",
+              "ayuda": "De 0 a 1 000. No puede ser menor que el límite diario."
+            },
+            "limite_admin_dia": {
+              "etiqueta": "Acciones por día (admin)",
+              "ayuda": "De 1 a 1 000."
+            },
+            "presupuesto_mensual_usd": {
+              "etiqueta": "Presupuesto mensual (USD)",
+              "ayuda": "De 1 a 1 000, con hasta 2 decimales."
+            },
+            "max_preguntas_solicitud": {
+              "etiqueta": "Preguntas por solicitud",
+              "ayuda": "De 1 a 50."
+            },
+            "lote_clasificacion": {
+              "etiqueta": "Preguntas por lote de clasificación",
+              "ayuda": "De 1 a 50."
+            }
+          },
+          "validacion": {
+            "rango": "Entre {min, number} y {max, number}, número entero.",
+            "presupuesto": "Entre {min, number} y {max, number}.",
+            "decimales": "Hasta 2 decimales.",
+            "diaMayorQueMes": "El límite diario no puede superar al mensual.",
+            "rechazado": "El servidor rechazó este valor. Revísalo."
+          }
+        },
+        "errores": {
+          "validacion": "Revisa los valores: hay campos fuera de rango."
+        },
+        "consumo": {
+          "titulo": "Tu consumo de hoy",
+          "usadas": "Acciones usadas",
+          "usados": "{usados, number} de {limite, number}",
+          "disponibles": "{disponibles, plural, =0 {Sin acciones disponibles} one {# acción disponible} other {# acciones disponibles}}",
+          "reinicia": "Se reinicia el {fecha}.",
+          "agotado": "El presupuesto mensual está agotado: no se pueden usar acciones de IA hasta que se reinicie.",
+          "avance": "Avance del límite diario",
+          "errorCarga": "No se pudo cargar tu consumo.",
+          "ayuda": "Es el límite de administradores; los usuarios tienen el suyo."
+        }
       }
     },
     "sesion-servidor-no-disponible-titulo": "El servidor no responde",
@@ -1939,6 +2028,7 @@
         "fallida": "Fallida"
       }
     },
+    "menu-admin-ia": "IA",
     "barra-superior-abrir-menu": "Abrir menú",
     "barra-superior-ubicacion": "Ubicación"
   }
