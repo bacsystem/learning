@@ -3,6 +3,7 @@ package questions
 import (
 	"net/http"
 
+	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/auth"
 )
 
@@ -17,12 +18,14 @@ import (
 //   - GET /preguntas/{id}     (admin)
 //   - PUT /preguntas/{id}     (admin)
 //   - DELETE /preguntas/{id}  (admin)
+//   - PATCH /preguntas/{id}/estado (admin)
+//   - PUT /preguntas/{id}/citas (admin)
 //   - GET /etiquetas          (admin)
 //   - POST /etiquetas         (admin)
 //   - PUT /etiquetas/{id}     (admin)
 //   - DELETE /etiquetas/{id}  (admin)
-func Mount(mux *http.ServeMux, svc *Service, jwtSecret string, checkSession auth.SessionChecker) {
-	h := NewHandler(svc)
+func Mount(mux *http.ServeMux, svc *Service, audLog *audit.Logger, jwtSecret string, checkSession auth.SessionChecker) {
+	h := NewHandler(svc, audLog)
 
 	authn := auth.RequireAuth(jwtSecret, checkSession)
 	admin := auth.RequireAdmin
@@ -38,6 +41,8 @@ func Mount(mux *http.ServeMux, svc *Service, jwtSecret string, checkSession auth
 	mux.Handle("GET /preguntas/{id}", authn(admin(http.HandlerFunc(h.GetPregunta))))
 	mux.Handle("PUT /preguntas/{id}", authn(admin(http.HandlerFunc(h.UpdatePregunta))))
 	mux.Handle("DELETE /preguntas/{id}", authn(admin(http.HandlerFunc(h.DeletePregunta))))
+	mux.Handle("PUT /preguntas/{id}/citas", authn(admin(http.HandlerFunc(h.ReemplazarCitas))))
+	mux.Handle("PATCH /preguntas/{id}/estado", authn(admin(http.HandlerFunc(h.CambiarEstado))))
 
 	// ── Etiquetas ─────────────────────────────────────────────────────────────
 	mux.Handle("GET /etiquetas", authn(admin(http.HandlerFunc(h.ListEtiquetas))))

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/httpx"
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog/log"
@@ -16,12 +17,13 @@ var validate = validator.New()
 
 // Handler exposes the questions HTTP handlers.
 type Handler struct {
-	svc *Service
+	svc    *Service
+	audLog *audit.Logger
 }
 
 // NewHandler creates a new Handler.
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *Service, audLog *audit.Logger) *Handler {
+	return &Handler{svc: svc, audLog: audLog}
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -184,8 +186,17 @@ func (h *Handler) UpdatePregunta(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	result, err := h.svc.UpdatePregunta(r.Context(), id, req)
+	aud, ok := h.auditor(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.svc.UpdatePregunta(r.Context(), id, req, aud)
 	if err != nil {
+		var re *ReglaError
+		if errors.As(err, &re) { // clave_oficial uses the coded format (E3-02 §4.5)
+			responderRegla(w, "questions.update", err)
+			return
+		}
 		mapErr(w, err)
 		return
 	}
@@ -198,7 +209,16 @@ func (h *Handler) DeletePregunta(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := h.svc.DeletePregunta(r.Context(), id); err != nil {
+	aud, ok := h.auditor(w, r)
+	if !ok {
+		return
+	}
+	if err := h.svc.DeletePregunta(r.Context(), id, aud); err != nil {
+		var re *ReglaError
+		if errors.As(err, &re) { // estado_invalido uses the coded format (E3-02 §7)
+			responderRegla(w, "questions.delete", err)
+			return
+		}
 		mapErr(w, err)
 		return
 	}

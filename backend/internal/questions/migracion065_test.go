@@ -126,6 +126,15 @@ func esquema(t *testing.T, tx *sqlx.Tx, cuando, defecto string, con065 bool) {
 // the passage id; the fuente is removed when the test ends.
 func pasajeDePrueba(t *testing.T, db *sqlx.DB) int64 {
 	t.Helper()
+	_, pasaje := fuenteDePrueba(t, db)
+	return pasaje
+}
+
+// fuenteDePrueba is pasajeDePrueba that also returns the fuente id. Its
+// cleanup removes the citations first (pregunta_citas.pasaje_id has no ON
+// DELETE), so it can run before the fixture deletes the preguntas.
+func fuenteDePrueba(t *testing.T, db *sqlx.DB) (fuenteID, pasajeID int64) {
+	t.Helper()
 	ctx := context.Background()
 	src := fuentes.NewPgSource(db)
 	id, v, err := src.GuardarFuente(ctx, fuentes.NuevaFuente{Titulo: "Migración " + dbtest.Uniq(), Tipo: "guia",
@@ -135,7 +144,8 @@ func pasajeDePrueba(t *testing.T, db *sqlx.DB) int64 {
 	}
 	t.Cleanup(func() {
 		for _, q := range []string{
-			`UPDATE fuentes SET version_vigente_id = NULL, estado = 'procesando' WHERE id = $1`,
+			`DELETE FROM pregunta_citas WHERE pasaje_id IN (SELECT p.id FROM pasajes p JOIN fuente_versiones v ON v.id = p.fuente_version_id WHERE v.fuente_id = $1)`,
+			`UPDATE fuentes SET version_vigente_id = NULL, estado = 'procesando', motivo_retiro = NULL WHERE id = $1`,
 			`DELETE FROM pasajes WHERE fuente_version_id IN (SELECT id FROM fuente_versiones WHERE fuente_id = $1)`,
 			`DELETE FROM fuente_versiones WHERE fuente_id = $1`,
 			`DELETE FROM fuentes WHERE id = $1`,
@@ -148,9 +158,8 @@ func pasajeDePrueba(t *testing.T, db *sqlx.DB) int64 {
 	if err := src.PublicarVersion(ctx, id, v, []fuentes.PasajeNuevo{{Orden: 1, LineaInicio: 1, LineaFin: 1, Texto: "Pasaje citado", Palabras: 2}}, nil); err != nil {
 		t.Fatal(err)
 	}
-	var pasaje int64
-	if err := db.Get(&pasaje, `SELECT p.id FROM pasajes p JOIN fuente_versiones v ON v.id = p.fuente_version_id WHERE v.fuente_id = $1`, id); err != nil {
+	if err := db.Get(&pasajeID, `SELECT p.id FROM pasajes p JOIN fuente_versiones v ON v.id = p.fuente_version_id WHERE v.fuente_id = $1`, id); err != nil {
 		t.Fatal(err)
 	}
-	return pasaje
+	return id, pasajeID
 }

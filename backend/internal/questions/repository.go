@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/cbaciliod/learning/internal/grading"
+	"github.com/cbaciliod/learning/internal/texto"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -255,7 +256,8 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 			) AS etiqueta_ids_json,
 			COALESCE(
 				(SELECT JSON_AGG(c ORDER BY c.fuente_id, c.version, c.pasaje_id)
-				 FROM (SELECT pc.pasaje_id, fv.fuente_id, fv.numero AS version, f.titulo AS fuente_titulo, f.estado AS fuente_estado
+				 FROM (SELECT pc.pasaje_id, fv.fuente_id, fv.numero AS version, f.titulo AS fuente_titulo, f.estado AS fuente_estado,
+				              pa.seccion, pa.linea_inicio, pa.linea_fin, pa.texto
 				       FROM pregunta_citas pc
 				       JOIN pasajes pa          ON pa.id = pc.pasaje_id
 				       JOIN fuente_versiones fv ON fv.id = pa.fuente_version_id
@@ -307,8 +309,8 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 	if err := json.Unmarshal(r0.EtiquetaIDsJSON, &etiquetaIDs); err != nil {
 		return PreguntaResponse{}, err
 	}
-	citas := []CitaResponse{}
-	if err := json.Unmarshal(r0.CitasJSON, &citas); err != nil {
+	citas, err := decodificarCitas(r0.CitasJSON)
+	if err != nil {
 		return PreguntaResponse{}, err
 	}
 
@@ -492,7 +494,7 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 
 // UpdatePregunta updates a question within a transaction.
 // Returns ErrValidation if proceso_id differs from the stored value.
-func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePreguntaRequest) (PreguntaResponse, error) {
+func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePreguntaRequest, aud Auditor) (PreguntaResponse, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return PreguntaResponse{}, err
@@ -503,9 +505,11 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 	// etiquetas check below (H19). FOR UPDATE keeps the row stable meanwhile.
 	var storedProcesoID, storedAsignaturaID int64
 	var storedTemaID *int64
+	var guardada contenidoGuardado
 	err = tx.QueryRowContext(ctx,
-		`SELECT proceso_id, asignatura_id, tema_id FROM preguntas WHERE id = $1 AND estado != 'eliminada' FOR UPDATE`, id,
-	).Scan(&storedProcesoID, &storedAsignaturaID, &storedTemaID)
+		`SELECT proceso_id, asignatura_id, tema_id, estado, origen, enunciado, tipo
+		 FROM preguntas WHERE id = $1 AND estado != 'eliminada' FOR UPDATE`, id,
+	).Scan(&storedProcesoID, &storedAsignaturaID, &storedTemaID, &guardada.Estado, &guardada.Origen, &guardada.Enunciado, &guardada.Tipo)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PreguntaResponse{}, ErrNotFound
 	}
@@ -550,7 +554,11 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 		return PreguntaResponse{}, ErrNotFound
 	}
 
-	if err := syncRespuestas(ctx, tx, id, req.Respuestas); err != nil {
+	cambioRespuestas, err := syncRespuestas(ctx, tx, id, req.Respuestas, guardada.Origen == OrigenBalotario)
+	if err != nil {
+		return PreguntaResponse{}, err
+	}
+	if guardada.Retro, err = leerRetro(ctx, tx, id); err != nil {
 		return PreguntaResponse{}, err
 	}
 
@@ -590,25 +598,17 @@ func (r *Repository) UpdatePregunta(ctx context.Context, id int64, req UpdatePre
 		}
 	}
 
+	if guardada.cambiaContenido(req, cambioRespuestas) && guardada.requiereRevision() {
+		if err := pasarARevision(ctx, tx, aud, id, guardada.Estado); err != nil {
+			return PreguntaResponse{}, err
+		}
+	}
+
 	if err = tx.Commit(); err != nil {
 		return PreguntaResponse{}, err
 	}
 
 	return r.GetPregunta(ctx, id)
-}
-
-// DeletePregunta soft-deletes a question by setting estado='eliminada'.
-func (r *Repository) DeletePregunta(ctx context.Context, id int64) error {
-	res, err := r.db.ExecContext(ctx,
-		`UPDATE preguntas SET estado = 'eliminada', updated_at = NOW() WHERE id = $1 AND estado != 'eliminada'`, id)
-	if err != nil {
-		return err
-	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return ErrNotFound
-	}
-	return nil
 }
 
 // ── Etiquetas ─────────────────────────────────────────────────────────────────
@@ -944,4 +944,17 @@ func (r *Repository) GetGlobalStats(ctx context.Context) (StatsGlobalesResponse,
 	}
 
 	return stats, nil
+}
+
+// decodificarCitas turns the JSON_AGG of GetPregunta into CitaResponse and
+// derives the excerpt of each passage (contract E3-07 §5).
+func decodificarCitas(raw []byte) ([]CitaResponse, error) {
+	citas := []CitaResponse{}
+	if err := json.Unmarshal(raw, &citas); err != nil {
+		return nil, err
+	}
+	for i := range citas {
+		citas[i].Extracto = texto.Extracto(citas[i].Texto)
+	}
+	return citas, nil
 }
