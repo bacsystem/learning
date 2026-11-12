@@ -6,11 +6,10 @@ import { useFormatter, useTranslations } from "next-intl";
 import { Alerta } from "@/components/feedback/alerta";
 import { FilaMetricas, Metrica } from "@/components/patrones/metricas";
 import { Chip } from "@/components/patrones/pill-estado";
-import { Badge } from "@/components/ui/badge";
 import { TARJETA } from "@/lib/estilos";
 import type { VistaPreviaBalotario } from "@/lib/serums-ia/balotario/api";
 import { cn } from "@/lib/utils";
-import { CheckCircleIcon, ListChecksIcon, SealCheckIcon, WarningCircleIcon, WarningIcon } from "@phosphor-icons/react";
+import { CheckCircleIcon, ListChecksIcon, WarningCircleIcon, WarningIcon } from "@phosphor-icons/react";
 
 /** Lo que el servidor encontró: de qué fuente y versión, los totales, la ruta de revisión y las importaciones previas. */
 export function ResumenBalotario({ vista }: { vista: VistaPreviaBalotario }) {
@@ -28,15 +27,7 @@ export function ResumenBalotario({ vista }: { vista: VistaPreviaBalotario }) {
         </h2>
         <Chip>{t("serumsIa.balotario.version", { numero: fuente.version })}</Chip>
         {fuente.oficial_verificada ? (
-          // «Oficial verificada · MINSA»: la entidad va dentro de la misma insignia (E3-03, escenario de fuente oficial).
-          fuente.oficial_entidad ? (
-            <Badge variant="secondary">
-              <SealCheckIcon weight="fill" data-icon="inline-start" />
-              {t("serumsIa.balotario.oficial", { entidad: fuente.oficial_entidad })}
-            </Badge>
-          ) : (
-            <InsigniaOficial />
-          )
+          <InsigniaOficial entidad={fuente.oficial_entidad} />
         ) : (
           <Chip>{t("serumsIa.balotario.noOficial")}</Chip>
         )}
