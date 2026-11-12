@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -53,12 +52,12 @@ func InsertarLote(ctx context.Context, tx *sqlx.Tx, lote []NuevaPregunta) ([]int
 	return ids, nil
 }
 
-// Limits of the columns respuestas.texto (VARCHAR(500)).
-const maxTextoRespuesta = 500
-
-// validarNueva checks what the schema does not: the statement and the answers
-// are not empty, the order is 1, 2, 3… without repeats and the key matches
-// the tipo. The caller validates the classification.
+// validarNueva checks what the schema does not. Each answer goes through the
+// same rules as the create endpoint (the validate tags of CreateRespuestaItem),
+// so a change there reaches the lote too; by hand it keeps what a tag cannot
+// say: the statement and the texts are not only spaces, the order is 1…n
+// without repeats, and the key matches the tipo. The caller validates the
+// classification.
 func validarNueva(p NuevaPregunta) error {
 	if strings.TrimSpace(p.Enunciado) == "" {
 		return fmt.Errorf("%w: el enunciado está vacío", ErrValidation)
@@ -68,10 +67,13 @@ func validarNueva(p NuevaPregunta) error {
 	}
 	ordenes := make(map[int]bool, len(p.Respuestas))
 	for _, r := range p.Respuestas {
-		if strings.TrimSpace(r.Texto) == "" || utf8.RuneCountInString(r.Texto) > maxTextoRespuesta {
-			return fmt.Errorf("%w: el texto de una respuesta está vacío o supera %d caracteres", ErrValidation, maxTextoRespuesta)
+		if err := validate.Struct(r); err != nil {
+			return fmt.Errorf("%w: respuesta inválida: %v", ErrValidation, err)
 		}
-		if r.Orden < 1 || r.Orden > len(p.Respuestas) || ordenes[r.Orden] {
+		if strings.TrimSpace(r.Texto) == "" {
+			return fmt.Errorf("%w: el texto de una respuesta está vacío", ErrValidation)
+		}
+		if r.Orden > len(p.Respuestas) || ordenes[r.Orden] {
 			return fmt.Errorf("%w: el orden de las respuestas debe ser 1…n sin repetir", ErrValidation)
 		}
 		ordenes[r.Orden] = true
