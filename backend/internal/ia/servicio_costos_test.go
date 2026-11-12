@@ -184,3 +184,22 @@ func TestServicio_CancelacionLiberaLaAccion(t *testing.T) {
 		t.Errorf("released %d, acciones %d; want 1 and 0", costos.liberadas, r.Acciones)
 	}
 }
+
+// ★5 fails closed when the budget cannot be read: our own failure, recorded as error_interno, not as a provider error.
+func TestServicio_FalloAlLeerElPresupuesto(t *testing.T) {
+	prov := &proveedorGuion{pasos: []paso{valida(1)}}
+	reg := &registroMemoria{}
+	costos := &costosMemoria{errPresupuesto: errors.New("pq: connection refused")}
+	s, _ := nuevoConCostos(prov, reg, costos)
+	r := res(sistema)
+	_, err := s.Clasificar(context.Background(), r, entradaClasificar(1))
+	if !errors.Is(err, ErrCostos) {
+		t.Fatalf("err = %v, want ErrCostos", err)
+	}
+	if prov.llamado != 0 || costos.liberadas != 1 || r.Acciones != 0 {
+		t.Errorf("%d provider calls, %d released, acciones %d", prov.llamado, costos.liberadas, r.Acciones)
+	}
+	if u := reg.unico(t); u.Resultado != ResultadoErrorInterno {
+		t.Errorf("resultado = %q, want error_interno", u.Resultado)
+	}
+}

@@ -427,3 +427,64 @@ func TestConsumo_PresupuestoYSistema(t *testing.T) {
 		t.Errorf("invalid actor: %v", err)
 	}
 }
+
+// Reservar and Liberar of the same actor lock the month and the day counters
+// in the same order, so running them together never deadlocks (a deadlock
+// would abort one of them and, if it is the release, lose quota unused).
+func TestReservarYLiberar_SinInterbloqueo(t *testing.T) {
+	db := entornoCostos(t)
+	configurar(t, db, `limite_usuario_dia = 50, limite_usuario_mes = 1000`)
+	c := nuevoPgCostos(t, db, reloj(mediodia))
+	a := usuarioDePrueba(t, db, ia.RolUsuario)
+	const rondas, hilos = 40, 8
+	reservas := make(chan ia.Reserva, rondas*hilos)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var fallos []error
+	registrar := func(err error) {
+		mu.Lock()
+		fallos = append(fallos, err)
+		mu.Unlock()
+	}
+	for h := 0; h < hilos; h++ {
+		wg.Add(2)
+		go func() { // reserves
+			defer wg.Done()
+			for i := 0; i < rondas; i++ {
+				r, err := c.Reservar(context.Background(), a, 1)
+				var lim *ia.ErrLimite
+				switch {
+				case err == nil:
+					reservas <- r
+				case !errors.As(err, &lim):
+					registrar(err)
+				}
+			}
+		}()
+		go func() { // releases what the others reserved
+			defer wg.Done()
+			for i := 0; i < rondas; i++ {
+				select {
+				case r := <-reservas:
+					if err := c.Liberar(context.Background(), &r, 1); err != nil {
+						registrar(err)
+					}
+				case <-time.After(20 * time.Millisecond):
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	for _, err := range fallos {
+		t.Errorf("concurrent reserve/release failed: %v", err)
+	}
+	if len(fallos) > 0 {
+		return
+	}
+	// No quota was lost: what is still reserved is exactly what was not released.
+	pendientes := len(reservas)
+	consumo, err := c.Consumo(context.Background(), a)
+	if err != nil || consumo.Dia.Usados != pendientes || consumo.Mes.Usados != pendientes {
+		t.Errorf("usados day %d, month %d; want %d (the reservations not released)", consumo.Dia.Usados, consumo.Mes.Usados, pendientes)
+	}
+}
