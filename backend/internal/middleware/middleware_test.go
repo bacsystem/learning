@@ -285,6 +285,47 @@ func TestMaxBodySize_RejectsLargeJSONByContentLength(t *testing.T) {
 	}
 }
 
+func TestMaxBodySize_RejectionUsesCodedErrorFormat(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		route       string
+		bodySize    int
+	}{
+		{"JSON over the JSON limit", "application/json", "", 2048},
+		{"multipart over the multipart limit", "multipart/form-data; boundary=xyz", "POST /", 8192},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := MaxBodySize(1024, 4096, tt.route)(okHandler)
+			r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(strings.Repeat("a", tt.bodySize)))
+			r.Header.Set("Content-Type", tt.contentType)
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+
+			if w.Code != http.StatusRequestEntityTooLarge {
+				t.Fatalf("got %d, want 413", w.Code)
+			}
+			if ct := w.Header().Get("Content-Type"); ct != "application/json" {
+				t.Errorf("Content-Type = %q, want application/json", ct)
+			}
+			var body struct {
+				Error   string `json:"error"`
+				Message string `json:"message"`
+			}
+			if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+				t.Fatalf("decode body: %v", err)
+			}
+			if body.Error != "cuerpo_demasiado_grande" {
+				t.Errorf("error = %q, want cuerpo_demasiado_grande", body.Error)
+			}
+			if body.Message != "El cuerpo de la solicitud es demasiado grande." {
+				t.Errorf("message = %q", body.Message)
+			}
+		})
+	}
+}
+
 func TestMaxBodySize_LimitsChunkedBodyWhileReading(t *testing.T) {
 	h := MaxBodySize(1024, 4096)(readAll)
 	r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(strings.Repeat("a", 2048)))
