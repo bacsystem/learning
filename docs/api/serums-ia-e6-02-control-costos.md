@@ -224,7 +224,7 @@ CREATE TABLE ia_configuracion (
     max_preguntas_solicitud INT           NOT NULL DEFAULT 20  CHECK (max_preguntas_solicitud BETWEEN 1 AND 50),
     lote_clasificacion      INT           NOT NULL DEFAULT 20  CHECK (lote_clasificacion BETWEEN 1 AND 50),
     presupuesto_mensual_usd NUMERIC(10,2) NOT NULL DEFAULT 40.00 CHECK (presupuesto_mensual_usd BETWEEN 1 AND 1000),
-    updated_by              BIGINT        REFERENCES usuarios(id),
+    updated_by              BIGINT        REFERENCES usuarios(id) ON DELETE SET NULL,   -- borrar un usuario no falla (H3 del #190)
     updated_at              TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_ia_configuracion_mes CHECK (limite_usuario_dia <= limite_usuario_mes)
 );
