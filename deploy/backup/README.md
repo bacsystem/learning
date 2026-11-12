@@ -136,8 +136,9 @@ solo para la prueba). Después corre:
 - tres fallos: bucket inexistente, credenciales malas y endpoint colgado;
 - la comprobación de las filas de `copias_bd`;
 - el latido opcional a Uptime Kuma (`BACKUP_PUSH_URL`): llega tras una copia
-  correcta, no se envía en una fallida, y si Kuma no responde la copia sigue
-  correcta; el token no aparece en los logs;
+  correcta, no se envía en una fallida ni en una subida pero no registrada
+  (exit 3), y si Kuma no responde la copia sigue correcta; el token no aparece
+  en los logs ni en argv de curl; una query pegada en la URL se descarta;
 - una restauración cronometrada con la clave privada.
 
 Al terminar borra todo.

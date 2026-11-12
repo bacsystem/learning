@@ -81,7 +81,8 @@ SQL
   # La URL lleva el token: va por stdin (-K -), no en argv, y no se registra nada
   # del error (podría incluir el host).
   if [ "$rc" -eq 0 ] && [ -n "${BACKUP_PUSH_URL:-}" ]; then
-    if printf 'url = "%s?status=up&msg=OK"\n' "$BACKUP_PUSH_URL" \
+    # Si se pegó la URL con su ?status=…, se descarta la query: se añade la propia.
+    if printf 'url = "%s?status=up&msg=OK"\n' "${BACKUP_PUSH_URL%%\?*}" \
          | curl -K - --silent --fail --output /dev/null --connect-timeout 10 --max-time 30 2>/dev/null; then
       echo "backup: aviso a Uptime Kuma enviado"
     else

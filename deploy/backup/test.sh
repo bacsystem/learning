@@ -12,7 +12,8 @@
 #     9. pg_dump colgado → timeout lo corta (motivo=tiempo_agotado)
 #    10. copias_bd no existe (064 sin aplicar) → copia subida, exit 3, motivo=no_existe
 #    11. BACKUP_PUSH_URL: latido a Uptime Kuma solo tras copia correcta; si el aviso falla,
-#        la copia sigue correcta; el token no está en argv ni en los logs
+#        la copia sigue correcta; el token no está en argv ni en los logs; sin latido si la
+#        copia se subió pero no se registró (exit 3); la query pegada en la URL se descarta
 # Uso: make backup/test  (BACKUP_TEST_IMAGE=<imagen> prueba una ya construida,
 #      p. ej. la de release linux/amd64). Todo se borra al terminar.
 set -eu
@@ -94,6 +95,7 @@ case "${STUB:-}:$*" in
   put500:*--upload-file*) printf 500; exit 0 ;;
   put500:*--head*) printf 'HTTP/1.1 200 OK\r\ncontent-length: %s\r\n\r\n' "$(stat -c %s /tmp/copia.dump.age)"; exit 0 ;;
 esac
+[ "${STUB:-}" = args ] && echo "curl $*" >> /stubs-out/curlargs
 exec /usr/bin/curl "$@"
 STUB
 cat > "$TMP/stubs/pg_dump" <<'STUB'
@@ -178,6 +180,26 @@ PUSH="$PUSH" copia "$OK_DB" "$S3" no-existe "$SEC" >/dev/null 2>&1 && fail "buck
 despues=$(pushes)
 [ "$antes" = "$despues" ] || fail "una copia fallida avisó a Kuma"
 echo "✓ 11c. copia fallida → no manda latido"
+
+# 11d. El token no va en argv de curl (va por stdin con -K -).
+rm -f "$TMP/out/curlargs"
+PUSH="$PUSH" copia "$OK_DB" "$S3" "$B" "$SEC" args >"$TMP/out/11d.log" 2>&1 || fail "la copia con stub de curl falló"
+grep -q 'aviso a Uptime Kuma enviado' "$TMP/out/11d.log" || fail "11d: no avisó a Kuma"
+[ -s "$TMP/out/curlargs" ] || fail "11d: el stub de curl no registró argv"
+! grep -q 'tokensecreto' "$TMP/out/curlargs" || fail "el token aparece en argv de curl: $(grep tokensecreto "$TMP/out/curlargs")"
+echo "✓ 11d. el token no está en argv de curl"
+# 11e. Copia subida pero no registrada (sin copias_bd, exit 3): no hay latido.
+antes=$(pushes)
+rc=0; out=$(PUSH="$PUSH" copia "$OK_DB" "$S3" "$B" "$SEC" "" sin_tabla 2>&1) || rc=$?
+[ "$rc" = 3 ] || fail "11e: esperaba exit 3, fue $rc: $out"
+[ "$antes" = "$(pushes)" ] || fail "una copia no registrada (exit 3) avisó a Kuma"
+echo "✓ 11e. copia subida pero no registrada (exit 3) → no manda latido"
+# 11f. Si se pega la URL de Kuma con su ?status=…, la query se descarta (un solo «?»).
+docker exec "$KUC" sh -c ': > /tmp/push.log'
+PUSH="$PUSH?status=up&msg=OK" copia "$OK_DB" "$S3" "$B" "$SEC" >/dev/null 2>&1 || fail "11f: la copia falló"
+linea=$(docker exec "$KUC" sh -c 'head -1 /tmp/push.log')
+[ "$(printf '%s' "$linea" | tr -cd '?' | wc -c | tr -d ' ')" = 1 ] || fail "11f: más de un «?» en la petición: $linea"
+echo "✓ 11f. URL pegada con ?status=… → una sola query"
 
 # 6. Restauración (RTO de prueba): bajar, descifrar con la privada, pg_restore en una base nueva.
 t0=$(date +%s)
