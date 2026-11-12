@@ -64,12 +64,12 @@ func (s *Service) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaListR
 }
 
 // UpdatePregunta validates and updates a question.
-func (s *Service) UpdatePregunta(ctx context.Context, id int64, req UpdatePreguntaRequest) (PreguntaResponse, error) {
+func (s *Service) UpdatePregunta(ctx context.Context, id int64, req UpdatePreguntaRequest, aud Auditor) (PreguntaResponse, error) {
 	if err := ValidateRespuestas(req.Tipo, req.Respuestas); err != nil {
 		return PreguntaResponse{}, err
 	}
 
-	result, err := s.repo.UpdatePregunta(ctx, id, req)
+	result, err := s.repo.UpdatePregunta(ctx, id, req, aud)
 	if err != nil {
 		if isAlternativaConIntentos(err) {
 			return PreguntaResponse{}, fmt.Errorf("%w: %s", ErrConflict, msgAlternativaConIntentos)
@@ -88,9 +88,39 @@ func (s *Service) UpdatePregunta(ctx context.Context, id int64, req UpdatePregun
 	return result, nil
 }
 
-// DeletePregunta soft-deletes a question.
-func (s *Service) DeletePregunta(ctx context.Context, id int64) error {
-	return s.repo.DeletePregunta(ctx, id)
+// CambiarEstado moves a question through its life cycle (E3-07 §3). The body
+// rules that need no database run first; the state rules run under the row
+// lock, against the state read there.
+func (s *Service) CambiarEstado(ctx context.Context, id int64, req CambiarEstadoRequest, aud Auditor) (PreguntaResponse, error) {
+	if err := validarCuerpoEstado(req); err != nil {
+		return PreguntaResponse{}, err
+	}
+	decidir := func(b preguntaBloqueada) (cambioEstado, error) { return decidirCambioEstado(b, req) }
+	if err := s.repo.CambiarEstado(ctx, id, decidir, aud); err != nil {
+		return PreguntaResponse{}, err
+	}
+	return s.repo.GetPregunta(ctx, id)
+}
+
+// ReemplazarCitas replaces the citations of a question (E3-07 §4). It never
+// changes the state.
+func (s *Service) ReemplazarCitas(ctx context.Context, id int64, req ReemplazarCitasRequest, aud Auditor) (PreguntaResponse, error) {
+	pedidos, err := validarPasajeIDs(req)
+	if err != nil {
+		return PreguntaResponse{}, err
+	}
+	decidir := func(b preguntaBloqueada, info map[int64]pasajeInfo) (planCitas, error) {
+		return decidirCitas(b, pedidos, info)
+	}
+	if err := s.repo.ReemplazarCitas(ctx, id, pedidos, decidir, aud); err != nil {
+		return PreguntaResponse{}, err
+	}
+	return s.repo.GetPregunta(ctx, id)
+}
+
+// DeletePregunta soft-deletes a question, only from the states of E3-02 §3.
+func (s *Service) DeletePregunta(ctx context.Context, id int64, aud Auditor) error {
+	return s.repo.EliminarPregunta(ctx, id, aud)
 }
 
 // ── Etiquetas ─────────────────────────────────────────────────────────────────

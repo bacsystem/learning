@@ -25,29 +25,37 @@ import (
 //     was graded with it: the stored verdict and the review, which reads the
 //     current key, would contradict each other (H133). That is also ErrConflict.
 //     Texts and order can still be edited.
-func syncRespuestas(ctx context.Context, tx *sqlx.Tx, preguntaID int64, items []CreateRespuestaItem) error {
+//
+// claveOficial (origen balotario, E3-02 §4.5) refuses any change of the key
+// with clave_oficial, before anything is written. It returns whether the
+// content changed: a text, the key, or an alternative added or removed; a
+// new order alone is not a content change.
+func syncRespuestas(ctx context.Context, tx *sqlx.Tx, preguntaID int64, items []CreateRespuestaItem, claveOficial bool) (cambioContenido bool, err error) {
 	rows, err := tx.QueryContext(ctx,
-		`SELECT id, es_correcta FROM respuestas WHERE pregunta_id = $1 ORDER BY orden, id FOR UPDATE`, preguntaID)
+		`SELECT id, es_correcta, texto FROM respuestas WHERE pregunta_id = $1 ORDER BY orden, id FOR UPDATE`, preguntaID)
 	if err != nil {
-		return err
+		return false, err
 	}
 	var existing []int64
 	oldKey := map[int64]bool{}
+	oldTexto := map[int64]string{}
 	for rows.Next() {
 		var id int64
 		var correcta bool
-		if err := rows.Scan(&id, &correcta); err != nil {
+		var texto string
+		if err := rows.Scan(&id, &correcta, &texto); err != nil {
 			rows.Close()
-			return err
+			return false, err
 		}
 		existing = append(existing, id)
+		oldTexto[id] = texto
 		if correcta {
 			oldKey[id] = true
 		}
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
-		return err
+		return false, err
 	}
 
 	belongs := map[int64]bool{}
@@ -68,10 +76,10 @@ func syncRespuestas(ctx context.Context, tx *sqlx.Tx, preguntaID int64, items []
 		switch {
 		case it.ID != nil:
 			if !belongs[*it.ID] {
-				return fmt.Errorf("%w: la respuesta %d no pertenece a la pregunta", ErrValidation, *it.ID)
+				return false, fmt.Errorf("%w: la respuesta %d no pertenece a la pregunta", ErrValidation, *it.ID)
 			}
 			if used[*it.ID] {
-				return fmt.Errorf("%w: la respuesta %d está repetida", ErrValidation, *it.ID)
+				return false, fmt.Errorf("%w: la respuesta %d está repetida", ErrValidation, *it.ID)
 			}
 			id := *it.ID
 			target[i] = &id
@@ -83,17 +91,22 @@ func syncRespuestas(ctx context.Context, tx *sqlx.Tx, preguntaID int64, items []
 		}
 	}
 
-	if keyChanged(oldKey, items, target) {
+	cambioClave := keyChanged(oldKey, items, target)
+	if cambioClave && claveOficial {
+		return false, regla(CodigoClaveOficial, nil)
+	}
+	cambioContenido = cambioClave
+	if cambioClave {
 		var graded bool
 		if err := tx.QueryRowContext(ctx, `
 			SELECT EXISTS (SELECT 1 FROM practica_respuestas WHERE pregunta_id = $1 AND es_correcta IS NOT NULL)
 			    OR EXISTS (SELECT 1 FROM simulacro_respuestas WHERE pregunta_id = $1 AND es_correcta IS NOT NULL)`,
 			preguntaID,
 		).Scan(&graded); err != nil {
-			return err
+			return false, err
 		}
 		if graded {
-			return fmt.Errorf("%w: %s", ErrConflict, msgClaveConIntentos)
+			return false, fmt.Errorf("%w: %s", ErrConflict, msgClaveConIntentos)
 		}
 	}
 
@@ -103,21 +116,27 @@ func syncRespuestas(ctx context.Context, tx *sqlx.Tx, preguntaID int64, items []
 			removed = append(removed, id)
 		}
 	}
+	for i, it := range items {
+		if target[i] == nil || oldTexto[*target[i]] != it.Texto {
+			cambioContenido = true
+		}
+	}
 	if len(removed) > 0 {
+		cambioContenido = true
 		var referenced bool
 		if err := tx.QueryRowContext(ctx, `
 			SELECT EXISTS (SELECT 1 FROM practica_respuestas WHERE respuesta_id = ANY($1))
 			    OR EXISTS (SELECT 1 FROM simulacro_respuesta_selecciones WHERE respuesta_id = ANY($1))`,
 			pq.Array(removed),
 		).Scan(&referenced); err != nil {
-			return err
+			return false, err
 		}
 		if referenced {
-			return fmt.Errorf("%w: %s", ErrConflict, msgAlternativaConIntentos)
+			return false, fmt.Errorf("%w: %s", ErrConflict, msgAlternativaConIntentos)
 		}
 		if _, err := tx.ExecContext(ctx,
 			`DELETE FROM respuestas WHERE pregunta_id = $1 AND id = ANY($2)`, preguntaID, pq.Array(removed)); err != nil {
-			return err
+			return false, err
 		}
 	}
 
@@ -126,17 +145,17 @@ func syncRespuestas(ctx context.Context, tx *sqlx.Tx, preguntaID int64, items []
 			if _, err := tx.ExecContext(ctx,
 				`UPDATE respuestas SET texto = $1, es_correcta = $2, orden = $3 WHERE id = $4 AND pregunta_id = $5`,
 				it.Texto, it.EsCorrecta, it.Orden, *target[i], preguntaID); err != nil {
-				return err
+				return false, err
 			}
 			continue
 		}
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO respuestas (pregunta_id, texto, es_correcta, orden) VALUES ($1, $2, $3, $4)`,
 			preguntaID, it.Texto, it.EsCorrecta, it.Orden); err != nil {
-			return err
+			return false, err
 		}
 	}
-	return nil
+	return cambioContenido, nil
 }
 
 // keyChanged reports whether applying items changes which alternatives are

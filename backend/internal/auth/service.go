@@ -46,6 +46,8 @@ type Service struct {
 	// registerIssues caps accepted registrations per persona (dni_hmac), in
 	// the shared Postgres counter table; see registerIssuesPerPersona.
 	registerIssues *internalmw.DBLimiter
+	// relojLimites is nil in production; tests fix it (fijarRelojLimites).
+	relojLimites func() time.Time
 }
 
 func NewService(repo *Repository, jwtSecret string, frontendBaseURL string) *Service {
@@ -53,6 +55,14 @@ func NewService(repo *Repository, jwtSecret string, frontendBaseURL string) *Ser
 		repo: repo, login: repo, jwtSecret: jwtSecret, frontendBaseURL: frontendBaseURL,
 		registerIssues: internalmw.NewDBLimiter(repo.db.DB, registerIssuesPrefix, registerIssuesPerPersona, registerIssueWindow),
 	}
+}
+
+// fijarRelojLimites makes every DBLimiter of this service, and of the handlers
+// built on it afterwards, count in the window of ahora. Only for tests (see
+// DBLimiter.ConReloj); production keeps now() of Postgres.
+func (s *Service) fijarRelojLimites(ahora func() time.Time) {
+	s.relojLimites = ahora
+	s.registerIssues.ConReloj(ahora)
 }
 
 // ── Check DNI ────────────────────────────────────────────────────────────────

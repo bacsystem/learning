@@ -30,10 +30,15 @@ DOCKER_TAG   ?=
 # Versión que reporta el backend (/health): el tag sin la «v».
 VERSION      := $(DOCKER_TAG:v%=%)
 BACKEND_IMG  := $(DOCKER_USER)/learning-backend:$(DOCKER_TAG)
+# Cron de copia diaria a R2 (deploy/backup/, ADR 0004 D11).
+BACKUP_IMG   := $(DOCKER_USER)/learning-backup:$(DOCKER_TAG)
 # La imagen del frontend es por entorno (NEXT_PUBLIC_API_URL se incrusta al construir):
 # producción = vX.Y.Z; otro entorno = vX.Y.Z-<entorno> (docs/ops/railway.md §2).
 FRONTEND_ENV ?= prod
 FRONTEND_IMG := $(DOCKER_USER)/learning-frontend:$(DOCKER_TAG)$(if $(filter prod,$(FRONTEND_ENV)),,-$(FRONTEND_ENV))
+# OJO: no exportes esta variable desde make (`export NEXT_PUBLIC_API_URL`): el
+# target build la heredaría y, en silencio, incrustaría la URL de producción en el
+# build local. Solo se pasa como build-arg en docker/build/frontend.
 NEXT_PUBLIC_API_URL        ?= https://api-capacitate.bacsystemsolutions.com
 NEXT_PUBLIC_STORAGE_PREFIX ?=
 NEXT_PUBLIC_CONTACT_EMAIL  ?=
@@ -53,7 +58,7 @@ s          ?=
 .PHONY: help dev dev/backend dev/frontend test lint fmt build \
         migrate/up migrate/down migrate/status migrate/create fix-encrypt-personas \
         docker/build docker/build/backend docker/build/frontend docker/verify \
-        docker/push docker/release \
+        docker/push docker/release docker/build/backup docker/push/backup backup/test \
         compose/init compose/up compose/down compose/reset compose/restart \
         compose/rebuild compose/logs compose/ps compose/psql \
         compose/migrate/status compose/seed/admin clean \
@@ -100,7 +105,9 @@ fmt: ## Formatea: go fmt y eslint --fix
 
 # Comprobación de paridad con el CI, no un artefacto de producción: producción
 # sale solo de docker/build (build-arg obligatorio). NEXT_PUBLIC_API_URL: la del
-# entorno o, como frontend.yml, http://localhost:8080.
+# entorno o, como frontend.yml, http://localhost:8080. Por eso la variable de make
+# del mismo nombre (arriba, con la URL de producción) NO debe exportarse: si se
+# exporta, este build incrusta la URL de producción sin avisar.
 build: ## Build como el CI: go build ./... + bin/server y next build
 	cd backend && go build ./...
 	cd backend && CGO_ENABLED=0 go build -o bin/server ./cmd/server
@@ -164,6 +171,17 @@ docker/push: check/release-tree docker/verify ## Publica en Docker Hub (solo el 
 
 docker/release: docker/build docker/push ## build + verify + push (solo el usuario)
 	@echo "✓ $(BACKEND_IMG) y $(FRONTEND_IMG) publicados en Docker Hub"
+
+# El cron de copia va aparte: solo se publica cuando cambia deploy/backup/.
+docker/build/backup: check/release-tree ## Imagen del cron de copia a R2 (linux/amd64) desde el tag
+	docker build --platform linux/amd64 --no-cache -t $(BACKUP_IMG) deploy/backup/
+
+docker/push/backup: check/release-tree ## Verifica y publica la imagen del cron (solo el usuario)
+	deploy/verify-image.sh $(BACKUP_IMG)
+	docker push $(BACKUP_IMG)
+
+backup/test: ## Prueba de punta a punta del cron de copia (Postgres y S3 desechables, sin R2)
+	deploy/backup/test.sh
 
 # ── Docker Compose (local) ────────────────────────────────────────────────────
 # Uso: make compose/init → make compose/up → http://localhost:3000

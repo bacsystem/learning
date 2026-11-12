@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/cbaciliod/learning/internal/crypto"
 	"github.com/jmoiron/sqlx"
@@ -61,6 +62,10 @@ func testSetup(t *testing.T) (*Handler, *Service) {
 	_ = fmt.Sprintf // keep fmt import used via testHexKey formatting if needed
 	repo := NewRepository(db, gcm, testRawKey(t))
 	svc := NewService(repo, "test-secret-32-bytes-exactly-ok!", "http://localhost:3000")
+	// #139: the limiters count in the window of the test's real start, so a
+	// test that crosses a 15-min boundary while it runs is not split in two.
+	inicio := time.Now()
+	svc.fijarRelojLimites(func() time.Time { return inicio })
 	h := NewHandler(svc)
 	return h, svc
 }
