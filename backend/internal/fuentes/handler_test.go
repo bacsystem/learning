@@ -24,12 +24,13 @@ const secretoUnitario = "unit-secret-32-bytes-exactly-ok!!"
 
 // fakeServicio records the file it got and answers with err.
 type fakeServicio struct {
-	err     error
-	archivo ArchivoSubido
-	form    FormularioFuente
-	filtro  FiltroListado
-	id      int64
-	cambios int // calls of S5–S7
+	err      error
+	archivo  ArchivoSubido
+	form     FormularioFuente
+	filtro   FiltroListado
+	id       int64
+	consulta string
+	cambios  int // calls of S5–S7
 }
 
 func (f *fakeServicio) Crear(_ context.Context, a ArchivoSubido, fm FormularioFuente, _ *int64, _ Auditor) (FuenteDetalle, error) {
@@ -45,6 +46,11 @@ func (f *fakeServicio) NuevaVersion(_ context.Context, _ string, a ArchivoSubido
 func (f *fakeServicio) Listar(_ context.Context, fl FiltroListado) (ListaFuentes, error) {
 	f.filtro = fl
 	return ListaFuentes{Data: []ResumenFuente{}}, f.err
+}
+
+func (f *fakeServicio) BuscarPasajes(_ context.Context, q string) (ListaPasajes, error) {
+	f.consulta = q
+	return ListaPasajes{Data: []PasajeBuscado{}}, f.err
 }
 
 func (f *fakeServicio) Obtener(_ context.Context, id int64) (FuenteDetalle, error) {
@@ -196,6 +202,7 @@ func TestResponderError(t *testing.T) {
 		{ErrFuenteDuplicada, 409, "fuente_duplicada", "<nil>"},
 		{&LimiteError{Limite: 100, EspecialidadID: &esp}, 422, "limite_fuentes", "map[especialidad_id:2 limite:100]"},
 		{&LimiteError{Limite: 500}, 422, "limite_fuentes", "map[limite:500]"},
+		{ErrConsultaInvalida, 422, "consulta_invalida", "map[max:300 min:3]"},
 		{ErrNoEncontrado, 404, "no_encontrado", "<nil>"},
 		{ErrEstadoInvalido, 409, "estado_invalido", "<nil>"},
 		{ErrLimiteVersiones, 422, "limite_versiones", "<nil>"},

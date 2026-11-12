@@ -73,6 +73,9 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_FROM: no-reply@preprod.invalid
+      # IA (contrato E6-01): el doble, que ENV=preprod permite. Sin adaptador real,
+      # así que no van IA_API_KEY ni IA_MODELO.
+      IA_PROVEEDOR: doble
     ports:
       - "127.0.0.1:8180:8080"
 

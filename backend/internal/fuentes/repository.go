@@ -371,3 +371,18 @@ func mapearVersion(err error) error {
 	}
 	return err
 }
+
+// BuscarPasajes is the admin search for citing (ADR 0007): the same SQL as
+// PgSource.BuscarPasajes, over every especialidad, with the fuente's title.
+// consulta is already validated.
+func (r *Repository) BuscarPasajes(ctx context.Context, consulta string) ([]PasajeConFuente, error) {
+	filas, err := buscarPasajesActivos(ctx, r.db, consulta, 0, MaxResultados)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]PasajeConFuente, 0, len(filas))
+	for _, f := range filas {
+		res = append(res, PasajeConFuente{Pasaje: f.pasaje(), TituloFuente: f.TituloFuente})
+	}
+	return res, nil
+}

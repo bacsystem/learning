@@ -161,6 +161,9 @@ En Railway se cargan como **variables de servicio**. Los secretos van
 | backend | `MIGRATE_LOCK_TIMEOUT` | `10m` |
 | backend | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | `45` |
 | backend | `LOG_LEVEL` | Vacío (queda en `info`) |
+| backend | `IA_PROVEEDOR` | **Vacío** hasta E6-02: IA deshabilitada. Nunca `doble` (con `ENV=production` el backend no arranca) |
+| backend | `IA_API_KEY` | Sellada, solo con el adaptador real (E6-02) |
+| backend | `IA_MODELO` | Solo con el adaptador real (E6-02) |
 | frontend | — | Los `NEXT_PUBLIC_*` van en la imagen, no en Railway (§2) |
 
 **Conexiones.** Cada backend abre hasta **25** conexiones
@@ -200,8 +203,9 @@ Según [backups](https://docs.railway.com/reference/backups) y
 - **Copia diaria fuera de Railway, en Cloudflare R2** (ADR 0004, D11). La crea
   un cron con `pg_dump` 16, cifrada con age, y el bucket lleva ciclo de vida y
   bucket lock de **30 días**.
-  - El bucket, el token y las reglas los crea el usuario cuando el diseño esté
-    aprobado. La implementación va en un PR aparte (`deploy/backup/`).
+  - El bucket, el token y las reglas los crea el usuario. El cron y su runbook
+    (aprovisionamiento, variables y restauración) están en
+    [deploy/backup/README.md](../../deploy/backup/README.md).
   - La jurisdicción del bucket la decide el usuario (C12).
 - **Plan Pro:** la documentación no dice si backups, PITR, HA y cron jobs
   dependen del plan. **A confirmar en el panel** (C1).

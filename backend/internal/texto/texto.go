@@ -35,3 +35,17 @@ var tildes = strings.NewReplacer(
 func Plegar(s string) string {
 	return tildes.Replace(strings.ToLower(s))
 }
+
+// MaxExtracto is the length of an extract, in runes.
+const MaxExtracto = 300
+
+// Extracto returns plain text to choose a passage by: every run of white
+// space (line breaks included) becomes one space, the result is trimmed and,
+// past 300 runes, cut there with a trailing «…».
+func Extracto(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if r := []rune(s); len(r) > MaxExtracto {
+		return string(r[:MaxExtracto]) + "…"
+	}
+	return s
+}

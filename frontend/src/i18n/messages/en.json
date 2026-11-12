@@ -1327,7 +1327,7 @@
         "clave_oficial": "The official answer key of a past-exam question cannot be changed.",
         "fuente_no_activa": "One of the sources is no longer active. Review the citations and try again.",
         "limite_citas": "A question allows at most {maximo} citations. Remove one to add another.",
-        "ultima_cita_activa": "You cannot remove the last active citation of an approved question. Add another first or reject the question.",
+        "ultima_cita_activa": "You cannot remove the last active citation of an approved question. Add another citation before removing this one.",
         "generico": "The operation could not be completed. Try again.",
         "falta_cita": "The question needs at least one citation to an active source.",
         "verificacion_requerida": "Tick the verification box before approving.",
