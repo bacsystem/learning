@@ -94,3 +94,29 @@ func TestMigracion068_DownYUp(t *testing.T) {
 		t.Errorf("default configuration = %d, %s (%v)", limiteDia, presupuesto, err)
 	}
 }
+
+// ia_cuotas.clave must start with the literal prefix: in a LIKE the `_` would
+// be a wildcard and accept «iaXcuota:».
+func TestMigracion068_PrefijoExactoDeLaClave(t *testing.T) {
+	db := dbtest.Open(t)
+	tests := []struct {
+		clave string
+		ok    bool
+	}{
+		{"ia_cuota:abc", true},
+		{"iaXcuota:abc", false},
+		{"ia_cuotaX", false},
+		{"otra:abc", false},
+	}
+	for _, tt := range tests {
+		tx, err := db.Beginx()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = tx.Exec(`INSERT INTO ia_cuotas (clave, ventana, ventana_inicio, usados, expira_en) VALUES ($1, 'dia', NOW(), 1, NOW())`, tt.clave)
+		if (err == nil) != tt.ok {
+			t.Errorf("clave %q: err = %v, want accepted = %v", tt.clave, err, tt.ok)
+		}
+		_ = tx.Rollback()
+	}
+}
