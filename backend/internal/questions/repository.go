@@ -431,9 +431,13 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 	query := fmt.Sprintf(`
 		SELECT
 			p.id,
+			p.proceso_id,
 			pr.nombre AS proceso,
+			p.asignatura_id,
 			a.nombre  AS asignatura,
+			p.grado_id,
 			g.nombre  AS grado,
+			p.especialidad_id,
 			e.nombre  AS especialidad,
 			p.tema_id,
 			t.nombre  AS tema,
@@ -465,7 +469,7 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 		var p PreguntaResponse
 		var citas int
 		if err := rows.Scan(
-			&p.ID, &p.Proceso, &p.Asignatura, &p.Grado, &p.Especialidad,
+			&p.ID, &p.ProcesoID, &p.Proceso, &p.AsignaturaID, &p.Asignatura, &p.GradoID, &p.Grado, &p.EspecialidadID, &p.Especialidad,
 			&p.TemaID, &p.Tema,
 			&p.Enunciado, &p.Tipo, &p.Dificultad, &p.Estado, &p.Origen, &p.MotivoRechazo, &citas, &p.CreatedAt,
 			&total,
