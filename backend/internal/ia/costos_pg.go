@@ -186,10 +186,13 @@ func (c *PgCostos) Liberar(ctx context.Context, r *Reserva, n int) error {
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), tiempoCostos)
 		defer cancel()
 		vigente, anterior := c.claves.Clave(antifraude.PrefijoCuotaIA, *r.Actor.ID)
-		ventanas := []ventanaReserva{{VentanaDia, r.Dia}}
+		// Same lock order as Reservar (month, then day): the opposite order
+		// makes a Reservar and a Liberar of the same actor deadlock.
+		var ventanas []ventanaReserva
 		if !r.Mes.IsZero() {
 			ventanas = append(ventanas, ventanaReserva{VentanaMes, r.Mes})
 		}
+		ventanas = append(ventanas, ventanaReserva{VentanaDia, r.Dia})
 		tx, err := c.db.BeginTxx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("liberar: %w", err)

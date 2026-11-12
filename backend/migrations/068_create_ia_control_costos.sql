@@ -12,7 +12,7 @@ CREATE TABLE ia_configuracion (
     max_preguntas_solicitud INT           NOT NULL DEFAULT 20  CHECK (max_preguntas_solicitud BETWEEN 1 AND 50),
     lote_clasificacion      INT           NOT NULL DEFAULT 20  CHECK (lote_clasificacion BETWEEN 1 AND 50),
     presupuesto_mensual_usd NUMERIC(10,2) NOT NULL DEFAULT 40.00 CHECK (presupuesto_mensual_usd BETWEEN 1 AND 1000),
-    updated_by              BIGINT        REFERENCES usuarios(id),
+    updated_by              BIGINT        REFERENCES usuarios(id) ON DELETE SET NULL,
     updated_at              TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_ia_configuracion_mes CHECK (limite_usuario_dia <= limite_usuario_mes)
 );
@@ -53,10 +53,11 @@ CREATE INDEX idx_ia_cache_expira ON ia_cache (expira_en);
 ALTER TABLE ia_usos DROP CONSTRAINT ia_usos_resultado_check;
 ALTER TABLE ia_usos ADD CONSTRAINT ck_ia_usos_resultado CHECK (resultado IN ('ok', 'no_disponible',
     'entrada_demasiado_grande', 'datos_personales', 'timeout', 'cancelado', 'salida_invalida',
-    'error_proveedor', 'presupuesto_agotado'));
+    'error_proveedor', 'presupuesto_agotado', 'error_interno'));
 
 -- +goose Down
 UPDATE ia_usos SET resultado = 'no_disponible' WHERE resultado = 'presupuesto_agotado';
+UPDATE ia_usos SET resultado = 'error_proveedor' WHERE resultado = 'error_interno';
 ALTER TABLE ia_usos DROP CONSTRAINT IF EXISTS ck_ia_usos_resultado;
 ALTER TABLE ia_usos ADD CONSTRAINT ia_usos_resultado_check CHECK (resultado IN ('ok', 'no_disponible',
     'entrada_demasiado_grande', 'datos_personales', 'timeout', 'cancelado', 'salida_invalida', 'error_proveedor'));
