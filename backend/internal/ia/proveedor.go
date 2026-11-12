@@ -11,6 +11,10 @@ type Solicitud struct {
 	Instrucciones string
 	Datos         []Bloque
 	EsquemaSalida string // e.g. "clasificar.v1"
+	// Fuentes are the fuente_id whose content goes in Datos. The consumer
+	// fills them; the cache uses them to know when an answer went stale
+	// (SIA-E6-02 §4). They are never sent to the provider.
+	Fuentes []int64
 }
 
 // Bloque is one delimited piece of data.

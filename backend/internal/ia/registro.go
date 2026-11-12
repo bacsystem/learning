@@ -41,6 +41,7 @@ type Uso struct {
 	Duracion      time.Duration
 	Intentos      int
 	Resultado     string
+	DesdeCache    bool // served from the cache: no provider, no cost (contract E6-02 §4)
 }
 
 // PgRegistro writes ia_usos with the service's own pool, outside any
@@ -64,9 +65,9 @@ func (r *PgRegistro) Registrar(ctx context.Context, u Uso) error {
 	if _, err := r.db.ExecContext(ctx, `
 		INSERT INTO ia_usos (operacion, actor_rol, actor_id, proveedor, modelo, tokens_entrada, tokens_salida,
 		                     costo_usd, duracion_ms, intentos, resultado, desde_cache)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false)`,
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 		u.Operacion, u.Actor.Rol, u.Actor.ID, u.Proveedor, modelo, u.TokensEntrada, u.TokensSalida,
-		u.CostoUSD, u.Duracion.Milliseconds(), u.Intentos, u.Resultado); err != nil {
+		u.CostoUSD, u.Duracion.Milliseconds(), u.Intentos, u.Resultado, u.DesdeCache); err != nil {
 		return fmt.Errorf("registrar uso de %s: %w", u.Operacion, err)
 	}
 	return nil

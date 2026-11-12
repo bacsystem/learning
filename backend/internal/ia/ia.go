@@ -8,6 +8,7 @@ package ia
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -54,6 +55,10 @@ type Servicio interface {
 	// Liberar gives n actions back; the consumer releases what it does not use.
 	Liberar(ctx context.Context, r *Reserva, n int) error
 	Consumo(ctx context.Context, a Actor) (Consumo, error)
+	// BuscarCache is the building block of BuscarEnCache, which consumers
+	// call: acepta decides whether the stored output is usable before the
+	// cache hit is recorded for a.
+	BuscarCache(ctx context.Context, a Actor, sol Solicitud, acepta func(json.RawMessage) bool) (json.RawMessage, bool, error)
 }
 
 // Errors of the service (contract §5). Their text is the stable code.
