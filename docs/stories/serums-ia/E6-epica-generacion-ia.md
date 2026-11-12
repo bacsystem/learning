@@ -16,7 +16,7 @@
 | SIA-E6-07 | Material de estudio aprobado para el postulante | v2 | 3 | #45 |
 | SIA-E6-08 | Explicaciones con cita por respuesta | v2 | 5 | #46 |
 | SIA-E6-09 | Reporte de contenido erróneo por el postulante | v2 | 5 | #47 |
-| SIA-E6-10 | Adaptador del proveedor real de IA | MVP | 3 | por crear |
+| SIA-E6-10 | Adaptador del proveedor real de IA | MVP | 3 | #173 |
 
 **Regla maestra:** sin cita a pasaje de fuente activa Y sin aprobación de admin, nada llega al alumno; lo incierto exige revisión explícita. Los reportes de postulantes nunca ocultan contenido aprobado por un admin: lo priorizan en la cola y avisan a los admins (SIA-E6-09).
 **Dependencias:** E2 (pasajes), E3-02 (estado borrador).
