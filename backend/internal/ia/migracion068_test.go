@@ -43,9 +43,11 @@ func TestMigracion068_DownYUp(t *testing.T) {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, `INSERT INTO ia_usos (operacion, actor_rol, proveedor, duracion_ms, resultado)
-		VALUES ('clasificar', 'sistema', 'doble', 0, 'presupuesto_agotado')`); err != nil {
-		t.Fatalf("068 must accept presupuesto_agotado: %v", err)
+	for _, resultado := range []string{"presupuesto_agotado", "error_interno"} {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO ia_usos (operacion, actor_rol, proveedor, duracion_ms, resultado)
+			VALUES ('clasificar', 'sistema', 'doble', 0, $1)`, resultado); err != nil {
+			t.Fatalf("068 must accept %s: %v", resultado, err)
+		}
 	}
 	up, down := seccionesGoose(t, migracion068)
 	if _, err := tx.ExecContext(ctx, down); err != nil {
@@ -57,9 +59,10 @@ func TestMigracion068_DownYUp(t *testing.T) {
 			t.Errorf("after Down, %s exists = %v (%v)", tabla, existe, err)
 		}
 	}
-	var resultado string
-	if err := tx.GetContext(ctx, &resultado, `SELECT resultado FROM ia_usos ORDER BY id DESC LIMIT 1`); err != nil || resultado != "no_disponible" {
-		t.Errorf("after Down, resultado = %q (%v), want no_disponible", resultado, err)
+	var resultados []string
+	if err := tx.SelectContext(ctx, &resultados, `SELECT resultado FROM ia_usos ORDER BY id DESC LIMIT 2`); err != nil ||
+		len(resultados) != 2 || resultados[0] != "error_proveedor" || resultados[1] != "no_disponible" {
+		t.Errorf("after Down, resultados = %v (%v), want [error_proveedor no_disponible]", resultados, err)
 	}
 	checks := func(momento, quiere, noQuiere string) {
 		t.Helper()
