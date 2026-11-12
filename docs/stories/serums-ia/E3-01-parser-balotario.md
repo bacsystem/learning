@@ -36,10 +36,10 @@ Formato observado: preguntas numeradas, alternativas A–D, clave dentro de `<ma
 15. El parser **no** detecta duplicados contra el banco ni crea `conflicto_clave`: eso es de SIA-E3-06, sobre los borradores ya importados.
 16. **HTML residual:** solo se eliminan las etiquetas HTML reconocibles (`<b>dosis</b>` queda «dosis»). Las etiquetas `<script>` y `<style>` se eliminan junto con su contenido. Todo esto genera la alerta `html_eliminado`. Un `<` o `>` que no forma una etiqueta («PA < 90», «Hb <7 g/dL») es texto y se conserva tal cual, sin alerta.
 17. **Ante la duda, «con problemas»** (decisión del PO, 12-nov, por el caso «C. difficile»): el parser nunca une, parte ni reetiqueta alternativas si eso puede cambiar qué texto queda marcado como clave. Una vez abierta la primera alternativa de una pregunta, va a «con problemas» con `etiquetas_ambiguas` si ocurre cualquiera de estas dos cosas:
-    - una línea empieza con algo que parece una etiqueta (letra seguida de `)` o `.`), pero el parser la trataría como continuación de la alternativa anterior;
+    - una línea empieza con algo que parece una etiqueta (una letra con cualquiera de las formas `A)`, `A.`, `A-` o `(A)`), pero el parser la trataría como continuación de la alternativa anterior;
     - las letras de las etiquetas retroceden o se repiten (por ejemplo A, C, B).
     
-    Dentro del enunciado, antes de la primera alternativa, una línea como «E. coli…» sigue siendo continuación sin problema. Un salto hacia adelante sin retroceso (A, B, D) sigue la regla 10: se reetiqueta con la alerta `vinetas_normalizadas`. Preferimos que el admin corrija el archivo antes que importar una clave equivocada.
+    Dentro del enunciado, antes de la primera alternativa, una línea como «E. coli…» sigue siendo continuación sin problema. Un salto hacia adelante sin retroceso (A, B, D) sigue la regla 10: se reetiqueta con la alerta `vinetas_normalizadas`. Preferimos que el admin corrija el archivo antes que importar una clave equivocada. Excepción a «se informan todos» (regla 10): si la pregunta es ambigua pero hay una `<mark>` en su rango, solo se informa `etiquetas_ambiguas`, no `sin_clave`. Así no se le dice al admin que falta una clave que sí está.
 
 ## Criterios de aceptación
 ```gherkin
@@ -152,6 +152,11 @@ Escenario: Nombre científico dentro de las alternativas
   Dado las líneas "A) Antibiótico contra", "C. difficile con vancomicina", "<mark>B) Metronidazol</mark>" y "C) Otro"
   Cuando se parsea
   Entonces la pregunta se lista como "con problemas" con motivo "etiquetas_ambiguas" y nunca como válida con una clave unida a otro texto
+
+Escenario: Etiqueta entre paréntesis que retrocede
+  Dado las líneas "(a) Uno", "(c) Dos", "<mark>(b) Tres</mark>" y "(d) Cuatro"
+  Cuando se parsea
+  Entonces se lista como "con problemas" solo con el motivo "etiquetas_ambiguas", sin "sin_clave", porque la marca existe
 
 Escenario: Letras que retroceden
   Dado una pregunta con alternativas etiquetadas A, C, B y D
