@@ -4,18 +4,21 @@ import { avisarSiSesionExpirada } from "@/lib/http/sesion";
 
 /** Cliente de la importación del balotario (docs/api/serums-ia-e3-01-e3-03-balotario.md §3 y §4). */
 
-export type MotivoProblema =
-  | "numeracion_rota"
-  | "enunciado_vacio"
-  | "enunciado_largo"
-  | "alternativas_insuficientes"
-  | "alternativas_excedidas"
-  | "alternativa_vacia"
-  | "alternativa_larga"
-  | "alternativas_duplicadas"
-  | "sin_clave"
-  | "sin_pasaje";
-
+/** Motivos de «con problemas» (contrato §2.4 más `sin_pasaje`, que añade la importación). Cada uno tiene su texto en i18n. */
+export const MOTIVOS_PROBLEMA = [
+  "numeracion_rota",
+  "enunciado_vacio",
+  "enunciado_largo",
+  "alternativas_insuficientes",
+  "alternativas_excedidas",
+  "etiquetas_ambiguas",
+  "alternativa_vacia",
+  "alternativa_larga",
+  "alternativas_duplicadas",
+  "sin_clave",
+  "sin_pasaje",
+] as const;
+export type MotivoProblema = (typeof MOTIVOS_PROBLEMA)[number];
 export type AlertaEstructura = "alternativas_separadas" | "vinetas_normalizadas" | "html_eliminado";
 export type RutaRevision = "estructural" | "verificacion_clave";
 export type MotivoNoConfirmable = "sin_validas" | "ya_importado";

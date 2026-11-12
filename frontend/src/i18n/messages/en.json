@@ -1797,6 +1797,7 @@
           "enunciado_largo": "Statement too long (over 2,000 characters)",
           "alternativas_insuficientes": "Fewer than 2 options",
           "alternativas_excedidas": "More than 6 options",
+          "etiquetas_ambiguas": "Ambiguous option label (a letter that goes back or repeats)",
           "alternativa_vacia": "Option without text",
           "alternativa_larga": "Option too long (over 500 characters)",
           "alternativas_duplicadas": "Repeated options",

@@ -1797,6 +1797,7 @@
           "enunciado_largo": "Enunciado demasiado largo (más de 2 000 caracteres)",
           "alternativas_insuficientes": "Menos de 2 alternativas",
           "alternativas_excedidas": "Más de 6 alternativas",
+          "etiquetas_ambiguas": "Etiqueta de alternativa ambigua (una letra que retrocede o se repite)",
           "alternativa_vacia": "Alternativa sin texto",
           "alternativa_larga": "Alternativa demasiado larga (más de 500 caracteres)",
           "alternativas_duplicadas": "Alternativas repetidas",
