@@ -78,37 +78,32 @@ describe("textos-khipu", () => {
   });
 
   describe("menu de usuario", () => {
-    it("maps every text of the menu, the appearance panel and the theme toggle to a menu-usuario key", () => {
+    it("maps each text of the menu, the appearance panel and the theme toggle to its own key", () => {
       const { t } = traductor();
-      const textos = textosMenuUsuario(t);
-      expect(Object.keys(textos).sort()).toEqual(
-        [
-          "menu",
-          "cuenta",
-          "tema",
-          "apariencia",
-          "aparienciaTitulo",
-          "aparienciaDescripcion",
-          "paleta",
-          "paletaAyuda",
-          "tonoOscuro",
-          "tonoOscuroAyuda",
-          "tipografia",
-          "tipografiaAyuda",
-          "tipografiaMuestra",
-          "diseno",
-          "disenoInterfaz",
-          "paletaColor",
-          "tonoModoOscuro",
-          "tipografiaFuente",
-          "temaInterfaz",
-          "claro",
-          "oscuro",
-          "sistema",
-        ].sort(),
-      );
-      for (const valor of Object.values(textos)) expect(String(valor)).toMatch(/^menu-usuario-/);
-      expect(textos.menu).toBe("menu-usuario-menu");
+      expect(textosMenuUsuario(t)).toEqual({
+        menu: "menu-usuario-menu",
+        cuenta: "menu-usuario-cuenta",
+        tema: "menu-usuario-tema",
+        apariencia: "menu-usuario-apariencia",
+        aparienciaTitulo: "menu-usuario-apariencia-titulo",
+        aparienciaDescripcion: "menu-usuario-apariencia-descripcion",
+        paleta: "menu-usuario-paleta",
+        paletaAyuda: "menu-usuario-paleta-ayuda",
+        tonoOscuro: "menu-usuario-tono-oscuro",
+        tonoOscuroAyuda: "menu-usuario-tono-oscuro-ayuda",
+        tipografia: "menu-usuario-tipografia",
+        tipografiaAyuda: "menu-usuario-tipografia-ayuda",
+        tipografiaMuestra: "menu-usuario-tipografia-muestra",
+        diseno: "menu-usuario-diseno",
+        disenoInterfaz: "menu-usuario-diseno-interfaz",
+        paletaColor: "menu-usuario-paleta-color",
+        tonoModoOscuro: "menu-usuario-tono-modo-oscuro",
+        tipografiaFuente: "menu-usuario-tipografia-fuente",
+        temaInterfaz: "menu-usuario-tema-interfaz",
+        claro: "menu-usuario-claro",
+        oscuro: "menu-usuario-oscuro",
+        sistema: "menu-usuario-sistema",
+      });
     });
 
     it.each([
