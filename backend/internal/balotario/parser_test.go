@@ -505,3 +505,21 @@ func TestParsear_FixtureReglasDeGramatica(t *testing.T) {
 		t.Errorf("problemas = %s", got)
 	}
 }
+
+func TestParsear_ScriptDeVariasLineas(t *testing.T) {
+	// The block disappears with its content and the lines of the rest do not move.
+	md := "1. ¿Qué <script>\nalert(1)\n</script> pasa?\nA) Uno\n<mark>B) Dos</mark>\n" +
+		"2. <style>\n.a { color: red }\n</style>Otra\nA) Uno\n<mark>B) Dos</mark>\n"
+	comprobarValidas(t, parsear(t, md).Validas, []esperada{
+		{1, 1, 5, "¿Qué pasa?", "unica", alts("Uno", "*Dos"), []string{AlertaHTMLEliminado}},
+		{2, 6, 10, "Otra", "unica", alts("Uno", "*Dos"), []string{AlertaHTMLEliminado}},
+	})
+	// CRLF line breaks are kept as they are.
+	crlf := "1. P <script>\r\nx\r\n</script>\r\nA) Uno\r\n<mark>B) Dos</mark>\r\n"
+	comprobarValidas(t, parsear(t, crlf).Validas, []esperada{{1, 1, 5, "P", "unica", alts("Uno", "*Dos"), []string{AlertaHTMLEliminado}}})
+}
+
+func TestParsear_CierreDeMarcaAlPrincipioDeLaContinuacion(t *testing.T) {
+	r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos\n</mark> y más\n")
+	comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "P", "unica", alts("Uno", "*Dos y más"), sinAlertas()}})
+}

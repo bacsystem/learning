@@ -8,6 +8,7 @@ package balotario
 import (
 	"bytes"
 	"errors"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -74,7 +75,8 @@ func (r Resultado) Totales() Totales {
 // Parsear reads the original content of a fuente version.
 func Parsear(contenido []byte) (Resultado, error) {
 	contenido = bytes.TrimPrefix(contenido, []byte(bom))
-	lineas := fuentes.DividirLineas([]byte(strings.ToValidUTF8(string(contenido), string(utf8.RuneError))))
+	limpio := aplanarScripts(strings.ToValidUTF8(string(contenido), string(utf8.RuneError)))
+	lineas := fuentes.DividirLineas([]byte(limpio))
 
 	var p lector
 	for i, cruda := range lineas {
@@ -84,6 +86,19 @@ func Parsear(contenido []byte) (Resultado, error) {
 	}
 	p.cerrar()
 	return p.res, nil
+}
+
+var reSaltoDeLinea = regexp.MustCompile(`\r\n|\r|\n`)
+
+// aplanarScripts removes the content of <script> and <style> blocks, also the
+// ones that span several lines (rule 16), before the content is split into
+// lines. The line breaks of the block stay, so the numbers of line do not
+// move, and an empty <script></script> stays in the first line to raise the
+// html_eliminado alert.
+func aplanarScripts(contenido string) string {
+	return reScriptStyle.ReplaceAllStringFunc(contenido, func(bloque string) string {
+		return "<script></script>" + strings.Join(reSaltoDeLinea.FindAllString(bloque, -1), "")
+	})
 }
 
 // lector is the state machine of the grammar (§2.2).
