@@ -65,24 +65,22 @@ func TestPlegar_EnieDescompuesta(t *testing.T) {
 }
 
 func TestExtracto(t *testing.T) {
-	cortos := strings.Repeat("a", MaxExtracto)
-	tests := []struct {
+	largo := strings.Repeat("ñ", 300)
+	cases := []struct {
 		name, in, want string
 	}{
 		{"vacío", "", ""},
 		{"solo espacios", " \n\t ", ""},
-		{"colapsa espacios y saltos", "  Caso   probable\n\nde\tdengue  ", "Caso probable de dengue"},
-		{"espacios Unicode", "uno dos tres", "uno dos tres"},
-		{"exactamente 300 no se corta", cortos, cortos},
-		{"301 se corta en 300 y agrega …", cortos + "b", cortos + "…"},
-		{"multibyte cuenta runes, no bytes", strings.Repeat("ñ", MaxExtracto+5), strings.Repeat("ñ", MaxExtracto) + "…"},
-		{"300 runes multibyte no se corta", strings.Repeat("é", MaxExtracto), strings.Repeat("é", MaxExtracto)},
-		{"el recorte se hace tras colapsar", strings.Repeat("a ", 200), strings.Repeat("a ", 150) + "…"},
+		{"colapsa espacios y saltos", "  uno\n\ndos \t tres  ", "uno dos tres"},
+		{"300 runes exactos no se cortan", largo, largo},
+		{"301 runes se cortan en 300", largo + "ñ", largo + "…"},
+		{"multibyte cuenta runes, no bytes", strings.Repeat("😀", 301), strings.Repeat("😀", 300) + "…"},
+		{"el corte va después de colapsar", strings.Repeat("a \n ", 200), strings.Repeat("a ", 150) + "…"},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := Extracto(tt.in); got != tt.want {
-				t.Errorf("Extracto(%q) = %q, want %q", tt.in, got, tt.want)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := Extracto(c.in); got != c.want {
+				t.Errorf("Extracto = %q, want %q", got, c.want)
 			}
 		})
 	}

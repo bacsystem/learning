@@ -167,27 +167,46 @@ func (s *PgSource) BuscarPasajes(ctx context.Context, b Busqueda) ([]PasajeEncon
 	if err != nil {
 		return nil, err
 	}
-	var filas []filaPasaje
-	if err := sqlx.SelectContext(ctx, s.db, &filas, `
-		WITH q AS (SELECT websearch_to_tsquery('spanish', $1) AS q)
-		SELECT `+columnasPasaje+`, ts_rank_cd(p.tsv, q.q) AS rank
-		FROM q
-		JOIN pasajes p          ON p.tsv @@ q.q
-		JOIN fuente_versiones v ON v.id = p.fuente_version_id
-		JOIN fuentes f          ON f.version_vigente_id = v.id
-		WHERE f.estado = 'activa'
-		  AND (NOT EXISTS (SELECT 1 FROM fuente_especialidades fe WHERE fe.fuente_id = f.id)
-		       OR EXISTS (SELECT 1 FROM fuente_especialidades fe
-		                  WHERE fe.fuente_id = f.id AND fe.especialidad_id = $2))
-		ORDER BY rank DESC, p.id ASC
-		LIMIT $3`, texto.Plegar(consulta), b.EspecialidadID, limite); err != nil {
-		return nil, fmt.Errorf("buscar pasajes (especialidad %d): %w", b.EspecialidadID, err)
+	filas, err := buscarPasajesActivos(ctx, s.db, consulta, b.EspecialidadID, limite)
+	if err != nil {
+		return nil, err
 	}
 	encontrados := make([]PasajeEncontrado, 0, len(filas))
 	for _, f := range filas {
 		encontrados = append(encontrados, f.pasaje())
 	}
 	return encontrados, nil
+}
+
+// filaBusqueda is a search hit with the title of its fuente.
+type filaBusqueda struct {
+	filaPasaje
+	TituloFuente string `db:"titulo_fuente"`
+}
+
+// buscarPasajesActivos is the single search SQL (ADR 0007), shared by the port
+// and by the admin search: the folded query over the current version of
+// 'activa' fuentes, by ts_rank_cd then id. especialidadID 0 means no
+// especialidad filter. The query is already validated.
+func buscarPasajesActivos(ctx context.Context, q sqlx.QueryerContext, consulta string, especialidadID int64, limite int) ([]filaBusqueda, error) {
+	var filas []filaBusqueda
+	if err := sqlx.SelectContext(ctx, q, &filas, `
+		WITH q AS (SELECT websearch_to_tsquery('spanish', $1) AS q)
+		SELECT `+columnasPasaje+`, f.titulo AS titulo_fuente, ts_rank_cd(p.tsv, q.q) AS rank
+		FROM q
+		JOIN pasajes p          ON p.tsv @@ q.q
+		JOIN fuente_versiones v ON v.id = p.fuente_version_id
+		JOIN fuentes f          ON f.version_vigente_id = v.id
+		WHERE f.estado = 'activa'
+		  AND ($2::bigint = 0
+		       OR NOT EXISTS (SELECT 1 FROM fuente_especialidades fe WHERE fe.fuente_id = f.id)
+		       OR EXISTS (SELECT 1 FROM fuente_especialidades fe
+		                  WHERE fe.fuente_id = f.id AND fe.especialidad_id = $2))
+		ORDER BY rank DESC, p.id ASC
+		LIMIT $3`, texto.Plegar(consulta), especialidadID, limite); err != nil {
+		return nil, fmt.Errorf("buscar pasajes (especialidad %d): %w", especialidadID, err)
+	}
+	return filas, nil
 }
 
 // ResolverCita returns the passage of (fuente, versión, pasaje) whatever the

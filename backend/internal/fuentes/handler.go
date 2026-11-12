@@ -35,6 +35,7 @@ const (
 	codigoEstadoInvalido  = "estado_invalido"
 	codigoLimiteVersiones = "limite_versiones"
 	codigoParametro       = "parametro_invalido"
+	codigoConsulta        = "consulta_invalida"
 	msgCuerpoInvalido     = "El formulario multipart con el archivo es obligatorio."
 	msgParametroInvalido  = "Parámetro inválido."
 	msgNoEncontrado       = "Fuente no encontrada."
@@ -56,6 +57,7 @@ type servicio interface {
 	CambiarEstado(ctx context.Context, id int64, req CambioEstadoRequest, actor int64, aud Auditor) (FuenteDetalle, error)
 	Oficial(ctx context.Context, id int64, req OficialRequest, actor int64, aud Auditor) (FuenteDetalle, error)
 	Editar(ctx context.Context, id int64, req EditarRequest, aud Auditor) (FuenteDetalle, error)
+	BuscarPasajes(ctx context.Context, q string) (ListaPasajes, error)
 }
 
 // Handler exposes S1–S7.
@@ -119,6 +121,16 @@ func (h *Handler) Listar(w http.ResponseWriter, r *http.Request) {
 	lista, err := h.svc.Listar(r.Context(), f)
 	if err != nil {
 		responderError(w, "listar", err)
+		return
+	}
+	jsonStatus(w, http.StatusOK, lista)
+}
+
+// BuscarPasajes handles GET /admin/pasajes?q= (E3-07 §2). q is never logged.
+func (h *Handler) BuscarPasajes(w http.ResponseWriter, r *http.Request) {
+	lista, err := h.svc.BuscarPasajes(r.Context(), r.URL.Query().Get("q"))
+	if err != nil {
+		responderError(w, "buscar_pasajes", err)
 		return
 	}
 	jsonStatus(w, http.StatusOK, lista)
@@ -326,6 +338,8 @@ func responderError(w http.ResponseWriter, op string, err error) {
 			detalle["especialidad_id"] = *limite.EspecialidadID
 		}
 		httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codigoLimiteFuentes, ErrLimiteFuentes.Error(), detalle)
+	case errors.Is(err, ErrConsultaInvalida):
+		httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codigoConsulta, err.Error(), map[string]any{"min": MinConsulta, "max": MaxConsulta})
 	case errors.Is(err, ErrNoEncontrado):
 		httpx.JSONErrorCode(w, http.StatusNotFound, codigoNoEncontrado, msgNoEncontrado, nil)
 	case errors.Is(err, ErrEstadoInvalido):
