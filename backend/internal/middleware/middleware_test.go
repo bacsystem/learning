@@ -291,9 +291,11 @@ func TestMaxBodySize_RejectionUsesCodedErrorFormat(t *testing.T) {
 		contentType string
 		route       string
 		bodySize    int
+		wantCode    string
 	}{
-		{"JSON over the JSON limit", "application/json", "", 2048},
-		{"multipart over the multipart limit", "multipart/form-data; boundary=xyz", "POST /", 8192},
+		{"JSON over the JSON limit", "application/json", "", 2048, "cuerpo_demasiado_grande"},
+		{"multipart on an unregistered route gets the JSON limit", "multipart/form-data; boundary=xyz", "", 2048, "cuerpo_demasiado_grande"},
+		{"multipart over the multipart limit on an upload route", "multipart/form-data; boundary=xyz", "POST /", 8192, "archivo_demasiado_grande"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -316,8 +318,8 @@ func TestMaxBodySize_RejectionUsesCodedErrorFormat(t *testing.T) {
 			if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 				t.Fatalf("decode body: %v", err)
 			}
-			if body.Error != "cuerpo_demasiado_grande" {
-				t.Errorf("error = %q, want cuerpo_demasiado_grande", body.Error)
+			if body.Error != tt.wantCode {
+				t.Errorf("error = %q, want %s", body.Error, tt.wantCode)
 			}
 			if body.Message != "El cuerpo de la solicitud es demasiado grande." {
 				t.Errorf("message = %q", body.Message)

@@ -15,6 +15,10 @@ const (
 
 const bodyTooLargeMsg = "El cuerpo de la solicitud es demasiado grande."
 
+// codeFileTooLarge is the 413 code of the multipart uploads (E2 S1); it is
+// the one the upload handlers answer when they cut the file themselves.
+const codeFileTooLarge = "archivo_demasiado_grande"
+
 // MaxBodySize caps the request body. Every request is limited to jsonLimit
 // except multipart/form-data requests to one of uploadRoutes ("METHOD /path",
 // exact match on r.Method and r.URL.Path), which get the larger
@@ -24,8 +28,9 @@ const bodyTooLargeMsg = "El cuerpo de la solicitud es demasiado grande."
 // JSON endpoint would otherwise be read up to multipartLimit.
 //
 // A request whose declared Content-Length already exceeds the limit is
-// rejected with 413 (coded error format, cuerpo_demasiado_grande) before the
-// handler runs. Bodies of unknown length are
+// rejected with 413 in the coded error format before the handler runs:
+// archivo_demasiado_grande on a registered upload route, cuerpo_demasiado_grande
+// anywhere else. Bodies of unknown length are
 // wrapped in http.MaxBytesReader, so reading past the limit fails with
 // *http.MaxBytesError (handlers should map it to 413).
 func MaxBodySize(jsonLimit, multipartLimit int64, uploadRoutes ...string) func(http.Handler) http.Handler {
@@ -39,13 +44,13 @@ func MaxBodySize(jsonLimit, multipartLimit int64, uploadRoutes ...string) func(h
 				next.ServeHTTP(w, r)
 				return
 			}
-			limit := jsonLimit
+			limit, code := jsonLimit, httpx.CodeBodyTooLarge
 			if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err == nil && mt == "multipart/form-data" &&
 				uploads[r.Method+" "+r.URL.Path] {
-				limit = multipartLimit
+				limit, code = multipartLimit, codeFileTooLarge
 			}
 			if r.ContentLength > limit {
-				httpx.JSONErrorCode(w, http.StatusRequestEntityTooLarge, httpx.CodeBodyTooLarge, bodyTooLargeMsg, nil)
+				httpx.JSONErrorCode(w, http.StatusRequestEntityTooLarge, code, bodyTooLargeMsg, nil)
 				return
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, limit)
