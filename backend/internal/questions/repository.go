@@ -128,8 +128,8 @@ func (r *Repository) CreatePregunta(ctx context.Context, req CreatePreguntaReque
 	var preguntaID int64
 	err = tx.QueryRowContext(ctx, `
 		INSERT INTO preguntas (institucion_id, proceso_id, asignatura_id, grado_id, especialidad_id,
-			tema_id, enunciado, tipo, dificultad, estado)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'activo')
+			tema_id, enunciado, tipo, dificultad, estado, origen)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'borrador', 'manual')
 		RETURNING id`,
 		institucionID, req.ProcesoID, req.AsignaturaID, req.GradoID, req.EspecialidadID,
 		req.TemaID, req.Enunciado, req.Tipo, req.Dificultad,
@@ -200,6 +200,8 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 		Tipo             string   `db:"tipo"`
 		Dificultad       string   `db:"dificultad"`
 		Estado           string   `db:"estado"`
+		Origen           string   `db:"origen"`
+		MotivoRechazo    *string  `db:"motivo_rechazo"`
 		CreatedAt        string   `db:"created_at"`
 		RetroExplicacion *string  `db:"retro_explicacion"`
 		RetroReferencia  *string  `db:"retro_referencia"`
@@ -210,6 +212,7 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 		RespuestasJSON   []byte   `db:"respuestas_json"`
 		EtiquetasJSON    []byte   `db:"etiquetas_json"`
 		EtiquetaIDsJSON  []byte   `db:"etiqueta_ids_json"`
+		CitasJSON        []byte   `db:"citas_json"`
 	}
 
 	var r0 row
@@ -225,7 +228,7 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 			e.nombre  AS especialidad,
 			p.tema_id,
 			t.nombre  AS tema,
-			p.enunciado, p.tipo, p.dificultad, p.estado,
+			p.enunciado, p.tipo, p.dificultad, p.estado, p.origen, p.motivo_rechazo,
 			p.created_at::text,
 			ret.explicacion AS retro_explicacion,
 			ret.referencia  AS retro_referencia,
@@ -249,7 +252,17 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 				(SELECT JSON_AGG(pe.etiqueta_id ORDER BY pe.etiqueta_id)
 				 FROM pregunta_etiquetas pe WHERE pe.pregunta_id = p.id),
 				'[]'::json
-			) AS etiqueta_ids_json
+			) AS etiqueta_ids_json,
+			COALESCE(
+				(SELECT JSON_AGG(c ORDER BY c.fuente_id, c.version, c.pasaje_id)
+				 FROM (SELECT pc.pasaje_id, fv.fuente_id, fv.numero AS version, f.titulo AS fuente_titulo, f.estado AS fuente_estado
+				       FROM pregunta_citas pc
+				       JOIN pasajes pa          ON pa.id = pc.pasaje_id
+				       JOIN fuente_versiones fv ON fv.id = pa.fuente_version_id
+				       JOIN fuentes f           ON f.id = fv.fuente_id
+				       WHERE pc.pregunta_id = p.id) c),
+				'[]'::json
+			) AS citas_json
 		FROM preguntas p
 		JOIN procesos pr ON pr.id = p.proceso_id
 		JOIN asignaturas a  ON a.id  = p.asignatura_id
@@ -263,10 +276,10 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 		&r0.ID, &r0.ProcesoID, &r0.Proceso, &r0.AsignaturaID, &r0.Asignatura,
 		&r0.GradoID, &r0.Grado, &r0.EspecialidadID, &r0.Especialidad,
 		&r0.TemaID, &r0.Tema,
-		&r0.Enunciado, &r0.Tipo, &r0.Dificultad, &r0.Estado, &r0.CreatedAt,
+		&r0.Enunciado, &r0.Tipo, &r0.Dificultad, &r0.Estado, &r0.Origen, &r0.MotivoRechazo, &r0.CreatedAt,
 		&r0.RetroExplicacion, &r0.RetroReferencia,
 		&r0.EstIntentos, &r0.EstAciertos, &r0.EstIndDif, &r0.EstIndDisc,
-		&r0.RespuestasJSON, &r0.EtiquetasJSON, &r0.EtiquetaIDsJSON,
+		&r0.RespuestasJSON, &r0.EtiquetasJSON, &r0.EtiquetaIDsJSON, &r0.CitasJSON,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PreguntaResponse{}, ErrNotFound
@@ -294,6 +307,10 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 	if err := json.Unmarshal(r0.EtiquetaIDsJSON, &etiquetaIDs); err != nil {
 		return PreguntaResponse{}, err
 	}
+	citas := []CitaResponse{}
+	if err := json.Unmarshal(r0.CitasJSON, &citas); err != nil {
+		return PreguntaResponse{}, err
+	}
 
 	resp := PreguntaResponse{
 		ID:             r0.ID,
@@ -311,6 +328,9 @@ func (r *Repository) GetPregunta(ctx context.Context, id int64) (PreguntaRespons
 		Tipo:           r0.Tipo,
 		Dificultad:     r0.Dificultad,
 		Estado:         r0.Estado,
+		Origen:         r0.Origen,
+		MotivoRechazo:  r0.MotivoRechazo,
+		Citas:          &citas,
 		Etiquetas:      etiquetas,
 		EtiquetaIDs:    etiquetaIDs,
 		Respuestas:     respuestas,
@@ -345,6 +365,11 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 	if q.Estado != "" {
 		where = append(where, fmt.Sprintf("p.estado = $%d", i))
 		args = append(args, q.Estado)
+		i++
+	}
+	if q.Origen != "" {
+		where = append(where, fmt.Sprintf("p.origen = $%d", i))
+		args = append(args, q.Origen)
 		i++
 	}
 	if q.ProcesoID > 0 {
@@ -409,7 +434,8 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 			e.nombre  AS especialidad,
 			p.tema_id,
 			t.nombre  AS tema,
-			p.enunciado, p.tipo, p.dificultad, p.estado,
+			p.enunciado, p.tipo, p.dificultad, p.estado, p.origen, p.motivo_rechazo,
+			(SELECT COUNT(*) FROM pregunta_citas pc WHERE pc.pregunta_id = p.id) AS citas_count,
 			p.created_at::text,
 			COUNT(*) OVER() AS total_count
 		FROM preguntas p
@@ -434,14 +460,16 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 	var total int
 	for rows.Next() {
 		var p PreguntaResponse
+		var citas int
 		if err := rows.Scan(
 			&p.ID, &p.Proceso, &p.Asignatura, &p.Grado, &p.Especialidad,
 			&p.TemaID, &p.Tema,
-			&p.Enunciado, &p.Tipo, &p.Dificultad, &p.Estado, &p.CreatedAt,
+			&p.Enunciado, &p.Tipo, &p.Dificultad, &p.Estado, &p.Origen, &p.MotivoRechazo, &citas, &p.CreatedAt,
 			&total,
 		); err != nil {
 			return PreguntaListResponse{}, err
 		}
+		p.CitasCount = &citas
 		p.Etiquetas = []string{}
 		p.EtiquetaIDs = []int64{}
 		p.Respuestas = []RespuestaResponse{}

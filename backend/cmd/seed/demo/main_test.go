@@ -116,7 +116,7 @@ func conteos(t *testing.T, db *sqlx.DB) map[string]int {
 		"asignaturas":          `SELECT COUNT(*) FROM asignaturas WHERE codigo LIKE 'DEMO-%' AND $1 <> $2`,
 		"procesos":             `SELECT COUNT(*) FROM procesos WHERE institucion_id IN (SELECT id FROM instituciones WHERE nombre IN ($1, $2))`,
 		"proceso_asignaturas":  `SELECT COUNT(*) FROM proceso_asignaturas WHERE proceso_id IN (SELECT p.id FROM procesos p JOIN instituciones i ON i.id = p.institucion_id WHERE i.nombre IN ($1, $2))`,
-		"preguntas":            `SELECT COUNT(*) FROM preguntas WHERE estado = 'activo' AND proceso_id IN (SELECT p.id FROM procesos p JOIN instituciones i ON i.id = p.institucion_id WHERE i.nombre IN ($1, $2))`,
+		"preguntas":            `SELECT COUNT(*) FROM preguntas WHERE estado = 'aprobada' AND proceso_id IN (SELECT p.id FROM procesos p JOIN instituciones i ON i.id = p.institucion_id WHERE i.nombre IN ($1, $2))`,
 		"configuracion_examen": `SELECT COUNT(*) FROM configuracion_examen WHERE proceso_id IN (SELECT p.id FROM procesos p JOIN instituciones i ON i.id = p.institucion_id WHERE i.nombre IN ($1, $2))`,
 		"temas":                `SELECT COUNT(*) FROM temas WHERE asignatura_id IN (SELECT id FROM asignaturas WHERE codigo LIKE 'DEMO-%') AND $1 <> $2`,
 		"usuarios":             `SELECT COUNT(*) FROM usuarios WHERE username LIKE 'demo\_%' AND $1 <> $2`,

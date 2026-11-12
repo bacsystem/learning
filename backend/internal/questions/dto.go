@@ -106,6 +106,17 @@ type AsignaturaSetItem struct {
 
 // ── Response structs ───────────────────────────────────────────────────────────
 
+// CitaResponse is one citation of a question: the passage and the fuente
+// version it belongs to (contract E3-02 §4.4); the passage text is resolved
+// through the fuentes port.
+type CitaResponse struct {
+	PasajeID     int64  `json:"pasaje_id"`
+	FuenteID     int64  `json:"fuente_id"`
+	Version      int    `json:"version"`
+	FuenteTitulo string `json:"fuente_titulo"`
+	FuenteEstado string `json:"fuente_estado"`
+}
+
 // RespuestaResponse is an answer in the admin detail view (includes es_correcta).
 type RespuestaResponse struct {
 	ID         int64  `json:"id"`
@@ -145,6 +156,10 @@ type PreguntaResponse struct {
 	Tipo              string                     `json:"tipo"`
 	Dificultad        string                     `json:"dificultad"`
 	Estado            string                     `json:"estado"`
+	Origen            string                     `json:"origen"`                // manual | balotario | ia (SIA-E3-02)
+	MotivoRechazo     *string                    `json:"motivo_rechazo"`        // set only while rechazada
+	Citas             *[]CitaResponse            `json:"citas,omitempty"`       // detail views only
+	CitasCount        *int                       `json:"citas_count,omitempty"` // list view only
 	Etiquetas         []string                   `json:"etiquetas"`
 	EtiquetaIDs       []int64                    `json:"etiqueta_ids"` // ids of Etiquetas (H100); empty in list views
 	Respuestas        []RespuestaResponse        `json:"respuestas"`
@@ -266,7 +281,8 @@ type ListQuery struct {
 	Dificultad     string
 	EtiquetaID     int64
 	TemaID         int64
-	Estado         string
+	Estado         string // exact; one of EstadosListables
+	Origen         string // exact; one of Origenes
 	Search         string
 	Page           int
 	PerPage        int
