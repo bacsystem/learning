@@ -29,7 +29,7 @@ Extiende el import con preview existente. Entrada: una fuente de tipo `balotario
 10. **Versión vista = versión importada:** la confirmación envía el número de versión de la vista previa. Si ya no es la vigente, responde 409 `version_desactualizada` y no crea nada.
 11. **Versiones nuevas:** una versión nueva de la misma fuente se puede importar. Sus duplicados frente a la versión anterior los resuelve SIA-E3-06. La idempotencia sigue siendo por (fuente, versión).
 12. **Con problemas:** se listan todas, paginadas (20 por defecto, máx. 100), con número de línea y los motivos traducidos. No se importan. Para recuperarlas, el admin corrige el archivo y sube una versión nueva.
-13. **Especialidad, proceso y área inicial:** los tres deben existir, la especialidad debe estar activa y el área debe pertenecer al proceso (la misma validación que el alta de preguntas; 422 `valor_invalido`). Si la fuente tiene profesiones asignadas, la especialidad elegida debe ser una de ellas (422 `especialidad_no_corresponde`).
+13. **Especialidad, proceso y área inicial:** los tres deben existir, la especialidad debe estar activa y el área debe pertenecer al proceso (la misma validación que el alta de preguntas; una referencia inexistente o ajena, como un área de otro proceso, responde 422 `referencia_invalida`). Si la fuente tiene profesiones asignadas, la especialidad elegida debe ser una de ellas (422 `especialidad_no_corresponde`).
 14. **Auditoría:** se registra en la misma transacción que la creación (todo o nada), con el actor, la fuente, la versión, la especialidad, el proceso y los totales.
 15. **Límite:** el error `limite_preguntas` del parser (más de 1 000 bloques) se responde como 422 `limite_preguntas` desde la vista previa.
 
@@ -67,7 +67,7 @@ Escenario: Confirmar
 Escenario: Área inicial de otro proceso
   Dado un área que no pertenece a SERUMS 2026-I
   Cuando el admin la elige como área inicial y confirma
-  Entonces recibe 422 "valor_invalido" y no se crea nada
+  Entonces recibe 422 "referencia_invalida" y no se crea nada
 
 Escenario: Aviso de área provisional
   Dado la pantalla de confirmación

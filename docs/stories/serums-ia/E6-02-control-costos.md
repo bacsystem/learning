@@ -55,7 +55,7 @@ flowchart TD
 14. **Costo de una llamada fallida:** la llamada libera su acción (regla 6), pero su costo real en USD, si el servicio de IA lo informa, sí suma al gasto del mes.
 15. **Reserva por lote:** se puede consultar cuántas acciones le quedan al actor y reservar N de una vez, de forma atómica (todo o nada), para la regla 6 de SIA-E3-04. Si no alcanzan, responde 429 sin reservar nada.
 16. **Gasto estable ante borrados:** el gasto del mes no baja cuando SIA-E9-07 borra o anonimiza los registros de uso de un usuario. Cómo se logra lo decide el architect.
-17. **Rangos de configuración:** postulante, 0–50 por día y 0–1000 por mes, con el diario ≤ el mensual; admin, 1–1000 por día; presupuesto, 1–1000 USD con 2 decimales. Fuera de rango: 422 `valor_invalido`.
+17. **Rangos de configuración:** postulante, 0–50 por día y 0–1000 por mes, con el diario ≤ el mensual; admin, 1–1000 por día; presupuesto, 1–1000 USD con 2 decimales. Un valor fuera de rango, o un diario mayor que el mensual, responde 422 `validacion`.
 18. **Cambios de configuración:** bajar un límite por debajo de lo ya consumido no es retroactivo; las siguientes solicitudes reciben 429. Subir el presupuesto reabre las llamadas de inmediato y rearma la alerta del 80 % una vez para el nuevo valor. Si al subirlo el gasto ya está en o por encima del 80 % del nuevo valor, la alerta se envía en ese momento, una vez. Los contadores del admin no necesitan HMAC (la regla 11 es solo para postulantes); su forma la decide el architect.
 19. **Canal de la alerta:** notificación in-app (campana existente) a todos los admins activos. El correo queda fuera de alcance.
 20. **Consumo del postulante:** en el MVP el postulante no tiene ninguna acción IA real (SIA-E5-06 solo encola y SIA-E6-08 la genera el admin). Esta historia entrega los límites del postulante y la API de su consumo propio; la vista para el postulante se construye en la primera historia que le dé una acción IA real. Los escenarios de cuota del postulante se verifican por API o por servicio. El admin sí ve su consumo del día en el panel. Cambio de alcance aprobado por el usuario (issue #40).
@@ -170,8 +170,13 @@ Escenario: Gasto estable tras un borrado
 
 Escenario: Valor fuera de rango
   Dado un admin en el panel de límites
-  Cuando guarda un límite diario de postulante de 61 con el mensual en 60
-  Entonces recibe 422 "valor_invalido" y no cambia nada
+  Cuando guarda un límite diario de postulante de 51
+  Entonces recibe 422 "validacion" y no cambia nada
+
+Escenario: Diario mayor que el mensual
+  Dado un admin en el panel de límites
+  Cuando guarda un límite diario de postulante de 30 con el mensual en 20
+  Entonces recibe 422 "validacion" y no cambia nada
 
 Escenario: Bajar un límite no es retroactivo
   Dado un admin con 150 acciones hoy
@@ -199,7 +204,7 @@ SIA-E6-01.
 Los contadores son por `HMAC(usuario_id)`; el secreto del HMAC vive solo en variables de entorno. El consumo de un usuario solo lo ve él y los admins en agregado.
 
 ## i18n
-Panel de admin (límites, presupuesto, gasto en USD y porcentaje, consumo propio del día), la notificación del 80 % y los errores `limite_ia`, `limite_ia_mensual`, `presupuesto_agotado` y `valor_invalido` en es/en, con formato de moneda y de hora del locale. Ningún código se muestra crudo.
+Panel de admin (límites, presupuesto, gasto en USD y porcentaje, consumo propio del día), la notificación del 80 % y los errores `limite_ia`, `limite_ia_mensual`, `presupuesto_agotado` y `validacion` en es/en, con formato de moneda y de hora del locale. Ningún código se muestra crudo.
 
 ## Definición de terminado
 Tests de concurrencia, de corte al 100 %, de reinicio diario y mensual por zona horaria Lima y de persistencia del contador tras borrado; migración con Down; `tsc`, `lint`, `build`; review limpio.
