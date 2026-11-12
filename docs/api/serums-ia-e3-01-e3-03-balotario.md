@@ -98,7 +98,7 @@ type Problema struct {
 
 ### 2.4 Motivos de «con problemas» (D2; regla 4)
 
-Lista cerrada. Se informan **todos** los que aplican, en este orden. Ninguna pregunta se descarta en silencio.
+Lista cerrada. Se informan **todos** los que aplican, en este orden. La única excepción explícita (E3-01 regla 10) es que no se informa `sin_clave` junto a `etiquetas_ambiguas` cuando la pregunta tiene una marca en su rango. Ninguna pregunta se descarta en silencio.
 
 | Motivo | Condición |
 |---|---|
