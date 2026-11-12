@@ -309,6 +309,17 @@ func TestVistaPrevia_SinValidas(t *testing.T) {
 	if body["puede_confirmar"] != false || body["motivo_no_confirmable"] != "sin_validas" || fmt.Sprint(body["preguntas"]) != "[]" {
 		t.Errorf("puede=%v motivo=%v preguntas=%v", body["puede_confirmar"], body["motivo_no_confirmable"], body["preguntas"])
 	}
+
+	// A version already imported that holds nothing valid: ya_importado wins.
+	var versionID int64
+	if err := x.db.Get(&versionID, `SELECT version_vigente_id FROM fuentes WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	insertarImportacion(t, x, id, versionID, 1)
+	_, body = x.get(rutaPrevia(id, ""), x.admin)
+	if body["puede_confirmar"] != false || body["motivo_no_confirmable"] != "ya_importado" {
+		t.Errorf("con importación previa: puede=%v motivo=%v", body["puede_confirmar"], body["motivo_no_confirmable"])
+	}
 }
 
 // insertarImportacion registers an import of a version, as the confirmation does.
