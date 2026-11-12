@@ -112,4 +112,4 @@ La URL se arma con `PREPROD_PG_USER` y `PREPROD_PG_PASSWORD` de `preprod.vars`.
 
 Están en [`preprod.vars`](preprod.vars). Son **falsas** (`NOT-FOR-PRODUCTION`)
 y se versionan a propósito. **Ningún valor de ahí se usa en Railway**: lo
-comprueba el checklist de release.
+comprueba el checklist de release. Incluye `PREPROD_ANTIFRAUD_HMAC_KEY` (ADR 0002), que el backend exige en todos los entornos.

@@ -1,4 +1,5 @@
 import { API_BASE } from "@/lib/http/api-base";
+import { apiErrorFrom, codigoDeConflicto } from "@/lib/http/api-error";
 import { avisarSiSesionExpirada } from "@/lib/http/sesion";
 
 async function req<T>(path: string, token: string, options?: RequestInit): Promise<T> {
@@ -12,22 +13,14 @@ async function req<T>(path: string, token: string, options?: RequestInit): Promi
   });
   if (!res.ok) {
     avisarSiSesionExpirada(res.status);
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw Object.assign(new Error(body.error ?? res.statusText), {
-      status: res.status,
-      practica_id: body.practica_id,
-      resultado_id: body.resultado_id,
-    });
+    throw await apiErrorFrom(res, ["practica_id", "resultado_id"] as const);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
-/** 409 error codes of the práctica endpoints (body.error). */
-export function errorCode(e: unknown): string | undefined {
-  const err = e as { status?: number; message?: string };
-  return err?.status === 409 ? err.message : undefined;
-}
+/** 409 error codes of the práctica endpoints (body.error, in the legacy and in the format 2 body). */
+export const errorCode = codigoDeConflicto;
 
 /**
  * 409 tiempo_agotado: the time limit is over. On GET of an expired práctica the

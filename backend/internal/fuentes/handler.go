@@ -24,7 +24,6 @@ const MaxCuerpoSubida = MaxArchivoBytes + 64*1024
 
 // Stable codes of the upload endpoints (docs/api/README.md §4).
 const (
-	codigoArchivoGrande   = "archivo_demasiado_grande"
 	codigoCuerpoInvalido  = "cuerpo_invalido"
 	codigoArchivoInvalido = "archivo_invalido"
 	codigoValidacion      = "validacion"
@@ -293,7 +292,7 @@ func leerArchivo(w http.ResponseWriter, r *http.Request) (ArchivoSubido, bool) {
 }
 
 func archivoDemasiadoGrande(w http.ResponseWriter) {
-	httpx.JSONErrorCode(w, http.StatusRequestEntityTooLarge, codigoArchivoGrande, ErrArchivoDemasiadoGrande.Error(), nil)
+	httpx.JSONErrorCode(w, http.StatusRequestEntityTooLarge, httpx.CodeFileTooLarge, ErrArchivoDemasiadoGrande.Error(), nil)
 }
 
 // auditor binds the authenticated admin, IP and user agent to an Auditor.

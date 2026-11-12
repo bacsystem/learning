@@ -1,4 +1,5 @@
 import { API_BASE } from "@/lib/http/api-base";
+import { apiErrorFrom } from "@/lib/http/api-error";
 import { avisarSiSesionExpirada } from "@/lib/http/sesion";
 
 async function req<T>(path: string, token: string, options?: RequestInit): Promise<T> {
@@ -12,8 +13,7 @@ async function req<T>(path: string, token: string, options?: RequestInit): Promi
   });
   if (!res.ok) {
     avisarSiSesionExpirada(res.status);
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw Object.assign(new Error(body.error ?? res.statusText), { status: res.status });
+    throw await apiErrorFrom(res);
   }
   return res.json() as Promise<T>;
 }

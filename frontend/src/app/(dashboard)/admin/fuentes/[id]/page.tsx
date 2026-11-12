@@ -32,6 +32,7 @@ import {
   ArrowLeftIcon,
   BooksIcon,
   ClockCounterClockwiseIcon,
+  FileArrowDownIcon,
   FileArrowUpIcon,
   PencilSimpleIcon,
   SealCheckIcon,
@@ -227,6 +228,12 @@ export default function FuenteDetallePage() {
                 {t(`serumsIa.fuentes.acciones.${b.accion}`)}
               </button>
             ))}
+            {fuente.tipo === "balotario" && fuente.estado === "activa" ? (
+              <Link href={`/admin/fuentes/${fuente.id}/balotario`} className={ACCION_SECUNDARIA}>
+                <FileArrowDownIcon className="size-4" />
+                {t("serumsIa.fuentes.acciones.importarBalotario")}
+              </Link>
+            ) : null}
           </div>
         </div>
       </section>
