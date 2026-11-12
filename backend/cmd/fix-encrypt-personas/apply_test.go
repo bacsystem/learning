@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cbaciliod/learning/internal/crypto"
+	"github.com/cbaciliod/learning/internal/db/testlock"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
@@ -30,6 +31,7 @@ func TestGeneratedSQLAbortsAndRollsBackOnConcurrentChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { conn.Close() })
+	testlock.Hold(t, conn) // released after the data cleanup below, before the pool closes
 	ctx := context.Background()
 	gcm, _ := crypto.NewCipher(testHexKey)
 	raw, _ := hex.DecodeString(testHexKey)

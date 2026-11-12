@@ -2,11 +2,15 @@ package ia_test
 
 import (
 	"context"
+	"errors"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/cbaciliod/learning/internal/db/dbtest"
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 const migracion068 = "../../migrations/068_create_ia_control_costos.sql"
@@ -32,10 +36,12 @@ func seccionesGoose(t *testing.T, ruta string) (up, down string) {
 // Escenario «Migración reversible»: the Down of 068 drops the four tables,
 // maps presupuesto_agotado to no_disponible and brings back the unnamed CHECK
 // of 066 (ia_usos_resultado_check); the Up again recreates everything with the
-// default configuration row. It runs in a transaction that is rolled back, so
-// the shared test database stays at 068.
+// default configuration row. It runs on a disposable database of its own: the
+// Down and the Up lock `usuarios` (the FKs of ia_usos and ia_configuracion)
+// exclusively, which would deadlock with the tests of other packages that
+// write to it on the shared test database.
 func TestMigracion068_DownYUp(t *testing.T) {
-	db := dbtest.Open(t)
+	db := baseDesechable068(t)
 	ctx := context.Background()
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -140,4 +146,61 @@ func TestMigracion068_UpdatedByNoImpideBorrarAlAdmin(t *testing.T) {
 	if !strings.Contains(fk, "ON DELETE SET NULL") {
 		t.Errorf("updated_by constraint = %s, want ON DELETE SET NULL", fk)
 	}
+}
+
+// sqlstateInsufficientPrivilege is the only CREATE DATABASE failure that skips
+// the test: anything else (a bad name, a dead server) is a real failure.
+const sqlstateInsufficientPrivilege = "42501"
+
+const migracion066 = "../../migrations/066_create_ia_usos.sql"
+
+// baseDesechable068 creates a database of its own on the test server, with the
+// only thing 066 and 068 need from the rest of the schema (a usuarios table to
+// point their FKs at) and the two migrations applied, and drops it when the
+// test ends. The test server user must be allowed to create databases (it is
+// in the CI service and in the test container); otherwise the test is skipped.
+func baseDesechable068(t *testing.T) *sqlx.DB {
+	t.Helper()
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL not set; skipping integration test")
+	}
+	nombre := "ia_mig068_" + dbtest.Uniq()
+	admin, err := sqlx.Connect("postgres", dsn)
+	if err != nil {
+		t.Fatalf("db connect: %v", err)
+	}
+	t.Cleanup(func() { _ = admin.Close() })
+	if _, err := admin.Exec(`CREATE DATABASE ` + nombre); err != nil {
+		var pgErr *pq.Error
+		if errors.As(err, &pgErr) && pgErr.Code == sqlstateInsufficientPrivilege {
+			t.Skipf("the test user cannot create databases (%v)", err)
+		}
+		t.Fatalf("create database %s: %v", nombre, err)
+	}
+	t.Cleanup(func() {
+		if _, err := admin.Exec(`DROP DATABASE IF EXISTS ` + nombre + ` WITH (FORCE)`); err != nil {
+			t.Errorf("drop %s: %v", nombre, err)
+		}
+	})
+	u, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.Path = "/" + nombre
+	db, err := sqlx.Connect("postgres", u.String())
+	if err != nil {
+		t.Fatalf("connect to %s: %v", nombre, err)
+	}
+	t.Cleanup(func() { _ = db.Close() }) // runs before the DROP: no session left on it
+	if _, err := db.Exec(`CREATE TABLE usuarios (id BIGSERIAL PRIMARY KEY)`); err != nil {
+		t.Fatal(err)
+	}
+	for _, ruta := range []string{migracion066, migracion068} {
+		up, _ := seccionesGoose(t, ruta)
+		if _, err := db.Exec(up); err != nil {
+			t.Fatalf("apply %s: %v", ruta, err)
+		}
+	}
+	return db
 }
