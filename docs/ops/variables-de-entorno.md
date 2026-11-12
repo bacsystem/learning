@@ -84,6 +84,20 @@ Las migraciones corren **en cada arranque** del contenedor, antes del servidor
 |---|---|---|
 | `TEST_DATABASE_URL` | Tests de integración (`internal/db/dbtest`, `internal/questions/questionstest`). `make test` la exige | Los tests de integración **se saltan** (`t.Skip`) y `go test` sale en verde. Por eso `make test` falla antes si no está definida |
 
+## Servicio de IA (contrato E6-01, `docs/api/serums-ia-e6-01-servicio-ia.md` §3)
+
+Las lee `config.Load` del backend (lo implementa E6-01).
+
+| Variable | Para qué sirve | Por defecto (código / compose / deploy/local / Railway) | Secreto | Si falta o es inválida |
+|---|---|---|---|---|
+| `IA_PROVEEDOR` | Proveedor de IA: vacío, `doble` o el nombre del adaptador real (E6-02) | vacío / vacío / `doble` / **vacío** hasta E6-02 | No | Vacío = **IA deshabilitada**: toda operación de IA responde 503 `ia_no_disponible` y el resto de la app funciona. `doble` con `ENV` fuera de `development`, `test` o `preprod` (incluido `production` o un valor mal escrito): **no arranca**. Nombre desconocido: no arranca |
+| `IA_API_KEY` | Credencial del adaptador real | — / vacío / no se define / sellada desde E6-02 | **Sí** | Con un adaptador real y sin clave: no arranca. Nunca en el código ni en los logs |
+| `IA_MODELO` | Modelo del adaptador real | — / vacío / no se define / desde E6-02 | No | Solo con un adaptador real |
+
+`ENV` por entorno, para la regla del doble: Railway `production` (no admite el
+doble), `deploy/local` `preprod` (lo usa), compose de desarrollo `development`
+y CI `test`.
+
 ## Cron de copia a R2 (`deploy/backup/backup.sh`)
 
 Solo en el servicio cron de Railway. Detalle y aprovisionamiento en
