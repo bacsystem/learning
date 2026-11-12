@@ -85,7 +85,7 @@ func (s) Liberar(ctx context.Context, r *Reserva, acciones int) error
 | ★0 | `r.Acciones ≥ 1` y actor válido | `ErrSinReserva` (error de programación): `500`, sin llamar ni registrar |
 | ★1 | Caché vigente (§4) | Si hay respuesta: `Liberar(r, 1)` y una fila en `ia_usos` con `desde_cache = true`, `resultado = 'ok'`, `proveedor = ''` (no se llamó a ninguno, como en `no_disponible`), `modelo = NULL`, costo 0 e intentos 0. Se devuelve la salida. Este paso va antes que «habilitado» (paso 2), así que la caché se sirve también con el servicio deshabilitado |
 | 2–4 | Pasos 1–3 de E6-01: habilitado, tamaño, redacción | Error de E6-01 y `Liberar(r, 1)` |
-| ★5 | Presupuesto: `gastado ≥ presupuesto` (D14) | `ErrPresupuestoAgotado`, `Liberar(r, 1)` y `ia_usos` con `presupuesto_agotado` |
+| ★5 | Presupuesto: `gastado ≥ presupuesto` (D14) | `ErrPresupuestoAgotado`, `Liberar(r, 1)` y `ia_usos` con `presupuesto_agotado`. Si falla la BD al leer el presupuesto: `ErrCostos`, `Liberar(r, 1)`, `ia_usos` con `error_interno` y no se llama al proveedor (review del #202, H2) |
 | 6–8 | Pasos 4–6 de E6-01: llamada, reintentos, validación | — |
 | ★9 | En una transacción: fila del mes `FOR UPDATE` (se crea si no existe); `gastado_usd += uso.CostoUSD` de **todos** los intentos, también si falló (D15); evaluación de la alerta (§2.4) | Si falla, log con `op`; no invalida la salida |
 | ★10 | Si salió bien: `r.Acciones--` y se escribe la caché. Si falló: `Liberar(r, 1)` | — |
@@ -106,9 +106,9 @@ func (s) Liberar(ctx context.Context, r *Reserva, acciones int) error
   - se inserta la notificación.
 - **Cuándo se evalúa:**
   - al sumar gasto (★9);
-  - en el `PUT` de configuración (§3.3), cada vez que cambia el presupuesto, tanto si sube como si baja (regla 18). Si el gasto ya está en ≥ 80 % del nuevo valor, la alerta se envía en ese momento. Escenario «Bajar el presupuesto»: de 40 a 24 USD con 20 gastados, la alerta sale al guardar.
+  - en el `PUT` de configuración (§3.3), cada vez que cambia el presupuesto, tanto si sube como si baja (regla 18). En la misma transacción, el `PUT` **reinicia la marca** del mes: pone `alerta_80_presupuesto_usd` y `alerta_80_at` en `NULL`. Después evalúa la condición. Si el gasto ya está en ≥ 80 % del nuevo valor, la alerta se envía en ese momento. Escenario «Bajar el presupuesto»: de 40 a 24 USD con 20 gastados, la alerta sale al guardar.
 
-  Con el mismo valor del presupuesto se envía una sola vez en el mes. Cambiar el valor rearma la alerta para el nuevo valor.
+  Con el mismo valor del presupuesto, la alerta se envía una sola vez. **Cada cambio de valor la rearma**, aunque se vuelva a un valor ya avisado (review del #202). Ejemplo: se avisó con 40, se cambia a 50 (con 35 gastados no se avisa) y se vuelve a 40. Al volver a 40, la alerta sale de nuevo, porque el cambio anterior reinició la marca. Un `PUT` que no cambia el presupuesto no toca la marca.
 - **Notificación:** va por la campana (in-app).
   - `titulo = "Presupuesto de IA al 80 %"`;
   - `cuerpo = "Se gastaron 32,10 USD de 40,00 USD en noviembre de 2026."`;
@@ -201,6 +201,7 @@ Lleva **todos** los campos de §3.2 salvo `updated_at`. Es un reemplazo completo
 | `*ErrLimite{Ventana:"mes"}` | **`limite_ia_mensual`** | 429 | `{"limite", "usados", "reinicia_at"}` |
 | `*ErrLimite{Ventana:"dia"}` | **`limite_ia`** | 429 | `{"limite", "usados", "reinicia_at"}`; E3-04 suma `caben_preguntas` |
 | `ErrSinReserva` | `error_interno` | 500 | — |
+| `ErrCostos` (falla la BD al leer el presupuesto en ★5) | `error_interno` | 500 | —. En `ia_usos`, resultado `error_interno` |
 
 - `ia.Codigo(err)` mapea estos errores y mantiene la firma `(codigo, http)` de E6-01. Para `*ErrLimite`, elige `limite_ia` o `limite_ia_mensual` según `Ventana`.
 - El `detalle` lo da una función aparte, **`ia.Detalle(err) map[string]any`**, que devuelve `nil` si el error no trae detalle. Acordado con backend-dev-2, para no volver a cambiar la firma de `Codigo`.
@@ -223,7 +224,7 @@ CREATE TABLE ia_configuracion (
     max_preguntas_solicitud INT           NOT NULL DEFAULT 20  CHECK (max_preguntas_solicitud BETWEEN 1 AND 50),
     lote_clasificacion      INT           NOT NULL DEFAULT 20  CHECK (lote_clasificacion BETWEEN 1 AND 50),
     presupuesto_mensual_usd NUMERIC(10,2) NOT NULL DEFAULT 40.00 CHECK (presupuesto_mensual_usd BETWEEN 1 AND 1000),
-    updated_by              BIGINT        REFERENCES usuarios(id),
+    updated_by              BIGINT        REFERENCES usuarios(id) ON DELETE SET NULL,   -- borrar un usuario no falla (H3 del #190)
     updated_at              TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_ia_configuracion_mes CHECK (limite_usuario_dia <= limite_usuario_mes)
 );
@@ -231,7 +232,7 @@ INSERT INTO ia_configuracion (id) VALUES (1);
 
 -- Contadores antifraude (ADR 0002): sin usuario_id ni FK; SIA-E9-07 no los borra.
 CREATE TABLE ia_cuotas (
-    clave          TEXT        NOT NULL CHECK (clave LIKE 'ia_cuota:%'),
+    clave          TEXT        NOT NULL CHECK (left(clave, 9) = 'ia_cuota:'),   -- exacto: en LIKE, `_` es comodín
     ventana        VARCHAR(3)  NOT NULL CHECK (ventana IN ('dia', 'mes')),
     ventana_inicio TIMESTAMPTZ NOT NULL,
     usados         INT         NOT NULL CHECK (usados >= 0),
@@ -267,10 +268,11 @@ CREATE INDEX idx_ia_cache_expira ON ia_cache (expira_en);
 ALTER TABLE ia_usos DROP CONSTRAINT ia_usos_resultado_check;
 ALTER TABLE ia_usos ADD CONSTRAINT ck_ia_usos_resultado CHECK (resultado IN ('ok', 'no_disponible',
     'entrada_demasiado_grande', 'datos_personales', 'timeout', 'cancelado', 'salida_invalida',
-    'error_proveedor', 'presupuesto_agotado'));
+    'error_proveedor', 'presupuesto_agotado', 'error_interno'));
 
 -- +goose Down
 UPDATE ia_usos SET resultado = 'no_disponible' WHERE resultado = 'presupuesto_agotado';
+UPDATE ia_usos SET resultado = 'error_proveedor' WHERE resultado = 'error_interno';
 ALTER TABLE ia_usos DROP CONSTRAINT IF EXISTS ck_ia_usos_resultado;
 ALTER TABLE ia_usos ADD CONSTRAINT ia_usos_resultado_check CHECK (resultado IN ('ok', 'no_disponible',
     'entrada_demasiado_grande', 'datos_personales', 'timeout', 'cancelado', 'salida_invalida', 'error_proveedor'));
@@ -281,7 +283,7 @@ DROP TABLE IF EXISTS ia_configuracion;
 ```
 
 - **Efecto sobre los datos existentes:** ninguno. Las tablas son nuevas y en `ia_usos` solo se amplía el `CHECK`.
-- **Qué pierde el Down:** la configuración (vuelve a los valores por defecto), los contadores, el gasto del mes y la caché. Además, las filas con resultado `presupuesto_agotado` pasan a `no_disponible`.
+- **Qué pierde el Down:** la configuración (vuelve a los valores por defecto), los contadores, el gasto del mes y la caché. Además, las filas con resultado `presupuesto_agotado` pasan a `no_disponible`, y las de `error_interno`, a `error_proveedor`.
 - **Nombre del `CHECK`:** confirmado en el #166 (b474ec6). El `CHECK` de `resultado` de la 066 no tiene nombre explícito, así que Postgres lo llama `ia_usos_resultado_check`, e incluye `cancelado`.
 - **Purga perezosa** (como en 056): las filas vencidas de `ia_cuotas` se borran al reservar, hasta 100 cada vez.
 
@@ -320,7 +322,7 @@ DROP TABLE IF EXISTS ia_configuracion;
 | # | Tarea | Depende de | h |
 |---|---|---|---|
 | K1 | Migración 068, Up y Down, con `up → down → up`. `ANTIFRAUD_HMAC_KEY` en `config.Load`, con tests (ADR 0002), si E4-01 no llegó antes | 066 | 2 |
-| K2 | `costos.go`: la clave HMAC se pide a **`internal/antifraude`**, un paquete nuevo y único que arma las claves (ADR 0002: «ningún otro paquete arma claves»). Su única función es `Claves(prefijo, usuarioID) (vigente, anterior string)`; E4-01 lo reutilizará con `diag_cooldown`. La tabla `ia_cuotas` y la reserva quedan en `ia`. El resto de la tarea: ventanas de Lima (`time/tzdata`, reloj inyectable), `Reservar` (orden D16), `Liberar` y `Consumo`, con rotación. Tests: dentro del límite, día, mes, admin, todo o nada con n > 1, concurrencia, reinicio diario y mensual, persistencia tras borrar datos, y precedencia del código cuando se agotan varios límites | K1 | 3 |
+| K2 | `costos.go`: la clave HMAC se pide a **`internal/antifraude`**, un paquete nuevo y único que arma las claves (ADR 0002: «ningún otro paquete arma claves»). Su forma real (PR #202) es el tipo `antifraude.Claves`, que se construye una vez con las claves de la configuración, con el método `(*Claves).Clave(prefijo, usuarioID)`. Ese método da la clave vigente y la anterior durante una rotación; la firma exacta es la del #202. E4-01 lo reutilizará con `diag_cooldown`. La tabla `ia_cuotas` y la reserva quedan en `ia`. El resto de la tarea: ventanas de Lima (`time/tzdata`, reloj inyectable), `Reservar` (orden D16), `Liberar` y `Consumo`, con rotación. Tests: dentro del límite, día, mes, admin, todo o nada con n > 1, concurrencia, reinicio diario y mensual, persistencia tras borrar datos, y precedencia del código cuando se agotan varios límites | K1 | 3 |
 | K3 | Presupuesto: ★5 y ★9, alerta por valor (§2.4) y notificación. Tests: corte al 100 %, 31,90 → 32,10 con una sola notificación, subir y bajar el presupuesto rearman la alerta (y la envían si el gasto ya está en ≥ 80 %), bajar a ≤ gasto corta, costo de una llamada fallida, y que el gasto no baja al borrar filas de `ia_usos` | K1 | 3 |
 | K4 | `cache.go`: clave, vigencia, escritura, purga y `BuscarEnCache` con su fila en `ia_usos`. Tests: caché, invalidación por versión nueva y por retiro, caché con el presupuesto y el límite agotados, y explicación sobre una versión citada anterior | K2, K3 | 3 |
 | K5 | Rutas de §3, `ia.Codigo` (§5) y auditoría del `PUT`. Tests: rangos de D19, `dec2`, `403`, auditoría solo de lo que cambió, `mes = null` para el admin | K2, K3 | 3 |
