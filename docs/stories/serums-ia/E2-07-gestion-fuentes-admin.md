@@ -19,7 +19,7 @@ Pantalla nueva en el panel admin con khipu (`TablaListado`, formulario con formi
 ## Reglas de negocio
 1. Listado paginado (20 por defecto, máx. 100) con título, tipo, profesión, versión vigente, estado, insignia «Oficial verificada», nº de pasajes y fecha.
 2. Filtros: estado, tipo, profesión y oficial verificada (sí/no); búsqueda por título (máx. 100 caracteres).
-3. Detalle: historial de versiones (con la marca oficial de cada una), entidad emisora y nota de verificación si está marcada, nº de contenidos que la citan y motivo de fallo si lo hay.
+3. Detalle: historial de versiones (con la marca oficial de cada una), entidad emisora y nota de verificación si está marcada, nº de contenidos que la citan y motivo de fallo si lo hay. «Contenidos que la citan» son los contenidos aprobados que hoy citan cualquier versión de la fuente: es el impacto que tendría retirarla. En una fuente retirada vale 0, porque al retirarla esos contenidos pasaron a `en_revision` (decisión del PO, 12-nov). Ver cuántos contenidos quedaron en revisión por un retiro queda fuera de alcance: el admin los encuentra con el filtro «En revisión» del listado de preguntas (SIA-E3-08).
 4. Acciones: subir, nueva versión, editar metadatos (regla 7), reintentar, retirar (con motivo), restaurar, marcar como oficial verificada (entidad emisora + nota) y desmarcar (con motivo), según SIA-E2-06.
 5. Marcar como oficial verificada es una acción explícita con diálogo de confirmación que explica su efecto: las preguntas pendientes de ese balotario sin conflicto de clave se aprueban revisando solo clasificación y estructura (SIA-E3-05). Al subir una fuente nunca se marca sola.
 6. Estados de UI: carga, vacío, error; el estado `procesando` se refresca cada 5 s.
