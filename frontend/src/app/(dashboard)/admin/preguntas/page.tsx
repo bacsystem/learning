@@ -30,6 +30,7 @@ import {
   CONTENEDOR_PAGINA,
 } from "@/lib/estilos";
 import { type ColumnaExportable, descargarCsv, imprimirTabla } from "@/lib/exportar";
+import { apiErrorCode } from "@/lib/http/api-error";
 import { POR_PAGINA_DEFECTO } from "@/lib/paginacion";
 import { type EstadoPregunta, type OrigenPregunta, Pregunta, questionsApi } from "@/lib/questions/api";
 import {
@@ -221,7 +222,7 @@ export default function PreguntasPage() {
       const err = e as { message?: string };
       const clave = claveErrorEliminacion(e);
       toast.error(clave ? t(clave) : (err.message ?? t("comun-error-eliminar")));
-      if (clave) {
+      if (apiErrorCode(e) === "estado_invalido") {
         // El estado cambió mientras tanto: se cierra el diálogo y se muestra el actual.
         setConfirmDelete({ open: false, row: null, submitting: false });
         load();

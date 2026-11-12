@@ -58,35 +58,41 @@ export function contenidoDePregunta(p: Pregunta): ContenidoPregunta {
 
 const huellaRespuestas = (c: ContenidoPregunta) =>
   c.respuestas
-    .map((r) => `${r.es_correcta ? 1 : 0}${r.texto.trim()}`)
+    .map((r) => `${r.es_correcta ? 1 : 0}${r.texto}`)
     .sort()
     .join("\n");
 
 /**
  * Solo para avisar antes de guardar: el servidor compara con lo guardado y decide el estado (E3-02 §4.5).
- * Reordenar alternativas no es cambiar el contenido.
+ * Compara exacto, sin recortar, igual que el servidor y como se envía el formulario. Reordenar alternativas no es
+ * cambiar el contenido.
  */
 export function cambiaElContenido(guardado: ContenidoPregunta, editado: ContenidoPregunta): boolean {
   return (
-    guardado.enunciado.trim() !== editado.enunciado.trim() ||
+    guardado.enunciado !== editado.enunciado ||
     guardado.tipo !== editado.tipo ||
-    guardado.explicacion.trim() !== editado.explicacion.trim() ||
-    guardado.referencia.trim() !== editado.referencia.trim() ||
+    guardado.explicacion !== editado.explicacion ||
+    guardado.referencia !== editado.referencia ||
     huellaRespuestas(guardado) !== huellaRespuestas(editado)
   );
 }
 
 /** Un mapa por operación: `estado_invalido` significa otra cosa al eliminar que al citar o cambiar de estado. */
 const CLAVES_EDICION: Record<string, string> = { clave_oficial: "serumsIa.errores.clave_oficial" };
-const CLAVES_ELIMINACION: Record<string, string> = { estado_invalido: "serumsIa.avisosPregunta.eliminarAyuda" };
+const CLAVES_ELIMINACION: Record<string, string> = { estado_invalido: "serumsIa.preguntas.errores.estado_invalido" };
 
+/** Un código sin traducción propia no muestra el `message` del servidor (siempre en español): usa este texto neutro. */
+const CLAVE_ERROR_GENERICO = "serumsIa.errores.generico";
+
+/** Con código: su clave o la genérica. Sin código (formato heredado de la API): `undefined`, y manda el `message`. */
 const claveDe = (claves: Record<string, string>, err: unknown): string | undefined => {
   const codigo = apiErrorCode(err);
-  return codigo && Object.hasOwn(claves, codigo) ? claves[codigo] : undefined;
+  if (!codigo) return undefined;
+  return Object.hasOwn(claves, codigo) ? claves[codigo] : CLAVE_ERROR_GENERICO;
 };
 
-/** Clave i18n del error de `PUT /preguntas/{id}`, si tiene una propia; si no, `undefined`. */
+/** Clave i18n del error de `PUT /preguntas/{id}`, la genérica si el código no tiene traducción, o `undefined` si el error no trae código. */
 export const claveErrorEdicion = (err: unknown) => claveDe(CLAVES_EDICION, err);
 
-/** Clave i18n del error de `DELETE /preguntas/{id}`, si tiene una propia; si no, `undefined`. */
+/** Clave i18n del error de `DELETE /preguntas/{id}`, la genérica si el código no tiene traducción, o `undefined` si el error no trae código. */
 export const claveErrorEliminacion = (err: unknown) => claveDe(CLAVES_ELIMINACION, err);

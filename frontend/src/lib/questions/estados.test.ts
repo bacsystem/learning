@@ -42,16 +42,20 @@ describe("claves de error por operación", () => {
 
   it("translates clave_oficial only when editing", () => {
     expect(claveErrorEdicion(error("clave_oficial"))).toBe("serumsIa.errores.clave_oficial");
-    expect(claveErrorEdicion(error("estado_invalido"))).toBeUndefined();
+    expect(claveErrorEdicion(error("estado_invalido"))).toBe("serumsIa.errores.generico");
   });
 
   it("translates estado_invalido only when deleting", () => {
-    expect(claveErrorEliminacion(error("estado_invalido"))).toBe("serumsIa.avisosPregunta.eliminarAyuda");
-    expect(claveErrorEliminacion(error("clave_oficial"))).toBeUndefined();
+    expect(claveErrorEliminacion(error("estado_invalido"))).toBe("serumsIa.preguntas.errores.estado_invalido");
+    expect(claveErrorEliminacion(error("clave_oficial"))).toBe("serumsIa.errores.generico");
   });
 
-  it("leaves other errors to the screen", () => {
-    expect(claveErrorEdicion(error("no_encontrado"))).toBeUndefined();
+  it("uses the generic text for a code without translation, never the server message", () => {
+    expect(claveErrorEdicion(error("cuerpo_demasiado_grande"))).toBe("serumsIa.errores.generico");
+    expect(claveErrorEliminacion(error("no_encontrado"))).toBe("serumsIa.errores.generico");
+  });
+
+  it("leaves errors without a code to the screen", () => {
     expect(claveErrorEliminacion(error())).toBeUndefined();
     expect(claveErrorEdicion(new TypeError("red"))).toBeUndefined();
   });
@@ -63,6 +67,7 @@ describe("claves i18n de estado y origen", () => {
     ...ORIGENES_PREGUNTA.map(claveOrigenPregunta),
     claveErrorEdicion(Object.assign(new Error("x"), { code: "clave_oficial" })) ?? "",
     claveErrorEliminacion(Object.assign(new Error("x"), { code: "estado_invalido" })) ?? "",
+    claveErrorEdicion(Object.assign(new Error("x"), { code: "otro_codigo" })) ?? "",
   ];
 
   it.each([
@@ -95,9 +100,17 @@ describe("cambiaElContenido (aviso de edición, E3-02 §4.5)", () => {
   } as Pregunta;
   const base = () => structuredClone(contenidoDePregunta(guardada));
 
-  it("is false when nothing changed, ignoring surrounding spaces", () => {
-    const editado = { ...base(), enunciado: "  ¿Cuál es la capital? " };
-    expect(cambiaElContenido(contenidoDePregunta(guardada), editado)).toBe(false);
+  it("is false when nothing changed", () => {
+    expect(cambiaElContenido(contenidoDePregunta(guardada), base())).toBe(false);
+  });
+
+  // El servidor compara exacto (ciclo.go cambiaContenido): un espacio de más ya la manda a revisión.
+  it.each<[string, (c: ReturnType<typeof base>) => ReturnType<typeof base>]>([
+    ["the statement", (c) => ({ ...c, enunciado: `${c.enunciado} ` })],
+    ["an alternative text", (c) => ({ ...c, respuestas: [{ ...c.respuestas[0], texto: " Lima" }, c.respuestas[1]] })],
+    ["the explanation", (c) => ({ ...c, explicacion: ` ${c.explicacion}` })],
+  ])("is true when only surrounding spaces are added to %s", (_, cambiar) => {
+    expect(cambiaElContenido(contenidoDePregunta(guardada), cambiar(base()))).toBe(true);
   });
 
   it("is false when the alternatives are only reordered", () => {

@@ -1319,7 +1319,8 @@
         "no_encontrado": "El tema ya no existe. Recarga la lista.",
         "error_interno": "Error interno del servidor. Inténtalo de nuevo.",
         "cuerpo_demasiado_grande": "Los datos enviados son demasiado grandes. Reduce el texto e inténtalo de nuevo.",
-        "clave_oficial": "La clave oficial de una pregunta de balotario no se puede cambiar."
+        "clave_oficial": "La clave oficial de una pregunta de balotario no se puede cambiar.",
+        "generico": "No se pudo completar la operación. Inténtalo de nuevo."
       },
       "pesos": {
         "titulo": "Pesos de {especialidad}",
@@ -1631,6 +1632,11 @@
         "rechazada": "Rechazada",
         "activo": "Activa (heredada)",
         "eliminada": "Eliminada"
+      },
+      "preguntas": {
+        "errores": {
+          "estado_invalido": "Esta pregunta cambió de estado; se actualizó la vista."
+        }
       }
     },
     "sesion-servidor-no-disponible-titulo": "El servidor no responde",

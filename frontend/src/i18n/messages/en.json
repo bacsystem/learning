@@ -1319,7 +1319,8 @@
         "no_encontrado": "The topic no longer exists. Reload the list.",
         "error_interno": "Internal server error. Please try again.",
         "cuerpo_demasiado_grande": "The data sent is too large. Shorten the text and try again.",
-        "clave_oficial": "The official answer key of a past-exam question cannot be changed."
+        "clave_oficial": "The official answer key of a past-exam question cannot be changed.",
+        "generico": "The operation could not be completed. Try again."
       },
       "pesos": {
         "titulo": "Weights for {especialidad}",
@@ -1631,6 +1632,11 @@
         "rechazada": "Rejected",
         "activo": "Active (legacy)",
         "eliminada": "Deleted"
+      },
+      "preguntas": {
+        "errores": {
+          "estado_invalido": "This question changed state; the view was refreshed."
+        }
       }
     },
     "sesion-servidor-no-disponible-titulo": "The server is not responding",
