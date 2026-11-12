@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"slices"
@@ -56,11 +57,20 @@ type Config struct {
 	// IAProveedor: empty (default) disables it, so every AI operation answers
 	// ia_no_disponible and the rest of the app works; "doble" is the
 	// deterministic double, only with ENV development, test or preprod.
-	// IAAPIKey and IAModelo are for the real adapters of SIA-E6-02.
+	// IAAPIKey and IAModelo are for the real adapters of SIA-E6-10.
 	IAProveedor string
 	IAAPIKey    string
 	IAModelo    string
+
+	// Antifraud counters (ADR 0002): HMAC key of the pseudonymous keys of the
+	// AI quota. AntifraudHMACKey writes and reads; AntifraudHMACKeyPrevious,
+	// optional, only reads during a rotation. Decoded bytes, never logged.
+	AntifraudHMACKey         []byte
+	AntifraudHMACKeyPrevious []byte
 }
+
+// MinAntifraudKeyBytes is the minimum decoded size of the antifraud keys.
+const MinAntifraudKeyBytes = 32
 
 // iaEnvsDoble are the ENV values where IA_PROVEEDOR=doble is accepted: the
 // double never serves made-up content to real students, so any other value
@@ -125,6 +135,9 @@ func Load() (*Config, error) {
 	}
 
 	if err := validarIA(cfg); err != nil {
+		return nil, err
+	}
+	if err := cargarClavesAntifraude(cfg); err != nil {
 		return nil, err
 	}
 
@@ -192,10 +205,53 @@ func requireSecureSSLMode(dsn string) error {
 // iaEnvsDoble, stops the start. The error never quotes IA_API_KEY.
 func validarIA(cfg *Config) error {
 	if _, err := ia.ProveedorDesdeNombre(cfg.IAProveedor); err != nil {
-		return fmt.Errorf("IA_PROVEEDOR must be empty or %q until SIA-E6-02 (got %q)", ia.NombreDoble, cfg.IAProveedor)
+		return fmt.Errorf("IA_PROVEEDOR must be empty or %q until SIA-E6-10 (got %q)", ia.NombreDoble, cfg.IAProveedor)
 	}
 	if cfg.IAProveedor == ia.NombreDoble && !slices.Contains(iaEnvsDoble, cfg.Env) {
 		return fmt.Errorf("IA_PROVEEDOR=%s is only allowed when ENV is %s (ENV=%q)", ia.NombreDoble, strings.Join(iaEnvsDoble, ", "), cfg.Env)
 	}
 	return nil
+}
+
+// cargarClavesAntifraude reads ANTIFRAUD_HMAC_KEY (required in every
+// environment) and ANTIFRAUD_HMAC_KEY_PREVIOUS (optional). Both are hex of at
+// least MinAntifraudKeyBytes bytes and must differ from each other and from
+// ENCRYPTION_KEY and JWT_SECRET (ADR 0002). The errors name the variable and
+// never quote a value.
+func cargarClavesAntifraude(cfg *Config) error {
+	textoVigente := strings.TrimSpace(viper.GetString("ANTIFRAUD_HMAC_KEY"))
+	vigente, err := claveAntifraude("ANTIFRAUD_HMAC_KEY", textoVigente, true)
+	if err != nil {
+		return err
+	}
+	anterior, err := claveAntifraude("ANTIFRAUD_HMAC_KEY_PREVIOUS", viper.GetString("ANTIFRAUD_HMAC_KEY_PREVIOUS"), false)
+	if err != nil {
+		return err
+	}
+	for nombre, otra := range map[string]string{"ENCRYPTION_KEY": cfg.EncryptionKey, "JWT_SECRET": cfg.JWTSecret} {
+		if strings.EqualFold(textoVigente, strings.TrimSpace(otra)) {
+			return fmt.Errorf("ANTIFRAUD_HMAC_KEY must differ from %s", nombre)
+		}
+	}
+	if anterior != nil && string(vigente) == string(anterior) {
+		return fmt.Errorf("ANTIFRAUD_HMAC_KEY_PREVIOUS must differ from ANTIFRAUD_HMAC_KEY")
+	}
+	cfg.AntifraudHMACKey, cfg.AntifraudHMACKeyPrevious = vigente, anterior
+	return nil
+}
+
+// claveAntifraude decodes one key; an empty optional one is nil.
+func claveAntifraude(nombre, valor string, obligatoria bool) ([]byte, error) {
+	valor = strings.TrimSpace(valor)
+	if valor == "" {
+		if obligatoria {
+			return nil, fmt.Errorf("%s is required", nombre)
+		}
+		return nil, nil
+	}
+	clave, err := hex.DecodeString(valor)
+	if err != nil || len(clave) < MinAntifraudKeyBytes {
+		return nil, fmt.Errorf("%s must be hex of at least %d bytes (%d characters)", nombre, MinAntifraudKeyBytes, 2*MinAntifraudKeyBytes)
+	}
+	return clave, nil
 }

@@ -1,4 +1,5 @@
 import { API_BASE } from "@/lib/http/api-base";
+import { apiErrorFrom, codigoDeConflicto } from "@/lib/http/api-error";
 import { avisarSiSesionExpirada } from "@/lib/http/sesion";
 
 async function req<T>(path: string, token: string, options?: RequestInit): Promise<T> {
@@ -12,12 +13,7 @@ async function req<T>(path: string, token: string, options?: RequestInit): Promi
   });
   if (!res.ok) {
     avisarSiSesionExpirada(res.status);
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw Object.assign(new Error(body.error ?? res.statusText), {
-      status: res.status,
-      simulacro_id: body.simulacro_id,
-      resultado_id: body.resultado_id,
-    });
+    throw await apiErrorFrom(res, ["simulacro_id", "resultado_id"] as const);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -29,9 +25,8 @@ async function req<T>(path: string, token: string, options?: RequestInit): Promi
  * returns resultado_id so the client can go straight to the result.
  */
 export function tiempoAgotado(e: unknown): { resultadoId?: number } | null {
-  const err = e as { status?: number; message?: string; resultado_id?: number };
-  if (err?.status !== 409 || err.message !== "tiempo_agotado") return null;
-  return { resultadoId: err.resultado_id };
+  if (codigoDeConflicto(e) !== "tiempo_agotado") return null;
+  return { resultadoId: (e as { resultado_id?: number }).resultado_id };
 }
 
 function buildQuery(params: Record<string, string | number | boolean | undefined | null>): string {
