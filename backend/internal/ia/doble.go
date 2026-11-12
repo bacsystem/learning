@@ -22,7 +22,7 @@ const confianzaDoble = 0.5
 var alternativasDoble = []string{"Alternativa A", "Alternativa B", "Alternativa C", "Alternativa D"}
 
 // ProveedorDesdeNombre returns the provider of IA_PROVEEDOR: nil (disabled)
-// for "", the double for "doble". The real adapters come with SIA-E6-02.
+// for "", the double for "doble". The real adapters come with SIA-E6-10.
 func ProveedorDesdeNombre(nombre string) (Proveedor, error) {
 	switch nombre {
 	case "":
