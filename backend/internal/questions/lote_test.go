@@ -145,25 +145,23 @@ func TestInsertarLote_Rechazos(t *testing.T) {
 }
 
 // The lote lives in the caller's transaction: rolling it back leaves nothing.
+// It checks its own ids, not global counts: other packages share the database.
 func TestInsertarLote_RollbackNoDejaNada(t *testing.T) {
 	f, _ := newMux(t, qt.Options{Asignaturas: []qt.AsignaturaSpec{{NumeroPreguntas: 1, Peso: 100, Unicas: 1}}})
-	var antes int
-	if err := f.DB.Get(&antes, `SELECT COUNT(*) FROM preguntas`); err != nil {
-		t.Fatal(err)
-	}
 	tx := f.DB.MustBeginTx(context.Background(), nil)
-	if _, err := InsertarLote(context.Background(), tx, loteDePrueba(f, 20, 4)); err != nil {
+	ids, err := InsertarLote(context.Background(), tx, loteDePrueba(f, 20, 4))
+	if err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Rollback(); err != nil {
 		t.Fatal(err)
 	}
-	var despues, respuestasHuerfanas int
-	if err := f.DB.Get(&despues, `SELECT COUNT(*) FROM preguntas`); err != nil || despues != antes {
-		t.Errorf("preguntas %d -> %d (%v)", antes, despues, err)
+	var preguntas, respuestas int
+	if err := f.DB.Get(&preguntas, `SELECT COUNT(*) FROM preguntas WHERE id = ANY($1)`, pq.Array(ids)); err != nil || preguntas != 0 {
+		t.Errorf("preguntas = %d (%v)", preguntas, err)
 	}
-	if err := f.DB.Get(&respuestasHuerfanas, `SELECT COUNT(*) FROM respuestas WHERE pregunta_id NOT IN (SELECT id FROM preguntas)`); err != nil || respuestasHuerfanas != 0 {
-		t.Errorf("respuestas huérfanas = %d (%v)", respuestasHuerfanas, err)
+	if err := f.DB.Get(&respuestas, `SELECT COUNT(*) FROM respuestas WHERE pregunta_id = ANY($1)`, pq.Array(ids)); err != nil || respuestas != 0 {
+		t.Errorf("respuestas = %d (%v)", respuestas, err)
 	}
 }
 
