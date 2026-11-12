@@ -137,3 +137,20 @@ solo para la prueba). Después corre:
 - una restauración cronometrada con la clave privada.
 
 Al terminar borra todo.
+
+**Si la prueba muere con `kill -9`** (o se corta la máquina), el `trap` de
+limpieza no corre y quedan contenedores, volúmenes anónimos y la red de esa
+corrida. Con `Ctrl-C` o un fallo normal sí se limpia sola. Los nombres llevan el
+PID de la corrida (`bkt<PID>-pg`, `bkt<PID>-s3`, `bkt<PID>-restore`,
+`capacitate-backup-test-<PID>`), así que se borran sin tocar nada más:
+
+```bash
+docker rm -fv $(docker ps -aq -f "name=^bkt[0-9]+-")                 # contenedores y sus volúmenes
+docker network rm $(docker network ls -q -f "name=^capacitate-backup-test-")
+docker rmi $(docker images -q "capacitate-backup:test-*")  # imágenes de la prueba
+```
+
+Si hay otra corrida en marcha (otra sesión u otro agente), el filtro `^bkt[0-9]+-` también
+la alcanza: para borrar solo una, usa su PID, p. ej. `-f "name=^bkt12345-"`. Un
+comando sin resultados falla con «requires at least 1 argument»: no es un error,
+solo no había nada que limpiar.
