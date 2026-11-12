@@ -328,7 +328,7 @@ DROP TABLE IF EXISTS ia_configuracion;
 
 | # | Tarea | h |
 |---|---|---|
-| D2 | `ANTIFRAUD_HMAC_KEY` en `.env.example`, `docker-compose.yml`, `Makefile`, `docs/puesta-en-marcha.md` y Railway (sealed), según la ADR 0002 § Archivos. Coordinado con K1 | 1 |
+| D2 | `ANTIFRAUD_HMAC_KEY` en `env.example` (renombrado en el #125), `docker-compose.yml`, `Makefile`, `docs/puesta-en-marcha.md` y Railway (sealed), según la ADR 0002 § Archivos. Coordinado con K1 | 1 |
 
 ### frontend-dev (panel de admin; sin pantalla del postulante, D21)
 
