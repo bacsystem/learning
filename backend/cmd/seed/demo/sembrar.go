@@ -356,7 +356,7 @@ func (s *sembrador) areasCompatibilidad(ctx context.Context, procesoID int64, p 
 // sinAuditoria: the seed is not an admin action; nothing goes to audit_log.
 func sinAuditoria(context.Context, sqlx.ExecerContext, map[string]any) error { return nil }
 
-// preguntas keeps preguntasPorArea active questions of the area in the proceso.
+// preguntas keeps preguntasPorArea approved questions of the area in the proceso.
 func (s *sembrador) preguntas(ctx context.Context, procesoID, asignaturaID int64, codigo string) error {
 	for i := 1; i <= preguntasPorArea; i++ {
 		enunciado := fmt.Sprintf("Pregunta demo %d de %s: ¿cuál es la opción correcta?", i, codigo)
@@ -368,13 +368,18 @@ func (s *sembrador) preguntas(ctx context.Context, procesoID, asignaturaID int64
 		if existe != 0 {
 			continue
 		}
-		if _, err := s.preg.CreatePregunta(ctx, questions.CreatePreguntaRequest{ProcesoID: procesoID, AsignaturaID: asignaturaID,
+		creada, err := s.preg.CreatePregunta(ctx, questions.CreatePreguntaRequest{ProcesoID: procesoID, AsignaturaID: asignaturaID,
 			Enunciado: enunciado, Tipo: "unica", Dificultad: "medio",
 			Respuestas: []questions.CreateRespuestaItem{
 				{Texto: "Opción correcta", EsCorrecta: true, Orden: 1},
 				{Texto: "Opción incorrecta", EsCorrecta: false, Orden: 2},
-			}}); err != nil {
+			}})
+		if err != nil {
 			return fmt.Errorf("pregunta %d de %s: %w", i, codigo, err)
+		}
+		// New questions are born as drafts and drafts are not served.
+		if _, err := s.db.ExecContext(ctx, `UPDATE preguntas SET estado = 'aprobada' WHERE id = $1`, creada.ID); err != nil {
+			return fmt.Errorf("aprobar pregunta %d de %s: %w", i, codigo, err)
 		}
 		s.creado["preguntas"]++
 	}
