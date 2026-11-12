@@ -11,6 +11,9 @@
 #   R2_BUCKET             bucket privado y dedicado
 #   R2_ACCESS_KEY_ID      token Object Read & Write limitado al bucket (sellada)
 #   R2_SECRET_ACCESS_KEY  (sellada)
+#   BACKUP_PUSH_URL       (opcional, sellada) URL Push de Uptime Kuma; lleva un token. Se
+#                         llama solo si la copia y su registro salieron bien. Un fallo
+#                         del aviso nunca hace fallar la copia.
 #   BACKUP_TIMEOUT        segundos para dump+cifrado y para la subida (por defecto 1800):
 #                         Railway no corta un cron colgado.
 #
@@ -74,6 +77,18 @@ SQL
     [ "$rc" -ne 0 ] || rc=3
   fi
   echo "backup: ${terminada} resultado=${resultado}${bytes:+ tamano_bytes=${bytes}}"
+  # Latido para Uptime Kuma (monitor Push): solo tras una copia correcta y registrada.
+  # La URL lleva el token: va por stdin (-K -), no en argv, y no se registra nada
+  # del error (podría incluir el host).
+  if [ "$rc" -eq 0 ] && [ -n "${BACKUP_PUSH_URL:-}" ]; then
+    # Si se pegó la URL con su ?status=…, se descarta la query: se añade la propia.
+    if printf 'url = "%s?status=up&msg=OK"\n' "${BACKUP_PUSH_URL%%\?*}" \
+         | curl -K - --silent --fail --output /dev/null --connect-timeout 10 --max-time 30 2>/dev/null; then
+      echo "backup: aviso a Uptime Kuma enviado"
+    else
+      echo "backup: no se pudo avisar a Uptime Kuma (la copia no se ve afectada)" >&2
+    fi
+  fi
   exit "$rc"
 }
 trap registrar EXIT

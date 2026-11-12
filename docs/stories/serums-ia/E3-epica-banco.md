@@ -9,7 +9,7 @@
 |---|---|---|---|---|
 | SIA-E3-01 | Parser del balotario con marca de clave | MVP | 5 | #23 |
 | SIA-E3-02 | Estado borrador y trazabilidad pregunta-fuente | MVP | 5 | #24 |
-| SIA-E3-03 | Importación del balotario con vista previa | MVP | 3 | #25 |
+| SIA-E3-03 | Importación del balotario con vista previa | MVP | 5 | #25 |
 | SIA-E3-04 | Clasificación por área y tema con IA | MVP | 5 | #26 |
 | SIA-E3-05 | Revisión humana de la clasificación y de la clave | MVP | 5 | #27 |
 | SIA-E3-06 | Deduplicación contra el banco existente | MVP | 5 | #28 |

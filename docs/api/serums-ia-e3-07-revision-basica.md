@@ -22,7 +22,10 @@
 - **Sin cambios:** la máquina de estados (E3-02 §3), el `DELETE` (E3-02 P2), el `PUT /preguntas/{id}` (E3-02 §4.5) y el suscriptor de retiro (E3-02 §5).
 - **Importación Excel (confirmado, 2026-11-11):** `POST /preguntas/import` crea cada fila con `svc.CreatePregunta` (`questions/importer.go:238-259`), igual que el alta manual. Las preguntas importadas nacen con **`estado = 'borrador'` y `origen = 'manual'`** (E3-02 regla 2 y P1; E3-02 I8). El Excel no es un balotario: el origen `balotario` lo fija solo la importación de SIA-E3-01. Así, una pregunta del Excel se aprueba por esta vía básica (§3.2, paso 7).
 - **Listado (necesidad de E3-08):** `GET /preguntas` ya trae, por E3-02 §4.3, los filtros exactos `estado` y `origen` y `citas_count` en cada item. E3-07 no lo cambia.
-- **`conflicto_clave` (regla 4 de la historia): diferido a SIA-E3-01/E3-03** (confirmado por el PO, 2026-11-11). El código `409 conflicto_clave` queda **reservado**, con su lugar en el orden de §3 (paso 8), pero **no se implementa** en E3-07. El dato que lo dispara (una clave en conflicto sin resolver, de SIA-E3-06) lo crean E3-01/E3-03, y la regla se activa con ellas, sin columna nueva ahora. El escenario «Conflicto de clave» y su test de la DoD se validan con esas historias; qa cierra E3-07 sin ese escenario.
+- **`conflicto_clave` (regla 4 de la historia): diferido a SIA-E3-06.** Corregido el 2026-11-12: el PO lo había atribuido a E3-01/E3-03 el 2026-11-11, pero el dato nace en la deduplicación (E3-06, regla 6; D6 del PO).
+  - El código `409 conflicto_clave` queda **reservado**, con su lugar en el orden de §3 (paso 8), y **no se implementa** en E3-07.
+  - E3-06 crea el dato (un conflicto de clave sin resolver) y activa la guarda. No hace falta ninguna columna ahora.
+  - El escenario «Conflicto de clave» y su test de la DoD se validan con E3-06. qa cierra E3-07 sin ese escenario.
 - **No hay `falta_area` ni `falta_tema`:** `asignatura_id` es obligatoria (`014_create_preguntas.sql`) y el tema es opcional en el MVP.
 
 ## 2. `GET /admin/pasajes` (nuevo; admin)
@@ -95,7 +98,7 @@ Sustituye el cuerpo y la tabla de validaciones de E3-02 §4.1. Lo demás de §4.
 | 6 | La transición está permitida (E3-02 §3) | `409 estado_invalido` (`detalle = {"estado_actual"}`) |
 | | **Los pasos 7–11 solo corren si `estado = "aprobada"`** | |
 | 7 | **Aprobar** (`borrador` → `aprobada`) solo si `origen = 'manual'`. Revalidar (`en_revision` → `aprobada`) se permite con cualquier origen | **`409 revision_especializada`** (`detalle = {"origen"}`) |
-| 8 | *Reservado:* sin `conflicto_clave` sin resolver. No se implementa en E3-07 (§1) | *`409 conflicto_clave`* |
+| 8 | *Reservado:* sin `conflicto_clave` sin resolver. Lo activa SIA-E3-06; no se implementa en E3-07 (§1) | *`409 conflicto_clave`* |
 | 9 | ≥ 1 cita a un pasaje de una fuente `activa`, en **todos los procesos** (decisión del usuario; E3-02 §4.1, paso 6) | `422 falta_cita` |
 | 10 | **Nota.** Revalidar con origen `balotario` o `ia`: obligatoria, **10–500 runes** tras `TrimSpace`. Cualquier otro caso (aprobar `manual` o revalidar `manual`): opcional, ≤ 500 | **`422 nota_obligatoria`** (`detalle = {"min": 10, "max": 500}`) / `422 validacion` (`detalle.campos.nota`) |
 | 11 | `verificado === true`. Ausente, `null` o `false` no valen | **`422 verificacion_requerida`** |
@@ -190,7 +193,7 @@ Sean `actuales` las citas de la pregunta tras el bloqueo, `nuevas = pasaje_ids �
 |---|---|---|
 | `consulta_invalida` | 422 | §2. Ya existía como error del puerto, sin HTTP (README §4); aquí se expone |
 | `revision_especializada` | 409 | §3.2, paso 7 |
-| `conflicto_clave` | 409 | §3.2, paso 8: **reservado**, se activa con E3-01/E3-03 |
+| `conflicto_clave` | 409 | §3.2, paso 8: **reservado**, se activa con E3-06 |
 | `nota_obligatoria` | 422 | §3.2, paso 10 |
 | `verificacion_requerida` | 422 | §3.2, paso 11 |
 | `limite_citas` | 422 | §4.2, paso 3 |
@@ -209,7 +212,7 @@ Se suman a los de E3-02 §7 (`estado_invalido`, `falta_cita`, `validacion`, `ref
 | Origen especializado | §3.2, paso 7: `409 revision_especializada`; la pregunta no cambia |
 | Revalidar tras fuente retirada | §4.2, la regla de citas nuevas, y después §3.2 |
 | Revalidar una de IA sin nota | §3.2, paso 10: `422 nota_obligatoria` |
-| Conflicto de clave | **Diferido** a E3-01/E3-03 (§1). Código reservado |
+| Conflicto de clave | **Diferido** a E3-06 (§1). Código reservado |
 | Cita a fuente retirada | §4.2, paso 7: `422 fuente_no_activa` |
 | Quitar la última cita de una aprobada | §4.2, paso 8: `409 ultima_cita_activa`; con otra cita activa antes, `200` |
 | Quitar la única cita de una `activo` heredada | §4.2: el paso 8 solo aplica a `aprobada`, así que da `200`, la pregunta queda sin citas y sigue `activo` (§4.1: las citas nunca cambian el estado) |
