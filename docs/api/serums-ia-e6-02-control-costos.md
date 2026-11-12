@@ -83,7 +83,7 @@ func (s) Liberar(ctx context.Context, r *Reserva, acciones int) error
 | Paso | Regla | Si falla |
 |---|---|---|
 | ★0 | `r.Acciones ≥ 1` y actor válido | `ErrSinReserva` (error de programación): `500`, sin llamar ni registrar |
-| ★1 | Caché vigente (§4) | Si hay respuesta: `Liberar(r, 1)` y fila en `ia_usos` con `desde_cache = true`, costo 0 e intentos 0. Se devuelve la salida |
+| ★1 | Caché vigente (§4) | Si hay respuesta: `Liberar(r, 1)` y una fila en `ia_usos` con `desde_cache = true`, `resultado = 'ok'`, `proveedor = ''` (no se llamó a ninguno, como en `no_disponible`), `modelo = NULL`, costo 0 e intentos 0. Se devuelve la salida. Este paso va antes que «habilitado» (paso 2), así que la caché se sirve también con el servicio deshabilitado |
 | 2–4 | Pasos 1–3 de E6-01: habilitado, tamaño, redacción | Error de E6-01 y `Liberar(r, 1)` |
 | ★5 | Presupuesto: `gastado ≥ presupuesto` (D14) | `ErrPresupuestoAgotado`, `Liberar(r, 1)` y `ia_usos` con `presupuesto_agotado` |
 | 6–8 | Pasos 4–6 de E6-01: llamada, reintentos, validación | — |
@@ -202,7 +202,8 @@ Lleva **todos** los campos de §3.2 salvo `updated_at`. Es un reemplazo completo
 | `*ErrLimite{Ventana:"dia"}` | **`limite_ia`** | 429 | `{"limite", "usados", "reinicia_at"}`; E3-04 suma `caben_preguntas` |
 | `ErrSinReserva` | `error_interno` | 500 | — |
 
-- `ia.Codigo(err)` mapea estos errores.
+- `ia.Codigo(err)` mapea estos errores y mantiene la firma `(codigo, http)` de E6-01. Para `*ErrLimite`, elige `limite_ia` o `limite_ia_mensual` según `Ventana`.
+- El `detalle` lo da una función aparte, **`ia.Detalle(err) map[string]any`**, que devuelve `nil` si el error no trae detalle. Acordado con backend-dev-2, para no volver a cambiar la firma de `Codigo`.
 - Los endpoints de §3 usan `400`, `401`/`403` del middleware, `413`, `422 validacion` y `500`.
 - **i18n** (README §8):
   - de módulo: `dashboard.serumsIa.errores.{presupuesto_agotado,limite_ia,limite_ia_mensual}`, con la hora de reinicio en la zona del navegador;
@@ -319,7 +320,7 @@ DROP TABLE IF EXISTS ia_configuracion;
 | # | Tarea | Depende de | h |
 |---|---|---|---|
 | K1 | Migración 068, Up y Down, con `up → down → up`. `ANTIFRAUD_HMAC_KEY` en `config.Load`, con tests (ADR 0002), si E4-01 no llegó antes | 066 | 2 |
-| K2 | `costos.go`: clave HMAC, ventanas de Lima (`time/tzdata`, reloj inyectable), `Reservar` (orden D16), `Liberar` y `Consumo`, con rotación. Tests: dentro del límite, día, mes, admin, todo o nada con n > 1, concurrencia, reinicio diario y mensual, persistencia tras borrar datos, y precedencia del código cuando se agotan varios límites | K1 | 3 |
+| K2 | `costos.go`: la clave HMAC se pide a **`internal/antifraude`**, un paquete nuevo y único que arma las claves (ADR 0002: «ningún otro paquete arma claves»). Su única función es `Claves(prefijo, usuarioID) (vigente, anterior string)`; E4-01 lo reutilizará con `diag_cooldown`. La tabla `ia_cuotas` y la reserva quedan en `ia`. El resto de la tarea: ventanas de Lima (`time/tzdata`, reloj inyectable), `Reservar` (orden D16), `Liberar` y `Consumo`, con rotación. Tests: dentro del límite, día, mes, admin, todo o nada con n > 1, concurrencia, reinicio diario y mensual, persistencia tras borrar datos, y precedencia del código cuando se agotan varios límites | K1 | 3 |
 | K3 | Presupuesto: ★5 y ★9, alerta por valor (§2.4) y notificación. Tests: corte al 100 %, 31,90 → 32,10 con una sola notificación, subir y bajar el presupuesto rearman la alerta (y la envían si el gasto ya está en ≥ 80 %), bajar a ≤ gasto corta, costo de una llamada fallida, y que el gasto no baja al borrar filas de `ia_usos` | K1 | 3 |
 | K4 | `cache.go`: clave, vigencia, escritura, purga y `BuscarEnCache` con su fila en `ia_usos`. Tests: caché, invalidación por versión nueva y por retiro, caché con el presupuesto y el límite agotados, y explicación sobre una versión citada anterior | K2, K3 | 3 |
 | K5 | Rutas de §3, `ia.Codigo` (§5) y auditoría del `PUT`. Tests: rangos de D19, `dec2`, `403`, auditoría solo de lo que cambió, `mes = null` para el admin | K2, K3 | 3 |
