@@ -33,9 +33,14 @@ describe("mensajeErrorTema", () => {
     );
   });
 
-  it("falls back to the server message", () => {
+  it("shows the translated generic text for a code without translation, never the server message", () => {
+    expect(mensajeErrorTema(apiError(422, "Otro error.", "codigo_nuevo"), t, "gen")).toBe(
+      "t:serumsIa.errores.generico",
+    );
+  });
+
+  it("falls back to the server message when the error has no code (legacy format)", () => {
     expect(mensajeErrorTema(apiError(403, "Acceso denegado."), t, "gen")).toBe("Acceso denegado.");
-    expect(mensajeErrorTema(apiError(422, "Otro error.", "codigo_nuevo"), t, "gen")).toBe("Otro error.");
   });
 
   it("uses the generic text on network errors", () => {

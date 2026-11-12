@@ -70,15 +70,20 @@ El repo tiene dos formatos:
     - `archivo_demasiado_grande` cuando se aplicó el techo multipart, es decir, en una ruta de subida registrada y con `multipart/form-data` (`bodylimit.go:38-41`);
     - `cuerpo_demasiado_grande` en el resto de los casos.
 
-    El mensaje es el mismo y no hay `detalle`. El frontend sigue tratando ese 413 **por status**, así que no rompe a ningún cliente.
+    El mensaje es el mismo y no hay `detalle`.
 
-  El frontend trata esos status (401, 403, 413 y 503 de middleware) **por status** y no por código. Solo el 401 dispara `auth:expired`. Si hay `message`, el código está en `error`; si no, `error` es texto.
+    **Orden obligatorio (decisión del architect, 2026-11-12, review del #172):** el middleware es global y no distingue rutas del módulo. Los clientes viejos leen `body.error` como texto: `auth-api.ts`, admin (importar personas), inscripciones, notifications, practices y simulations. Si recibieran el formato 2, mostrarían el código crudo (p. ej. `archivo_demasiado_grande`).
+    - Por eso el **#172 se mergea después** de que frontend-dev pase esos clientes a `apiErrorFrom` (`body.message ?? body.error`, con el código aparte), dentro del alcance del #163.
+    - Hasta entonces, el 413 del middleware se queda con el formato heredado.
+    - No se adopta un formato por ruta (heredado fuera de serums-ia): duplicaría la lógica en un middleware global y dejaría dos contratos para el mismo error.
+
+  El frontend trata esos status (401, 403, 503 y, hasta el #172, el 413 del middleware) **por status** y no por código. Solo el 401 dispara `auth:expired`. Si hay `message`, el código está en `error`; si no, `error` es texto.
 - **Cuerpo demasiado grande en el handler (convención):** sin `Content-Length` (p. ej. `Transfer-Encoding: chunked`), el middleware no rechaza la petición: envuelve el cuerpo en `http.MaxBytesReader` (`bodylimit.go:46`). Pasado el límite, la lectura falla dentro del handler con `*http.MaxBytesError`.
   - **Regla:** todo handler del módulo que decodifica un cuerpo JSON comprueba `var mbe *http.MaxBytesError; errors.As(err, &mbe)` **antes** de responder `400 cuerpo_invalido`. Si es ese error, responde `413` con el formato 2: `{"error": "cuerpo_demasiado_grande", "message": "El cuerpo de la solicitud es demasiado grande."}`.
   - Precedente: hoy solo `auth` hace este mapeo (`internal/auth/handler.go:58-65`), con el formato heredado. Los handlers de temas responden 400 (`internal/temas/handler.go:255-264`, `decodificar`) y deben corregirse (tarea de backend-dev).
   - Las subidas multipart siguen usando su propio código, `413 archivo_demasiado_grande` (E2 S1 paso 1).
   - Alcance: los endpoints nuevos del módulo con cuerpo. Los endpoints existentes fuera del módulo no cambian.
-  - El frontend trata `cuerpo_demasiado_grande` por código, con su clave i18n (§8). El 413 del middleware sigue tratándose por status.
+  - El frontend trata `cuerpo_demasiado_grande` por código, con su clave i18n (§8). El 413 del middleware se trata **por status** hasta el #172. Desde entonces lleva código, y el cliente lo resuelve con `apiErrorFrom`.
 - **Frontend (tarea de frontend-dev):** los clientes usan **`body.message ?? body.error`** como texto y guardan el código aparte:
 
   ```ts
@@ -115,7 +120,7 @@ El repo tiene dos formatos:
 | 403 | Sin rol (middleware) o sin inscripción aprobada | `inscripcion_requerida` |
 | 404 | Recurso inexistente o ajeno | `no_encontrado` o uno específico (`profesion_no_definida`) |
 | 409 | Estado del recurso incompatible con la acción, duplicados de identidad, datos desactualizados | `estado_invalido`, `orden_desactualizado`, `peso_duplicado`, `fuente_duplicada`, `confirmacion_requerida`, `formato_no_configurado`, `tiempo_agotado` |
-| 413 | Archivo o cuerpo demasiado grande | `archivo_demasiado_grande` (multipart), `cuerpo_demasiado_grande` (JSON leído en el handler, §3), texto del middleware |
+| 413 | Archivo o cuerpo demasiado grande | `archivo_demasiado_grande` (multipart), `cuerpo_demasiado_grande` (JSON leído en el handler, §3). El middleware responde con texto heredado hasta el #172 y después con esos mismos dos códigos (§3) |
 | 422 | Validación semántica y límites de negocio | `validacion`, `referencia_invalida`, `limite_*`, más los específicos de cada épica |
 | 429 | Límite de uso: cuotas de IA (E6-02), solicitudes abiertas (E5-06) y exportaciones (épicas posteriores) | `limite_ia`, `limite_ia_mensual`, `presupuesto_agotado` (E6-02); cada historia nombra su propio código, y `limite_uso` ya no se usa |
 | 500 | Error inesperado | `error_interno` |
@@ -167,7 +172,7 @@ Catálogo de códigos usados por E1, E2 y E3:
 
 | Límite | Valor | Dónde se aplica |
 |---|---|---|
-| Cuerpo JSON | 1 MB: 413 del middleware si el `Content-Length` lo supera; `413 cuerpo_demasiado_grande` del handler si se supera al leer (§3) | `middleware/bodylimit.go:10,42-46`, global en `cmd/server/main.go:138-144` |
+| Cuerpo JSON | 1 MB: 413 del middleware si el `Content-Length` lo supera (formato heredado hasta el #172, después `cuerpo_demasiado_grande`; §3); `413 cuerpo_demasiado_grande` del handler si se supera al leer | `middleware/bodylimit.go:10,42-46`, global en `cmd/server/main.go:138-144` |
 | Subida multipart | techo global de 20 MB solo para rutas registradas; cada handler aplica su propio `http.MaxBytesReader` | `bodylimit.go:11,26-49`. Una ruta de subida nueva **debe** añadirse a la lista de `main.go:138-143`, que compara `r.URL.Path` exacto: no puede llevar `{id}` |
 | Archivo `.md` de fuente | 2 MiB, 20 000 líneas, UTF-8, `.md`, `text/markdown` o `text/plain` | E2 S1/S2 |
 | Texto libre (notas, motivos) | ≤ 500 caracteres; el mínimo lo fija cada regla | README de historias:174 |
@@ -201,7 +206,7 @@ Catálogo de códigos usados por E1, E2 y E3:
 
   | Nivel | Clave | Qué códigos |
   |---|---|---|
-  | Recurso | `dashboard.serumsIa.<recurso>.errores.<codigo>` | Los **cuatro códigos comunes**, que cambian de sentido según el recurso: `estado_invalido`, `no_encontrado`, `validacion` y `referencia_invalida`. Cada pantalla define los que usa en su recurso: `temas`, `pesos`, `profesion`, `fuentes` y `preguntas` |
+  | Recurso | `dashboard.serumsIa.<recurso>.errores.<codigo>` | Dos grupos:<br>• los **cuatro códigos comunes**, que cambian de sentido según el recurso: `estado_invalido`, `no_encontrado`, `validacion` y `referencia_invalida`;<br>• **los que un contrato marque con «recurso `<recurso>`»** en la columna de clave i18n de su tabla de errores (p. ej. contrato del balotario §7), porque el mismo código ya tiene otro sentido en otra épica. Hoy es solo `limite_preguntas` en `balotario`: en E1-03 es «Σ ≤ 200 preguntas del formato» y en E3-03, «más de 1 000 preguntas en el archivo».<br>Cada pantalla define los que usa en su recurso: `temas`, `pesos`, `profesion`, `fuentes`, `preguntas`, `balotario` e `ia`. Todo código nuevo que choque con uno existente se marca así en su contrato y se suma a esta lista |
   | Módulo | `dashboard.serumsIa.errores.<codigo>` | Los códigos con **un solo sentido** en todo el módulo, una clave por código reutilizada en todas las pantallas: los específicos (`tema_duplicado`, `falta_cita`, `fuente_no_activa`, `limite_citas`, `clave_oficial`…), los transversales (`error_interno`, `cuerpo_demasiado_grande`) y `generico`. Además, los cuatro códigos comunes con un **texto neutro**, válido para cualquier recurso (p. ej. `estado_invalido`: «Los datos cambiaron mientras tanto. Recarga y vuelve a intentarlo.») |
 
   - **Resolución, en orden:** `<recurso>.errores.<codigo>` → `errores.<codigo>` → `errores.generico`. Es la misma función para todas las pantallas del módulo.
