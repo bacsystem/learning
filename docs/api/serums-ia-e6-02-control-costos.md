@@ -106,9 +106,9 @@ func (s) Liberar(ctx context.Context, r *Reserva, acciones int) error
   - se inserta la notificación.
 - **Cuándo se evalúa:**
   - al sumar gasto (★9);
-  - en el `PUT` de configuración (§3.3), cada vez que cambia el presupuesto, tanto si sube como si baja (regla 18). Si el gasto ya está en ≥ 80 % del nuevo valor, la alerta se envía en ese momento. Escenario «Bajar el presupuesto»: de 40 a 24 USD con 20 gastados, la alerta sale al guardar.
+  - en el `PUT` de configuración (§3.3), cada vez que cambia el presupuesto, tanto si sube como si baja (regla 18). En la misma transacción, el `PUT` **reinicia la marca** del mes: pone `alerta_80_presupuesto_usd` y `alerta_80_at` en `NULL`. Después evalúa la condición. Si el gasto ya está en ≥ 80 % del nuevo valor, la alerta se envía en ese momento. Escenario «Bajar el presupuesto»: de 40 a 24 USD con 20 gastados, la alerta sale al guardar.
 
-  Con el mismo valor del presupuesto se envía una sola vez en el mes. Cambiar el valor rearma la alerta para el nuevo valor.
+  Con el mismo valor del presupuesto, la alerta se envía una sola vez. **Cada cambio de valor la rearma**, aunque se vuelva a un valor ya avisado (review del #202). Ejemplo: se avisó con 40, se cambia a 50 (con 35 gastados no se avisa) y se vuelve a 40. Al volver a 40, la alerta sale de nuevo, porque el cambio anterior reinició la marca. Un `PUT` que no cambia el presupuesto no toca la marca.
 - **Notificación:** va por la campana (in-app).
   - `titulo = "Presupuesto de IA al 80 %"`;
   - `cuerpo = "Se gastaron 32,10 USD de 40,00 USD en noviembre de 2026."`;
@@ -320,7 +320,7 @@ DROP TABLE IF EXISTS ia_configuracion;
 | # | Tarea | Depende de | h |
 |---|---|---|---|
 | K1 | Migración 068, Up y Down, con `up → down → up`. `ANTIFRAUD_HMAC_KEY` en `config.Load`, con tests (ADR 0002), si E4-01 no llegó antes | 066 | 2 |
-| K2 | `costos.go`: la clave HMAC se pide a **`internal/antifraude`**, un paquete nuevo y único que arma las claves (ADR 0002: «ningún otro paquete arma claves»). Su única función es `Claves(prefijo, usuarioID) (vigente, anterior string)`; E4-01 lo reutilizará con `diag_cooldown`. La tabla `ia_cuotas` y la reserva quedan en `ia`. El resto de la tarea: ventanas de Lima (`time/tzdata`, reloj inyectable), `Reservar` (orden D16), `Liberar` y `Consumo`, con rotación. Tests: dentro del límite, día, mes, admin, todo o nada con n > 1, concurrencia, reinicio diario y mensual, persistencia tras borrar datos, y precedencia del código cuando se agotan varios límites | K1 | 3 |
+| K2 | `costos.go`: la clave HMAC se pide a **`internal/antifraude`**, un paquete nuevo y único que arma las claves (ADR 0002: «ningún otro paquete arma claves»). Su forma real (PR #202) es el tipo `antifraude.Claves`, que se construye una vez con las claves de la configuración, con el método `(*Claves).Clave(prefijo, usuarioID)`. Ese método da la clave vigente y la anterior durante una rotación; la firma exacta es la del #202. E4-01 lo reutilizará con `diag_cooldown`. La tabla `ia_cuotas` y la reserva quedan en `ia`. El resto de la tarea: ventanas de Lima (`time/tzdata`, reloj inyectable), `Reservar` (orden D16), `Liberar` y `Consumo`, con rotación. Tests: dentro del límite, día, mes, admin, todo o nada con n > 1, concurrencia, reinicio diario y mensual, persistencia tras borrar datos, y precedencia del código cuando se agotan varios límites | K1 | 3 |
 | K3 | Presupuesto: ★5 y ★9, alerta por valor (§2.4) y notificación. Tests: corte al 100 %, 31,90 → 32,10 con una sola notificación, subir y bajar el presupuesto rearman la alerta (y la envían si el gasto ya está en ≥ 80 %), bajar a ≤ gasto corta, costo de una llamada fallida, y que el gasto no baja al borrar filas de `ia_usos` | K1 | 3 |
 | K4 | `cache.go`: clave, vigencia, escritura, purga y `BuscarEnCache` con su fila en `ia_usos`. Tests: caché, invalidación por versión nueva y por retiro, caché con el presupuesto y el límite agotados, y explicación sobre una versión citada anterior | K2, K3 | 3 |
 | K5 | Rutas de §3, `ia.Codigo` (§5) y auditoría del `PUT`. Tests: rangos de D19, `dec2`, `403`, auditoría solo de lo que cambió, `mes = null` para el admin | K2, K3 | 3 |
