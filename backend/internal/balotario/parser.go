@@ -19,6 +19,13 @@ import (
 // MaxPreguntas question blocks (valid and with problems). No partial result.
 var ErrLimitePreguntas = errors.New("el balotario supera el máximo de preguntas")
 
+// LimiteError is ErrLimitePreguntas with the number of blocks detected, for the
+// detail of the API error (contract §3, step 5).
+type LimiteError struct{ Detectadas int }
+
+func (e *LimiteError) Error() string        { return ErrLimitePreguntas.Error() }
+func (e *LimiteError) Is(target error) bool { return target == ErrLimitePreguntas }
+
 const bom = "\xef\xbb\xbf"
 
 // Resultado is what Parsear found, in order of appearance.
@@ -80,11 +87,12 @@ func Parsear(contenido []byte) (Resultado, error) {
 
 	var p lector
 	for i, cruda := range lineas {
-		if err := p.linea(i+1, cruda); err != nil {
-			return Resultado{}, err
-		}
+		p.linea(i+1, cruda)
 	}
 	p.cerrar()
+	if p.detectados > MaxPreguntas {
+		return Resultado{}, &LimiteError{Detectadas: p.detectados}
+	}
 	return p.res, nil
 }
 
@@ -123,7 +131,7 @@ type lector struct {
 	enBlanco       bool
 }
 
-func (p *lector) linea(n int, cruda string) error {
+func (p *lector) linea(n int, cruda string) {
 	l := limpiar(cruda, false)
 	t := l.t
 	if len(t.r) == 0 {
@@ -131,10 +139,10 @@ func (p *lector) linea(n int, cruda string) error {
 			if p.cur != nil {
 				p.cur.html = true
 			}
-			return nil
+			return
 		}
 		p.enBlanco = p.cur != nil
-		return nil
+		return
 	}
 	enBlanco := p.enBlanco
 	p.enBlanco = false
@@ -142,40 +150,36 @@ func (p *lector) linea(n int, cruda string) error {
 	if t.r[0] == '#' {
 		p.cerrar()
 		p.trasEncabezado = true
-		return nil
+		return
 	}
 	if numero, resto, ok := inicioPregunta(t); ok && p.abre(numero) {
 		p.cerrar()
 		p.detectados++
-		if p.detectados > MaxPreguntas {
-			return ErrLimitePreguntas
-		}
 		l.t = resto
 		p.abrir(n, numero, l)
-		return nil
+		return
 	}
 	if p.cur == nil {
-		return nil // outside of the questions: headers, footers (rule 7)
+		return // outside of the questions: headers, footers (rule 7)
 	}
 	if et, _, ok := etiquetaAlternativa(t); ok {
 		if p.cur.admite(et) {
 			p.cur.etiquetadaLinea(n, l)
-			return nil
+			return
 		}
 		if p.cur.pareceEtiqueta(et) {
 			p.cur.ambiguaLinea(n, l)
-			return nil
+			return
 		}
 	}
 	if enBlanco && len(p.cur.alts) > 0 {
 		p.cerrar() // the text after the last alternative is not part of the question
-		return nil
+		return
 	}
 	if p.cur.pendiente() {
 		l = limpiar(cruda, true) // a <mark> left open in the alternative may close here
 	}
 	p.cur.continuacion(n, l)
-	return nil
 }
 
 // abre decides whether a line that looks like "N." starts a question: when
