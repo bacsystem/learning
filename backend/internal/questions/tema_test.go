@@ -267,14 +267,8 @@ func TestListarPreguntas_ItemsTraenSusIDs(t *testing.T) {
 			t.Errorf("question %d: grado_id %v, especialidad_id %v; want %v and %v", it.ID, it.GradoID, it.EspecialidadID, want.GradoID, want.EspecialidadID)
 		}
 	}
-	// With a grado and an especialidad set, the list shows them.
-	var grado, esp int64
-	if err := f.DB.QueryRow(`SELECT id FROM grados LIMIT 1`).Scan(&grado); err != nil {
-		t.Skip("no grado in the fixture catalog")
-	}
-	if err := f.DB.QueryRow(`SELECT id FROM especialidades LIMIT 1`).Scan(&esp); err != nil {
-		t.Skip("no especialidad in the fixture catalog")
-	}
+	// With the fixture's own grado and especialidad set, the list shows them.
+	grado, esp := f.GradoID, f.EspecialidadID
 	if _, err := f.DB.Exec(`UPDATE preguntas SET grado_id = $1, especialidad_id = $2 WHERE id = $3`, grado, esp, list.Data[0].ID); err != nil {
 		t.Fatal(err)
 	}
