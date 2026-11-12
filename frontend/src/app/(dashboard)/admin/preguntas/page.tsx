@@ -563,7 +563,7 @@ export default function PreguntasPage() {
                           destructiva: true,
                           separador: true,
                           disabled: !puedeEliminar(p.estado),
-                          title: puedeEliminar(p.estado) ? undefined : t("serumsIa.avisosPregunta.eliminarAyuda"),
+                          ayuda: puedeEliminar(p.estado) ? undefined : t("serumsIa.avisosPregunta.eliminarAyuda"),
                           onClick: () => setConfirmDelete({ open: true, row: p, submitting: false }),
                         },
                       ]}
