@@ -6,6 +6,8 @@ Convenciones transversales para todos los endpoints del módulo «Aprendizaje as
 |---|---|---|
 | [serums-ia-e1-taxonomia.md](serums-ia-e1-taxonomia.md) | E1-01, E1-02, E1-03, E1-04 (MVP) | vigente (2026-11-11) |
 | [serums-ia-e2-fuentes.md](serums-ia-e2-fuentes.md) | E2-02, E2-03, E2-05, E2-06, E2-07 (MVP) | aprobado, pendiente de implementación (2026-11-11) |
+| [serums-ia-e3-02-ciclo-preguntas.md](serums-ia-e3-02-ciclo-preguntas.md) | E3-02 (MVP) | borrador para revisión (2026-11-11) |
+| [serums-ia-e6-01-servicio-ia.md](serums-ia-e6-01-servicio-ia.md) | E6-01 (MVP), contrato interno Go | borrador para revisión (2026-11-11); ADR [0006](../adr/0006-puerto-servicio-ia.md) |
 
 ADRs: [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones), [0005](../adr/0005-estado-operativo-panel-salud.md) estado operativo del panel de salud. Contrato de la épica de plataforma PLT-E1: [plataforma-salud.md](plataforma-salud.md).
 
