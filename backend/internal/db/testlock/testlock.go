@@ -8,6 +8,7 @@ package testlock
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -33,7 +34,15 @@ var (
 // t.Cleanup before calling Hold, so the lock is released first.
 func Hold(t testing.TB, db *sqlx.DB) {
 	t.Helper()
+	hold(t, db, Key)
+}
+
+// hold is Hold for any key, so the tests of this package can check the lock
+// semantics on a key nobody else uses.
+func hold(t testing.TB, db *sqlx.DB, key int64) {
+	t.Helper()
 	root, _, _ := strings.Cut(t.Name(), "/")
+	root = fmt.Sprintf("%s#%d", root, key)
 	mu.Lock()
 	if owned[root] {
 		mu.Unlock()
@@ -48,13 +57,13 @@ func Hold(t testing.TB, db *sqlx.DB) {
 		release(root)
 		t.Fatalf("db conn: %v", err)
 	}
-	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, Key); err != nil {
+	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, key); err != nil {
 		_ = conn.Close()
 		release(root)
 		t.Fatalf("advisory lock: %v", err)
 	}
 	t.Cleanup(func() {
-		_, _ = conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, Key)
+		_, _ = conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, key)
 		_ = conn.Close()
 		release(root)
 	})
