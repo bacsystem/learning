@@ -231,7 +231,7 @@ INSERT INTO ia_configuracion (id) VALUES (1);
 
 -- Contadores antifraude (ADR 0002): sin usuario_id ni FK; SIA-E9-07 no los borra.
 CREATE TABLE ia_cuotas (
-    clave          TEXT        NOT NULL CHECK (clave LIKE 'ia_cuota:%'),
+    clave          TEXT        NOT NULL CHECK (left(clave, 9) = 'ia_cuota:'),   -- exacto: en LIKE, `_` es comodín
     ventana        VARCHAR(3)  NOT NULL CHECK (ventana IN ('dia', 'mes')),
     ventana_inicio TIMESTAMPTZ NOT NULL,
     usados         INT         NOT NULL CHECK (usados >= 0),
