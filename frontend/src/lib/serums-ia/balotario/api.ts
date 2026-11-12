@@ -109,7 +109,12 @@ async function req<T>(path: string, token: string, options?: RequestInit): Promi
 
 export const balotarioApi = {
   /** `GET /admin/fuentes/{id}/balotario`: analiza la versión vigente sin guardar nada. `page` pagina solo `problemas`. */
-  vistaPrevia(token: string, fuenteId: number, page = 1, perPage = PROBLEMAS_POR_PAGINA): Promise<VistaPreviaBalotario> {
+  vistaPrevia(
+    token: string,
+    fuenteId: number,
+    page = 1,
+    perPage = PROBLEMAS_POR_PAGINA,
+  ): Promise<VistaPreviaBalotario> {
     const qs = new URLSearchParams({ page: String(page), per_page: String(perPage) });
     return req<VistaPreviaBalotario>(`/admin/fuentes/${fuenteId}/balotario?${qs}`, token);
   },

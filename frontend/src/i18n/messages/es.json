@@ -1571,7 +1571,8 @@
           "restaurar": "Restaurar",
           "reintentar": "Reintentar",
           "marcarOficial": "Marcar como oficial verificada",
-          "desmarcarOficial": "Quitar marca oficial"
+          "desmarcarOficial": "Quitar marca oficial",
+          "importarBalotario": "Importar preguntas del balotario"
         },
         "retirar": {
           "titulo": "Retirar fuente",
@@ -1759,9 +1760,10 @@
           "titulo": "Resultado del análisis",
           "validas": "Válidas",
           "conProblemas": "Con problemas",
-          "unica": "Respuesta única",
-          "multiple": "Selección múltiple",
-          "conAlertas": "Con alertas"
+          "conAlertas": "Con alertas",
+          "tipos": "{unica, number} de respuesta única · {multiple, number} de selección múltiple",
+          "conProblemasAyuda": "No se importan",
+          "conAlertasAyuda": "El texto se ajustó al leerlas"
         },
         "preguntas": {
           "titulo": "Primeras {n, plural, one {# pregunta válida} other {# preguntas válidas}}",

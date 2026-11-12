@@ -1571,7 +1571,8 @@
           "restaurar": "Restore",
           "reintentar": "Retry",
           "marcarOficial": "Mark as officially verified",
-          "desmarcarOficial": "Remove official mark"
+          "desmarcarOficial": "Remove official mark",
+          "importarBalotario": "Import past-exam questions"
         },
         "retirar": {
           "titulo": "Retire source",
@@ -1759,9 +1760,10 @@
           "titulo": "Analysis result",
           "validas": "Valid",
           "conProblemas": "With problems",
-          "unica": "Single answer",
-          "multiple": "Multiple choice",
-          "conAlertas": "With alerts"
+          "conAlertas": "With alerts",
+          "tipos": "{unica, number} single answer · {multiple, number} multiple choice",
+          "conProblemasAyuda": "They are not imported",
+          "conAlertasAyuda": "The text was adjusted when reading them"
         },
         "preguntas": {
           "titulo": "First {n, plural, one {# valid question} other {# valid questions}}",
