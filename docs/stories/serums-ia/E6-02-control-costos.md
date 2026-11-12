@@ -56,7 +56,7 @@ flowchart TD
 15. **Reserva por lote:** se puede consultar cuántas acciones le quedan al actor y reservar N de una vez, de forma atómica (todo o nada), para la regla 6 de SIA-E3-04. Si no alcanzan, responde 429 sin reservar nada.
 16. **Gasto estable ante borrados:** el gasto del mes no baja cuando SIA-E9-07 borra o anonimiza los registros de uso de un usuario. Cómo se logra lo decide el architect.
 17. **Rangos de configuración:** postulante, 0–50 por día y 0–1000 por mes, con el diario ≤ el mensual; admin, 1–1000 por día; presupuesto, 1–1000 USD con 2 decimales. Un valor fuera de rango, o un diario mayor que el mensual, responde 422 `validacion`.
-18. **Cambios de configuración:** bajar un límite por debajo de lo ya consumido no es retroactivo; las siguientes solicitudes reciben 429. Subir el presupuesto reabre las llamadas de inmediato y rearma la alerta del 80 % una vez para el nuevo valor. Si al subirlo el gasto ya está en o por encima del 80 % del nuevo valor, la alerta se envía en ese momento, una vez. Los contadores del admin no necesitan HMAC (la regla 11 es solo para postulantes); su forma la decide el architect.
+18. **Cambios de configuración:** bajar un límite por debajo de lo ya consumido no es retroactivo; las siguientes solicitudes reciben 429. Subir el presupuesto por encima del gasto reabre las llamadas de inmediato. Bajarlo a un valor igual o menor que el gasto corta las llamadas en ese momento (regla 2). Cualquier cambio de valor, al subir o al bajar, rearma la alerta del 80 % una vez para el nuevo valor. Si tras el cambio el gasto ya está en o por encima del 80 % del nuevo valor, la alerta se envía en ese momento, una vez. Los contadores del admin no necesitan HMAC (la regla 11 es solo para postulantes); su forma la decide el architect.
 19. **Canal de la alerta:** notificación in-app (campana existente) a todos los admins activos. El correo queda fuera de alcance.
 20. **Consumo del postulante:** en el MVP el postulante no tiene ninguna acción IA real (SIA-E5-06 solo encola y SIA-E6-08 la genera el admin). Esta historia entrega los límites del postulante y la API de su consumo propio; la vista para el postulante se construye en la primera historia que le dé una acción IA real. Los escenarios de cuota del postulante se verifican por API o por servicio. El admin sí ve su consumo del día en el panel. Cambio de alcance aprobado por el usuario (issue #40).
 21. **Pruebas sin proveedor real:** los escenarios se verifican con el doble del servicio de IA (SIA-E6-01) configurado con un costo por llamada. Elegir el proveedor y el modelo reales y construir su adaptador es SIA-E6-10, que requiere la aprobación del usuario y no bloquea esta historia.
@@ -187,6 +187,11 @@ Escenario: Subir el presupuesto tras el corte
   Dado el presupuesto de 40 USD agotado y la alerta del 80 % ya enviada
   Cuando un admin lo sube a 60 USD
   Entonces las llamadas al LLM se permiten de inmediato y la alerta se envía una vez más al llegar a 48 USD
+
+Escenario: Bajar el presupuesto
+  Dado un presupuesto de 40 USD con 20 USD gastados y la alerta del mes sin enviar
+  Cuando un admin lo baja a 24 USD
+  Entonces todos los admins reciben la alerta del 80 % en ese momento, una vez, y las llamadas siguen permitidas hasta llegar a 24 USD
 
 Escenario: Consumo propio del postulante
   Dado un postulante con 2 acciones hoy y 10 en el mes
