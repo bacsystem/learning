@@ -1,9 +1,10 @@
 "use client";
 
+import { AccionesRevision } from "../_componentes/acciones-revision";
 import { BuscadorPasajes } from "../_componentes/buscador-pasajes";
 import { CitasPregunta } from "../_componentes/citas-pregunta";
 import { PillEstadoPregunta } from "../_componentes/estado-pregunta";
-import { useCitasPregunta } from "../_componentes/use-citas-pregunta";
+import { useRevisionPregunta } from "../_componentes/use-revision-pregunta";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
@@ -12,9 +13,8 @@ import { BotonReintentar } from "@/components/app/boton-reintentar";
 import { Alerta } from "@/components/feedback/alerta";
 import { Skeleton } from "@/components/feedback/skeleton";
 import { CabeceraPagina, EnlaceVolver } from "@/components/patrones/cabecera-pagina";
-import { Chip } from "@/components/patrones/pill-estado";
 import { CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
-import { claveOrigenPregunta } from "@/lib/questions/estados";
+import { claveErrorPregunta } from "@/lib/serums-ia/revision/errores";
 import { idsDeCitas, MAX_CITAS } from "@/lib/serums-ia/revision/reglas";
 
 /** Detalle de una pregunta para revisarla: citas actuales y buscador de pasajes (SIA-E3-08). */
@@ -22,7 +22,7 @@ export default function DetallePreguntaPage() {
   const t = useTranslations("dashboard");
   const params = useParams<{ id: string }>();
   const preguntaId = Number(params.id);
-  const { pregunta, carga, guardando, claveError, cargar, anadir, quitar } = useCitasPregunta(preguntaId);
+  const { pregunta, carga, guardando, error, cargar, anadir, quitar, cambiarEstado } = useRevisionPregunta(preguntaId);
   const citas = useMemo(() => pregunta?.citas ?? [], [pregunta]);
   const citados = useMemo(() => new Set(idsDeCitas(citas)), [citas]);
 
@@ -64,27 +64,12 @@ export default function DetallePreguntaPage() {
         <p className="text-cuerpo text-foreground whitespace-pre-wrap">{pregunta.enunciado}</p>
       </section>
 
-      {claveError ? <Alerta tono="error">{t(claveError, { maximo: MAX_CITAS })}</Alerta> : null}
+      {error ? <Alerta tono="error">{t(claveErrorPregunta(error, t.has), { maximo: MAX_CITAS })}</Alerta> : null}
 
       <CitasPregunta citas={citas} ocupado={guardando} onQuitar={quitar} />
       <BuscadorPasajes citados={citados} llena={citas.length >= MAX_CITAS} ocupado={guardando} onAnadir={anadir} />
 
-      {/* Zona de revisión: SIA-E3-09 añade aquí las acciones (aprobar, revalidar, rechazar, reabrir). */}
-      <section aria-labelledby="revision-titulo" className={`${TARJETA} grid gap-2 p-4`}>
-        <h2 id="revision-titulo" className="text-titulo text-foreground">
-          {t("serumsIa.revision.citas.acciones.titulo")}
-        </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <PillEstadoPregunta estado={pregunta.estado} />
-          {pregunta.origen ? <Chip>{t(claveOrigenPregunta(pregunta.origen))}</Chip> : null}
-        </div>
-        {pregunta.motivo_rechazo ? (
-          <p className="text-control text-muted-foreground">
-            <span className="font-medium">{t("serumsIa.revision.citas.acciones.motivoRechazo")}: </span>
-            {pregunta.motivo_rechazo}
-          </p>
-        ) : null}
-      </section>
+      <AccionesRevision key={pregunta.estado} pregunta={pregunta} ocupado={guardando} onCambiar={cambiarEstado} />
     </div>
   );
 }
