@@ -7,17 +7,25 @@ import {
   type RespuestaRow,
   type TipoPregunta,
 } from "../../_componentes/editor-pregunta";
+import { PillEstadoPregunta } from "../../_componentes/estado-pregunta";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { Alerta } from "@/components/feedback/alerta";
 import { Skeleton } from "@/components/feedback/skeleton";
+import { DialogoConfirmacion } from "@/components/navegacion/dialogo-confirmacion";
 import { CabeceraPagina, EnlaceVolver } from "@/components/patrones/cabecera-pagina";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, Especialidad, Grado, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
 import { CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { Etiqueta, Pregunta, questionsApi, UpdatePreguntaPayload } from "@/lib/questions/api";
+import {
+  cambiaElContenido,
+  claveErrorEdicion,
+  contenidoDePregunta,
+  editarContenidoLaRetira,
+} from "@/lib/questions/estados";
 
 /** Renumbers orden after a move/removal; ids stay attached to their text. */
 const renumber = (rows: RespuestaRow[]) => rows.map((r, i) => ({ ...r, orden: i + 1 }));
@@ -79,6 +87,7 @@ export default function EditPreguntaPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmarRevision, setConfirmarRevision] = useState(false);
 
   useEffect(() => {
     if (!token || !preguntaID) return;
@@ -194,8 +203,25 @@ export default function EditPreguntaPage() {
     [tipo],
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /** Pide confirmación solo si guardar sacaría de circulación una pregunta publicada (E3-02 §4.5). */
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!pregunta) return;
+    const editado = {
+      enunciado,
+      tipo,
+      respuestas,
+      explicacion: retroExplicacion,
+      referencia: retroReferencia,
+    };
+    if (editarContenidoLaRetira(pregunta.estado) && cambiaElContenido(contenidoDePregunta(pregunta), editado)) {
+      setConfirmarRevision(true);
+      return;
+    }
+    void guardar();
+  };
+
+  const guardar = async () => {
     if (!token || !pregunta) return;
     setSubmitting(true);
     setError(null);
@@ -226,6 +252,12 @@ export default function EditPreguntaPage() {
       router.push("/admin/preguntas");
     } catch (e: unknown) {
       const err = e as { message?: string; status?: number };
+      const clave = claveErrorEdicion(e);
+      if (clave) {
+        setError(t(clave));
+        setSubmitting(false);
+        return;
+      }
       // The backend sends a specific message for every 409 (alternative with
       // attempts, duplicated statement…) and 400 (invalid subject/tags). The
       // key change on a question that already graded attempts (H133) gets its
@@ -278,6 +310,20 @@ export default function EditPreguntaPage() {
           proceso: pregunta.proceso,
           b: (c) => <strong className="text-foreground font-semibold">{c}</strong>,
         })}
+        acciones={<PillEstadoPregunta estado={pregunta.estado} />}
+      />
+
+      <DialogoConfirmacion
+        open={confirmarRevision}
+        onOpenChange={setConfirmarRevision}
+        destructiva={false}
+        titulo={t("serumsIa.avisosPregunta.confirmarEdicion.titulo")}
+        descripcion={t("serumsIa.avisosPregunta.confirmarEdicion.texto")}
+        textoConfirmar={t("serumsIa.avisosPregunta.confirmarEdicion.confirmar")}
+        textoCancelar={t("serumsIa.avisosPregunta.confirmarEdicion.cancelar")}
+        textoPendiente={t("comun-guardando")}
+        etiquetaCerrar={t("comun-cerrar")}
+        onConfirmar={guardar}
       />
 
       <EditorPregunta

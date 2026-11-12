@@ -48,6 +48,7 @@ pg_dump -Fc (rol backup_ro, sslmode=require)  →  age -r <clave PÚBLICA>  → 
 | `R2_BUCKET` | el bucket dedicado | no |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | token **Object Read & Write limitado a ese bucket** (R2 no ofrece permiso solo de escritura) | **sí** |
 | `BACKUP_TIMEOUT` | `1800` | no |
+| `BACKUP_PUSH_URL` | opcional: `http://uptime-kuma.railway.internal:3001/api/push/<token>` (monitor Push, [railway.md §7.1](../../docs/ops/railway.md)) | **sí** (lleva el token) |
 
 ## Aprovisionamiento (una vez, con aprobación del usuario)
 
@@ -134,6 +135,27 @@ solo para la prueba). Después corre:
 - una copia correcta;
 - tres fallos: bucket inexistente, credenciales malas y endpoint colgado;
 - la comprobación de las filas de `copias_bd`;
+- el latido opcional a Uptime Kuma (`BACKUP_PUSH_URL`): llega tras una copia
+  correcta, no se envía en una fallida ni en una subida pero no registrada
+  (exit 3), y si Kuma no responde la copia sigue correcta; el token no aparece
+  en los logs ni en argv de curl; una query pegada en la URL se descarta;
 - una restauración cronometrada con la clave privada.
 
 Al terminar borra todo.
+
+**Si la prueba muere con `kill -9`** (o se corta la máquina), el `trap` de
+limpieza no corre y quedan contenedores, volúmenes anónimos y la red de esa
+corrida. Con `Ctrl-C` o un fallo normal sí se limpia sola. Los nombres llevan el
+PID de la corrida (`bkt<PID>-pg`, `bkt<PID>-s3`, `bkt<PID>-restore`,
+`capacitate-backup-test-<PID>`), así que se borran sin tocar nada más:
+
+```bash
+docker rm -fv $(docker ps -aq -f "name=^bkt[0-9]+-")                 # contenedores y sus volúmenes
+docker network rm $(docker network ls -q -f "name=^capacitate-backup-test-")
+docker rmi $(docker images -q "capacitate-backup:test-*")  # imágenes de la prueba
+```
+
+Si hay otra corrida en marcha (otra sesión u otro agente), el filtro `^bkt[0-9]+-` también
+la alcanza: para borrar solo una, usa su PID, p. ej. `-f "name=^bkt12345-"`. Un
+comando sin resultados falla con «requires at least 1 argument»: no es un error,
+solo no había nada que limpiar.

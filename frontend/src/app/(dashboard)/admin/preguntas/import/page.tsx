@@ -622,7 +622,7 @@ export default function ImportPreguntasPage() {
             )}
             <p className="text-titulo-pagina text-foreground">
               {result.imported > 0
-                ? t("admin-preguntas-import-resultado-importadas", { n: result.imported })
+                ? t("serumsIa.avisosPregunta.importadasBorrador", { n: result.imported })
                 : t("admin-preguntas-import-sin-registros")}
             </p>
             <div className="flex flex-wrap justify-center gap-2">

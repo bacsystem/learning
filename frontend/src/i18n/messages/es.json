@@ -559,7 +559,6 @@
     "admin-preguntas-import-unidad-filas": "filas",
     "admin-preguntas-import-importando": "Importando…",
     "admin-preguntas-import-confirmar": "Confirmar importación ({n, plural, one {# pregunta} other {# preguntas}})",
-    "admin-preguntas-import-resultado-importadas": "{n, plural, one {# pregunta importada} other {# preguntas importadas}}",
     "admin-preguntas-import-sin-registros": "Sin registros nuevos",
     "admin-preguntas-import-pill-importadas": "{n, plural, one {# importada} other {# importadas}}",
     "admin-preguntas-import-pill-errores": "{n, plural, one {# error} other {# errores}}",
@@ -569,8 +568,6 @@
     "admin-preguntas-import-fila": "Fila {n}:",
     "admin-preguntas-eliminada": "Pregunta eliminada exitosamente.",
     "admin-preguntas-estado": "Estado",
-    "admin-preguntas-estado-activo": "Activo",
-    "admin-preguntas-estado-eliminada": "Eliminada",
     "admin-preguntas-reintentar": "Reintentar",
     "admin-preguntas-importar-csv": "Importar CSV",
     "admin-preguntas-nueva": "Nueva pregunta",
@@ -583,7 +580,6 @@
     "admin-preguntas-limpiar-filtros": "Limpiar filtros",
     "admin-preguntas-acciones": "Acciones",
     "admin-preguntas-acciones-de": "Acciones de la pregunta {id}",
-    "admin-preguntas-sin-resultados-filtros": "No hay preguntas con los filtros seleccionados.",
     "admin-preguntas-vacio": "Todavía no hay preguntas en el banco. Crea la primera con «Nueva pregunta» o impórtalas desde un CSV.",
     "admin-preguntas-unidad": "preguntas en el banco",
     "admin-preguntas-eliminar-titulo": "Eliminar pregunta",
@@ -1309,19 +1305,35 @@
           "sinActivos": "No hay temas activos para ordenar.",
           "minimo": "Se necesitan al menos 2 temas activos.",
           "mover": "Mover"
+        },
+        "errores": {
+          "validacion": "Revisa los datos del formulario.",
+          "referencia_invalida": "Una de las especialidades o la asignatura ya no está activa. Recarga y vuelve a intentarlo.",
+          "estado_invalido": "El tema ya está en ese estado. Recarga la lista.",
+          "no_encontrado": "El tema ya no existe. Recarga la lista."
         }
       },
       "errores": {
-        "validacion": "Revisa los datos del formulario.",
-        "referencia_invalida": "Una de las especialidades o la asignatura ya no está activa. Recarga y vuelve a intentarlo.",
+        "validacion": "Revisa los datos e inténtalo de nuevo.",
+        "referencia_invalida": "Un dato relacionado ya no es válido. Recarga y vuelve a intentarlo.",
         "tema_duplicado": "Ya existe un tema con ese nombre en esta asignatura (puede estar archivado: reactívalo).",
         "limite_temas": "Esta asignatura ya tiene 60 temas activos. Archiva uno para liberar cupo.",
         "orden_invalido": "La lista de orden no es válida.",
         "orden_desactualizado": "Los temas cambiaron mientras ordenabas. Recarga la lista y vuelve a ordenar.",
-        "estado_invalido": "El tema ya está en ese estado. Recarga la lista.",
-        "no_encontrado": "El tema ya no existe. Recarga la lista.",
+        "estado_invalido": "Los datos cambiaron mientras tanto. Recarga y vuelve a intentarlo.",
+        "no_encontrado": "El elemento ya no existe. Recarga la lista.",
         "error_interno": "Error interno del servidor. Inténtalo de nuevo.",
-        "cuerpo_demasiado_grande": "Los datos enviados son demasiado grandes. Reduce el texto e inténtalo de nuevo."
+        "cuerpo_demasiado_grande": "Los datos enviados son demasiado grandes. Reduce el texto e inténtalo de nuevo.",
+        "clave_oficial": "La clave oficial de una pregunta de balotario no se puede cambiar.",
+        "fuente_no_activa": "Una de las fuentes ya no está activa. Revisa las citas y vuelve a intentarlo.",
+        "limite_citas": "Una pregunta admite como máximo {maximo} citas. Quita alguna para añadir otra.",
+        "ultima_cita_activa": "No puedes quitar la última cita activa de una pregunta aprobada. Añade otra cita antes de quitar esta.",
+        "generico": "No se pudo completar la operación. Inténtalo de nuevo.",
+        "falta_cita": "La pregunta necesita al menos una cita a una fuente activa.",
+        "verificacion_requerida": "Marca la casilla de verificación antes de aprobar.",
+        "nota_obligatoria": "Escribe una nota de revisión de {min} a {max} caracteres.",
+        "conflicto_clave": "Esta pregunta tiene un conflicto de clave sin resolver.",
+        "revision_especializada": "Esta pregunta se revisa en su cola especializada, no desde aquí."
       },
       "pesos": {
         "titulo": "Pesos de {especialidad}",
@@ -1613,6 +1625,104 @@
           "validacion": "Revisa los datos del formulario.",
           "referencia_invalida": "Una profesión o el proceso ya no está activo. Recarga y vuelve a intentarlo.",
           "no_encontrado": "La fuente ya no existe."
+        }
+      },
+      "avisosPregunta": {
+        "creadaBorrador": "Guardada como borrador. Añade una cita y apruébala para que la vean los postulantes.",
+        "importadasBorrador": "{n, plural, one {# pregunta importada como borrador} other {# preguntas importadas como borrador}}",
+        "confirmarEdicion": {
+          "titulo": "Esta pregunta pasará a En revisión",
+          "texto": "Al guardar, la pregunta pasará a En revisión y dejará de mostrarse hasta revalidarla con una cita.",
+          "confirmar": "Guardar y pasar a revisión",
+          "cancelar": "Seguir editando"
+        },
+        "eliminarAyuda": "Recházala primero para poder eliminarla"
+      },
+      "estadosPregunta": {
+        "borrador": "Borrador",
+        "en_revision": "En revisión",
+        "aprobada": "Aprobada",
+        "rechazada": "Rechazada",
+        "activo": "Activa (heredada)",
+        "eliminada": "Eliminada"
+      },
+      "revision": {
+        "listado": {
+          "columnaOrigen": "Origen",
+          "columnaCitas": "Citas",
+          "filtroOrigenTodos": "Origen: todos",
+          "origenes": {
+            "manual": "Manual",
+            "balotario": "Balotario",
+            "ia": "IA"
+          },
+          "vacio": "No hay preguntas con ese filtro",
+          "verDetalle": "Ver citas"
+        },
+        "citas": {
+          "tituloPagina": "Citas de la pregunta #{id}",
+          "volver": "Preguntas",
+          "enunciado": "Enunciado",
+          "titulo": "Citas actuales",
+          "contador": "{n, plural, one {# cita} other {# citas}} de {maximo}",
+          "vacio": "Esta pregunta aún no tiene citas.",
+          "cargando": "Cargando la pregunta…",
+          "errorCarga": "No se pudo cargar la pregunta.",
+          "noEncontrada": "La pregunta no existe o fue eliminada.",
+          "version": "Versión {n}",
+          "lineas": "Líneas {inicio}–{fin}",
+          "seccion": "Sección: {seccion}",
+          "fuenteRetirada": "Fuente retirada",
+          "fuenteActiva": "Fuente activa",
+          "verTexto": "Ver el pasaje completo",
+          "quitar": "Quitar cita",
+          "quitarDe": "Quitar la cita de «{fuente}»",
+          "guardando": "Guardando citas…",
+          "guardadas": "Citas actualizadas.",
+          "buscador": {
+            "titulo": "Buscar pasajes",
+            "etiqueta": "Buscar en las fuentes activas",
+            "placeholder": "Ej.: hipertensión arterial",
+            "ayuda": "Escribe entre {min} y {max} caracteres.",
+            "buscar": "Buscar",
+            "buscando": "Buscando…",
+            "sinResultados": "Sin resultados",
+            "errorBusqueda": "No se pudo buscar. Inténtalo de nuevo.",
+            "resultados": "{n, plural, one {# resultado} other {# resultados}}",
+            "anadir": "Añadir cita",
+            "anadirDe": "Añadir la cita de «{fuente}»",
+            "yaCitado": "Ya citado",
+            "limiteAlcanzado": "Se alcanzó el máximo de citas."
+          }
+        },
+        "acciones": {
+          "titulo": "Revisión",
+          "motivoRechazo": "Motivo del rechazo",
+          "verificado": "He verificado la pregunta y su clave contra la cita",
+          "aprobar": "Aprobar",
+          "revalidar": "Revalidar",
+          "rechazar": "Rechazar",
+          "reabrir": "Reabrir",
+          "seRevisaEnCola": "Se revisa en su cola",
+          "sinAcciones": "No hay acciones de revisión para el estado actual.",
+          "nota": "Nota de revisión",
+          "notaObligatoria": "La nota es obligatoria (mínimo {min} caracteres).",
+          "notaOpcional": "Opcional, hasta {max} caracteres.",
+          "notaAyuda": "Entre {min} y {max} caracteres.",
+          "motivo": "Motivo del rechazo",
+          "motivoMinimo": "Escribe al menos {min} caracteres.",
+          "motivoAyuda": "Entre {min} y {max} caracteres.",
+          "procesando": "Guardando…",
+          "rechazarTitulo": "Rechazar la pregunta",
+          "reabrirAyuda": "Vuelve a borrador para corregirla y citarla de nuevo."
+        }
+      },
+      "preguntas": {
+        "errores": {
+          "estado_invalido": "Esta pregunta cambió de estado; se actualizó la vista.",
+          "no_encontrado": "La pregunta ya no existe o fue eliminada.",
+          "validacion": "Revisa los datos enviados: un pasaje puede estar repetido.",
+          "referencia_invalida": "Uno de los pasajes ya no existe. Se actualizó la lista de citas."
         }
       }
     },

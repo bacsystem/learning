@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 import { Menu, MenuContent, MenuItem, MenuLinkItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { OBJETIVO_TACTIL } from "@/lib/estilos";
 import type { IconoComponente } from "@/lib/iconos";
@@ -14,9 +16,48 @@ export type AccionFila = {
   destructiva?: boolean;
   disabled?: boolean;
   title?: string;
+  /** Por qué la acción está deshabilitada: texto visible bajo el ítem, enlazado con `aria-describedby`. Un `title` no sirve en un ítem deshabilitado: no recibe puntero (`pointer-events-none`) y en el móvil no hay hover. Con teclado el ítem sí recibe foco (base-ui usa `focusableWhenDisabled`), y ahí `aria-describedby` anuncia la ayuda. */
+  ayuda?: string;
   /** Pinta un separador antes de esta acción. */
   separador?: boolean;
 };
+
+/** Texto de ayuda de una acción deshabilitada, fuera del ítem para que no herede su opacidad y se lea con contraste normal. */
+export function AyudaAccion({ id, children }: { id: string; children: string }) {
+  return (
+    <p id={id} aria-hidden="true" className="text-etiqueta text-muted-foreground -mt-0.5 px-2.5 pb-1.5">
+      {children}
+    </p>
+  );
+}
+
+function ItemAccion({ accion: a }: { accion: AccionFila }) {
+  const idAyuda = useId();
+  const Icono = a.icon;
+  return (
+    <>
+      {a.separador ? <MenuSeparator /> : null}
+      {a.href ? (
+        <MenuLinkItem href={a.href} title={a.title}>
+          {Icono ? <Icono /> : null}
+          {a.label}
+        </MenuLinkItem>
+      ) : (
+        <MenuItem
+          variant={a.destructiva ? "destructive" : "default"}
+          disabled={a.disabled}
+          title={a.title}
+          aria-describedby={a.ayuda ? idAyuda : undefined}
+          onClick={a.onClick}
+        >
+          {Icono ? <Icono /> : null}
+          {a.label}
+        </MenuItem>
+      )}
+      {a.ayuda ? <AyudaAccion id={idAyuda}>{a.ayuda}</AyudaAccion> : null}
+    </>
+  );
+}
 
 /** Botón "⋯" de fila que abre un menú con las acciones secundarias (ver, duplicar, descargar, eliminar…). */
 export function MenuAcciones({
@@ -42,30 +83,11 @@ export function MenuAcciones({
         <DotsThreeIcon weight="bold" className="size-4" />
       </MenuTrigger>
       <MenuContent side="bottom" align="end" className="min-w-44">
-        {acciones.map((a) => {
-          const Icono = a.icon;
-          return (
-            <span key={a.label} className="contents">
-              {a.separador ? <MenuSeparator /> : null}
-              {a.href ? (
-                <MenuLinkItem href={a.href} title={a.title}>
-                  {Icono ? <Icono /> : null}
-                  {a.label}
-                </MenuLinkItem>
-              ) : (
-                <MenuItem
-                  variant={a.destructiva ? "destructive" : "default"}
-                  disabled={a.disabled}
-                  title={a.title}
-                  onClick={a.onClick}
-                >
-                  {Icono ? <Icono /> : null}
-                  {a.label}
-                </MenuItem>
-              )}
-            </span>
-          );
-        })}
+        {acciones.map((a) => (
+          <span key={a.label} className="contents">
+            <ItemAccion accion={a} />
+          </span>
+        ))}
       </MenuContent>
     </Menu>
   );

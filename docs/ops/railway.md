@@ -161,6 +161,9 @@ En Railway se cargan como **variables de servicio**. Los secretos van
 | backend | `MIGRATE_LOCK_TIMEOUT` | `10m` |
 | backend | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | `45` |
 | backend | `LOG_LEVEL` | Vacío (queda en `info`) |
+| backend | `IA_PROVEEDOR` | **Vacío** hasta E6-02: IA deshabilitada. Nunca `doble` (con `ENV=production` el backend no arranca) |
+| backend | `IA_API_KEY` | Sellada, solo con el adaptador real (E6-02) |
+| backend | `IA_MODELO` | Solo con el adaptador real (E6-02) |
 | frontend | — | Los `NEXT_PUBLIC_*` van en la imagen, no en Railway (§2) |
 
 **Conexiones.** Cada backend abre hasta **25** conexiones
@@ -319,14 +322,27 @@ configuración; se anota en
 
 No se apaga el backend de producción para probarlo.
 
-**Opcional, para el cron de R2 (C13):** un monitor de tipo **Push**
-(heartbeat) con 26 h sin señal = caído. El cron llamaría a su URL privada
-`http://uptime-kuma.railway.internal:3001/api/push/<token>` al terminar bien.
-Así se avisa también cuando el cron **no corre**. Requiere una variable
-opcional más en `deploy/backup/backup.sh`, `BACKUP_PUSH_URL`. Lleva un token, así
-que es **secreta**: va como variable **sellada** del servicio cron y, en
-`env.example`, solo como placeholder. La aprobó el tech-lead para un PR aparte,
-después del #122 y de este.
+**Monitor Push para el cron de R2 (C13):** avisa también cuando el cron **no
+corre** (Railway no avisa de eso). Es opcional hasta que el usuario lo active.
+
+1. En Uptime Kuma: Add New Monitor → tipo **Push**, nombre `copia diaria R2`,
+   *Heartbeat Interval* **93600 s (26 h)**, reintentos 0, notificación Email.
+   Kuma muestra la URL con el token (`…/api/push/<token>`).
+2. En el servicio cron de Railway, la variable **sellada** `BACKUP_PUSH_URL` =
+   `http://uptime-kuma.railway.internal:3001/api/push/<token>` (sin
+   `?status=…`: el script lo añade). El token es un secreto: no va al repo ni a
+   los logs.
+3. `deploy/backup/backup.sh` llama a esa URL **solo si la copia salió bien y
+   quedó registrada en `copias_bd`**. Si el aviso falla, deja una línea
+   «no se pudo avisar a Uptime Kuma» y la copia sigue correcta; sin la variable,
+   no hace nada.
+4. Probar (con el usuario): `railway cron run` y ver el monitor en verde; luego
+   un fallo a propósito (`R2_BUCKET` inexistente) no debe mandar latido, y a las
+   26 h sin señal el monitor pasa a caído y llega el email. Anotar en
+   [condiciones-lanzamiento.md](condiciones-lanzamiento.md), C13/C14.
+
+Al ser Push, un cron que corre y falla deja de latir y el monitor cae a las
+26 h (no al instante): el panel de salud (PLT-05) muestra el fallo antes.
 
 **Límite (ADR 0004, D12):** Uptime Kuma corre dentro de Railway. Si cae todo
 Railway, cae también el monitor y **no llega ninguna alerta**. Cubrir ese caso

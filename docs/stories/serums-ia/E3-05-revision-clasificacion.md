@@ -30,7 +30,7 @@ Decisión P2 (issue #65), enfoque híbrido. Cada pregunta tiene una **ruta de re
 7. Mientras una pregunta tenga `conflicto_clave` sin resolver no puede aprobarse (409 `conflicto_clave`, se resuelve en SIA-E3-06).
 8. Si el admin detecta que la clave oficial es incorrecta, la rechaza con motivo; la clave `<mark>` no se reescribe (edición fuera de alcance).
 9. Toda aprobación, cambio y rechazo se audita con la ruta aplicada, la casilla marcada y la nota si la hay.
-10. Una pregunta sin área no puede aprobarse.
+10. **Área confirmada** (decisión del PO, 12-nov; aclara «área asignada» de las reglas 3 y 4): toda pregunta de balotario tiene un área, la inicial y provisional de SIA-E3-03. Aprobar no basta con que exista un área: la solicitud de aprobación debe incluir de forma explícita el área (y el tema, si lo hay) que el admin confirma. El servidor la valida contra la taxonomía del proceso y la guarda. Si falta, responde 422 `falta_area`. La pantalla rellena el área y el tema solo con la propuesta válida de SIA-E3-04, nunca con el área inicial. Una pregunta `sin_clasificar` muestra el selector vacío y el admin tiene que elegir. La aprobación masiva aplica a cada pregunta el área y el tema de su propuesta.
 
 ```mermaid
 flowchart TD
@@ -41,7 +41,7 @@ flowchart TD
   E -- No --> G[Cambia area y tema]
   E -- Si --> F{Tiene area asignada}
   G --> F
-  F -- No --> X1[Rechaza 422 falta area]
+  F -- No, sin area confirmada en la solicitud --> X1[Rechaza 422 falta area]
   F -- Si --> R{Fuente oficial verificada y sin conflicto de clave historico y no incierta}
   R -- Si --> S[Ruta estructural: casilla de clasificacion y estructura]
   R -- No --> V[Ruta verificacion de clave: casilla de clave y nota]
@@ -124,8 +124,13 @@ Escenario: Límite masivo
 
 Escenario: Sin área
   Dado una pregunta "sin_clasificar"
-  Cuando el admin intenta aprobarla
+  Cuando el admin intenta aprobarla sin elegir un área
   Entonces recibe 422 "falta_area"
+
+Escenario: El área inicial no se aprueba sola
+  Dado una pregunta "sin_clasificar" con el área inicial Salud Pública de la importación
+  Cuando el admin abre la pregunta
+  Entonces el selector de área aparece vacío, y al elegir Salud Pública y aprobar, queda aprobada con esa área confirmada en audit_log
 
 Escenario: Rechazar
   Dado una pregunta en la cola
