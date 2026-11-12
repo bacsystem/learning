@@ -548,7 +548,6 @@ func TestParsear_EtiquetasAmbiguas(t *testing.T) {
 		{"ambigua y sin ninguna marca: los dos motivos", "1. P\nA) Uno\nB) Dos\nA) otra\n", "[1@1-4:etiquetas_ambiguas+sin_clave]"},
 		{"ambigua con la marca en una alternativa valida", "1. P\n<mark>A) Uno</mark>\nB) Dos\nA) otra\n", "[1@1-4:etiquetas_ambiguas]"},
 		{"una marca solo en el enunciado no es clave", "1. <mark>P</mark>\nA) Uno\nB) Dos\nA) otra\n", "[1@1-4:etiquetas_ambiguas+sin_clave]"},
-		{"letra fuera de A-F no parece etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\nG) otra\n", "[]"},
 		{"sin espacio tras el separador no parece etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\nA.otra\n", "[]"},
 		{"antes de la primera alternativa es enunciado", "1. P\nE. coli enterohemorrágica\nA) Uno\n<mark>B) Dos</mark>\n", "[]"},
 	}
@@ -603,4 +602,40 @@ func TestParsear_PasadoElLimiteSoloCuenta(t *testing.T) {
 	if _, err := Parsear([]byte(bloquesSinar(5000))); err == nil {
 		t.Error("5000 bloques deben dar ErrLimitePreguntas")
 	}
+}
+
+// Rule 17, «Letras G–Z»: after the first alternative a line shaped like a label
+// with a letter G–Z is never joined to the previous one.
+func TestParsear_LetrasGaZ(t *testing.T) {
+	seis := "1. P\nA) 1\nB) 2\nC) 3\nD) 4\nE) 5\n<mark>F) 6</mark>\n"
+	tests := []struct {
+		name string
+		md   string
+		want string
+	}{
+		{"G tras la F abre la septima", seis + "G) 7\n", "[1@1-8:alternativas_excedidas]"},
+		{"G tras la F con la clave en la G", "1. P\nA) 1\nB) 2\nC) 3\nD) 4\nE) 5\nF) 6\n<mark>G) Siete</mark>\n", "[1@1-8:alternativas_excedidas]"},
+		{"G envuelta en negrita", seis + "**G)** 7\n", "[1@1-8:alternativas_excedidas]"},
+		{"H tras la G", seis + "G) 7\nH) 8\n", "[1@1-9:alternativas_excedidas]"},
+		{"H tras la F no es la siguiente", seis + "H) 7\n", "[1@1-8:etiquetas_ambiguas]"},
+		{"Z tras la B", "1. P\nA) Uno\n<mark>B) Dos</mark>\nZ. algo\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"G tras la C no es la siguiente", "1. P\nA) Uno\n<mark>B) Dos</mark>\nC) Tres\nG) siete\n", "[1@1-5:etiquetas_ambiguas]"},
+		{"minuscula entre parentesis", "1. P\n(a) Uno\n<mark>(b) Dos</mark>\n(z) algo\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"S. aureus dentro de las alternativas", "1. P\nA) Infección por\nS. aureus\n<mark>B) Otra</mark>\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"ambigua sin ninguna marca: los dos motivos", "1. P\nA) Uno\nB) Dos\nZ. algo\n", "[1@1-4:etiquetas_ambiguas+sin_clave]"},
+		// Before the first alternative nothing changes: continuation of the enunciado.
+		{"S. aureus en el enunciado", "1. Infección por\nS. aureus\nA) Uno\n<mark>B) Dos</mark>\n", "[]"},
+		{"G. lamblia en el enunciado", "1. Parásito\nG. lamblia en niños\nA) Uno\n<mark>B) Dos</mark>\n", "[]"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := fmt.Sprint(motivosDe(parsear(t, tt.md))); got != tt.want {
+				t.Errorf("problemas = %s, want %s", got, tt.want)
+			}
+		})
+	}
+	t.Run("el enunciado conserva S. aureus", func(t *testing.T) {
+		r := parsear(t, "1. Infección por\nS. aureus\nA) Uno\n<mark>B) Dos</mark>\n")
+		comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "Infección por S. aureus", "unica", alts("Uno", "*Dos"), sinAlertas()}})
+	})
 }
