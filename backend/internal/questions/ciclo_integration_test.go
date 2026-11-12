@@ -257,3 +257,16 @@ func jsonString(t *testing.T, v any) string {
 	}
 	return string(b)
 }
+
+// A body with data after the JSON value is refused, not half-read (#228).
+func TestCambiarEstado_RechazaDatosDespuesDelCuerpo(t *testing.T) {
+	c := newCicloFx(t)
+	c.poner(t, EstadoBorrador, OrigenManual)
+	for _, body := range []string{`{"estado":"en_revision"}{}`, `{"estado":"en_revision"} basura`} {
+		w := qt.Do(c.mux, "PATCH", fmt.Sprintf("/preguntas/%d/estado", c.p.ID), c.admin, body)
+		c.esperar(t, w, http.StatusBadRequest, "cuerpo_invalido")
+		if e, _ := c.estado(t); e != EstadoBorrador {
+			t.Errorf("%q cambió el estado a %s", body, e)
+		}
+	}
+}
