@@ -1,6 +1,6 @@
 "use client";
 import { PillEstadoPregunta } from "./_componentes/estado-pregunta";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -109,7 +109,11 @@ export default function PreguntasPage() {
   const [filterEspecialidadID, setFilterEspecialidadID] = useState<number>(0);
   const [filterDificultad, setFilterDificultad] = useState<string>("");
   const [filterEstado, setFilterEstado] = useState<Exclude<EstadoPregunta, "eliminada"> | "">("");
-  const [filterOrigen, setFilterOrigen] = useState<OrigenPregunta | "">("");
+  // `?origen=balotario` abre el listado ya filtrado (el enlace de la importación del balotario).
+  const origenInicial = useSearchParams().get("origen");
+  const [filterOrigen, setFilterOrigen] = useState<OrigenPregunta | "">(
+    () => ORIGENES_PREGUNTA.find((o) => o === origenInicial) ?? "",
+  );
   const [filterSearch, setFilterSearch] = useState<string>("");
   /** Texto de búsqueda ya estabilizado: es el que dispara la petición. */
   const [busqueda, setBusqueda] = useState<string>("");

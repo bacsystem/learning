@@ -44,7 +44,7 @@ NEXT_PUBLIC_STORAGE_PREFIX ?=
 NEXT_PUBLIC_CONTACT_EMAIL  ?=
 
 # ── Docker Compose (local) ────────────────────────────────────────────────────
-# Lee la configuración del .env de la raíz (ver .env.example).
+# Lee la configuración del .env de la raíz (ver env.example).
 COMPOSE    := docker compose
 root_env    = $(shell grep -E '^$(1)=' .env 2>/dev/null | cut -d'=' -f2-)
 C_PG_USER  := $(or $(call root_env,POSTGRES_USER),learning)
@@ -53,6 +53,7 @@ C_PG_DB    := $(or $(call root_env,POSTGRES_DB),learning)
 C_DB_PORT  := $(or $(call root_env,DB_PORT),5433)
 C_DB_URL   := postgres://$(C_PG_USER):$(C_PG_PASS)@localhost:$(C_DB_PORT)/$(C_PG_DB)?sslmode=disable
 C_ENC_KEY  := $(call root_env,ENCRYPTION_KEY)
+C_AF_KEY   := $(call root_env,ANTIFRAUD_HMAC_KEY)
 s          ?=
 
 .PHONY: help dev dev/backend dev/frontend test lint fmt build \
@@ -187,24 +188,25 @@ backup/test: ## Prueba de punta a punta del cron de copia (Postgres y S3 desecha
 # Uso: make compose/init → make compose/up → http://localhost:3000
 # s=<servicio> limita logs/restart/rebuild a db | backend | frontend
 
-# Crea .env desde .env.example: JWT_SECRET y POSTGRES_PASSWORD aleatorios y ENCRYPTION_KEY
+# Crea .env desde env.example: JWT_SECRET, POSTGRES_PASSWORD y ANTIFRAUD_HMAC_KEY aleatorios y ENCRYPTION_KEY
 # de backend/.env (si es válida, para que los datos cifrados sean compatibles) o aleatoria.
 # No pisa un .env existente. ENV_EXAMPLE/ENV_OUT permiten probarlo sobre otros archivos.
-ENV_EXAMPLE ?= .env.example
+ENV_EXAMPLE ?= env.example
 ENV_OUT     ?= .env
-compose/init: ## Crea .env desde .env.example con secretos aleatorios (no pisa uno existente)
+compose/init: ## Crea .env desde env.example con secretos aleatorios (no pisa uno existente)
 	@if [ -f "$(ENV_OUT)" ]; then echo "$(ENV_OUT) ya existe — no se modifica"; exit 0; fi; \
 	key=$$(grep -E '^ENCRYPTION_KEY=[0-9a-fA-F]{64}$$' backend/.env 2>/dev/null | cut -d= -f2-); src="backend/.env"; \
 	[ -n "$$key" ] || { key=$$(openssl rand -hex 32); src="generada"; }; \
-	jwt=$$(openssl rand -hex 32); pgpw=$$(openssl rand -hex 24); \
-	[ -n "$$jwt" ] && [ -n "$$pgpw" ] || { echo "ERROR: openssl rand falló"; exit 1; }; \
+	jwt=$$(openssl rand -hex 32); pgpw=$$(openssl rand -hex 24); af=$$(openssl rand -hex 32); \
+	[ -n "$$jwt" ] && [ -n "$$pgpw" ] && [ -n "$$af" ] || { echo "ERROR: openssl rand falló"; exit 1; }; \
 	sed -e "s/^JWT_SECRET=$$/JWT_SECRET=$$jwt/" -e "s/^ENCRYPTION_KEY=$$/ENCRYPTION_KEY=$$key/" \
-	    -e "s/^POSTGRES_PASSWORD=$$/POSTGRES_PASSWORD=$$pgpw/" "$(ENV_EXAMPLE)" > "$(ENV_OUT)"; \
-	echo "✓ $(ENV_OUT) creado (JWT_SECRET y POSTGRES_PASSWORD generados, ENCRYPTION_KEY: $$src)"
+	    -e "s/^POSTGRES_PASSWORD=$$/POSTGRES_PASSWORD=$$pgpw/" -e "s/^ANTIFRAUD_HMAC_KEY=$$/ANTIFRAUD_HMAC_KEY=$$af/" "$(ENV_EXAMPLE)" > "$(ENV_OUT)"; \
+	echo "✓ $(ENV_OUT) creado (JWT_SECRET, POSTGRES_PASSWORD y ANTIFRAUD_HMAC_KEY generados, ENCRYPTION_KEY: $$src)"
 
 compose/check-env:
 	@test -f .env || (echo "ERROR: falta .env — ejecuta: make compose/init" && exit 1)
 	@test -n "$(C_PG_PASS)" || (echo "ERROR: POSTGRES_PASSWORD vacío en .env (genera uno con: openssl rand -hex 24)" && exit 1)
+	@test -n "$(C_AF_KEY)" || (echo "ERROR: ANTIFRAUD_HMAC_KEY vacía en .env (un .env anterior no la tiene). Añádela: echo \"ANTIFRAUD_HMAC_KEY=\$$(openssl rand -hex 32)\" >> .env" && exit 1)
 
 compose/up: compose/check-env ## Levanta db + backend (migra) + frontend
 	$(COMPOSE) up -d --build
