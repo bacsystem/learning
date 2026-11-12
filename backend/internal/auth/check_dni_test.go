@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -24,11 +25,24 @@ func (f *fixture) checkDNIFrom(mux http.Handler, ip, dni string) *httptest.Respo
 	return w
 }
 
-// testIP returns a random documentation-range IP whose persisted limiter
-// counters are deleted on cleanup.
+// ipSecuencia numbers the addresses testIP hands out; it starts at a random
+// point so two runs against the same database do not meet the same keys.
+var ipSecuencia = func() *atomic.Uint64 {
+	var n atomic.Uint64
+	n.Store(uint64(rand.Intn(ipsDisponibles)))
+	return &n
+}()
+
+// ipsDisponibles is how many different addresses testIP has (198.18.0.0/16
+// without the .0 and .255 hosts).
+const ipsDisponibles = 256 * 254
+
+// testIP returns a documentation-range IP, never the same twice in a run, whose
+// persisted limiter counters are deleted on cleanup.
 func (f *fixture) testIP() string {
 	f.t.Helper()
-	ip := fmt.Sprintf("198.18.%d.%d", rand.Intn(256), 1+rand.Intn(254))
+	n := int(ipSecuencia.Add(1) % ipsDisponibles)
+	ip := fmt.Sprintf("198.18.%d.%d", n/254, 1+n%254)
 	f.t.Cleanup(func() {
 		if _, err := f.db.Exec(`DELETE FROM auth_intentos_fallidos WHERE clave LIKE '%'||$1||'%'`, f.repo.ipHMAC(ip)); err != nil {
 			f.t.Errorf("cleanup ip counters: %v", err)
@@ -142,5 +156,21 @@ func TestMaskNames(t *testing.T) {
 		if n != c.wantN || ap != c.wantAP {
 			t.Errorf("maskNames(%q,%q) = %q,%q want %q,%q", c.nombres, c.ap, n, ap, c.wantN, c.wantAP)
 		}
+	}
+}
+
+// TestTestIP_NeverRepeats: testIP must hand out a different address on every
+// call. It used to draw one of ~65 000 addresses at random, so a test using
+// ~30 «distinct sources» (PerDNICountsDistinctSources) hit a repeat in about
+// 0.7 % of the runs, and the two «sources» then shared a limiter key.
+func TestTestIP_NeverRepeats(t *testing.T) {
+	f := newFixture(t)
+	vistas := map[string]bool{}
+	for i := 0; i < 3000; i++ {
+		ip := f.testIP()
+		if vistas[ip] {
+			t.Fatalf("testIP repeated %s after %d calls", ip, i)
+		}
+		vistas[ip] = true
 	}
 }
