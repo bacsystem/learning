@@ -337,8 +337,13 @@ func TestParsear_Limite(t *testing.T) {
 	if r := parsear(t, bloquesSinar(MaxPreguntas)); len(r.Validas) != MaxPreguntas {
 		t.Errorf("1000 bloques: %d validas", len(r.Validas))
 	}
-	if r, err := Parsear([]byte(bloquesSinar(MaxPreguntas + 1))); !errors.Is(err, ErrLimitePreguntas) || len(r.Validas)+len(r.Problemas) != 0 {
-		t.Errorf("1001 bloques: err=%v resultado=%+v", err, r)
+	r, err := Parsear([]byte(bloquesSinar(MaxPreguntas + 5)))
+	var limite *LimiteError
+	if !errors.Is(err, ErrLimitePreguntas) || !errors.As(err, &limite) || limite.Detectadas != MaxPreguntas+5 || len(r.Validas)+len(r.Problemas) != 0 {
+		t.Errorf("1005 bloques: err=%v resultado=%+v", err, r)
+	}
+	if _, err := Parsear([]byte(bloquesSinar(MaxPreguntas + 1))); !errors.Is(err, ErrLimitePreguntas) {
+		t.Errorf("1001 bloques: err=%v", err)
 	}
 	// 995 valid + 6 with problems = 1001 blocks.
 	var md strings.Builder
