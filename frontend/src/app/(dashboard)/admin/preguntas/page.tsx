@@ -30,10 +30,11 @@ import {
   CONTENEDOR_PAGINA,
 } from "@/lib/estilos";
 import { type ColumnaExportable, descargarCsv, imprimirTabla } from "@/lib/exportar";
+import { apiErrorCode } from "@/lib/http/api-error";
 import { POR_PAGINA_DEFECTO } from "@/lib/paginacion";
 import { type EstadoPregunta, type OrigenPregunta, Pregunta, questionsApi } from "@/lib/questions/api";
 import {
-  claveErrorPregunta,
+  claveErrorEliminacion,
   claveEstadoPregunta,
   claveOrigenPregunta,
   ESTADOS_FILTRABLES,
@@ -219,8 +220,14 @@ export default function PreguntasPage() {
       load();
     } catch (e: unknown) {
       const err = e as { message?: string };
-      const clave = claveErrorPregunta(e);
+      const clave = claveErrorEliminacion(e);
       toast.error(clave ? t(clave) : (err.message ?? t("comun-error-eliminar")));
+      if (apiErrorCode(e) === "estado_invalido") {
+        // El estado cambió mientras tanto: se cierra el diálogo y se muestra el actual.
+        setConfirmDelete({ open: false, row: null, submitting: false });
+        load();
+        return;
+      }
       setConfirmDelete((d) => ({ ...d, submitting: false }));
     }
   };
@@ -551,17 +558,15 @@ export default function PreguntasPage() {
                           onClick: () => router.push(`/admin/preguntas/${p.id}/edit`),
                         },
                         // P2 (SIA-E3-02): un borrador o una en revisión se rechazan antes de eliminarse.
-                        ...(puedeEliminar(p.estado)
-                          ? [
-                              {
-                                label: t("comun-eliminar"),
-                                icon: TrashIcon,
-                                destructiva: true,
-                                separador: true,
-                                onClick: () => setConfirmDelete({ open: true, row: p, submitting: false }),
-                              },
-                            ]
-                          : []),
+                        {
+                          label: t("comun-eliminar"),
+                          icon: TrashIcon,
+                          destructiva: true,
+                          separador: true,
+                          disabled: !puedeEliminar(p.estado),
+                          ayuda: puedeEliminar(p.estado) ? undefined : t("serumsIa.avisosPregunta.eliminarAyuda"),
+                          onClick: () => setConfirmDelete({ open: true, row: p, submitting: false }),
+                        },
                       ]}
                     />
                   </TableCell>

@@ -1,10 +1,13 @@
 import en from "../../i18n/messages/en.json";
 import es from "../../i18n/messages/es.json";
-import type { EstadoPregunta } from "./api";
+import type { EstadoPregunta, Pregunta } from "./api";
 import {
-  claveErrorPregunta,
+  cambiaElContenido,
+  claveErrorEdicion,
+  claveErrorEliminacion,
   claveEstadoPregunta,
   claveOrigenPregunta,
+  contenidoDePregunta,
   editarContenidoLaRetira,
   ESTADOS_FILTRABLES,
   ESTADOS_PREGUNTA,
@@ -34,18 +37,27 @@ describe("estados de la pregunta (SIA-E3-02)", () => {
   });
 });
 
-describe("claveErrorPregunta", () => {
+describe("claves de error por operación", () => {
   const error = (code?: string) => Object.assign(new Error("x"), { status: 409, code });
 
-  it("maps the coded errors of E3-02", () => {
-    expect(claveErrorPregunta(error("estado_invalido"))).toBe("admin-preguntas-error-estado-invalido");
-    expect(claveErrorPregunta(error("clave_oficial"))).toBe("admin-preguntas-error-clave-oficial");
+  it("translates clave_oficial only when editing", () => {
+    expect(claveErrorEdicion(error("clave_oficial"))).toBe("serumsIa.errores.clave_oficial");
+    expect(claveErrorEdicion(error("estado_invalido"))).toBe("serumsIa.errores.generico");
   });
 
-  it("leaves other errors to the screen", () => {
-    expect(claveErrorPregunta(error("no_encontrado"))).toBeUndefined();
-    expect(claveErrorPregunta(error())).toBeUndefined();
-    expect(claveErrorPregunta(new TypeError("red"))).toBeUndefined();
+  it("translates estado_invalido only when deleting", () => {
+    expect(claveErrorEliminacion(error("estado_invalido"))).toBe("serumsIa.preguntas.errores.estado_invalido");
+    expect(claveErrorEliminacion(error("clave_oficial"))).toBe("serumsIa.errores.generico");
+  });
+
+  it("uses the generic text for a code without translation, never the server message", () => {
+    expect(claveErrorEdicion(error("cuerpo_demasiado_grande"))).toBe("serumsIa.errores.generico");
+    expect(claveErrorEliminacion(error("no_encontrado"))).toBe("serumsIa.errores.generico");
+  });
+
+  it("leaves errors without a code to the screen", () => {
+    expect(claveErrorEliminacion(error())).toBeUndefined();
+    expect(claveErrorEdicion(new TypeError("red"))).toBeUndefined();
   });
 });
 
@@ -53,9 +65,9 @@ describe("claves i18n de estado y origen", () => {
   const claves = [
     ...ESTADOS_PREGUNTA.map(claveEstadoPregunta),
     ...ORIGENES_PREGUNTA.map(claveOrigenPregunta),
-    ...["estado_invalido", "clave_oficial"].map(
-      (code) => claveErrorPregunta(Object.assign(new Error("x"), { status: 422, code })) ?? "",
-    ),
+    claveErrorEdicion(Object.assign(new Error("x"), { code: "clave_oficial" })) ?? "",
+    claveErrorEliminacion(Object.assign(new Error("x"), { code: "estado_invalido" })) ?? "",
+    claveErrorEdicion(Object.assign(new Error("x"), { code: "otro_codigo" })) ?? "",
   ];
 
   it.each([
@@ -73,5 +85,46 @@ describe("claves i18n de estado y origen", () => {
 
   it("live under serumsIa.estadosPregunta, owned by E3-02", () => {
     expect(claveEstadoPregunta("en_revision")).toBe("serumsIa.estadosPregunta.en_revision");
+  });
+});
+
+describe("cambiaElContenido (aviso de edición, E3-02 §4.5)", () => {
+  const guardada = {
+    enunciado: "¿Cuál es la capital?",
+    tipo: "unica",
+    respuestas: [
+      { id: 1, texto: "Lima", es_correcta: true, orden: 1 },
+      { id: 2, texto: "Cusco", es_correcta: false, orden: 2 },
+    ],
+    retroalimentacion: { explicacion: "Es Lima.", referencia: null },
+  } as Pregunta;
+  const base = () => structuredClone(contenidoDePregunta(guardada));
+
+  it("is false when nothing changed", () => {
+    expect(cambiaElContenido(contenidoDePregunta(guardada), base())).toBe(false);
+  });
+
+  // El servidor compara exacto (ciclo.go cambiaContenido): un espacio de más ya la manda a revisión.
+  it.each<[string, (c: ReturnType<typeof base>) => ReturnType<typeof base>]>([
+    ["the statement", (c) => ({ ...c, enunciado: `${c.enunciado} ` })],
+    ["an alternative text", (c) => ({ ...c, respuestas: [{ ...c.respuestas[0], texto: " Lima" }, c.respuestas[1]] })],
+    ["the explanation", (c) => ({ ...c, explicacion: ` ${c.explicacion}` })],
+  ])("is true when only surrounding spaces are added to %s", (_, cambiar) => {
+    expect(cambiaElContenido(contenidoDePregunta(guardada), cambiar(base()))).toBe(true);
+  });
+
+  it("is false when the alternatives are only reordered", () => {
+    const editado = { ...base(), respuestas: [...base().respuestas].reverse() };
+    expect(cambiaElContenido(contenidoDePregunta(guardada), editado)).toBe(false);
+  });
+
+  it.each<[string, (c: ReturnType<typeof base>) => ReturnType<typeof base>]>([
+    ["the statement", (c) => ({ ...c, enunciado: "Otra" })],
+    ["the type", (c) => ({ ...c, tipo: "multiple" })],
+    ["an alternative text", (c) => ({ ...c, respuestas: [{ texto: "Arequipa", es_correcta: true }, c.respuestas[1]] })],
+    ["the answer key", (c) => ({ ...c, respuestas: c.respuestas.map((r) => ({ ...r, es_correcta: !r.es_correcta })) })],
+    ["the explanation", (c) => ({ ...c, explicacion: "Es Cusco." })],
+  ])("is true when %s changes", (_, cambiar) => {
+    expect(cambiaElContenido(contenidoDePregunta(guardada), cambiar(base()))).toBe(true);
   });
 });

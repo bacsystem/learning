@@ -1,4 +1,4 @@
-import type { EstadoPregunta, OrigenPregunta } from "./api";
+import type { EstadoPregunta, OrigenPregunta, Pregunta } from "./api";
 
 import { apiErrorCode } from "@/lib/http/api-error";
 
@@ -39,14 +39,60 @@ export function editarContenidoLaRetira(estado: EstadoPregunta): boolean {
   return estado === "aprobada" || estado === "activo";
 }
 
-/** Claves i18n (`dashboard.*`) de los errores con código de E3-02 (§7) que llegan a estas pantallas. */
-const CLAVE_ERROR: Record<string, string> = {
-  estado_invalido: "admin-preguntas-error-estado-invalido",
-  clave_oficial: "admin-preguntas-error-clave-oficial",
+/** Lo que el §4.5 llama «contenido»: cambiarlo en una publicada la pasa a revisión; la clasificación no. */
+export type ContenidoPregunta = Pick<Pregunta, "enunciado" | "tipo"> & {
+  respuestas: { texto: string; es_correcta: boolean }[];
+  explicacion: string;
+  referencia: string;
 };
 
-/** Clave i18n del error, si tiene una propia; si no, `undefined` y la pantalla usa su mensaje habitual. */
-export function claveErrorPregunta(err: unknown): string | undefined {
-  const codigo = apiErrorCode(err);
-  return codigo ? CLAVE_ERROR[codigo] : undefined;
+export function contenidoDePregunta(p: Pregunta): ContenidoPregunta {
+  return {
+    enunciado: p.enunciado,
+    tipo: p.tipo,
+    respuestas: p.respuestas,
+    explicacion: p.retroalimentacion?.explicacion ?? "",
+    referencia: p.retroalimentacion?.referencia ?? "",
+  };
 }
+
+const huellaRespuestas = (c: ContenidoPregunta) =>
+  c.respuestas
+    .map((r) => `${r.es_correcta ? 1 : 0}${r.texto}`)
+    .sort()
+    .join("\n");
+
+/**
+ * Solo para avisar antes de guardar: el servidor compara con lo guardado y decide el estado (E3-02 §4.5).
+ * Compara exacto, sin recortar, igual que el servidor y como se envía el formulario. Reordenar alternativas no es
+ * cambiar el contenido.
+ */
+export function cambiaElContenido(guardado: ContenidoPregunta, editado: ContenidoPregunta): boolean {
+  return (
+    guardado.enunciado !== editado.enunciado ||
+    guardado.tipo !== editado.tipo ||
+    guardado.explicacion !== editado.explicacion ||
+    guardado.referencia !== editado.referencia ||
+    huellaRespuestas(guardado) !== huellaRespuestas(editado)
+  );
+}
+
+/** Un mapa por operación: `estado_invalido` significa otra cosa al eliminar que al citar o cambiar de estado. */
+const CLAVES_EDICION: Record<string, string> = { clave_oficial: "serumsIa.errores.clave_oficial" };
+const CLAVES_ELIMINACION: Record<string, string> = { estado_invalido: "serumsIa.preguntas.errores.estado_invalido" };
+
+/** Un código sin traducción propia no muestra el `message` del servidor (siempre en español): usa este texto neutro. */
+const CLAVE_ERROR_GENERICO = "serumsIa.errores.generico";
+
+/** Con código: su clave o la genérica. Sin código (formato heredado de la API): `undefined`, y manda el `message`. */
+const claveDe = (claves: Record<string, string>, err: unknown): string | undefined => {
+  const codigo = apiErrorCode(err);
+  if (!codigo) return undefined;
+  return Object.hasOwn(claves, codigo) ? claves[codigo] : CLAVE_ERROR_GENERICO;
+};
+
+/** Clave i18n del error de `PUT /preguntas/{id}`, la genérica si el código no tiene traducción, o `undefined` si el error no trae código. */
+export const claveErrorEdicion = (err: unknown) => claveDe(CLAVES_EDICION, err);
+
+/** Clave i18n del error de `DELETE /preguntas/{id}`, la genérica si el código no tiene traducción, o `undefined` si el error no trae código. */
+export const claveErrorEliminacion = (err: unknown) => claveDe(CLAVES_ELIMINACION, err);
