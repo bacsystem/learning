@@ -181,8 +181,9 @@ func (c *PgCache) Buscar(ctx context.Context, clave string) ([]byte, bool, error
 		FuenteIDs  pq.Int64Array `db:"fuente_ids"`
 		VigenteIDs pq.Int64Array `db:"vigente_ids"`
 		ExpiraEn   time.Time     `db:"expira_en"`
+		CreadaEn   time.Time     `db:"created_at"`
 	}
-	err := c.db.GetContext(ctx, &e, `SELECT salida, fuente_ids, vigente_ids, expira_en FROM ia_cache WHERE clave = $1`, clave)
+	err := c.db.GetContext(ctx, &e, `SELECT salida, fuente_ids, vigente_ids, expira_en, created_at FROM ia_cache WHERE clave = $1`, clave)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, false, nil
 	}
@@ -197,12 +198,22 @@ func (c *PgCache) Buscar(ctx context.Context, clave string) ([]byte, bool, error
 		}
 	}
 	if !vigente {
-		if _, err := c.db.ExecContext(ctx, `DELETE FROM ia_cache WHERE clave = $1`, clave); err != nil {
-			return nil, false, fmt.Errorf("borrar entrada vencida de la caché de ia: %w", err)
+		if err := c.borrarEntradaLeida(ctx, clave, e.CreadaEn); err != nil {
+			return nil, false, err
 		}
 		return nil, false, nil
 	}
 	return e.Salida, true, nil
+}
+
+// borrarEntradaLeida deletes the stale entry that was read, not whatever is
+// under the key now: another request may have written a fresh one between the
+// read and the delete, and that one must stay.
+func (c *PgCache) borrarEntradaLeida(ctx context.Context, clave string, creadaEn time.Time) error {
+	if _, err := c.db.ExecContext(ctx, `DELETE FROM ia_cache WHERE clave = $1 AND created_at = $2`, clave, creadaEn); err != nil {
+		return fmt.Errorf("borrar entrada vencida de la caché de ia: %w", err)
+	}
+	return nil
 }
 
 // fuentesVigentes: every (source, version) pair still matches an `activa`
