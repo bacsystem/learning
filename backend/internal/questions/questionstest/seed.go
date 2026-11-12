@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/cbaciliod/learning/internal/auth"
+	"github.com/cbaciliod/learning/internal/db/testlock"
 	"github.com/cbaciliod/learning/internal/jwt"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // postgres driver
@@ -39,7 +40,11 @@ func DB(t *testing.T) *sqlx.DB {
 	// The Postgres server is shared: keep each test's pool small (concurrency
 	// tests then queue on the pool instead of exhausting max_connections).
 	db.SetMaxOpenConns(8)
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() }) // runs after the lock is released
+	// Same advisory lock as dbtest.Open: integration tests of every package
+	// share one database, and the ones that seed through this package used to
+	// run unserialized against the rest (#218).
+	testlock.Hold(t, db)
 	return db
 }
 
