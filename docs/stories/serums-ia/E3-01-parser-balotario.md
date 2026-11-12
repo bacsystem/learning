@@ -25,6 +25,14 @@ Formato observado: preguntas numeradas, alternativas A–D, clave dentro de `<ma
 6. El resultado guarda el rango de líneas de origen de cada pregunta (trazabilidad).
 7. Se excluye cualquier texto fuera de las preguntas (encabezados, pies de página).
 8. Cada pregunta válida lleva una lista de `alertas_estructura` cuando el parser tuvo que intervenir: `alternativas_separadas` (venían pegadas en una línea), `vinetas_normalizadas`, `html_eliminado`. Sirve para que el admin revise la consistencia estructural en SIA-E3-05 (decisión P2, issue #65); una pregunta sin intervención lleva la lista vacía.
+9. **Entrada** (decisión del PO, 12-nov): el parser lee el `contenido` original de la versión vigente de la fuente, no los pasajes. Los números de línea son los del archivo original, los mismos de `pasajes.linea_inicio/linea_fin` (ADR 0003).
+10. **Motivos de «con problemas»** (lista cerrada): `sin_clave`, `enunciado_vacio`, `alternativas_insuficientes` (menos de 2), `alternativas_excedidas` (más de 6), `alternativas_duplicadas`, `numeracion_rota`, `enunciado_largo` (más de 2 000 caracteres) y `alternativa_larga` (más de 500). Si una pregunta tiene varios motivos, se informan todos.
+11. **Numeración rota:** se compara solo con la pregunta inmediatamente anterior. Si su número no es el anterior + 1 (salto o repetición), va a «con problemas» con `numeracion_rota` y el parseo sigue contando desde ese número. Una numeración que vuelve a 1 tras un encabezado de sección cuenta como inicio de secuencia nueva, no como numeración rota.
+12. **Límite de 1 000:** cuentan todos los bloques de pregunta detectados, válidos y con problemas. El parser devuelve el error `limite_preguntas` y no produce resultado; SIA-E3-03 lo traduce a 422.
+13. **Marca de clave:** una alternativa es correcta si cualquier parte de su texto, incluida la etiqueta, está dentro de `<mark>…</mark>`. Las etiquetas `<mark>` no quedan en el texto guardado.
+14. **Determinista:** la misma entrada produce siempre la misma salida (mismo orden, mismos textos, mismas alertas), para que la vista previa y la confirmación de SIA-E3-03 coincidan.
+15. El parser **no** detecta duplicados contra el banco ni crea `conflicto_clave`: eso es de SIA-E3-06, sobre los borradores ya importados.
+16. **HTML residual:** solo se eliminan las etiquetas HTML reconocibles (`<b>dosis</b>` queda «dosis»). Las etiquetas `<script>` y `<style>` se eliminan junto con su contenido. Todo esto genera la alerta `html_eliminado`. Un `<` o `>` que no forma una etiqueta («PA < 90», «Hb <7 g/dL») es texto y se conserva tal cual, sin alerta.
 
 ## Criterios de aceptación
 ```gherkin
@@ -49,14 +57,59 @@ Escenario: Sin clave
   Entonces se lista como "con problemas" con número de línea y motivo "sin_clave"
 
 Escenario: Exceso de preguntas
-  Dado un archivo con 1 001 preguntas
+  Dado un archivo con 995 preguntas válidas y 6 con problemas (1 001 bloques)
   Cuando se parsea
-  Entonces responde 422 "limite_preguntas" sin crear nada
+  Entonces devuelve el error "limite_preguntas" sin resultado parcial
+
+Escenario: Varios motivos
+  Dado una pregunta sin <mark> y con una sola alternativa
+  Cuando se parsea
+  Entonces se lista como "con problemas" con los motivos "sin_clave" y "alternativas_insuficientes"
+
+Escenario: Numeración rota
+  Dado las preguntas 1, 2, 4 y 5 seguidas
+  Cuando se parsea
+  Entonces la 4 se lista como "con problemas" con motivo "numeracion_rota" y su número de línea, y la 5 es válida
+
+Escenario: Numeración por secciones
+  Dado las preguntas 1 a 30, un encabezado de sección y otra vez las preguntas 1 a 20
+  Cuando se parsea
+  Entonces ninguna tiene el motivo "numeracion_rota"
+
+Escenario: Textos demasiado largos
+  Dado una pregunta con un enunciado de 2 001 caracteres y otra con una alternativa de 501
+  Cuando se parsea
+  Entonces la primera tiene el motivo "enunciado_largo" y la segunda "alternativa_larga"
+
+Escenario: Marca sobre la etiqueta
+  Dado la alternativa "<mark>C)</mark> Tres"
+  Cuando se parsea
+  Entonces C es la correcta y su texto guardado es "Tres", sin etiquetas <mark>
+
+Escenario: HTML residual
+  Dado el enunciado "Ajuste la <b>dosis</b><script>x</script> diaria"
+  Cuando se parsea
+  Entonces el texto guardado es "Ajuste la dosis diaria" y la pregunta lleva la alerta "html_eliminado"
+
+Escenario: Signos menor y mayor que no son HTML
+  Dado el enunciado "Paciente con PA < 90 mmHg y Hb <7 g/dL"
+  Cuando se parsea
+  Entonces el texto guardado es idéntico y la pregunta no lleva la alerta "html_eliminado"
+
+Escenario: Líneas del original
+  Dado una pregunta que ocupa las líneas 120 a 126 del archivo original
+  Cuando se parsea
+  Entonces su rango de origen es 120–126
+
+Escenario: Determinismo
+  Dado el mismo archivo parseado dos veces
+  Cuando se comparan los resultados
+  Entonces son idénticos
 
 Escenario: Conservación del texto
   Dado un enunciado y alternativas con espacios y viñetas irregulares
   Cuando se parsea
-  Entonces el texto de enunciado y alternativas no se reescribe (solo se normalizan espacios y viñetas)
+  Entonces el texto de enunciado y alternativas no se reescribe (solo se normalizan espacios y viñetas y se quitan las etiquetas de las reglas 13 y 16)
 
 Escenario: Resumen
   Dado un archivo con preguntas válidas y con problemas
@@ -75,16 +128,16 @@ Escenario: Sin intervención
 ```
 
 ## Fuera de alcance
-Clasificar por área (SIA-E3-04), persistir (SIA-E3-03), PDF.
+Clasificar por área (SIA-E3-04), persistir (SIA-E3-03), deduplicar y `conflicto_clave` (SIA-E3-06), PDF.
 
 ## Dependencias
 SIA-E3-02 (modelo de borrador), SIA-E2-05.
 
 ## Seguridad y privacidad
-El contenido se trata como datos; HTML residual se escapa o elimina salvo `<mark>`.
+El contenido se trata como datos; el HTML residual se elimina (regla 16), y `<mark>` solo se usa para detectar la clave.
 
 ## i18n
-Motivos de problema mapeados a claves es/en para la UI (SIA-E3-03).
+Los ocho motivos de la regla 10 y las tres alertas de la regla 8 se muestran en la UI de SIA-E3-03 con claves es/en; el parser solo devuelve los códigos.
 
 ## Definición de terminado
 Suite de pruebas con fixtures sintéticos (sin datos de assets/) cubriendo cada regla; review limpio.

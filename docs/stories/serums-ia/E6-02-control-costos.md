@@ -44,9 +44,22 @@ flowchart TD
 6. El reintento de una operación fallida no consume límite; una llamada que falla libera su reserva.
 7. Encolar una solicitud administrativa sin llamada al LLM (SIA-E5-06) no descuenta cuota del postulante; la generación que luego hace el admin al atenderla descuenta del límite del admin.
 8. Admins configuran límites y presupuesto desde un panel; cada cambio se audita con valor anterior y nuevo.
-9. El postulante ve su consumo restante (día y mes); el admin ve el gasto del mes en USD y el porcentaje del presupuesto.
+9. El postulante obtiene su consumo restante (día y mes) por la API; su vista se construye después (regla 20). El admin ve en el panel el gasto del mes en USD, el porcentaje del presupuesto y su propio consumo del día.
 10. Operaciones concurrentes no pueden superar el límite ni el presupuesto (control atómico).
 11. Contadores antifraude: los contadores de acciones IA del postulante se guardan por `HMAC(usuario_id)` con un secreto de servidor (variable de entorno), sin otros datos personales, para que borrar los datos de aprendizaje (SIA-E9-07) no reinicie la cuota. Se conservan solo hasta el fin del mes en curso.
+
+**Decisiones del PO (12-nov, contrato de E6-02):**
+
+12. **Orden de verificación:** caché → presupuesto → límite mensual → límite diario. Si fallan varios, se responde el código del primero que falla en ese orden. La caché vigente se sirve aunque el presupuesto o el límite del actor estén agotados.
+13. **Presupuesto y llamadas en curso:** el costo se conoce después de la llamada, así que el corte se aplica cuando el gasto registrado es ≥ presupuesto, antes de llamar. Se acepta que las llamadas que ya estaban en curso lo superen un poco. No se reserva un costo estimado. El control atómico estricto de la regla 10 vale para los límites de acciones, no para los USD.
+14. **Costo de una llamada fallida:** la llamada libera su acción (regla 6), pero su costo real en USD, si el servicio de IA lo informa, sí suma al gasto del mes.
+15. **Reserva por lote:** se puede consultar cuántas acciones le quedan al actor y reservar N de una vez, de forma atómica (todo o nada), para la regla 6 de SIA-E3-04. Si no alcanzan, responde 429 sin reservar nada.
+16. **Gasto estable ante borrados:** el gasto del mes no baja cuando SIA-E9-07 borra o anonimiza los registros de uso de un usuario. Cómo se logra lo decide el architect.
+17. **Rangos de configuración:** postulante, 0–50 por día y 0–1000 por mes, con el diario ≤ el mensual; admin, 1–1000 por día; presupuesto, 1–1000 USD con 2 decimales. Un valor fuera de rango, o un diario mayor que el mensual, responde 422 `validacion`.
+18. **Cambios de configuración:** bajar un límite por debajo de lo ya consumido no es retroactivo; las siguientes solicitudes reciben 429. Subir el presupuesto reabre las llamadas de inmediato y rearma la alerta del 80 % una vez para el nuevo valor. Si al subirlo el gasto ya está en o por encima del 80 % del nuevo valor, la alerta se envía en ese momento, una vez. Los contadores del admin no necesitan HMAC (la regla 11 es solo para postulantes); su forma la decide el architect.
+19. **Canal de la alerta:** notificación in-app (campana existente) a todos los admins activos. El correo queda fuera de alcance.
+20. **Consumo del postulante:** en el MVP el postulante no tiene ninguna acción IA real (SIA-E5-06 solo encola y SIA-E6-08 la genera el admin). Esta historia entrega los límites del postulante y la API de su consumo propio; la vista para el postulante se construye en la primera historia que le dé una acción IA real. Los escenarios de cuota del postulante se verifican por API o por servicio. El admin sí ve su consumo del día en el panel. Cambio de alcance aprobado por el usuario (issue #40).
+21. **Pruebas sin proveedor real:** los escenarios se verifican con el doble del servicio de IA (SIA-E6-01) configurado con un costo por llamada. Elegir el proveedor y el modelo reales y construir su adaptador es SIA-E6-10, que requiere la aprobación del usuario y no bloquea esta historia.
 
 ## Criterios de aceptación
 ```gherkin
@@ -116,18 +129,73 @@ Escenario: Contador tras borrado de datos
   Entonces recibe 429 "limite_ia"
 
 Escenario: Contador sin datos personales
-  Dado los contadores de acciones IA guardados
-  Cuando se inspecciona la tabla de contadores
+  Dado los contadores de acciones IA de postulantes guardados
+  Cuando se inspecciona la tabla de contadores de postulantes
   Entonces solo contienen el HMAC del usuario, el periodo y el número, sin id en claro, nombre, DNI ni email
 
 Escenario: Auditoría
   Dado un admin en el panel de límites
   Cuando cambia un límite o el presupuesto
   Entonces audit_log registra valor anterior y nuevo
+
+Escenario: Exceso por llamadas en curso
+  Dado un presupuesto de 40 USD con 39,90 USD gastados y dos llamadas en curso de 0,20 USD cada una
+  Cuando ambas terminan
+  Entonces el gasto queda en 40,30 USD y la siguiente solicitud recibe 429 "presupuesto_agotado"
+
+Escenario: Costo de una llamada fallida
+  Dado un admin con 10 acciones hoy
+  Cuando una llamada falla y el servicio de IA informa un costo de 0,05 USD
+  Entonces el admin sigue con 10 acciones y el gasto del mes sube 0,05 USD
+
+Escenario: Caché con el límite del actor agotado
+  Dado un admin con 200 acciones hoy y una respuesta vigente en caché
+  Cuando repite esa operación
+  Entonces se sirve de caché sin error y sigue con 200 acciones
+
+Escenario: Precedencia de errores
+  Dado el presupuesto agotado y un postulante con 5 acciones hoy
+  Cuando solicita una acción que requiere llamada al LLM
+  Entonces recibe 429 "presupuesto_agotado"
+
+Escenario: Reserva de un lote
+  Dado un admin con 195 acciones hoy
+  Cuando pide reservar 10 acciones de una vez
+  Entonces recibe 429 "limite_ia" con 5 acciones disponibles y no se reserva ninguna
+
+Escenario: Gasto estable tras un borrado
+  Dado un gasto del mes de 12 USD, parte de él generado por un postulante
+  Cuando ese postulante borra sus datos de aprendizaje (SIA-E9-07)
+  Entonces el gasto del mes sigue en 12 USD
+
+Escenario: Valor fuera de rango
+  Dado un admin en el panel de límites
+  Cuando guarda un límite diario de postulante de 51
+  Entonces recibe 422 "validacion" y no cambia nada
+
+Escenario: Diario mayor que el mensual
+  Dado un admin en el panel de límites
+  Cuando guarda un límite diario de postulante de 30 con el mensual en 20
+  Entonces recibe 422 "validacion" y no cambia nada
+
+Escenario: Bajar un límite no es retroactivo
+  Dado un admin con 150 acciones hoy
+  Cuando otro admin baja el límite diario de admin a 100
+  Entonces sus acciones de hoy no se anulan y su siguiente solicitud recibe 429 "limite_ia"
+
+Escenario: Subir el presupuesto tras el corte
+  Dado el presupuesto de 40 USD agotado y la alerta del 80 % ya enviada
+  Cuando un admin lo sube a 60 USD
+  Entonces las llamadas al LLM se permiten de inmediato y la alerta se envía una vez más al llegar a 48 USD
+
+Escenario: Consumo propio del postulante
+  Dado un postulante con 2 acciones hoy y 10 en el mes
+  Cuando consulta su consumo por la API
+  Entonces recibe 3 restantes del día y 50 del mes con las horas de reinicio en America/Lima, y nunca el consumo de otro usuario
 ```
 
 ## Fuera de alcance
-Cobro al usuario o planes de pago; presupuestos por profesión.
+Cobro al usuario o planes de pago; presupuestos por profesión; proveedor y adaptador real (SIA-E6-10); alerta por correo; vista del consumo para el postulante (regla 20), que se construye en la primera historia que le dé una acción IA real.
 
 ## Dependencias
 SIA-E6-01.
@@ -136,7 +204,7 @@ SIA-E6-01.
 Los contadores son por `HMAC(usuario_id)`; el secreto del HMAC vive solo en variables de entorno. El consumo de un usuario solo lo ve él y los admins en agregado.
 
 ## i18n
-Consumo, errores, gasto en USD y panel en es/en (formato de moneda del locale).
+Panel de admin (límites, presupuesto, gasto en USD y porcentaje, consumo propio del día), la notificación del 80 % y los errores `limite_ia`, `limite_ia_mensual`, `presupuesto_agotado` y `validacion` en es/en, con formato de moneda y de hora del locale. Ningún código se muestra crudo.
 
 ## Definición de terminado
 Tests de concurrencia, de corte al 100 %, de reinicio diario y mensual por zona horaria Lima y de persistencia del contador tras borrado; migración con Down; `tsc`, `lint`, `build`; review limpio.
