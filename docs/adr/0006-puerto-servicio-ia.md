@@ -19,7 +19,7 @@ Varias historias necesitan «el servicio de IA». El proveedor, el modelo y los 
 
 - **Paquete:** `internal/ia`, con el puerto `Proveedor` y el `Servicio` de cuatro operaciones tipadas (contrato §1).
 - **Doble:** el doble determinista es el único adaptador en E6-01.
-- **Adaptador real:** se agrega en SIA-E6-02, con la aprobación del usuario y su propio ADR (proveedor, modelo, costos y región de los datos).
+- **Adaptador real:** se agrega en **SIA-E6-10** (#173; antes asignado a E6-02, corregido el 2026-11-12). Requiere la aprobación del usuario y su propio ADR (proveedor, modelo, costos y región de los datos).
 - **El servicio rechaza antes de llamar** cuando la entrada pasa de 30 000 runes, trae datos personales (DNI, email o teléfono) o el servicio está deshabilitado. Ese tipo de datos nunca llega a un tercero.
 - **El doble falla cerrado:** solo se acepta con `ENV` `development`, `test` o `preprod`. Con cualquier otro valor la aplicación no arranca, así un alumno nunca recibe contenido ficticio.
 - **Registro de uso en `ia_usos`**, una fila por invocación, sin contenido ni texto detectado, escrita fuera de la transacción del consumidor.
@@ -36,4 +36,4 @@ Varias historias necesitan «el servicio de IA». El proveedor, el modelo y los 
   - Rechazar por patrón tiene falsos positivos, por ejemplo una fecha `20261111` (8 dígitos) o el teléfono de contacto de una norma. Decisión del PO (contrato §7): el servicio rechaza y nunca enmascara por su cuenta. Los consumidores que arman entradas con contenido de fuentes o preguntas enmascaran antes de llamar, con la función exportada `ia.Enmascarar`.
   - La detección pliega los dígitos Unicode (`Nd`) a ASCII antes de buscar, pero no aplica NFKC, para no sumar `golang.org/x/text` como dependencia directa. **Riesgo aceptado:** un correo con letras o `＠` de ancho completo, o un número con caracteres invisibles entre los dígitos, puede pasar sin detectarse. Es una ofuscación deliberada, poco probable en contenido que carga un admin (contrato §4, plegado de dígitos). Si hiciera falta NFKC, se pide aprobación para la dependencia.
   - Cada consumidor necesita infraestructura asíncrona (job y estado), y eso aumenta el costo de E3-04 y E6-03.
-  - Hasta E6-02, con `IA_PROVEEDOR` vacío, ninguna función de IA está disponible en producción.
+  - Hasta E6-10, con `IA_PROVEEDOR` vacío, ninguna función de IA está disponible en producción.

@@ -344,6 +344,8 @@ Es determinista e idempotente: mismo contenido y misma `normalizador_version` da
    - Test de propiedad obligatorio: en todo documento de 150 palabras o más, cada pasaje tiene entre 150 y 800.
 7. **Excepción** (decisión del PO): un documento entero de 1 a 149 palabras se publica como un único pasaje (escenario «Documento corto»). Si no tiene ninguna palabra, `ErrSinContenido` (`fallida` con `sin_contenido`). Con más de 5 000 pasajes, `ErrLimitePasajes` (`fallida` con `limite_pasajes`).
 8. **Alternativas pegadas** («a) … b) … c) …» en una línea): **no** se separan en el MVP. La regla 1 de SIA-E2-05 no lo pide y la heurística da falsos positivos (p. ej. «vitamina b) …»). La DoD las cubre como caso de test: el texto se conserva igual y el resultado es determinista. La separación por pregunta y alternativa de los balotarios llega con SIA-E3-01.
+> **Enmienda** de la última viñeta del paso 6 y de los pasos 8 y 9, en la [ADR 0008](0008-balotario-parser-bajo-demanda-y-cita-por-rango.md) (D8 del PO): los balotarios mantienen la segmentación genérica v1, el parser de SIA-E3-01 corre bajo demanda y cada pregunta cita por solape de líneas.
+
 9. Los balotarios se segmentan por pregunta en SIA-E3-01. Hasta entonces usan esta segmentación genérica. `normalizador_version` (`SMALLINT`, hoy 1) distingue los pasajes generados por cada algoritmo. Una versión nueva del algoritmo no reescribe pasajes ya citados.
 
 ## Consecuencias
