@@ -150,6 +150,13 @@ func TestDecodeJSONStrict(t *testing.T) {
 		{"campo desconocido", `{"nombre":"Tema","x":1}`, 0, false, http.StatusBadRequest, "cuerpo_invalido"},
 		{"mal formado", `{"nombre":`, 0, false, http.StatusBadRequest, "cuerpo_invalido"},
 		{"dentro del límite", `{"nombre":"Tema"}`, 64, true, 0, ""},
+		{"espacios y saltos de línea al final", "{\"nombre\":\"Tema\"} \n\t\r\n", 0, true, 0, ""},
+		{"otro objeto después", `{"nombre":"Tema"}{}`, 0, false, http.StatusBadRequest, "cuerpo_invalido"},
+		{"otro objeto después de un espacio", `{"nombre":"Tema"} {"nombre":"Otro"}`, 0, false, http.StatusBadRequest, "cuerpo_invalido"},
+		{"un valor suelto después", `{"nombre":"Tema"} 1`, 0, false, http.StatusBadRequest, "cuerpo_invalido"},
+		{"basura después", `{"nombre":"Tema"} basura`, 0, false, http.StatusBadRequest, "cuerpo_invalido"},
+		{"el cuerpo vacío", ``, 0, false, http.StatusBadRequest, "cuerpo_invalido"},
+		{"los datos sobrantes pasan el límite", `{"nombre":"Tema"}` + strings.Repeat(" ", 100) + `{}`, 32, false, http.StatusRequestEntityTooLarge, "cuerpo_demasiado_grande"},
 		{"pasa el límite al leer", `{"nombre":"` + strings.Repeat("a", 100) + `"}`, 16, false, http.StatusRequestEntityTooLarge, "cuerpo_demasiado_grande"},
 	}
 	for _, c := range cases {
