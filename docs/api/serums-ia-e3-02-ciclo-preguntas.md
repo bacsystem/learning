@@ -91,10 +91,10 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 
 ### 4.1 `PATCH /preguntas/{id}/estado` (nuevo)
 
-> **Pendiente de actualizar con SIA-E3-07:** B4 se implementa con las reglas del contrato de E3-07: `revision_especializada` al aprobar `balotario` o `ia`, y `verificado` y `nota` en el cuerpo para revalidar. Ese contrato actualiza este §, y el cuerpo definitivo **incluye** `verificado` y `nota` desde el inicio, para que agregarlos después no rompa a los clientes por `DisallowUnknownFields` (p. ej. el seed B8). Donde este § y E3-07 difieran, manda E3-07.
+> **Actualizado por SIA-E3-07** ([contrato §3](serums-ia-e3-07-revision-basica.md#3-patch-preguntasidestado-versión-definitiva)): el cuerpo definitivo trae `estado`, `motivo`, `verificado` y `nota` desde el inicio. La tabla de validaciones de abajo queda **sustituida** por la de E3-07 §3.2, que añade `revision_especializada`, `nota_obligatoria` y `verificacion_requerida` y fija el orden total. Se mantienen el bloqueo, la respuesta y la auditoría de este §, con el `detalle` de E3-07 §3.3. Donde difieran, manda E3-07.
 
 ```json
-{ "estado": "rechazada", "motivo": "La clave no coincide con la NTS vigente." }
+{ "estado": "rechazada", "motivo": "La clave no coincide con la NTS vigente.", "verificado": null, "nota": null }
 ```
 
 | # | Validación, en orden | Error |
@@ -121,16 +121,14 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 
 ### 4.2 `PUT /preguntas/{id}/citas` (nuevo)
 
-> **Pendiente de actualizar con SIA-E3-07:** B5 se implementa con las reglas del contrato de E3-07: `422 fuente_no_activa` al citar un pasaje de una fuente no activa; en una `aprobada` se permiten agregar citas siempre y quitarlas solo si queda una cita a una fuente activa (si no, `409 ultima_cita_activa`); y `422 limite_citas` por encima de 20. Ese contrato actualiza este §. Donde este § y E3-07 difieran, manda E3-07.
+> **Actualizado por SIA-E3-07** ([contrato §4](serums-ia-e3-07-revision-basica.md#4-put-preguntasidcitas-versión-definitiva)): las reglas de estados y validación de abajo quedan **sustituidas** por E3-07 §4. En resumen: se permite también en `aprobada`; más de 20 ids da `422 limite_citas`; las citas **nuevas** exigen una fuente `activa` (`422 fuente_no_activa`); en una `aprobada`, quitar exige que quede una cita a una fuente activa (`409 ultima_cita_activa`). Se mantienen el cuerpo, el reemplazo, el bloqueo, la respuesta y la auditoría. Donde difieran, manda E3-07.
 
 ```json
 { "pasaje_ids": [9012, 9013] }
 ```
 
-- Reemplaza el conjunto de citas. `pasaje_ids` es obligatorio, con 0–20 ids, sin repetidos y todos existentes. Si no, `422 validacion` / `422 referencia_invalida`.
-- Se permite en `borrador`, `en_revision`, `rechazada` y `activo` (agregar trazabilidad al banco heredado).
-- En `aprobada` responde `409 estado_invalido`: una aprobada no puede quedar sin su cita. Para cambiarla se pasa antes a `en_revision`.
-- Se puede citar un pasaje de una fuente `retirada`, pero esa cita no cuenta para aprobar (§4.1, regla 6).
+- Reemplaza el conjunto de citas. `pasaje_ids` es obligatorio, sin repetidos y todos existentes (`422 validacion` / `422 referencia_invalida`); el máximo de 20 da `422 limite_citas` (E3-07 §4.2).
+- ~~Se permite en `borrador`, `en_revision`, `rechazada` y `activo`. En `aprobada` responde `409 estado_invalido`. Se puede citar un pasaje de una fuente `retirada`.~~ **Sustituido por E3-07 §4.1–§4.2:** se permite también en `aprobada` (con `ultima_cita_activa`) y una cita **nueva** exige una fuente `activa` (`fuente_no_activa`). Una cita ya existente a una fuente retirada se puede conservar, pero no cuenta para aprobar (§4.1, regla 6).
 - **Bloqueo** (corrección H2 del review): se bloquean las fuentes de las citas **actuales y las nuevas**.
   1. Resolver los `fuente_id` de los `pasaje_ids` del cuerpo y unirlos con los de las citas actuales de la pregunta.
   2. `SELECT … FROM fuentes WHERE id = ANY($unión) ORDER BY id FOR SHARE`.
@@ -138,7 +136,7 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
   4. Volver a leer las citas actuales: si su conjunto de fuentes ya no está dentro de la unión bloqueada, responder `409 estado_invalido`.
   5. Validar y escribir.
 
-  Bloquear también las fuentes **nuevas** evita dos carreras. Una: que se agregue una cita a una fuente que se retira a la vez, y que una pregunta servida quede citando solo una fuente retirada. Otra: que `liberarVersion` (`fuentes/repository.go:328`) archive esa versión y borre sus pasajes mientras se inserta la cita, lo que daría un error de FK convertido en 500. El orden fuente → pregunta es el mismo que en §4.1 y en el retiro.
+  Bloquear también las fuentes **nuevas** evita dos carreras. Una: que se agregue una cita a una fuente que se retira a la vez, y que una pregunta servida quede citando solo una fuente retirada. Otra: que `liberarVersion` (`fuentes/repository.go:326`) archive esa versión y borre sus pasajes mientras se inserta la cita, lo que daría un error de FK convertido en 500. El orden fuente → pregunta es el mismo que en §4.1 y en el retiro.
 - `200` con el objeto pregunta.
 - Auditoría: `pregunta.citas`, `detalle = {"antes": [ids], "despues": [ids]}`.
 
@@ -146,7 +144,7 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 
 | Endpoint | Cambio |
 |---|---|
-| `POST /preguntas`, `POST /preguntas/import` | Nacen `estado = 'borrador'`, `origen = 'manual'` (P1, decidida: **toda** pregunta nueva nace en `borrador`, cualquiera sea su origen). El cuerpo **no** acepta `estado` ni `origen`: el origen `ia` lo fijan los generadores (E6) y `balotario` la importación de SIA-E3-01 |
+| `POST /preguntas`, `POST /preguntas/import` | Nacen `estado = 'borrador'`, `origen = 'manual'` (P1, decidida: **toda** pregunta nueva nace en `borrador`, cualquiera sea su origen). El cuerpo **no** acepta `estado` ni `origen`: si llegan, se **ignoran** y nunca se aplican. El handler heredado no usa `DisallowUnknownFields` y no se cambia, para no romper a los clientes existentes (README §3, «Ningún otro endpoint existente cambia»). el origen `ia` lo fijan los generadores (E6) y `balotario` la importación de SIA-E3-01 |
 | `GET /preguntas` | Filtros opcionales nuevos `estado` y `origen`. `estado` es un valor **exacto** entre `borrador`, `en_revision`, `aprobada`, `rechazada` y `activo`: `activo` (heredado) se filtra aparte de `aprobada`. Sin filtro se listan todas las no eliminadas, también los borradores, porque el admin tiene que verlos. Cada item del listado suma `estado`, `origen` y `citas_count` (número de citas), pero **no** el array `citas`, que va solo en `GET /preguntas/{id}` |
 | `GET /preguntas/{id}` | La respuesta suma los campos de §4.4 |
 | `PUT /preguntas/{id}` | La respuesta suma los campos de §4.4. Efecto sobre el estado (P3, decidida) en §4.5 |
@@ -166,7 +164,7 @@ ALTER TABLE preguntas ADD CONSTRAINT preguntas_estado_check CHECK (estado IN ('a
 }
 ```
 
-`citas` va ordenado por `fuente_id, version, pasaje_id`. No incluye el texto del pasaje, que se resuelve con `ResolverCita` del puerto (ADR 0003).
+`citas` va ordenado por `fuente_id, version, pasaje_id`. No incluye el texto completo del pasaje, que se resuelve con `ResolverCita` del puerto (ADR 0003). **SIA-E3-07 §5** suma a cada cita `seccion`, `linea_inicio`, `linea_fin`, `extracto` (≤ 300 runes, `texto.Extracto`) y `texto`, el pasaje completo de la versión citada (decisión del PO).
 
 ### 4.5 `PUT /preguntas/{id}`: efecto sobre el estado (P3, decidida por el PO)
 
@@ -237,6 +235,8 @@ Implementaciones en `internal/questions`, registradas en `cmd/server/main.go` al
 | `validacion`, `referencia_invalida` | 422 | §4 |
 | `falta_cita` | 422 | §4.1 |
 | `clave_oficial` | 422 | §4.5 (origen `balotario`) |
+| `revision_especializada`, `ultima_cita_activa`, `conflicto_clave` (reservado) | 409 | SIA-E3-07 §3, §4 |
+| `verificacion_requerida`, `nota_obligatoria`, `limite_citas`, `fuente_no_activa`, `consulta_invalida` | 422 | SIA-E3-07 §2, §3, §4 |
 
 Los códigos de esta tabla usan el **formato 2** (`{"error": "<codigo>", "message": "…", "detalle"?}`, README §3). También usa el formato 2 el `409 estado_invalido` del `DELETE` existente. El resto de los errores heredados de `internal/questions` no cambia.
 
@@ -258,10 +258,10 @@ Los códigos de esta tabla usan el **formato 2** (`{"error": "<codigo>", "messag
 | B1 | Migración 065, Up y Down, con un test `up → down → up` sobre filas en estados nuevos | 2 |
 | B2 | I1, I4 e I5 (`PreguntaServible` y los dos conteos), con los tests «Borrador no se sirve», «Compatibilidad» e «Intento en curso» | 2 |
 | B3 | I8: alta e importación en `borrador`/`manual`; campos de §4.4 en las respuestas; filtros de `GET /preguntas` | 3 |
-| B4 | §4.1, `PATCH …/estado`: transiciones, motivo, `falta_cita`, orden de bloqueo y auditoría. Un test por fila de §3 | 3 |
-| B5 | §4.2, `PUT …/citas`, más la implementación de `Citantes` | 2 |
+| B4 | **Sustituida por B4a y B4b de SIA-E3-07 §9** (§4.1 con las guardas de E3-07) | — |
+| B5 | **Sustituida por B5 de SIA-E3-07 §9** (§4.2 con las reglas de E3-07, más `Citantes`) | — |
 | B6 | I9, `DELETE` según el estado | 1 |
 | B6b | §4.5: `PUT` con contenido → `en_revision` (comparando con lo guardado) y `422 clave_oficial` en `balotario` | 2 |
 | B7 | §5, `SuscriptorRetiro`: registro en `main` y tests de «Retirar fuente citada» (12 aprobadas y 3 en borrador), «Restaurar no reaprueba» y «todo o nada» con un fallo provocado | 3 |
 | B8 | I12 (vía acordada con backend-dev):<br>• **seed de demo:** siembra una fuente activa titulada **«Fuente demo (no oficial)»** por el puerto (`GuardarFuente` + `PublicarVersion`). Usa texto sintético, nunca de `assets/`, y va **sin** marca de oficial verificada. **Nunca** se siembra en producción: el comando se niega a correr con `ENV=production` (condiciones del PO). Después cita cada pregunta (uno o pocos pasajes) y la aprueba con la transición de B4, sin crear ninguna en `activo`.<br>• **fixture `questionstest/seed.go:198`:** lleva `estado` **explícito** en el INSERT (`activo`, que representa el banco heredado), más casos aparte con `aprobada`, para no depender del DEFAULT | 2 |
-| F1 | frontend-dev: tipos de `questions/api.ts`, estado visible en el listado admin y claves i18n es/en de los 6 estados y del origen | 2 |
+| F1 | frontend-dev: tipos de `questions/api.ts`, estado visible en el listado admin y claves i18n es/en de los 6 estados y del origen. La rama adelanta además eliminar según el estado y el aviso al editar: se aceptan contra E3-10 (alcance y reparto en SIA-E3-07 §9) | 2 |

@@ -7,9 +7,10 @@ Convenciones transversales para todos los endpoints del módulo «Aprendizaje as
 | [serums-ia-e1-taxonomia.md](serums-ia-e1-taxonomia.md) | E1-01, E1-02, E1-03, E1-04 (MVP) | vigente (2026-11-11) |
 | [serums-ia-e2-fuentes.md](serums-ia-e2-fuentes.md) | E2-02, E2-03, E2-05, E2-06, E2-07 (MVP) | aprobado, pendiente de implementación (2026-11-11) |
 | [serums-ia-e3-02-ciclo-preguntas.md](serums-ia-e3-02-ciclo-preguntas.md) | E3-02 (MVP) | borrador para revisión (2026-11-11) |
+| [serums-ia-e3-07-revision-basica.md](serums-ia-e3-07-revision-basica.md) | E3-07 (MVP); extiende E3-02 | borrador para revisión (2026-11-11); ADR [0007](../adr/0007-busqueda-pasajes-admin-fuera-del-puerto.md) |
 | [serums-ia-e6-01-servicio-ia.md](serums-ia-e6-01-servicio-ia.md) | E6-01 (MVP), contrato interno Go | borrador para revisión (2026-11-11); ADR [0006](../adr/0006-puerto-servicio-ia.md) |
 
-ADRs: [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones), [0005](../adr/0005-estado-operativo-panel-salud.md) estado operativo del panel de salud. Contrato de la épica de plataforma PLT-E1: [plataforma-salud.md](plataforma-salud.md).
+ADRs: [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones), [0005](../adr/0005-estado-operativo-panel-salud.md) estado operativo del panel de salud, [0006](../adr/0006-puerto-servicio-ia.md) puerto del servicio de IA, [0007](../adr/0007-busqueda-pasajes-admin-fuera-del-puerto.md) búsqueda de pasajes para el admin. Contrato de la épica de plataforma PLT-E1: [plataforma-salud.md](plataforma-salud.md).
 
 Un cambio a un contrato ya publicado se avisa directamente a backend-dev, frontend-dev y al tech-lead.
 
@@ -55,7 +56,7 @@ El repo tiene dos formatos:
 | Campo | Regla |
 |---|---|
 | `error` | Código estable en `snake_case`, que es el contrato. Nunca cambia por un cambio de texto |
-| `message` | Texto en español para logs del cliente y como respaldo. La UI no lo muestra si existe la traducción del código (§8) |
+| `message` | Texto en español para los logs del cliente. La UI muestra la traducción del código o, si no existe, un genérico traducido (§8) |
 | `detalle` | Opcional, objeto sin datos personales (p. ej. `{"suma_pesos": 95.0}`, `{"campos": {"nombre": "min"}}`) |
 
 - **Helper:** backend-dev añade a `internal/httpx` una función `JSONErrorCode(w, status, code, msg string, detalle map[string]any)`, junto a `JSONError`, para no duplicar `jsonError` por paquete.
@@ -116,7 +117,7 @@ El repo tiene dos formatos:
 - Los handlers existentes mezclan 400 y 422 para la validación (`catalogs/handler.go:100,190`). En el módulo, **toda** validación de reglas da 422 y 400 queda solo para errores de sintaxis.
 - Las validaciones se evalúan en el orden que fija cada endpoint y se devuelve el primer error.
 
-Catálogo de códigos usados por E1 y E2:
+Catálogo de códigos usados por E1, E2 y E3:
 
 | Código | HTTP | Épica |
 |---|---|---|
@@ -137,7 +138,11 @@ Catálogo de códigos usados por E1 y E2:
 | `pesos_no_suman_100`, `limite_preguntas` | 422 | E1-03 |
 | `especialidad_invalida` | 422 | E1-04 |
 | `archivo_invalido`, `limite_fuentes`, `limite_versiones` | 422 | E2-03, E2-06, E2-07 |
-| `consulta_invalida`, `cita_invalida` | — (errores del puerto Go, sin HTTP en MVP) | E2-02 |
+| `consulta_invalida` | 422 en `GET /admin/pasajes` (E3-07 §2); en el puerto Go, error sin HTTP | E2-02, E3-07 |
+| `cita_invalida` | — (error del puerto Go, sin HTTP en MVP) | E2-02 |
+| `falta_cita`, `clave_oficial` | 422 | E3-02 |
+| `verificacion_requerida`, `nota_obligatoria`, `limite_citas`, `fuente_no_activa` | 422 | E3-07 |
+| `revision_especializada`, `ultima_cita_activa`, `conflicto_clave` (reservado, E3-01/E3-03) | 409 | E3-07 |
 | `error_interno` | 500 | todas |
 
 ## 5. Paginación
@@ -179,7 +184,20 @@ Catálogo de códigos usados por E1 y E2:
 
 ## 8. i18n
 
-- La API responde solo en español (`message`). La UI traduce por código: clave `dashboard.serumsIa.errores.<codigo>` en `frontend/src/i18n/messages/es.json` y `en.json`. Toda clave existe en ambos archivos (CLAUDE.md y supuesto 8). Si un código no tiene clave, la UI muestra `message`.
+- La API responde solo en español (`message`). La UI traduce por código, en `frontend/src/i18n/messages/es.json` y `en.json`. Toda clave existe en ambos archivos (CLAUDE.md y supuesto 8).
+- **Dos niveles de clave** (decisión del architect, 2026-11-11):
+
+  | Nivel | Clave | Qué códigos |
+  |---|---|---|
+  | Recurso | `dashboard.serumsIa.<recurso>.errores.<codigo>` | Los **cuatro códigos comunes**, que cambian de sentido según el recurso: `estado_invalido`, `no_encontrado`, `validacion` y `referencia_invalida`. Cada pantalla define los que usa en su recurso: `temas`, `pesos`, `profesion`, `fuentes` y `preguntas` |
+  | Módulo | `dashboard.serumsIa.errores.<codigo>` | Los códigos con **un solo sentido** en todo el módulo, una clave por código reutilizada en todas las pantallas: los específicos (`tema_duplicado`, `falta_cita`, `fuente_no_activa`, `limite_citas`, `clave_oficial`…), los transversales (`error_interno`, `cuerpo_demasiado_grande`) y `generico`. Además, los cuatro códigos comunes con un **texto neutro**, válido para cualquier recurso (p. ej. `estado_invalido`: «Los datos cambiaron mientras tanto. Recarga y vuelve a intentarlo.») |
+
+  - **Resolución, en orden:** `<recurso>.errores.<codigo>` → `errores.<codigo>` → `errores.generico`. Es la misma función para todas las pantallas del módulo.
+  - **Por qué:** cambiar los códigos (p. ej. `pregunta_estado_invalido`) rompería el contrato estable de la API (§3: el código nunca cambia) y los clientes que ya existen. Un texto único para los cuatro códigos comunes pierde contexto («La fuente ya no existe» frente a «El tema ya no existe»). Además, `pesos`, `profesion` y `fuentes` ya usan claves por recurso (`es.json`, `serumsIa.pesos.errores`, `serumsIa.profesion.errores`, `serumsIa.fuentes.errores`): esta regla lo convierte en convención.
+  - **Migración (frontend-dev, ~1 h):** los textos de temas que hoy ocupan `serumsIa.errores.{estado_invalido,no_encontrado,validacion,referencia_invalida}` pasan a `serumsIa.temas.errores.*`, y en su lugar quedan los textos neutros. Los demás códigos de `serumsIa.errores` no cambian.
+  - **Preguntas (E3-08, E3-09, E3-10):** recurso `preguntas`, con claves `dashboard.serumsIa.preguntas.errores.<codigo>`. Por ejemplo, `estado_invalido`: «Esta pregunta cambió de estado; se actualizó la vista».
+- **Código sin clave** (decisión del PO, 2026-11-11, desde E3-08): la UI muestra el **texto genérico traducido** de la clave única del módulo `dashboard.serumsIa.errores.generico`, nunca `message`. `message` viene siempre en español y se vería en español con la UI en inglés. Solo se usa en la consola o los logs del cliente.
+- Las pantallas existentes de E1 y E2 que hoy muestran `message` se alinean cuando se vuelvan a tocar, sin una tarea aparte.
 - Los estados y enums (`activo`/`archivado`, `procesando`/`activa`/`fallida`/`retirada`, `completa`/`incompleta`, `tipo` de fuente y `motivo_fallo`) viajan como códigos y la UI los traduce con `dashboard.serumsIa.<dominio>.<enum>.<valor>`.
 - El contenido (nombres de temas, títulos y pasajes de fuentes) es solo en español y no se traduce.
 
