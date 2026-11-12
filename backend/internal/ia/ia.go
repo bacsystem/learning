@@ -55,6 +55,9 @@ var (
 	ErrTimeout                = errors.New("ia_timeout")
 	ErrSalidaInvalida         = errors.New("salida_invalida")
 	ErrProveedor              = errors.New("ia_error")
+	// ErrCancelado wraps context.Canceled: the consumer cancelled its own ctx,
+	// so it is recorded but never mapped to HTTP (Codigo reports ok=false).
+	ErrCancelado = errors.New("cancelado")
 	// ErrActorInvalido is a programming error of the consumer: the actor
 	// would break ck_ia_usos_actor, so nothing is called nor recorded.
 	ErrActorInvalido = errors.New("actor_invalido")

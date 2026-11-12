@@ -17,7 +17,7 @@ CREATE TABLE ia_usos (
     duracion_ms     INT           NOT NULL CHECK (duracion_ms >= 0),
     intentos        SMALLINT      NOT NULL DEFAULT 0 CHECK (intentos BETWEEN 0 AND 6),
     resultado       VARCHAR(30)   NOT NULL CHECK (resultado IN ('ok', 'no_disponible',
-                    'entrada_demasiado_grande', 'datos_personales', 'timeout', 'salida_invalida', 'error_proveedor')),
+                    'entrada_demasiado_grande', 'datos_personales', 'timeout', 'cancelado', 'salida_invalida', 'error_proveedor')),
     desde_cache     BOOLEAN       NOT NULL DEFAULT false,
     created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_ia_usos_actor CHECK ((actor_rol = 'sistema') = (actor_id IS NULL))

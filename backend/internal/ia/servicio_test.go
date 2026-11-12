@@ -269,17 +269,77 @@ func TestServicio_IdDeOchoDigitosNoEsDNI(t *testing.T) {
 	}
 }
 
-// A consumer that gives up is a timeout, and its usage is still recorded.
-func TestServicio_ConsumidorCancelado(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	reg := &registroMemoria{}
-	s, _ := nuevo(NewDoble(), reg)
-	if _, err := s.Clasificar(ctx, sistema, entradaClasificar(1)); !errors.Is(err, ErrTimeout) {
-		t.Fatalf("err %v, want ErrTimeout", err)
+// A consumer that cancels its ctx gets ErrCancelado (wrapping context.Canceled)
+// and its usage is still recorded; an expired deadline of its ctx is a timeout
+// (contract §5).
+func TestServicio_FinDelCtxDelConsumidor(t *testing.T) {
+	vencido := func() (context.Context, context.CancelFunc) {
+		return context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
 	}
-	if u := reg.unico(t); u.Resultado != ResultadoTimeout || u.Intentos != 0 {
+	cancelado := func() (context.Context, context.CancelFunc) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		return ctx, cancel
+	}
+	tests := []struct {
+		name          string
+		ctx           func() (context.Context, context.CancelFunc)
+		wantErr       error
+		wantCanceled  bool
+		wantResultado string
+	}{
+		{"cancelled before the call", cancelado, ErrCancelado, true, ResultadoCancelado},
+		{"deadline expired before the call", vencido, ErrTimeout, false, ResultadoTimeout},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := tt.ctx()
+			defer cancel()
+			reg := &registroMemoria{}
+			s, _ := nuevo(NewDoble(), reg)
+			_, err := s.Clasificar(ctx, sistema, entradaClasificar(1))
+			if !errors.Is(err, tt.wantErr) || errors.Is(err, context.Canceled) != tt.wantCanceled {
+				t.Fatalf("err %v, want %v (wraps Canceled: %v)", err, tt.wantErr, tt.wantCanceled)
+			}
+			if u := reg.unico(t); u.Resultado != tt.wantResultado || u.Intentos != 0 {
+				t.Errorf("usage %+v", u)
+			}
+			if _, _, ok := Codigo(err); ok && tt.wantErr == ErrCancelado {
+				t.Error("ErrCancelado must not map to HTTP")
+			}
+		})
+	}
+}
+
+// proveedorQueCancela cancels the consumer's ctx from inside the call and
+// fails like an adapter that lost its connection.
+type proveedorQueCancela struct {
+	proveedorGuion
+	cancelar context.CancelFunc
+}
+
+func (p *proveedorQueCancela) Completar(context.Context, Solicitud) (Respuesta, error) {
+	p.cancelar()
+	return Respuesta{}, &ErrorTransitorio{Causa: errors.New("connection lost")}
+}
+
+// The consumer cancels while the provider is working: the attempt ends as
+// cancelado, not as ia_error nor ia_timeout, and it is not retried.
+func TestServicio_CancelaDuranteLaLlamada(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	prov := &proveedorQueCancela{cancelar: cancel}
+	reg := &registroMemoria{}
+	s, esperas := nuevo(prov, reg)
+	_, err := s.Clasificar(ctx, sistema, entradaClasificar(1))
+	if !errors.Is(err, ErrCancelado) || !errors.Is(err, context.Canceled) {
+		t.Fatalf("err %v, want ErrCancelado wrapping context.Canceled", err)
+	}
+	if u := reg.unico(t); u.Resultado != ResultadoCancelado || u.Intentos != 1 {
 		t.Errorf("usage %+v", u)
+	}
+	if len(*esperas) != 0 {
+		t.Errorf("waited %v, want no retry", *esperas)
 	}
 }
 

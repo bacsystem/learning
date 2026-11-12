@@ -15,6 +15,7 @@ const (
 	ResultadoEntradaDemasiadoGrande = "entrada_demasiado_grande"
 	ResultadoDatosPersonales        = "datos_personales"
 	ResultadoTimeout                = "timeout"
+	ResultadoCancelado              = "cancelado"
 	ResultadoSalidaInvalida         = "salida_invalida"
 	ResultadoErrorProveedor         = "error_proveedor"
 )

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -140,8 +141,8 @@ func llamar[S any](ctx context.Context, s *servicio, sol Solicitud, uso *Uso, va
 // of every answer received add up in uso.
 func (s *servicio) transporte(ctx context.Context, sol Solicitud, uso *Uso) (Respuesta, error) {
 	for intento := 0; ; intento++ {
-		if ctx.Err() != nil { // the consumer gave up: no answer in the time it had
-			return Respuesta{}, ErrTimeout
+		if err := finDelConsumidor(ctx); err != nil {
+			return Respuesta{}, err
 		}
 		llamadaCtx, cancel := context.WithTimeout(ctx, s.tiempoLlamada)
 		resp, err := s.prov.Completar(llamadaCtx, sol)
@@ -155,6 +156,9 @@ func (s *servicio) transporte(ctx context.Context, sol Solicitud, uso *Uso) (Res
 			uso.Modelo = resp.Modelo
 			return resp, nil
 		}
+		if cerr := finDelConsumidor(ctx); cerr != nil {
+			return Respuesta{}, cerr
+		}
 		if vencido {
 			return Respuesta{}, ErrTimeout
 		}
@@ -163,8 +167,23 @@ func (s *servicio) transporte(ctx context.Context, sol Solicitud, uso *Uso) (Res
 			return Respuesta{}, ErrProveedor
 		}
 		if !s.dormir(ctx, s.esperas[intento]) {
-			return Respuesta{}, ErrTimeout
+			return Respuesta{}, finDelConsumidor(ctx)
 		}
+	}
+}
+
+// finDelConsumidor says why the consumer's ctx ended (contract §5): a
+// cancellation is ErrCancelado, which wraps context.Canceled; an expired
+// deadline is ErrTimeout (no answer in the time it had). It is nil while ctx
+// is alive.
+func finDelConsumidor(ctx context.Context) error {
+	switch err := ctx.Err(); {
+	case err == nil:
+		return nil
+	case errors.Is(err, context.Canceled):
+		return fmt.Errorf("%w: %w", ErrCancelado, err)
+	default:
+		return ErrTimeout
 	}
 }
 
@@ -234,6 +253,8 @@ func resultadoDe(err error) string {
 		return ResultadoDatosPersonales
 	case errors.Is(err, ErrTimeout):
 		return ResultadoTimeout
+	case errors.Is(err, ErrCancelado):
+		return ResultadoCancelado
 	case errors.Is(err, ErrSalidaInvalida):
 		return ResultadoSalidaInvalida
 	default:

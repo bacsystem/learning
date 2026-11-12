@@ -74,6 +74,13 @@ func TestPgRegistro_UnaFilaPorInvocacion(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Cancelled by the consumer: its own row, written with a detached ctx.
+	cancelada, cancelar := context.WithCancel(ctx)
+	cancelar()
+	if _, err := ok.Clasificar(cancelada, sistema, in); !errors.Is(err, ia.ErrCancelado) {
+		t.Fatal(err)
+	}
+
 	filas := usosDesde(t, db, desde)
 	want := []struct {
 		rol, proveedor, resultado string
@@ -83,6 +90,7 @@ func TestPgRegistro_UnaFilaPorInvocacion(t *testing.T) {
 		{ia.RolSistema, "", ia.ResultadoNoDisponible, 0},
 		{ia.RolSistema, ia.NombreDoble, ia.ResultadoDatosPersonales, 0},
 		{ia.RolSistema, ia.NombreDoble, ia.ResultadoTimeout, 1},
+		{ia.RolSistema, ia.NombreDoble, ia.ResultadoCancelado, 0},
 	}
 	if len(filas) != len(want) {
 		t.Fatalf("%d rows, want %d: %+v", len(filas), len(want), filas)
@@ -109,7 +117,7 @@ func TestMigracion066_RestriccionDelActor(t *testing.T) {
 		`INSERT INTO ia_usos (operacion, actor_rol, actor_id, proveedor, duracion_ms, resultado) VALUES ('clasificar', 'admin', NULL, 'doble', 0, 'ok')`,
 		`INSERT INTO ia_usos (operacion, actor_rol, proveedor, duracion_ms, resultado) VALUES ('otra', 'sistema', 'doble', 0, 'ok')`,
 		`INSERT INTO ia_usos (operacion, actor_rol, proveedor, duracion_ms, intentos, resultado) VALUES ('clasificar', 'sistema', 'doble', 0, 7, 'ok')`,
-		`INSERT INTO ia_usos (operacion, actor_rol, proveedor, duracion_ms, resultado) VALUES ('clasificar', 'sistema', 'doble', 0, 'cancelado')`,
+		`INSERT INTO ia_usos (operacion, actor_rol, proveedor, duracion_ms, resultado) VALUES ('clasificar', 'sistema', 'doble', 0, 'otro')`,
 	} {
 		tx, err := db.Beginx()
 		if err != nil {
