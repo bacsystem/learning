@@ -429,10 +429,6 @@ func TestParsear_ReglaDeLetras(t *testing.T) {
 			t.Errorf("problemas = %s", got)
 		}
 	})
-	t.Run("una letra menor que la de la posicion es continuacion", func(t *testing.T) {
-		r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos</mark>\nA) otra vez\n")
-		comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "P", "unica", alts("Uno", "*Dos A) otra vez"), sinAlertas()}})
-	})
 	t.Run("un salto se reetiqueta", func(t *testing.T) {
 		r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos</mark>\nE) Tres\n")
 		comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "P", "unica", alts("Uno", "*Dos", "Tres"), []string{AlertaVinetasNormalizadas}}})
@@ -522,4 +518,59 @@ func TestParsear_ScriptDeVariasLineas(t *testing.T) {
 func TestParsear_CierreDeMarcaAlPrincipioDeLaContinuacion(t *testing.T) {
 	r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos\n</mark> y más\n")
 	comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "P", "unica", alts("Uno", "*Dos y más"), sinAlertas()}})
+}
+
+func TestParsear_EtiquetasAmbiguas(t *testing.T) {
+	tests := []struct {
+		name string
+		md   string
+		want string
+	}{
+		{"nombre cientifico dentro de las alternativas", "1. P\nA) Antibiótico contra\nC. difficile con vancomicina\n<mark>B) Metronidazol</mark>\nC) Otro\n",
+			"[1@1-5:etiquetas_ambiguas+sin_clave]"}, // «C. difficile» abre una C; la B marcada retrocede y no cuenta
+		{"letras que retroceden", "1. P\nA) Uno\nC) Tres\n<mark>B) Dos</mark>\n", "[1@1-4:etiquetas_ambiguas+sin_clave]"},
+		{"letras repetidas", "1. P\nA) Uno\n<mark>B) Dos</mark>\nB) Dos otra vez\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"letra repetida con punto", "1. P\na. Uno\n<mark>b. Dos</mark>\nb. otra\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"la etiqueta envuelta en negrita tambien", "1. P\nA) Uno\n<mark>B) Dos</mark>\n**A)** otra\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"etiqueta sola al final", "1. P\nA) Uno\n<mark>B) Dos</mark>\nA)\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"va tras el limite de alternativas y antes de la vacia", "1. P\nA) 1\nB) 2\nC) 3\nD) 4\nE) 5\nF) 6\n<mark>- 7</mark>\nA) x\n",
+			"[1@1-9:alternativas_excedidas+etiquetas_ambiguas]"},
+		// What does not look like a label: the shape is a letter A–F plus ")" or "." and a space.
+		{"con guion no parece etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\nA- otra\n", "[]"},
+		{"entre parentesis no parece etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\n(a) otra\n", "[]"},
+		{"letra fuera de A-F no parece etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\nG) otra\n", "[]"},
+		{"sin espacio tras el separador no parece etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\nA.otra\n", "[]"},
+		{"antes de la primera alternativa es enunciado", "1. P\nE. coli enterohemorrágica\nA) Uno\n<mark>B) Dos</mark>\n", "[]"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := fmt.Sprint(motivosDe(parsear(t, tt.md))); got != tt.want {
+				t.Errorf("problemas = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParsear_BordeDeLaUltimaLetra(t *testing.T) {
+	// D) plus "E. coli" at the end opens a real E: the alert comes from the mixed styles.
+	r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos</mark>\nC) Tres\nD) Infección por\nE. coli\n")
+	comprobarValidas(t, r.Validas, []esperada{{1, 1, 6, "P", "unica", alts("Uno", "*Dos", "Tres", "Infección por", "coli"), []string{AlertaVinetasNormalizadas}}})
+	// With "." everywhere the false E is indistinguishable: 5 alternatives, no alert (accepted risk).
+	r = parsear(t, "1. P\nA. Uno\n<mark>B. Dos</mark>\nC. Tres\nD. Infección por\nE. coli\n")
+	comprobarValidas(t, r.Validas, []esperada{{1, 1, 6, "P", "unica", alts("Uno", "*Dos", "Tres", "Infección por", "coli"), sinAlertas()}})
+}
+
+func TestParsear_SaltoHaciaAdelanteNoEsAmbiguo(t *testing.T) {
+	r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos</mark>\nD) Tres\n")
+	comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "P", "unica", alts("Uno", "*Dos", "Tres"), []string{AlertaVinetasNormalizadas}}})
+}
+
+// The lines of a multi-line script are not blank lines: the text after its
+// closing still continues the alternative (H3 of the review of #193).
+func TestParsear_ScriptDeVariasLineasDentroDeUnaAlternativa(t *testing.T) {
+	r := parsear(t, "1. P\nA) Uno <script>\nx\n</script> más\n<mark>B) Dos</mark>\n")
+	comprobarValidas(t, r.Validas, []esperada{{1, 1, 5, "P", "unica", alts("Uno más", "*Dos"), []string{AlertaHTMLEliminado}}})
+	// A script on its own lines does not hide the real blank line that follows.
+	r = parsear(t, "1. P\nA) Uno\n<mark>B) Dos</mark>\n<script>\nx\n</script>\n\nPie de página\n")
+	comprobarValidas(t, r.Validas, []esperada{{1, 1, 3, "P", "unica", alts("Uno", "*Dos"), []string{AlertaHTMLEliminado}}})
 }

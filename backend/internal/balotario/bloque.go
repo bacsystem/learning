@@ -26,6 +26,7 @@ type bloque struct {
 	enunciado      []string
 	alts           []*alternativa
 
+	ambigua   bool // a line with the shape of a label did not open an alternative (rule 17)
 	separadas bool // alternatives glued in one line were split
 	html      bool // some HTML (or an unpaired mark) was removed
 }
@@ -125,6 +126,21 @@ func (b *bloque) cerrarPendiente() {
 	}
 }
 
+// pareceEtiqueta says whether a line that did not open an alternative still
+// has the shape of a label: a letter A–F followed by ")" or "." (contract
+// §2.2, rule 17). After the first alternative such a line is not absorbed as
+// continuation: the question is not imported when the key may be elsewhere.
+func (b *bloque) pareceEtiqueta(et etiqueta) bool {
+	return len(b.alts) > 0 && !et.vineta && (et.forma == ')' || et.forma == '.')
+}
+
+// ambiguaLinea records the line of a label that does not open an alternative.
+func (b *bloque) ambiguaLinea(linea int, l lineaLimpia) {
+	b.ambigua = true
+	b.fin = linea
+	b.html = b.html || l.html
+}
+
 // continuacion adds a line without label to the last element: the last
 // alternative, or the enunciado while there is none. l was cleaned knowing
 // whether pendiente().
@@ -159,6 +175,7 @@ const (
 	MotivoEnunciadoLargo            = "enunciado_largo"
 	MotivoAlternativasInsuficientes = "alternativas_insuficientes"
 	MotivoAlternativasExcedidas     = "alternativas_excedidas"
+	MotivoEtiquetasAmbiguas         = "etiquetas_ambiguas"
 	MotivoAlternativaVacia          = "alternativa_vacia"
 	MotivoAlternativaLarga          = "alternativa_larga"
 	MotivoAlternativasDuplicadas    = "alternativas_duplicadas"
@@ -223,6 +240,7 @@ func (b *bloque) motivos(enunciado string, textos []string, correctas int) []str
 	anadir(utf8.RuneCountInString(enunciado) > MaxEnunciado, MotivoEnunciadoLargo)
 	anadir(len(textos) < MinAlternativas, MotivoAlternativasInsuficientes)
 	anadir(len(textos) > MaxAlternativas, MotivoAlternativasExcedidas)
+	anadir(b.ambigua, MotivoEtiquetasAmbiguas)
 	anadir(alguna(textos, func(s string) bool { return s == "" }), MotivoAlternativaVacia)
 	anadir(alguna(textos, func(s string) bool { return utf8.RuneCountInString(s) > MaxAlternativa }), MotivoAlternativaLarga)
 	anadir(hayDuplicadas(textos), MotivoAlternativasDuplicadas)

@@ -88,16 +88,26 @@ func Parsear(contenido []byte) (Resultado, error) {
 	return p.res, nil
 }
 
+// placeholderScript stands for a removed block in each of its lines: a line with
+// only removed HTML is not a blank line for the grammar.
+const placeholderScript = "<script></script>"
+
 var reSaltoDeLinea = regexp.MustCompile(`\r\n|\r|\n`)
 
 // aplanarScripts removes the content of <script> and <style> blocks, also the
 // ones that span several lines (rule 16), before the content is split into
 // lines. The line breaks of the block stay, so the numbers of line do not
-// move, and an empty <script></script> stays in the first line to raise the
-// html_eliminado alert.
+// move, and every one of its lines keeps an empty <script></script> to raise
+// the html_eliminado alert.
 func aplanarScripts(contenido string) string {
 	return reScriptStyle.ReplaceAllStringFunc(contenido, func(bloque string) string {
-		return "<script></script>" + strings.Join(reSaltoDeLinea.FindAllString(bloque, -1), "")
+		var sb strings.Builder
+		sb.WriteString(placeholderScript)
+		for _, salto := range reSaltoDeLinea.FindAllString(bloque, -1) {
+			sb.WriteString(salto)
+			sb.WriteString(placeholderScript)
+		}
+		return sb.String()
 	})
 }
 
@@ -117,6 +127,12 @@ func (p *lector) linea(n int, cruda string) error {
 	l := limpiar(cruda, false)
 	t := l.t
 	if len(t.r) == 0 {
+		if l.html { // only removed HTML (a multi-line script): neither blank nor content
+			if p.cur != nil {
+				p.cur.html = true
+			}
+			return nil
+		}
 		p.enBlanco = p.cur != nil
 		return nil
 	}
@@ -141,9 +157,15 @@ func (p *lector) linea(n int, cruda string) error {
 	if p.cur == nil {
 		return nil // outside of the questions: headers, footers (rule 7)
 	}
-	if et, _, ok := etiquetaAlternativa(t); ok && p.cur.admite(et) {
-		p.cur.etiquetadaLinea(n, l)
-		return nil
+	if et, _, ok := etiquetaAlternativa(t); ok {
+		if p.cur.admite(et) {
+			p.cur.etiquetadaLinea(n, l)
+			return nil
+		}
+		if p.cur.pareceEtiqueta(et) {
+			p.cur.ambiguaLinea(n, l)
+			return nil
+		}
 	}
 	if enBlanco && len(p.cur.alts) > 0 {
 		p.cerrar() // the text after the last alternative is not part of the question
