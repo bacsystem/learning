@@ -1684,6 +1684,7 @@
           "fuenteRetirada": "Source withdrawn",
           "fuenteActiva": "Active source",
           "verTexto": "View the full passage",
+          "claveOficial": "official key",
           "quitar": "Remove citation",
           "quitarDe": "Remove the citation from “{fuente}”",
           "guardando": "Saving citations…",

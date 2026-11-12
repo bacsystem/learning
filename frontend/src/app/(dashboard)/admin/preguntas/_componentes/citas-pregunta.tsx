@@ -1,5 +1,6 @@
 "use client";
 
+import { TextoConClave } from "./texto-con-clave";
 import { useTranslations } from "next-intl";
 
 import { Acordeon } from "@/components/navegacion/acordeon";
@@ -59,14 +60,20 @@ function ItemCita({
           </button>
         </div>
       </div>
-      <p className="text-control text-muted-foreground">{cita.extracto}</p>
+      <p className="text-control text-muted-foreground">
+        <TextoConClave texto={cita.extracto} />
+      </p>
       <Acordeon
         items={[
           {
             id: String(cita.pasaje_id),
             titulo: t("serumsIa.revision.citas.verTexto"),
-            // Texto plano: React lo escapa y `whitespace-pre-wrap` conserva los saltos de línea.
-            contenido: <p className="text-foreground whitespace-pre-wrap">{cita.texto}</p>,
+            // React escapa el texto y `whitespace-pre-wrap` conserva los saltos de línea; solo `<mark>` se resalta.
+            contenido: (
+              <p className="text-foreground whitespace-pre-wrap">
+                <TextoConClave texto={cita.texto} />
+              </p>
+            ),
           },
         ]}
       />

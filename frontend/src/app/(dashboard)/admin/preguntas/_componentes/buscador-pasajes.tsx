@@ -1,5 +1,6 @@
 "use client";
 
+import { TextoConClave } from "./texto-con-clave";
 import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
@@ -131,7 +132,9 @@ export function BuscadorPasajes({
                     </button>
                   )}
                 </div>
-                <p className="text-control text-muted-foreground">{p.extracto}</p>
+                <p className="text-control text-muted-foreground">
+                  <TextoConClave texto={p.extracto} />
+                </p>
               </li>
             ))}
           </ul>
