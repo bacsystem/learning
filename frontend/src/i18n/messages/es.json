@@ -1724,11 +1724,6 @@
           "validacion": "Revisa los datos enviados: un pasaje puede estar repetido.",
           "referencia_invalida": "Uno de los pasajes ya no existe. Se actualizó la lista de citas."
         }
-      },
-      "preguntas": {
-        "errores": {
-          "estado_invalido": "Esta pregunta cambió de estado; se actualizó la vista."
-        }
       }
     },
     "sesion-servidor-no-disponible-titulo": "El servidor no responde",
