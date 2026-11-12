@@ -46,24 +46,32 @@ describe.each(Object.entries(llamadas))("cliente %s", (_, llamar) => {
 });
 
 describe.each([
-  ["practices", () => practicasApi.getPractica("tk", 1), tiempoAgotadoPractica, "practica_id"],
-  ["simulations", () => simulacrosApi.getSimulacro("tk", 1), tiempoAgotadoSimulacro, "simulacro_id"],
-] as const)("409 tiempo_agotado of %s", (_, llamar, tiempoAgotado, campoId) => {
-  it("is read from the message in the legacy format, with the result id", async () => {
-    responder(409, { error: "tiempo_agotado", [campoId]: 5, resultado_id: 9 });
+  ["practices", () => practicasApi.getPractica("tk", 1), tiempoAgotadoPractica, "practica_id", "practica_en_curso"],
+  [
+    "simulations",
+    () => simulacrosApi.getSimulacro("tk", 1),
+    tiempoAgotadoSimulacro,
+    "simulacro_id",
+    "simulacro_en_curso",
+  ],
+] as const)("409 of %s", (_, llamar, tiempoAgotado, campoId, enCurso) => {
+  it("tiempo_agotado carries a message: the code is read from `code`, with the result id", async () => {
+    responder(409, { error: "tiempo_agotado", message: "El tiempo terminó.", [campoId]: 5, resultado_id: 9 });
     const error = await llamar().catch((e: unknown) => e);
     expect(tiempoAgotado(error)).toEqual({ resultadoId: 9 });
-    expect(error).toMatchObject({ [campoId]: 5, resultado_id: 9 });
+    expect(error).toMatchObject({ code: "tiempo_agotado", [campoId]: 5, resultado_id: 9 });
   });
 
-  it("is read from the code in the format 2, with the result id", async () => {
-    responder(409, { error: "tiempo_agotado", message: "El tiempo terminó.", resultado_id: 9 });
+  it("the in-progress code arrives without message: the code is read from the message", async () => {
+    responder(409, { error: enCurso, [campoId]: 5 });
     const error = await llamar().catch((e: unknown) => e);
-    expect(tiempoAgotado(error)).toEqual({ resultadoId: 9 });
+    expect(codigoDeConflicto(error)).toBe(enCurso);
+    expect(error).toMatchObject({ [campoId]: 5 });
+    expect(tiempoAgotado(error)).toBeNull();
   });
 
-  it("is not another 409 or another status", async () => {
-    responder(409, { error: "simulacro_en_curso", message: "Ya hay uno." });
+  it("tiempo_agotado is not another 409 or another status", async () => {
+    responder(409, { error: enCurso, message: "Ya hay uno." });
     expect(tiempoAgotado(await llamar().catch((e: unknown) => e))).toBeNull();
     responder(500, { error: "tiempo_agotado", message: "x" });
     expect(tiempoAgotado(await llamar().catch((e: unknown) => e))).toBeNull();

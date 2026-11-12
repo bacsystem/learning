@@ -57,9 +57,9 @@ export function apiErrorCode(err: unknown): string | undefined {
 }
 
 /**
- * Código de un 409 de práctica o simulacro (`tiempo_agotado`, `simulacro_en_curso`, …). Esos endpoints responden
- * `{"error": "<codigo>"}` (el código queda en `message`) y, en el formato 2, `{"error": "<codigo>", "message": "<texto>"}`
- * (el código queda en `code`): se leen los dos.
+ * Código de un 409 de práctica o simulacro. Esos handlers responden de dos formas: `tiempo_agotado` y otros llevan
+ * `{"error": "<codigo>", "message": "<texto>", …}` (el código queda en `code`), mientras que `practica_en_curso` y
+ * `simulacro_en_curso` llegan sin `message`, `{"error": "<codigo>", …}` (el código queda en `message`). Se leen las dos.
  */
 export function codigoDeConflicto(err: unknown): string | undefined {
   const { status, code, message } = (err ?? {}) as { status?: unknown; code?: unknown; message?: unknown };
