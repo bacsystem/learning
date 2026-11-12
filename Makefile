@@ -206,7 +206,7 @@ compose/init: ## Crea .env desde env.example con secretos aleatorios (no pisa un
 compose/check-env:
 	@test -f .env || (echo "ERROR: falta .env — ejecuta: make compose/init" && exit 1)
 	@test -n "$(C_PG_PASS)" || (echo "ERROR: POSTGRES_PASSWORD vacío en .env (genera uno con: openssl rand -hex 24)" && exit 1)
-	@test -n "$(C_AF_KEY)" || (echo "ERROR: ANTIFRAUD_HMAC_KEY vacía en .env (un .env anterior no la tiene). Añádela: echo \"ANTIFRAUD_HMAC_KEY=$$(openssl rand -hex 32)\" >> .env" && exit 1)
+	@test -n "$(C_AF_KEY)" || (echo "ERROR: ANTIFRAUD_HMAC_KEY vacía en .env (un .env anterior no la tiene). Añádela: echo \"ANTIFRAUD_HMAC_KEY=\$$(openssl rand -hex 32)\" >> .env" && exit 1)
 
 compose/up: compose/check-env ## Levanta db + backend (migra) + frontend
 	$(COMPOSE) up -d --build
