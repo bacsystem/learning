@@ -10,9 +10,9 @@ import (
 var (
 	// reInicio: number of 1–4 digits plus ".", ")", "-" or ":"; optional
 	// "Pregunta"/"Nº" prefix and optional **/__ around the number (§2.2).
-	reInicio = regexp.MustCompile(`^(?:\*\*|__)?(?:(?i:pregunta)\s*|N[º°]\s*)?(\d{1,4})(?:\*\*|__)?[.):\-](?:\*\*|__)?`)
+	reInicio = regexp.MustCompile(`^(?:\*\*|__)?(?:(?i:pregunta)\s*|N[º°]\s*)?(\d{1,4})(?:\*\*|__)?[.):\-](?:\*\*|__)?(?:\s|$)`)
 	// reLetra: A–F with ")", "." or "-", or in parentheses, optionally in **.
-	reLetra = regexp.MustCompile(`^(\*\*)?(?:\(([A-Fa-f])\)|([A-Fa-f])([).\-]))(\*\*)?`)
+	reLetra = regexp.MustCompile(`^(\*\*)?(?:\(([A-Fa-f])\)|([A-Fa-f])([).\-]))(\*\*)?(?:\s|$)`)
 	// reVineta: a bullet without letter must be followed by a space, so that
 	// "**bold**" is not one.
 	reVineta = regexp.MustCompile(`^[-*•+▪◦](?:\s+|$)`)
@@ -30,8 +30,9 @@ type estilo struct {
 
 // etiqueta is a parsed alternative label. letra is 0 for a bullet.
 type etiqueta struct {
-	letra   rune // 'A'..'F', always upper case
-	marcada bool // the label itself is inside <mark>
+	letra rune // 'A'..'F', always upper case
+	// confirmada / tentativa: the label itself is inside a closed / still open <mark>.
+	confirmada, tentativa bool
 	estilo
 }
 
@@ -63,7 +64,7 @@ func etiquetaAlternativa(t texto) (etiqueta, texto, bool) {
 			et.letra, et.forma = []rune(strings.ToUpper(loc[3]))[0], loc[4][0]
 			et.mayus = loc[3] == strings.ToUpper(loc[3])
 		}
-		et.marcada = t.tramo(0, runas(loc[0])).marcado()
+		et.confirmada, et.tentativa = t.tramo(0, runas(loc[0])).confirmada(), t.tramo(0, runas(loc[0])).tentativa()
 		resto := t.tramo(runas(loc[0]), len(t.r)).recortar()
 		// "**A) Uno**" wraps the whole line: drop the closing ** as well.
 		if loc[1] != "" && loc[5] == "" && strings.HasSuffix(resto.String(), negrita) {
@@ -72,7 +73,8 @@ func etiquetaAlternativa(t texto) (etiqueta, texto, bool) {
 		return et, resto, true
 	}
 	if loc := reVineta.FindStringIndex(s); loc != nil {
-		et := etiqueta{estilo: estilo{vineta: true}, marcada: t.tramo(0, runas(s[:loc[1]])).marcado()}
+		marca := t.tramo(0, runas(s[:loc[1]]))
+		et := etiqueta{estilo: estilo{vineta: true}, confirmada: marca.confirmada(), tentativa: marca.tentativa()}
 		return et, t.tramo(runas(s[:loc[1]]), len(t.r)).recortar(), true
 	}
 	return etiqueta{}, texto{}, false
@@ -92,6 +94,25 @@ func (e etiqueta) escrita(letra rune) string {
 	return l + string(e.forma)
 }
 
+// indiceEtiqueta returns the byte index of the space before "etiqueta" in s
+// when the label is followed by a space or the end (so "2.5" or "b)c" are not
+// labels), or -1.
+func indiceEtiqueta(s, etiqueta string) int {
+	desde := 0
+	for {
+		i := strings.Index(s[desde:], " "+etiqueta)
+		if i < 0 {
+			return -1
+		}
+		i += desde
+		fin := i + 1 + len(etiqueta)
+		if fin == len(s) || s[fin] == ' ' {
+			return i
+		}
+		desde = i + 1
+	}
+}
+
 // siguiente returns the rune index of " B)" (the next letter with the same
 // style, after a space) in t, or -1 (§2.2, "Alternativas pegadas").
 func (e etiqueta) siguiente(t texto) int {
@@ -99,7 +120,7 @@ func (e etiqueta) siguiente(t texto) int {
 		return -1
 	}
 	s := " " + t.String()
-	i := strings.Index(s, " "+e.escrita(e.letra+1))
+	i := indiceEtiqueta(s, e.escrita(e.letra+1))
 	if i < 0 {
 		return -1
 	}
@@ -124,13 +145,8 @@ func corteEnunciado(t texto) int {
 	s := " " + t.String()
 	mejor := -1
 	for _, e := range todosLosEstilos {
-		i := strings.Index(s, " "+e.escrita('A'))
-		if i < 0 {
-			continue
-		}
-		b := e
-		b.letra = 'B'
-		if !strings.Contains(s[i+1:], " "+b.escrita('B')) {
+		i := indiceEtiqueta(s, e.escrita('A'))
+		if i < 0 || indiceEtiqueta(s[i+1:], e.escrita('B')) < 0 {
 			continue
 		}
 		if pos := runas(s[:i]); mejor == -1 || pos < mejor {

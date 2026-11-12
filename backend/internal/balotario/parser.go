@@ -99,7 +99,8 @@ type lector struct {
 }
 
 func (p *lector) linea(n int, cruda string) error {
-	t, hayHTML := limpiar(cruda)
+	l := limpiar(cruda, false)
+	t := l.t
 	if len(t.r) == 0 {
 		p.enBlanco = p.cur != nil
 		return nil
@@ -118,21 +119,25 @@ func (p *lector) linea(n int, cruda string) error {
 		if p.detectados > MaxPreguntas {
 			return ErrLimitePreguntas
 		}
-		p.abrir(n, numero, resto, hayHTML)
+		l.t = resto
+		p.abrir(n, numero, l)
 		return nil
 	}
 	if p.cur == nil {
 		return nil // outside of the questions: headers, footers (rule 7)
 	}
-	if _, _, ok := etiquetaAlternativa(t); ok {
-		p.cur.etiquetadaLinea(n, t, hayHTML)
+	if et, _, ok := etiquetaAlternativa(t); ok && p.cur.admite(et) {
+		p.cur.etiquetadaLinea(n, l)
 		return nil
 	}
-	if enBlanco && p.cur.alternativas() > 0 {
+	if enBlanco && len(p.cur.alts) > 0 {
 		p.cerrar() // the text after the last alternative is not part of the question
 		return nil
 	}
-	p.cur.continuacion(n, t, hayHTML)
+	if p.cur.pendiente() {
+		l = limpiar(cruda, true) // a <mark> left open in the alternative may close here
+	}
+	p.cur.continuacion(n, l)
 	return nil
 }
 
@@ -141,15 +146,15 @@ func (p *lector) linea(n int, cruda string) error {
 // next expected number (so a question without alternatives does not swallow
 // the next one). Otherwise it is part of the enunciado ("1. … 3. …").
 func (p *lector) abre(numero int) bool {
-	return p.cur == nil || p.cur.alternativas() > 0 || numero == p.cur.numero+1
+	return p.cur == nil || len(p.cur.alts) > 0 || numero == p.cur.numero+1
 }
 
-func (p *lector) abrir(linea, numero int, resto texto, hayHTML bool) {
+func (p *lector) abrir(linea, numero int, l lineaLimpia) {
 	esperado := numero == p.numeroAnterior+1 || (p.trasEncabezado && numero == 1)
 	rota := p.hayAnterior && !esperado
 	p.hayAnterior, p.numeroAnterior, p.trasEncabezado = true, numero, false
 	p.cur = nuevoBloque(numero, linea, rota)
-	p.cur.enunciadoLinea(linea, resto, hayHTML)
+	p.cur.enunciadoLinea(linea, l)
 }
 
 func (p *lector) cerrar() {

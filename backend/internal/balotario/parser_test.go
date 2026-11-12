@@ -117,7 +117,7 @@ func TestParsear_Estilos(t *testing.T) {
 		{"viñetas de varios simbolos", []string{"* Uno", "• Dos", "<mark>+ Tres</mark>"}, alts("Uno", "Dos", "*Tres"), []string{AlertaVinetasNormalizadas}},
 		{"estilos mezclados", []string{"A) Uno", "<mark>b. Dos</mark>"}, alts("Uno", "*Dos"), []string{AlertaVinetasNormalizadas}},
 		{"letras fuera de orden", []string{"A) Uno", "B) Dos", "<mark>D) Tres</mark>"}, alts("Uno", "Dos", "*Tres"), []string{AlertaVinetasNormalizadas}},
-		{"empieza en B", []string{"B) Uno", "<mark>C) Dos</mark>"}, alts("Uno", "*Dos"), []string{AlertaVinetasNormalizadas}},
+		{"viñeta, letra, viñeta y letra con salto", []string{"- Uno", "B) Dos", "• Tres", "<mark>D. Cuatro</mark>"}, alts("Uno", "Dos", "Tres", "*Cuatro"), []string{AlertaVinetasNormalizadas}},
 		{"envuelta en negrita", []string{"**A)** Uno", "<mark>**B)** Dos</mark>"}, alts("Uno", "*Dos"), sinAlertas()},
 	}
 	for _, tt := range tests {
@@ -416,4 +416,71 @@ func TestParsear_BalotarioSintetico(t *testing.T) {
 	if got, want := r.Totales(), (Totales{Validas: 5, ConProblemas: 3, Unica: 4, Multiple: 1, ConAlertas: 3}); got != want {
 		t.Errorf("totales = %+v, want %+v", got, want)
 	}
+}
+
+func TestParsear_ReglaDeLetras(t *testing.T) {
+	t.Run("E. coli dentro del enunciado es continuacion", func(t *testing.T) {
+		r := parsear(t, "1. Un paciente con diarrea.\nE. coli enterohemorrágica?\nA) Uno\nB) Dos\n<mark>C) Tres</mark>\nD) Cuatro\n")
+		comprobarValidas(t, r.Validas, []esperada{{1, 1, 6, "Un paciente con diarrea. E. coli enterohemorrágica?", "unica", alts("Uno", "Dos", "*Tres", "Cuatro"), sinAlertas()}})
+	})
+	t.Run("la primera con letra debe ser A", func(t *testing.T) {
+		r := parsear(t, "1. P\nB) Uno\n<mark>C) Dos</mark>\n")
+		if got := fmt.Sprint(motivosDe(r)); got != "[1@1-3:alternativas_insuficientes+sin_clave]" {
+			t.Errorf("problemas = %s", got)
+		}
+	})
+	t.Run("una letra menor que la de la posicion es continuacion", func(t *testing.T) {
+		r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos</mark>\nA) otra vez\n")
+		comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "P", "unica", alts("Uno", "*Dos A) otra vez"), sinAlertas()}})
+	})
+	t.Run("un salto se reetiqueta", func(t *testing.T) {
+		r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos</mark>\nE) Tres\n")
+		comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "P", "unica", alts("Uno", "*Dos", "Tres"), []string{AlertaVinetasNormalizadas}}})
+	})
+}
+
+func TestParsear_SeparadorConEspacio(t *testing.T) {
+	t.Run("2.5 mg no abre pregunta", func(t *testing.T) {
+		r := parsear(t, "1. Dosis de\n2.5 mg de X\n0.9% NaCl\nA) Uno\n<mark>B) Dos</mark>\n")
+		comprobarValidas(t, r.Validas, []esperada{{1, 1, 5, "Dosis de 2.5 mg de X 0.9% NaCl", "unica", alts("Uno", "*Dos"), sinAlertas()}})
+	})
+	t.Run("A)Uno sin espacio no es etiqueta", func(t *testing.T) {
+		r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos</mark>\nC)Tres\n")
+		comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "P", "unica", alts("Uno", "*Dos C)Tres"), sinAlertas()}})
+	})
+	t.Run("etiqueta sola es alternativa vacia", func(t *testing.T) {
+		r := parsear(t, "1. P\nA) Uno\n<mark>B)</mark>\n\n")
+		if got := fmt.Sprint(motivosDe(r)); got != "[1@1-3:alternativa_vacia]" {
+			t.Errorf("problemas = %s", got)
+		}
+	})
+	t.Run("pegadas: b) pegado a texto no corta", func(t *testing.T) {
+		r := parsear(t, "1. P\nA) <mark>Uno</mark> B)Dos\nB) Tres\n")
+		comprobarValidas(t, r.Validas, []esperada{{1, 1, 3, "P", "unica", alts("*Uno B)Dos", "Tres"), sinAlertas()}})
+	})
+}
+
+func TestParsear_MarcasPorElemento(t *testing.T) {
+	t.Run("abre en la alternativa y cierra en su continuacion", func(t *testing.T) {
+		r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos\ny tres</mark>\nC) Cuatro\n")
+		comprobarValidas(t, r.Validas, []esperada{{1, 1, 5, "P", "unica", alts("Uno", "*Dos y tres", "Cuatro"), sinAlertas()}})
+	})
+	t.Run("abre en una alternativa y cierra en otra: no es marca", func(t *testing.T) {
+		r := parsear(t, "1. P\nA) <mark>Uno</mark>\n<mark>B) Dos\nC) Tres</mark>\n")
+		comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "P", "unica", alts("*Uno", "Dos", "Tres"), []string{AlertaHTMLEliminado}}})
+	})
+	t.Run("abierta sin cerrar nunca", func(t *testing.T) {
+		r := parsear(t, "1. P\nA) <mark>Uno</mark>\nB) <mark>Dos\ny mas\n")
+		comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "P", "unica", alts("*Uno", "Dos y mas"), []string{AlertaHTMLEliminado}}})
+	})
+	t.Run("la alternativa abierta sin cierre no es clave", func(t *testing.T) {
+		r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos\n")
+		if got := fmt.Sprint(motivosDe(r)); got != "[1@1-3:sin_clave]" {
+			t.Errorf("problemas = %s", got)
+		}
+	})
+	t.Run("marca abierta en la linea de la alternativa pegada", func(t *testing.T) {
+		r := parsear(t, "1. P\nA) Uno B) <mark>Dos\ny tres</mark>\n")
+		comprobarValidas(t, r.Validas, []esperada{{1, 1, 3, "P", "unica", alts("Uno", "*Dos y tres"), []string{AlertaAlternativasSeparadas}}})
+	})
 }

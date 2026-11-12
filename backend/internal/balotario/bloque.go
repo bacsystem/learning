@@ -10,9 +10,12 @@ import (
 
 // alternativa is an alternative while its block is being read.
 type alternativa struct {
-	et       etiqueta
-	partes   []string
-	correcta bool
+	et     etiqueta
+	partes []string
+	// correcta: the key is inside a closed <mark>. tentativa: it is inside a
+	// <mark> still open; abierta: the last line left a <mark> open, so the
+	// next continuation line may close it (§2.3).
+	correcta, tentativa, abierta bool
 }
 
 // bloque is a question under construction.
@@ -31,13 +34,28 @@ func nuevoBloque(numero, linea int, rota bool) *bloque {
 	return &bloque{numero: numero, inicio: linea, fin: linea, numeracionRota: rota}
 }
 
+// admite says whether a label opens an alternative: a bullet always does; a
+// letter only if it is A with none open, or not lower than the letter of the
+// next position (a gap is relabelled). Anything else, like "E. coli" inside
+// the enunciado, is continuation (contract §2.2).
+func (b *bloque) admite(et etiqueta) bool {
+	if et.vineta {
+		return true
+	}
+	if len(b.alts) == 0 {
+		return et.letra == 'A'
+	}
+	return et.letra >= rune('A'+len(b.alts))
+}
+
 // enunciadoLinea adds text to the enunciado; if the alternatives start in that
 // same line, the enunciado ends there.
-func (b *bloque) enunciadoLinea(linea int, t texto, hayHTML bool) {
+func (b *bloque) enunciadoLinea(linea int, l lineaLimpia) {
+	t := l.t
 	b.fin = linea
-	b.html = b.html || hayHTML
+	b.html = b.html || l.html
 	corte := len(t.r)
-	if b.alternativas() == 0 {
+	if len(b.alts) == 0 {
 		if c := corteEnunciado(t); c >= 0 {
 			corte = c
 		}
@@ -49,15 +67,14 @@ func (b *bloque) enunciadoLinea(linea int, t texto, hayHTML bool) {
 	}
 	if corte < len(t.r) {
 		b.separadas = true
-		b.etiquetadas(t.tramo(corte, len(t.r)))
+		b.etiquetadas(t.tramo(corte, len(t.r)), l.abierta)
 	}
 }
 
-func (b *bloque) alternativas() int { return len(b.alts) }
-
 // etiquetadas adds the alternatives of a text that starts with a label,
-// splitting the ones glued in the same line.
-func (b *bloque) etiquetadas(t texto) {
+// splitting the ones glued in the same line. abierta: the line ends with a
+// <mark> still open, which belongs to the last alternative.
+func (b *bloque) etiquetadas(t texto, abierta bool) {
 	for len(t.r) > 0 {
 		et, resto, ok := etiquetaAlternativa(t)
 		if !ok {
@@ -69,7 +86,11 @@ func (b *bloque) etiquetadas(t texto) {
 			propio = resto.tramo(0, corte)
 			b.separadas = true
 		}
-		alt := &alternativa{et: et, correcta: et.marcada || propio.marcado()}
+		b.cerrarPendiente()
+		alt := &alternativa{et: et,
+			correcta:  et.confirmada || propio.confirmada(),
+			tentativa: et.tentativa || propio.tentativa(),
+			abierta:   corte < 0 && abierta}
 		if p := propio.recortar(); len(p.r) > 0 {
 			alt.partes = append(alt.partes, p.String())
 		}
@@ -82,24 +103,47 @@ func (b *bloque) etiquetadas(t texto) {
 }
 
 // etiquetadaLinea adds the alternatives of a line that starts with a label.
-func (b *bloque) etiquetadaLinea(linea int, t texto, hayHTML bool) {
+func (b *bloque) etiquetadaLinea(linea int, l lineaLimpia) {
 	b.fin = linea
-	b.html = b.html || hayHTML
-	b.etiquetadas(t)
+	b.html = b.html || l.html
+	b.etiquetadas(l.t, l.abierta)
+}
+
+// pendiente: the last alternative has a <mark> open that the next
+// continuation line may close.
+func (b *bloque) pendiente() bool {
+	return len(b.alts) > 0 && b.alts[len(b.alts)-1].abierta
+}
+
+// cerrarPendiente discards the <mark> that stayed open: it does not form a mark
+// and is removed like any HTML.
+func (b *bloque) cerrarPendiente() {
+	if b.pendiente() {
+		ultima := b.alts[len(b.alts)-1]
+		ultima.abierta, ultima.tentativa = false, false
+		b.html = true
+	}
 }
 
 // continuacion adds a line without label to the last element: the last
-// alternative, or the enunciado while there is none.
-func (b *bloque) continuacion(linea int, t texto, hayHTML bool) {
+// alternative, or the enunciado while there is none. l was cleaned knowing
+// whether pendiente().
+func (b *bloque) continuacion(linea int, l lineaLimpia) {
 	if len(b.alts) == 0 {
-		b.enunciadoLinea(linea, t, hayHTML)
+		b.enunciadoLinea(linea, l)
 		return
 	}
 	b.fin = linea
-	b.html = b.html || hayHTML
+	b.html = b.html || l.html
 	ultima := b.alts[len(b.alts)-1]
-	ultima.correcta = ultima.correcta || t.marcado()
-	ultima.partes = append(ultima.partes, t.String())
+	if ultima.abierta && l.cerroInicial {
+		ultima.correcta = ultima.correcta || ultima.tentativa
+		ultima.tentativa = false
+	}
+	ultima.correcta = ultima.correcta || l.t.confirmada()
+	ultima.tentativa = ultima.tentativa || l.t.tentativa()
+	ultima.abierta = l.abierta
+	ultima.partes = append(ultima.partes, l.t.String())
 }
 
 // limpio decodes the entities after the marks are known (§2.3) and collapses
@@ -141,6 +185,7 @@ const (
 
 // resolver closes the block: it returns the valid question or the problem.
 func (b *bloque) resolver() (Pregunta, Problema, bool) {
+	b.cerrarPendiente()
 	enunciado := limpio(b.enunciado)
 	textos := make([]string, len(b.alts))
 	correctas := 0
