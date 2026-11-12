@@ -40,6 +40,13 @@ func nuevoBloque(numero, linea int, rota bool) *bloque {
 // letter only if it is A with none open, or not lower than the letter of the
 // next position (a gap is relabelled). Anything else, like "E. coli" inside
 // the enunciado, is continuation (contract §2.2).
+//
+// Letters G–Z (rule 17) are never relabelled: once there is an alternative,
+// only the letter of the next position opens one (G after F: the sixth is
+// exceeded), and any other is left for pareceEtiqueta, which makes it
+// ambiguous. The exception is the line after a blank line: there the lector
+// closes the question instead (a reference like "S. Pérez, 2020"); the blank
+// line wins, except for the letter of the next position.
 func (b *bloque) admite(et etiqueta) bool {
 	if et.vineta {
 		return true
@@ -47,7 +54,11 @@ func (b *bloque) admite(et etiqueta) bool {
 	if len(b.alts) == 0 {
 		return et.letra == 'A'
 	}
-	return et.letra >= rune('A'+len(b.alts))
+	siguiente := rune('A' + len(b.alts))
+	if et.letra > 'F' {
+		return et.letra == siguiente
+	}
+	return et.letra >= siguiente
 }
 
 // enunciadoLinea adds text to the enunciado; if the alternatives start in that
