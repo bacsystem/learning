@@ -44,7 +44,9 @@ func nuevoBloque(numero, linea int, rota bool) *bloque {
 // Letters G–Z (rule 17) are never relabelled: once there is an alternative,
 // only the letter of the next position opens one (G after F: the sixth is
 // exceeded), and any other is left for pareceEtiqueta, which makes it
-// ambiguous.
+// ambiguous. The exception is the line after a blank line: there the lector
+// closes the question instead (a reference like "S. Pérez, 2020"); the blank
+// line wins, except for the letter of the next position.
 func (b *bloque) admite(et etiqueta) bool {
 	if et.vineta {
 		return true
