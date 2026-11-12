@@ -95,7 +95,7 @@ const (
 	esquemaGenerarExplicacion = "generar_explicacion.v1"
 )
 
-// Fixed instructions of each operation. The prompts are SIA-E6-02's; these
+// Fixed instructions of each operation. The prompts are SIA-E6-10's; these
 // placeholders only fix that the instructions are code, not data.
 const (
 	instruccionesClasificar         = "Clasifica cada item en una opción de la taxonomía. Responde solo con el JSON del esquema."

@@ -65,6 +65,8 @@ services:
       DATABASE_URL: postgres://${PREPROD_PG_USER}:${PREPROD_PG_PASSWORD}@db:5432/${PREPROD_PG_DB}?sslmode=require
       JWT_SECRET: ${PREPROD_JWT_SECRET:?usa make local/up}
       ENCRYPTION_KEY: ${PREPROD_ENCRYPTION_KEY:?usa make local/up}
+      ANTIFRAUD_HMAC_KEY: ${PREPROD_ANTIFRAUD_HMAC_KEY:?usa make local/up}
+      ANTIFRAUD_HMAC_KEY_PREVIOUS: ""
       CORS_ORIGINS: http://localhost:3110
       FRONTEND_BASE_URL: http://localhost:3110
       TRUSTED_PROXIES: ""
