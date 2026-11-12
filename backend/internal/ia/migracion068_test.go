@@ -120,3 +120,21 @@ func TestMigracion068_PrefijoExactoDeLaClave(t *testing.T) {
 		_ = tx.Rollback()
 	}
 }
+
+// updated_by must not stop the deletion of an admin: the configuration keeps
+// its values and forgets who saved them.
+func TestMigracion068_UpdatedByNoImpideBorrarAlAdmin(t *testing.T) {
+	db := dbtest.Open(t)
+	admin := dbtest.SeedUser(t, db, dbtest.SeedCatalog(t, db), "admin", "activo")
+	if _, err := db.Exec(`UPDATE ia_configuracion SET updated_by = $1 WHERE id = 1`, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.Exec(`UPDATE ia_configuracion SET updated_by = NULL WHERE id = 1`) })
+	var fk string
+	if err := db.Get(&fk, `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ia_configuracion_updated_by_fkey'`); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(fk, "ON DELETE SET NULL") {
+		t.Errorf("updated_by constraint = %s, want ON DELETE SET NULL", fk)
+	}
+}
