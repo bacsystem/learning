@@ -1325,7 +1325,7 @@
         "error_interno": "Error interno del servidor. Inténtalo de nuevo.",
         "cuerpo_demasiado_grande": "Los datos enviados son demasiado grandes. Reduce el texto e inténtalo de nuevo.",
         "clave_oficial": "La clave oficial de una pregunta de balotario no se puede cambiar.",
-        "fuente_no_activa": "Una de las fuentes ya no está activa. Revisa las citas y vuelve a intentarlo.",
+        "fuente_no_activa": "Una de las fuentes ya no está activa. Recarga la página y vuelve a intentarlo.",
         "limite_citas": "Una pregunta admite como máximo {maximo} citas. Quita alguna para añadir otra.",
         "ultima_cita_activa": "No puedes quitar la última cita activa de una pregunta aprobada. Añade otra cita antes de quitar esta.",
         "generico": "No se pudo completar la operación. Inténtalo de nuevo.",
@@ -1340,7 +1340,7 @@
         "ya_importado": "Esta versión ya se importó. Se actualizó la vista.",
         "tipo_fuente_invalido": "Solo se importan fuentes de tipo balotario.",
         "especialidad_invalida": "Esa profesión no está activa o no es de la institución del proceso. Elige otra.",
-        "especialidad_no_corresponde": "Esa profesión no está entre las de la fuente. Elige una de las que la fuente cubre.",
+        "especialidad_no_corresponde": "Esa profesión no está entre las de la fuente: {profesiones}. Elige una de ellas.",
         "sin_validas": "No hay preguntas válidas que importar."
       },
       "pesos": {

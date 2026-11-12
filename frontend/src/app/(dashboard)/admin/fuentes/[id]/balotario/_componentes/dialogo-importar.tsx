@@ -10,7 +10,12 @@ import { Campo } from "@/components/app/campo";
 import { SelectCampo } from "@/components/formularios/select-campo";
 import { useAuth } from "@/lib/auth/auth-context";
 import type { ImportacionCreada } from "@/lib/serums-ia/balotario/api";
-import { claveErrorBalotario, pideRecargar, valoresDeError } from "@/lib/serums-ia/balotario/errores";
+import {
+  claveErrorBalotario,
+  especialidadesDeError,
+  pideRecargar,
+  valoresDeError,
+} from "@/lib/serums-ia/balotario/errores";
 import { cuerpoConfirmacion, esquemaImportacion, VALORES_INICIALES } from "@/lib/serums-ia/balotario/reglas";
 import { FileArrowDownIcon } from "@phosphor-icons/react";
 
@@ -40,7 +45,11 @@ export function DialogoImportar({
       try {
         await onConfirmar(cuerpoConfirmacion(version, v));
       } catch (e) {
-        const texto = t(claveErrorBalotario(e, t.has), valoresDeError(e));
+        // En `especialidad_no_corresponde` se nombran las profesiones de la fuente para que el admin sepa cuál elegir.
+        const profesiones = especialidadesDeError(e)
+          .map((id) => opciones.especialidades.find((p) => p.id === id)?.nombre ?? `#${id}`)
+          .join(", ");
+        const texto = t(claveErrorBalotario(e, t.has), { ...valoresDeError(e), profesiones });
         if (pideRecargar(e)) onConflicto(texto);
         else setMensaje(texto);
       }
@@ -87,6 +96,7 @@ export function DialogoImportar({
           }}
           placeholder={t("serumsIa.balotario.confirmar.procesoPlaceholder")}
           invalido={Boolean(campo("proceso_id"))}
+          describidoPor={campo("proceso_id") ? "importar-proceso-error" : undefined}
           disabled={opciones.cargandoOpciones}
         />
       </Campo>
@@ -106,6 +116,7 @@ export function DialogoImportar({
           onCambio={(v) => void formik.setFieldValue("especialidad_id", v)}
           placeholder={t("serumsIa.balotario.confirmar.especialidadPlaceholder")}
           invalido={Boolean(campo("especialidad_id"))}
+          describidoPor={campo("especialidad_id") ? "importar-especialidad-error" : undefined}
           disabled={!proceso}
         />
       </Campo>
@@ -130,6 +141,7 @@ export function DialogoImportar({
           onCambio={(v) => void formik.setFieldValue("asignatura_id", v)}
           placeholder={t("serumsIa.balotario.confirmar.areaPlaceholder")}
           invalido={Boolean(campo("asignatura_id"))}
+          describidoPor={`importar-area-${campo("asignatura_id") ? "error" : "ayuda"}`}
           disabled={!proceso || opciones.cargandoAreas}
         />
       </Campo>

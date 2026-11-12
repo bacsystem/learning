@@ -1325,7 +1325,7 @@
         "error_interno": "Internal server error. Please try again.",
         "cuerpo_demasiado_grande": "The data sent is too large. Shorten the text and try again.",
         "clave_oficial": "The official answer key of a past-exam question cannot be changed.",
-        "fuente_no_activa": "One of the sources is no longer active. Review the citations and try again.",
+        "fuente_no_activa": "One of the sources is no longer active. Reload the page and try again.",
         "limite_citas": "A question allows at most {maximo} citations. Remove one to add another.",
         "ultima_cita_activa": "You cannot remove the last active citation of an approved question. Add another citation before removing this one.",
         "generico": "The operation could not be completed. Try again.",
@@ -1340,7 +1340,7 @@
         "ya_importado": "This version has already been imported. The view was refreshed.",
         "tipo_fuente_invalido": "Only sources of type past-exam bank can be imported.",
         "especialidad_invalida": "That profession is not active or does not belong to the process institution. Choose another.",
-        "especialidad_no_corresponde": "That profession is not among those of the source. Choose one the source covers.",
+        "especialidad_no_corresponde": "That profession is not among those of the source: {profesiones}. Choose one of them.",
         "sin_validas": "There are no valid questions to import."
       },
       "pesos": {

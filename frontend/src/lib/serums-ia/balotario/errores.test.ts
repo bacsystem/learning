@@ -1,6 +1,6 @@
 import en from "../../../i18n/messages/en.json";
 import es from "../../../i18n/messages/es.json";
-import { claveErrorBalotario, pideRecargar, valoresDeError } from "./errores";
+import { claveErrorBalotario, especialidadesDeError, pideRecargar, valoresDeError } from "./errores";
 import { describe, expect, it } from "vitest";
 
 const error = (code?: string, detalle?: Record<string, unknown>) =>
@@ -75,5 +75,18 @@ describe("valoresDeError", () => {
     expect(valoresDeError(error("limite_preguntas"))).toEqual({});
     expect(valoresDeError(error("limite_preguntas", { maximo: "1000" }))).toEqual({});
     expect(valoresDeError(null)).toEqual({});
+  });
+});
+
+describe("especialidadesDeError", () => {
+  it("reads the profession ids of the source from the detail", () => {
+    expect(especialidadesDeError(error("especialidad_no_corresponde", { especialidad_ids: [2, 5] }))).toEqual([2, 5]);
+  });
+
+  it("ignores a missing detail or values that are not ids", () => {
+    expect(especialidadesDeError(error("especialidad_no_corresponde"))).toEqual([]);
+    expect(especialidadesDeError(error("x", { especialidad_ids: "2" }))).toEqual([]);
+    expect(especialidadesDeError(error("x", { especialidad_ids: [2, "3", null] }))).toEqual([2]);
+    expect(especialidadesDeError(null)).toEqual([]);
   });
 });

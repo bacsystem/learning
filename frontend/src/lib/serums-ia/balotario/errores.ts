@@ -23,3 +23,11 @@ export function valoresDeError(err: unknown): Record<string, number> {
     ...(typeof detectadas === "number" && { detectadas }),
   };
 }
+
+/** Ids de las profesiones de la fuente en un 422 `especialidad_no_corresponde` (`detalle.especialidad_ids`). */
+export function especialidadesDeError(err: unknown): number[] {
+  const detalle = (err as { detalle?: unknown } | null)?.detalle;
+  if (typeof detalle !== "object" || detalle === null) return [];
+  const ids = (detalle as Record<string, unknown>).especialidad_ids;
+  return Array.isArray(ids) ? ids.filter((id): id is number => typeof id === "number") : [];
+}
