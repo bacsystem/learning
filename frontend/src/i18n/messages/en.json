@@ -1724,6 +1724,11 @@
           "validacion": "Check the submitted data: a passage may be repeated.",
           "referencia_invalida": "One of the passages no longer exists. The citation list was refreshed."
         }
+      },
+      "preguntas": {
+        "errores": {
+          "estado_invalido": "This question changed state; the view was refreshed."
+        }
       }
     },
     "sesion-servidor-no-disponible-titulo": "The server is not responding",
