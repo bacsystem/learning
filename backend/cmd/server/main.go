@@ -10,15 +10,19 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	_ "time/tzdata" // the quota windows run in America/Lima (SIA-E6-02); the image has no tz database
 
 	"github.com/cbaciliod/learning/internal/admin"
+	"github.com/cbaciliod/learning/internal/antifraude"
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/auth"
+	"github.com/cbaciliod/learning/internal/balotario"
 	"github.com/cbaciliod/learning/internal/catalogs"
 	"github.com/cbaciliod/learning/internal/config"
 	"github.com/cbaciliod/learning/internal/crypto"
 	"github.com/cbaciliod/learning/internal/db"
 	"github.com/cbaciliod/learning/internal/fuentes"
+	"github.com/cbaciliod/learning/internal/ia"
 	"github.com/cbaciliod/learning/internal/inscripciones"
 	"github.com/cbaciliod/learning/internal/logger"
 	internalmw "github.com/cbaciliod/learning/internal/middleware"
@@ -122,8 +126,16 @@ func run() int {
 	questions.Mount(mux, qSvc, audLog, cfg.JWTSecret, checkSession)
 	temas.Mount(mux, temas.NewService(temas.NewRepository(database)), audLog, cfg.JWTSecret, checkSession)
 	perfiles.Mount(mux, perfiles.NewService(perfiles.NewRepository(database), catSvc), cfg.JWTSecret, checkSession)
+	balotario.Mount(mux, balotario.NewService(balotario.NewRepository(database)), audLog, cfg.JWTSecret, checkSession)
 	fuentes.Mount(mux, fuentes.NewService(fuentes.NewRepository(database), questions.Citantes{}, questions.SuscriptorRetiro{}), audLog, cfg.JWTSecret, checkSession)
 	practices.Mount(mux, pSvc, cfg.JWTSecret, checkSession)
+	// Cost control of the AI (SIA-E6-02): quota, budget and their admin panel.
+	iaCostos, err := ia.NewPgCostos(database, antifraude.New(cfg.AntifraudHMACKey, cfg.AntifraudHMACKeyPrevious))
+	if err != nil {
+		log.Error().Err(err).Msg("ia cost control init failed")
+		return 1
+	}
+	ia.Mount(mux, iaCostos, audLog, cfg.JWTSecret, checkSession)
 	// Health of the services for admins, in the contract order (PLT-01).
 	salud.Mount(mux, salud.NewService([]salud.Comprobacion{
 		salud.ComprobarAPI(version, arranque, time.Now),

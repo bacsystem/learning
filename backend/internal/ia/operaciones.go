@@ -31,6 +31,7 @@ type Pasaje struct {
 }
 
 type EntradaClasificar struct {
+	Fuentes   []int64 // fuente_id whose content goes in the data (cache validity)
 	Items     []ItemTexto
 	Taxonomia []OpcionTaxonomia
 }
@@ -47,6 +48,7 @@ type Clasificacion struct {
 }
 
 type EntradaGenerarPreguntas struct {
+	Fuentes  []int64 // fuente_id whose content goes in the data (cache validity)
 	TemaID   int64
 	Cantidad int
 	Pasajes  []Pasaje
@@ -64,6 +66,7 @@ type PreguntaGenerada struct {
 }
 
 type EntradaGenerarMaterial struct {
+	Fuentes []int64 // fuente_id whose content goes in the data (cache validity)
 	TemaID  int64
 	Pasajes []Pasaje
 }
@@ -75,6 +78,7 @@ type SalidaGenerarMaterial struct {
 }
 
 type EntradaGenerarExplicacion struct {
+	Fuentes      []int64 // fuente_id whose content goes in the data (cache validity)
 	PreguntaID   int64
 	Enunciado    string
 	Alternativas []string
@@ -95,7 +99,7 @@ const (
 	esquemaGenerarExplicacion = "generar_explicacion.v1"
 )
 
-// Fixed instructions of each operation. The prompts are SIA-E6-02's; these
+// Fixed instructions of each operation. The prompts are SIA-E6-10's; these
 // placeholders only fix that the instructions are code, not data.
 const (
 	instruccionesClasificar         = "Clasifica cada item en una opción de la taxonomía. Responde solo con el JSON del esquema."
@@ -145,7 +149,7 @@ func (in EntradaClasificar) solicitud() Solicitud {
 		}
 		datos = append(datos, Bloque{Etiqueta: etiqueta(etiquetaOpcion, ids...), Texto: o.Nombre})
 	}
-	return Solicitud{Operacion: OpClasificar, Instrucciones: instruccionesClasificar, Datos: datos, EsquemaSalida: esquemaClasificar}
+	return Solicitud{Operacion: OpClasificar, Instrucciones: instruccionesClasificar, Datos: datos, EsquemaSalida: esquemaClasificar, Fuentes: in.Fuentes}
 }
 
 // validar: one result per input item, each id of the input once.
@@ -200,7 +204,7 @@ func (s SalidaClasificar) validar(in EntradaClasificar) error {
 func (in EntradaGenerarPreguntas) solicitud() Solicitud {
 	datos := append([]Bloque{{Etiqueta: etiqueta(etiquetaParametro+":tema", in.TemaID)},
 		{Etiqueta: etiqueta(etiquetaParametro+":cantidad", int64(in.Cantidad))}}, bloquesPasajes(in.Pasajes)...)
-	return Solicitud{Operacion: OpGenerarPreguntas, Instrucciones: instruccionesGenerarPreguntas, Datos: datos, EsquemaSalida: esquemaGenerarPreguntas}
+	return Solicitud{Operacion: OpGenerarPreguntas, Instrucciones: instruccionesGenerarPreguntas, Datos: datos, EsquemaSalida: esquemaGenerarPreguntas, Fuentes: in.Fuentes}
 }
 
 // validar: at most Cantidad questions, a correct index inside the
@@ -222,7 +226,7 @@ func (s SalidaGenerarPreguntas) validar(in EntradaGenerarPreguntas) error {
 
 func (in EntradaGenerarMaterial) solicitud() Solicitud {
 	datos := append([]Bloque{{Etiqueta: etiqueta(etiquetaParametro+":tema", in.TemaID)}}, bloquesPasajes(in.Pasajes)...)
-	return Solicitud{Operacion: OpGenerarMaterial, Instrucciones: instruccionesGenerarMaterial, Datos: datos, EsquemaSalida: esquemaGenerarMaterial}
+	return Solicitud{Operacion: OpGenerarMaterial, Instrucciones: instruccionesGenerarMaterial, Datos: datos, EsquemaSalida: esquemaGenerarMaterial, Fuentes: in.Fuentes}
 }
 
 func (s SalidaGenerarMaterial) validar(in EntradaGenerarMaterial) error {
@@ -239,7 +243,7 @@ func (in EntradaGenerarExplicacion) solicitud() Solicitud {
 		datos = append(datos, Bloque{Etiqueta: etiqueta(etiquetaAlternativa, int64(i)), Texto: a})
 	}
 	datos = append(datos, bloquesPasajes(in.Pasajes)...)
-	return Solicitud{Operacion: OpGenerarExplicacion, Instrucciones: instruccionesGenerarExplicacion, Datos: datos, EsquemaSalida: esquemaGenerarExplicacion}
+	return Solicitud{Operacion: OpGenerarExplicacion, Instrucciones: instruccionesGenerarExplicacion, Datos: datos, EsquemaSalida: esquemaGenerarExplicacion, Fuentes: in.Fuentes}
 }
 
 func (s SalidaGenerarExplicacion) validar(in EntradaGenerarExplicacion) error {
@@ -258,4 +262,15 @@ func citasValidas(citas []int64, pasajes []Pasaje) error {
 		}
 	}
 	return nil
+}
+
+// validarSalida makes every input an Entrada: it checks the output against it.
+func (in EntradaClasificar) validarSalida(o SalidaClasificar) error { return o.validar(in) }
+
+func (in EntradaGenerarPreguntas) validarSalida(o SalidaGenerarPreguntas) error { return o.validar(in) }
+
+func (in EntradaGenerarMaterial) validarSalida(o SalidaGenerarMaterial) error { return o.validar(in) }
+
+func (in EntradaGenerarExplicacion) validarSalida(o SalidaGenerarExplicacion) error {
+	return o.validar(in)
 }

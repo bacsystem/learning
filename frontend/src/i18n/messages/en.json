@@ -27,8 +27,29 @@
     "user-profile": "Profile",
     "user-language": "Language",
     "user-sign-out": "Sign out",
-    "barra-superior-abrir-menu": "Open menu",
-    "barra-superior-ubicacion": "Location",
+    "menu-usuario-menu": "User menu",
+    "menu-usuario-cuenta": "Your account",
+    "menu-usuario-tema": "Theme",
+    "menu-usuario-apariencia": "Appearance…",
+    "menu-usuario-apariencia-titulo": "Appearance",
+    "menu-usuario-apariencia-descripcion": "Applied instantly and saved in this browser.",
+    "menu-usuario-paleta": "Palette",
+    "menu-usuario-paleta-ayuda": "The accent color: active item, highlighted metrics and charts.",
+    "menu-usuario-tono-oscuro": "Dark tone",
+    "menu-usuario-tono-oscuro-ayuda": "Used when the theme is dark.",
+    "menu-usuario-tipografia": "Typography",
+    "menu-usuario-tipografia-ayuda": "Data (serial numbers, ids) stays in JetBrains Mono.",
+    "menu-usuario-tipografia-muestra": "Invoice F001-00000136 · S/ 4,820.00 accepted by SUNAT.",
+    "menu-usuario-diseno": "Layout",
+    "menu-usuario-diseno-interfaz": "Interface layout",
+    "menu-usuario-paleta-color": "Color palette",
+    "menu-usuario-tono-modo-oscuro": "Dark mode tone",
+    "menu-usuario-tipografia-fuente": "Typography",
+    "menu-usuario-cerrar": "Close",
+    "menu-usuario-tema-interfaz": "Interface theme",
+    "menu-usuario-claro": "Light",
+    "menu-usuario-oscuro": "Dark",
+    "menu-usuario-sistema": "System",
     "menu-practicas": "Practices",
     "practicas-historial": "History",
     "practicas-nueva": "New Practice",
@@ -1327,7 +1348,7 @@
         "error_interno": "Internal server error. Please try again.",
         "cuerpo_demasiado_grande": "The data sent is too large. Shorten the text and try again.",
         "clave_oficial": "The official answer key of a past-exam question cannot be changed.",
-        "fuente_no_activa": "One of the sources is no longer active. Review the citations and try again.",
+        "fuente_no_activa": "One of the sources is no longer active. Reload the page and try again.",
         "limite_citas": "A question allows at most {maximo} citations. Remove one to add another.",
         "ultima_cita_activa": "You cannot remove the last active citation of an approved question. Add another citation before removing this one.",
         "generico": "The operation could not be completed. Try again.",
@@ -1335,7 +1356,15 @@
         "verificacion_requerida": "Tick the verification box before approving.",
         "nota_obligatoria": "Write a review note of {min} to {max} characters.",
         "conflicto_clave": "This question has an unresolved answer-key conflict.",
-        "revision_especializada": "This question is reviewed in its specialised queue, not from here."
+        "revision_especializada": "This question is reviewed in its specialised queue, not from here.",
+        "parametro_invalido": "The request is not valid. Reload the page.",
+        "cuerpo_invalido": "The request is not valid. Reload the page.",
+        "version_desactualizada": "A new version of the source was uploaded. It was analysed again; review and confirm again.",
+        "ya_importado": "This version has already been imported. The view was refreshed.",
+        "tipo_fuente_invalido": "Only sources of type past-exam bank can be imported.",
+        "especialidad_invalida": "That profession is not active or does not belong to the process institution. Choose another.",
+        "especialidad_no_corresponde": "That profession is not among those of the source: {profesiones}. Choose one of them.",
+        "sin_validas": "There are no valid questions to import."
       },
       "pesos": {
         "titulo": "Weights for {especialidad}",
@@ -1491,7 +1520,8 @@
           "fallida": "Version {numero, number} failed"
         },
         "oficial": {
-          "insignia": "Officially verified"
+          "insignia": "Officially verified",
+          "insigniaEntidad": "Officially verified · {entidad}"
         },
         "col": {
           "titulo": "Title",
@@ -1565,7 +1595,8 @@
           "restaurar": "Restore",
           "reintentar": "Retry",
           "marcarOficial": "Mark as officially verified",
-          "desmarcarOficial": "Remove official mark"
+          "desmarcarOficial": "Remove official mark",
+          "importarBalotario": "Import past-exam questions"
         },
         "retirar": {
           "titulo": "Retire source",
@@ -1677,6 +1708,7 @@
           "fuenteRetirada": "Source withdrawn",
           "fuenteActiva": "Active source",
           "verTexto": "View the full passage",
+          "claveOficial": "official key",
           "quitar": "Remove citation",
           "quitarDe": "Remove the citation from “{fuente}”",
           "guardando": "Saving citations…",
@@ -1725,6 +1757,121 @@
           "no_encontrado": "The question no longer exists or was deleted.",
           "validacion": "Check the submitted data: a passage may be repeated.",
           "referencia_invalida": "One of the passages no longer exists. The citation list was refreshed."
+        }
+      },
+      "balotario": {
+        "titulo": "Import past-exam questions",
+        "volver": "Back to the source",
+        "importar": "Import questions",
+        "importarAyuda": "Review the analysis and create the valid questions as drafts.",
+        "cargando": "Analysing the current version…",
+        "errorCarga": "The question bank could not be analysed.",
+        "recargar": "Analyse again",
+        "version": "Version {numero}",
+        "noOficial": "Not official",
+        "rutaRevision": {
+          "titulo": "Review route",
+          "estructural": {
+            "nombre": "Structural review",
+            "ayuda": "The source is verified official: it is enough to check that the question was read correctly."
+          },
+          "verificacion_clave": {
+            "nombre": "Answer-key verification",
+            "ayuda": "The source is not verified official: each answer key must be checked against the source."
+          }
+        },
+        "totales": {
+          "titulo": "Analysis result",
+          "validas": "Valid",
+          "conProblemas": "With problems",
+          "conAlertas": "With alerts",
+          "tipos": "{unica, number} single answer · {multiple, number} multiple choice",
+          "conProblemasAyuda": "They are not imported",
+          "conAlertasAyuda": "The text was adjusted when reading them"
+        },
+        "preguntas": {
+          "titulo": "First {n, plural, one {# valid question} other {# valid questions}}",
+          "vacio": "The analysis found no valid questions.",
+          "numero": "No.",
+          "lineas": "Lines {inicio}–{fin}",
+          "enunciado": "Statement",
+          "tipo": "Type",
+          "alertas": "Alerts",
+          "sinAlertas": "No alerts",
+          "correcta": "Correct",
+          "alternativas": "{n, plural, one {# option} other {# options}}",
+          "tipos": {
+            "unica": "Single",
+            "multiple": "Multiple"
+          }
+        },
+        "problemas": {
+          "titulo": "Questions with problems",
+          "ayuda": "They are not imported. Find them in the source by line number.",
+          "vacio": "No questions have problems.",
+          "numero": "No.",
+          "sinNumero": "No number",
+          "lineas": "Lines",
+          "motivos": "Reasons",
+          "unidad": "problems"
+        },
+        "motivos": {
+          "numeracion_rota": "Broken numbering",
+          "enunciado_vacio": "Empty statement",
+          "enunciado_largo": "Statement too long (over 2,000 characters)",
+          "alternativas_insuficientes": "Fewer than 2 options",
+          "alternativas_excedidas": "More than 6 options",
+          "etiquetas_ambiguas": "Ambiguous option label (a letter that goes back or repeats)",
+          "alternativa_vacia": "Option without text",
+          "alternativa_larga": "Option too long (over 500 characters)",
+          "alternativas_duplicadas": "Repeated options",
+          "sin_clave": "No answer key marked",
+          "sin_pasaje": "No passage from the source"
+        },
+        "alertas": {
+          "alternativas_separadas": "Options that came on a single line were split.",
+          "vinetas_normalizadas": "The letters or bullets of the options were normalised.",
+          "html_eliminado": "HTML was removed from the text."
+        },
+        "noConfirmable": {
+          "sin_validas": "There are no valid questions to import.",
+          "ya_importado": "This version has already been imported."
+        },
+        "yaImportado": "This version was imported on {fecha}: {n, plural, one {# question created} other {# questions created}}.",
+        "otrasImportaciones": {
+          "titulo": "Other versions have been imported",
+          "texto": "If you repeat questions already imported, they could be duplicated; duplicates are detected during review.",
+          "fila": "Version {version}: {n, plural, one {# question} other {# questions}} on {fecha}"
+        },
+        "confirmar": {
+          "titulo": "Import questions",
+          "descripcion": "They will be created as drafts, with the past-exam origin and cited to the passages of version {version}.",
+          "proceso": "Process",
+          "procesoPlaceholder": "Choose a process",
+          "especialidad": "Profession",
+          "especialidadPlaceholder": "Choose a profession",
+          "area": "Initial area",
+          "areaPlaceholder": "Choose an area",
+          "areaAyuda": "Provisional: it is confirmed when each question is reviewed.",
+          "areaSinProceso": "Choose a process first.",
+          "areaVacia": "This process has no assigned areas.",
+          "boton": "Import",
+          "pendiente": "Importing…",
+          "cancelar": "Cancel",
+          "requerido": "This field is required.",
+          "errorOpciones": "The options could not be loaded."
+        },
+        "exito": {
+          "titulo": "Import completed",
+          "texto": "{creadas, plural, one {# question was created} other {# questions were created}} as a draft. {problemas, plural, =0 {None had problems.} one {# had problems and was not imported.} other {# had problems and were not imported.}}",
+          "verListado": "See the imported questions",
+          "cerrar": "Close"
+        },
+        "errores": {
+          "no_encontrado": "The source no longer exists or has no current version.",
+          "validacion": "Check the data: fields are missing or invalid.",
+          "referencia_invalida": "The process or the area is no longer valid. Reload and choose them again.",
+          "limite_preguntas": "The question bank has more than {maximo, number} questions ({detectadas, number} detected). Split it into parts and upload each as a version."
         }
       }
     },
@@ -1791,6 +1938,8 @@
         "correcta": "Successful",
         "fallida": "Failed"
       }
-    }
+    },
+    "barra-superior-abrir-menu": "Open menu",
+    "barra-superior-ubicacion": "Location"
   }
 }

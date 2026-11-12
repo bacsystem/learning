@@ -3,11 +3,15 @@
 // that reject personal data and oversized input before calling the provider,
 // bound every call, retry only transient errors and invalid output, validate
 // the output and record one usage row per invocation, never its content.
-// It has no HTTP routes: consumers run it in jobs or workers.
+// The calls run in the consumers' jobs, never in a request. SIA-E6-02 adds the
+// control of costs (docs/api/serums-ia-e6-02-control-costos.md, ADR 0009): the
+// quota of actions reserved all or nothing, the monthly budget, the cache, and
+// the routes of the consumption and of the admin's configuration and spend.
 package ia
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -39,12 +43,26 @@ type Actor struct {
 	ID  *int64
 }
 
-// Servicio is what consumers use; every method records one usage row.
+// Servicio is what consumers use. Every operation spends one action of the
+// reservation r (SIA-E6-02) and records one usage row. Reservar, Liberar and
+// Consumo are the quota API of the consumers (contract E6-02 §2.2).
 type Servicio interface {
-	Clasificar(ctx context.Context, a Actor, in EntradaClasificar) (SalidaClasificar, error)
-	GenerarPreguntas(ctx context.Context, a Actor, in EntradaGenerarPreguntas) (SalidaGenerarPreguntas, error)
-	GenerarMaterial(ctx context.Context, a Actor, in EntradaGenerarMaterial) (SalidaGenerarMaterial, error)
-	GenerarExplicacion(ctx context.Context, a Actor, in EntradaGenerarExplicacion) (SalidaGenerarExplicacion, error)
+	Clasificar(ctx context.Context, r *Reserva, in EntradaClasificar) (SalidaClasificar, error)
+	GenerarPreguntas(ctx context.Context, r *Reserva, in EntradaGenerarPreguntas) (SalidaGenerarPreguntas, error)
+	GenerarMaterial(ctx context.Context, r *Reserva, in EntradaGenerarMaterial) (SalidaGenerarMaterial, error)
+	GenerarExplicacion(ctx context.Context, r *Reserva, in EntradaGenerarExplicacion) (SalidaGenerarExplicacion, error)
+
+	// Reservar takes n actions all or nothing (D17), in the order budget,
+	// month, day. Errors: *ErrorPresupuesto, *ErrLimite.
+	Reservar(ctx context.Context, a Actor, n int) (Reserva, error)
+	// Liberar gives n actions back; the consumer releases what it does not use.
+	Liberar(ctx context.Context, r *Reserva, n int) error
+	Consumo(ctx context.Context, a Actor) (Consumo, error)
+	Configuracion(ctx context.Context) (Configuracion, error)
+	// BuscarCache is the building block of BuscarEnCache, which consumers
+	// call: acepta decides whether the stored output is usable before the
+	// cache hit is recorded for a.
+	BuscarCache(ctx context.Context, a Actor, sol Solicitud, acepta func(json.RawMessage) bool) (json.RawMessage, bool, error)
 }
 
 // Errors of the service (contract §5). Their text is the stable code.
@@ -58,6 +76,9 @@ var (
 	// ErrCancelado wraps context.Canceled: the consumer cancelled its own ctx,
 	// so it is recorded but never mapped to HTTP (Codigo reports ok=false).
 	ErrCancelado = errors.New("cancelado")
+	// ErrCostos wraps a failure of the cost control itself (the database),
+	// not of the provider: it is recorded as error_interno and answered 500.
+	ErrCostos = errors.New("error_costos")
 	// ErrActorInvalido is a programming error of the consumer: the actor
 	// would break ck_ia_usos_actor, so nothing is called nor recorded.
 	ErrActorInvalido = errors.New("actor_invalido")
@@ -89,26 +110,60 @@ func (e *ErrorDatosPersonales) Error() string {
 func (e *ErrorDatosPersonales) Unwrap() error { return ErrDatosPersonales }
 
 // Codigo maps an error of the service to the code (format 2) and the HTTP
-// status a consumer must use to expose it (contract §5). It returns ("", 0)
-// for nil, for ErrCancelado (the consumer caused it) and for an error that is
-// not of the service.
+// status a consumer must use to expose it (contract §5; E6-02 §5). It returns
+// ("", 0) for nil, for ErrCancelado (the consumer caused it) and for an error
+// that is not of the service. Detalle gives the data that goes with it.
 func Codigo(err error) (codigo string, status int) {
+	var lim *ErrLimite
+	if errors.As(err, &lim) {
+		return lim.Error(), http.StatusTooManyRequests
+	}
 	for _, m := range mapaErrores {
 		if errors.Is(err, m.err) {
-			return m.err.Error(), m.status
+			return m.codigo(), m.status
 		}
 	}
 	return "", 0
 }
 
-var mapaErrores = []struct {
+// Detalle is the `detalle` object of the error response of Codigo, or nil
+// when the error carries none: the instant the budget or the quota restarts
+// and, for a quota, its limit and what was used (contract E6-02 §5).
+func Detalle(err error) map[string]any {
+	var lim *ErrLimite
+	var ep *ErrorPresupuesto
+	switch {
+	case errors.As(err, &lim):
+		return map[string]any{"limite": lim.Limite, "usados": lim.Usados, "reinicia_at": lim.ReiniciaAt}
+	case errors.As(err, &ep):
+		return map[string]any{"reinicia_at": ep.ReiniciaAt}
+	}
+	return nil
+}
+
+// errorMapeado is the status and code of one error of the service.
+type errorMapeado struct {
 	err    error
 	status int
-}{
-	{ErrNoDisponible, http.StatusServiceUnavailable},
-	{ErrEntradaDemasiadoGrande, http.StatusUnprocessableEntity},
-	{ErrDatosPersonales, http.StatusUnprocessableEntity},
-	{ErrTimeout, http.StatusGatewayTimeout},
-	{ErrSalidaInvalida, http.StatusBadGateway},
-	{ErrProveedor, http.StatusBadGateway},
+	cod    string // when the code is not the error's text
+}
+
+func (m errorMapeado) codigo() string {
+	if m.cod != "" {
+		return m.cod
+	}
+	return m.err.Error()
+}
+
+var mapaErrores = []errorMapeado{
+	{ErrNoDisponible, http.StatusServiceUnavailable, ""},
+	{ErrEntradaDemasiadoGrande, http.StatusUnprocessableEntity, ""},
+	{ErrDatosPersonales, http.StatusUnprocessableEntity, ""},
+	{ErrTimeout, http.StatusGatewayTimeout, ""},
+	{ErrSalidaInvalida, http.StatusBadGateway, ""},
+	{ErrProveedor, http.StatusBadGateway, ""},
+	{ErrPresupuestoAgotado, http.StatusTooManyRequests, ""},
+	{ErrSinReserva, http.StatusInternalServerError, "error_interno"},
+	{ErrCostos, http.StatusInternalServerError, "error_interno"},
+	{ErrActorInvalido, http.StatusInternalServerError, "error_interno"},
 }

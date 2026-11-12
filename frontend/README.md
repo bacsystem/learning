@@ -52,7 +52,7 @@ npm run lint       # ESLint + Prettier
 npm run build      # build de producción
 ```
 
-Variables de entorno:
+Variables de entorno (plantilla en `env.example`: `cp env.example .env.local`):
 
 | Variable                     | Uso                                                                                                                              |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -61,6 +61,8 @@ Variables de entorno:
 | `NEXT_PUBLIC_CONTACT_EMAIL`  | Correo público de contacto (política de privacidad, términos y pie de la landing). Por defecto `contact@bacsystemsolutions.com`. |
 
 Las variables `NEXT_PUBLIC_*` se incrustan en el bundle al construir.
+
+`package.json` fuerza `minimatch ^11.0.1` para `@typescript-eslint/typescript-estree` (`overrides`): `minimatch` < 11.0.1 tiene un aviso de DoS (GHSA-g3hv-75wg-m249) y `typescript-eslint` aún pide `^10`. Es solo de desarrollo (lint). Se quita cuando `typescript-eslint` pida `minimatch ^11` por su cuenta; `npm audit` debe seguir en 0.
 
 ## Docker
 

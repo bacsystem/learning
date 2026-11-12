@@ -8,7 +8,13 @@ import { cn } from "@/lib/utils";
  * Select con los diseños disponibles (el atributo `data-diseno` de `<html>`). Mismo ancho y fondo que `ThemeToggle conTexto`,
  * para ir justo debajo de él en el menú de usuario. No pinta nada sin `DisenoProvider` o con un solo diseño.
  */
-export function SelectorDiseno({ className }: { className?: string }) {
+export function SelectorDiseno({
+  className,
+  etiqueta = "Diseño de la interfaz",
+}: {
+  className?: string;
+  etiqueta?: string;
+}) {
   const { diseno, setDiseno, disenos } = useDiseno();
   if (disenos.length < 2) return null;
 
@@ -21,7 +27,7 @@ export function SelectorDiseno({ className }: { className?: string }) {
       items={disenos.map((d) => ({ value: d.valor, label: d.etiqueta }))}
     >
       <SelectTrigger
-        aria-label="Diseño de la interfaz"
+        aria-label={etiqueta}
         size="campo"
         className={cn("bg-muted text-control w-full font-medium", className)}
       >

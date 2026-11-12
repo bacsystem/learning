@@ -23,6 +23,7 @@ export function PanelLateral({
   children,
   pie,
   ancho = "sm:max-w-lg",
+  etiquetaCerrar = "Cerrar",
 }: {
   trigger?: ReactNode;
   open?: boolean;
@@ -33,6 +34,8 @@ export function PanelLateral({
   children: ReactNode;
   pie?: ReactNode;
   ancho?: string;
+  /** Nombre del botón de cerrar para el lector de pantalla, para traducirlo (por defecto «Cerrar»). */
+  etiquetaCerrar?: string;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -52,7 +55,7 @@ export function PanelLateral({
             ) : null}
           </div>
           <SheetClose
-            aria-label="Cerrar"
+            aria-label={etiquetaCerrar}
             className={cn(
               OBJETIVO_TACTIL,
               "text-texto-terciario hover:bg-secondary hover:text-foreground -mt-1 -mr-1 grid size-8 place-items-center rounded-full transition-colors",

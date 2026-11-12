@@ -25,13 +25,19 @@ export function PillEstadoFuente({ estado }: { estado: EstadoFuente }) {
   return <PillEstado tono={TONO_ESTADO[estado]}>{t(`serumsIa.fuentes.estado.${estado}`)}</PillEstado>;
 }
 
-/** Insignia «Oficial verificada» de la versión vigente. */
-export function InsigniaOficial() {
+/**
+ * Insignia «Oficial verificada» de la versión vigente; con `entidad`, «Oficial verificada · MINSA». La entidad admite
+ * hasta 100 caracteres: la insignia puede ocupar varias líneas (`h-auto`, `whitespace-normal`) en vez de desbordar.
+ */
+export function InsigniaOficial({ entidad }: { entidad?: string | null }) {
   const t = useTranslations("dashboard");
+  const texto = entidad
+    ? t("serumsIa.fuentes.oficial.insigniaEntidad", { entidad })
+    : t("serumsIa.fuentes.oficial.insignia");
   return (
-    <Badge variant="secondary">
-      <SealCheckIcon weight="fill" data-icon="inline-start" />
-      {t("serumsIa.fuentes.oficial.insignia")}
+    <Badge variant="secondary" title={texto} className="h-auto max-w-full text-left break-words whitespace-normal">
+      <SealCheckIcon weight="fill" data-icon="inline-start" className="shrink-0" />
+      {texto}
     </Badge>
   );
 }

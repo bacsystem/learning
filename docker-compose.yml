@@ -1,6 +1,6 @@
 # Stack local: Postgres + backend (Go) + frontend (Next.js)
 #
-#   make compose/init       # crea .env con secretos (o: cp .env.example .env y complétalo)
+#   make compose/init       # crea .env con secretos (o: cp env.example .env y complétalo)
 #   make compose/up         # o: docker compose up -d --build
 #
 # Frontend: http://localhost:3000   Backend: http://localhost:8080   Postgres: localhost:5433
@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-learning}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio (ver .env.example)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio (ver env.example)}
       POSTGRES_DB: ${POSTGRES_DB:-learning}
     ports:
       - "127.0.0.1:${DB_PORT:-5433}:5432"
@@ -56,9 +56,11 @@ services:
     environment:
       PORT: 8080
       ENV: ${ENV:-development}
-      DATABASE_URL: postgres://${POSTGRES_USER:-learning}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio (ver .env.example)}@db:5432/${POSTGRES_DB:-learning}?sslmode=disable
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET es obligatorio (ver .env.example)}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY es obligatorio (ver .env.example)}
+      DATABASE_URL: postgres://${POSTGRES_USER:-learning}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD es obligatorio (ver env.example)}@db:5432/${POSTGRES_DB:-learning}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET es obligatorio (ver env.example)}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY es obligatorio (ver env.example)}
+      ANTIFRAUD_HMAC_KEY: ${ANTIFRAUD_HMAC_KEY:?ANTIFRAUD_HMAC_KEY es obligatorio (make compose/init la genera; ver env.example)}
+      ANTIFRAUD_HMAC_KEY_PREVIOUS: ${ANTIFRAUD_HMAC_KEY_PREVIOUS:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-}

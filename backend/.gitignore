@@ -6,8 +6,7 @@ tmp/build-errors.log
 # Air
 tmp/
 
-# Environment (keep .env.example, ignore .env with real secrets)
-# .env  ← committed intentionally with placeholder values
+# Environment (keep env.example (template), ignore .env with real secrets)
 
 # Go test cache
 *.test

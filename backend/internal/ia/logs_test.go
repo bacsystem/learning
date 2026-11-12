@@ -45,7 +45,7 @@ func TestServicio_LogsSinContenido(t *testing.T) {
 		{nil, in, &registroMemoria{}},
 	} {
 		s, _ := nuevo(c.prov, c.reg)
-		_, err := s.Clasificar(ctx, sistema, c.in)
+		_, err := s.Clasificar(ctx, res(sistema), c.in)
 		errs = append(errs, err)
 	}
 	if buf.Len() == 0 {

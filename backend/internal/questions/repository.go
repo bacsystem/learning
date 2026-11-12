@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cbaciliod/learning/internal/db"
 	"github.com/cbaciliod/learning/internal/grading"
 	"github.com/cbaciliod/learning/internal/texto"
 	"github.com/jmoiron/sqlx"
@@ -410,8 +411,8 @@ func (r *Repository) ListPreguntas(ctx context.Context, q ListQuery) (PreguntaLi
 		i++
 	}
 	if q.Search != "" {
-		where = append(where, fmt.Sprintf("p.enunciado ILIKE $%d", i))
-		args = append(args, "%"+q.Search+"%")
+		where = append(where, fmt.Sprintf(`p.enunciado ILIKE $%d ESCAPE '\'`, i))
+		args = append(args, "%"+db.EscapeLike(q.Search)+"%")
 		i++
 	}
 
