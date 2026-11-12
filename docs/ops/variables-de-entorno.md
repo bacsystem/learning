@@ -88,7 +88,7 @@ Las migraciones corren **en cada arranque** del contenedor, antes del servidor
 
 | Variable | Estado |
 |---|---|
-| `ANTIFRAUD_HMAC_KEY`, `ANTIFRAUD_HMAC_KEY_PREVIOUS` | Las define el [ADR 0002](../adr/0002-secreto-hmac-contadores-antifraude.md): secreto obligatorio en todos los entornos, 64 caracteres hex, distinto de `ENCRYPTION_KEY` y de `JWT_SECRET`. **No hay código que la lea en `develop`** ni en ninguna rama. Cuando llegue el PR que la implementa, devops agrega en el mismo cambio: `ANTIFRAUD_HMAC_KEY: ${ANTIFRAUD_HMAC_KEY:?…}` en compose, su generación en `make compose/init`, la línea en `.env.example` y esta tabla. Si compose la exige antes de que `compose/init` la genere, `make compose/up` se rompe |
+| `ANTIFRAUD_HMAC_KEY`, `ANTIFRAUD_HMAC_KEY_PREVIOUS` | Las define el [ADR 0002](../adr/0002-secreto-hmac-contadores-antifraude.md): secreto obligatorio en todos los entornos, 64 caracteres hex, distinto de `ENCRYPTION_KEY` y de `JWT_SECRET`. **No hay código que la lea en `develop`** ni en ninguna rama. Cuando llegue el PR que la implementa, devops agrega en el mismo cambio: `ANTIFRAUD_HMAC_KEY: ${ANTIFRAUD_HMAC_KEY:?…}` en compose, su generación en `make compose/init`, la línea en `env.example` y esta tabla. Si compose la exige antes de que `compose/init` la genere, `make compose/up` se rompe |
 
 ## Frontend (Next.js)
 
