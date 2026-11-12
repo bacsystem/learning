@@ -39,7 +39,7 @@ Formato observado: preguntas numeradas, alternativas A–D, clave dentro de `<ma
     - una línea empieza con algo que parece una etiqueta (una letra con cualquiera de las formas `A)`, `A.`, `A-` o `(A)`), pero el parser la trataría como continuación de la alternativa anterior;
     - las letras de las etiquetas retroceden o se repiten (por ejemplo A, C, B).
     
-    Dentro del enunciado, antes de la primera alternativa, una línea como «E. coli…» sigue siendo continuación sin problema. Un salto hacia adelante sin retroceso (A, B, D) sigue la regla 10: se reetiqueta con la alerta `vinetas_normalizadas`. Preferimos que el admin corrija el archivo antes que importar una clave equivocada. **Letras G–Z** (decisión del PO, 12-nov, borde encontrado por qa): una vez abierta una alternativa, una línea con forma de etiqueta y letra G–Z nunca se une en silencio a la anterior. Si es justo la letra siguiente a la última alternativa abierta (G después de F), abre una alternativa nueva, y la pregunta va a «con problemas» con `alternativas_excedidas` (más de 6). En cualquier otro caso va a `etiquetas_ambiguas`. Excepción a «se informan todos» (regla 10): si la pregunta es ambigua pero hay una `<mark>` en su rango, solo se informa `etiquetas_ambiguas`, no `sin_clave`. Así no se le dice al admin que falta una clave que sí está.
+    Dentro del enunciado, antes de la primera alternativa, una línea como «E. coli…» sigue siendo continuación sin problema. Un salto hacia adelante sin retroceso (A, B, D) sigue la regla 10: se reetiqueta con la alerta `vinetas_normalizadas`. Preferimos que el admin corrija el archivo antes que importar una clave equivocada. **Letras G–Z** (decisión del PO, 12-nov, borde encontrado por qa): una vez abierta una alternativa, una línea con forma de etiqueta y letra G–Z nunca se une en silencio a la anterior. Si es justo la letra siguiente a la última alternativa abierta (G después de F), abre una alternativa nueva, y la pregunta va a «con problemas» con `alternativas_excedidas` (más de 6). En cualquier otro caso va a `etiquetas_ambiguas`. Esto vale solo para las líneas pegadas a una alternativa. **Tras una línea en blanco** (decisión del PO, 12-nov, review del #232), una línea G–Z con forma de etiqueta que sea justo la letra siguiente continúa la pregunta (y da `alternativas_excedidas`). Cualquier otra cierra la pregunta y queda como texto fuera de ella (regla 7), por ejemplo una referencia «S. Pérez, 2020» al pie. No se une a nada, así que la clave no puede corromperse. Excepción a «se informan todos» (regla 10): si la pregunta es ambigua pero hay una `<mark>` en su rango, solo se informa `etiquetas_ambiguas`, no `sin_clave`. Así no se le dice al admin que falta una clave que sí está.
 
 ## Criterios de aceptación
 ```gherkin
@@ -167,6 +167,11 @@ Escenario: Letra lejana dentro de las alternativas
   Dado las líneas "A) Uno", "S. aureus resistente", "B) Dos" y "C) Tres"
   Cuando se parsea
   Entonces se lista como "con problemas" con motivo "etiquetas_ambiguas"
+
+Escenario: Referencia al pie tras línea en blanco
+  Dado la última pregunta con alternativas A) a D), una línea en blanco y la línea "S. Pérez, 2020"
+  Cuando se parsea
+  Entonces la pregunta es válida con 4 alternativas y "S. Pérez, 2020" queda fuera de ella, sin motivo "etiquetas_ambiguas"
 
 Escenario: Letras que retroceden
   Dado una pregunta con alternativas etiquetadas A, C, B y D
