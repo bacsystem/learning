@@ -26,9 +26,10 @@ type bloque struct {
 	enunciado      []string
 	alts           []*alternativa
 
-	ambigua   bool // a line with the shape of a label did not open an alternative (rule 17)
-	separadas bool // alternatives glued in one line were split
-	html      bool // some HTML (or an unpaired mark) was removed
+	ambigua      bool // a line with the shape of a label did not open an alternative (rule 17)
+	marcaAmbigua bool // ...and it carries a closed <mark>: there is a key in the range of the question
+	separadas    bool // alternatives glued in one line were split
+	html         bool // some HTML (or an unpaired mark) was removed
 }
 
 func nuevoBloque(numero, linea int, rota bool) *bloque {
@@ -127,16 +128,18 @@ func (b *bloque) cerrarPendiente() {
 }
 
 // pareceEtiqueta says whether a line that did not open an alternative still
-// has the shape of a label: a letter A–F followed by ")" or "." (contract
-// §2.2, rule 17). After the first alternative such a line is not absorbed as
-// continuation: the question is not imported when the key may be elsewhere.
+// has the shape of a label: any label with a letter, X), X., X- or (X)
+// (contract §2.2, rule 17). Bullets never are. After the first alternative
+// such a line is not absorbed as continuation: the question is not imported
+// when the key may be elsewhere.
 func (b *bloque) pareceEtiqueta(et etiqueta) bool {
-	return len(b.alts) > 0 && !et.vineta && (et.forma == ')' || et.forma == '.')
+	return len(b.alts) > 0 && !et.vineta
 }
 
 // ambiguaLinea records the line of a label that does not open an alternative.
 func (b *bloque) ambiguaLinea(linea int, l lineaLimpia) {
 	b.ambigua = true
+	b.marcaAmbigua = b.marcaAmbigua || l.t.confirmada()
 	b.fin = linea
 	b.html = b.html || l.html
 }
@@ -244,7 +247,9 @@ func (b *bloque) motivos(enunciado string, textos []string, correctas int) []str
 	anadir(alguna(textos, func(s string) bool { return s == "" }), MotivoAlternativaVacia)
 	anadir(alguna(textos, func(s string) bool { return utf8.RuneCountInString(s) > MaxAlternativa }), MotivoAlternativaLarga)
 	anadir(hayDuplicadas(textos), MotivoAlternativasDuplicadas)
-	anadir(correctas == 0, MotivoSinClave)
+	// sin_clave: no valid mark in the whole range of the question, also in the
+	// lines that did not open an alternative (H5 of the review of #193).
+	anadir(correctas == 0 && !b.marcaAmbigua, MotivoSinClave)
 	return motivos
 }
 

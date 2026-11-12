@@ -121,6 +121,7 @@ func TestInsertarLote_Rechazos(t *testing.T) {
 		{"origen invalido", func(p *NuevaPregunta) { p.Origen = "otro" }, false},
 		{"enunciado vacio", func(p *NuevaPregunta) { p.Enunciado = "  " }, true},
 		{"respuesta sin texto", func(p *NuevaPregunta) { p.Respuestas[1].Texto = "" }, true},
+		{"respuesta solo con espacios", func(p *NuevaPregunta) { p.Respuestas[1].Texto = "   " }, true},
 		{"respuesta de 501", func(p *NuevaPregunta) { p.Respuestas[1].Texto = strings.Repeat("a", 501) }, true},
 		{"orden cero", func(p *NuevaPregunta) { p.Respuestas[0].Orden = 0 }, true},
 		{"orden repetido", func(p *NuevaPregunta) { p.Respuestas[1].Orden = 1 }, true},

@@ -532,8 +532,8 @@ func TestParsear_EtiquetasAmbiguas(t *testing.T) {
 		want string
 	}{
 		{"nombre cientifico dentro de las alternativas", "1. P\nA) Antibiótico contra\nC. difficile con vancomicina\n<mark>B) Metronidazol</mark>\nC) Otro\n",
-			"[1@1-5:etiquetas_ambiguas+sin_clave]"}, // «C. difficile» abre una C; la B marcada retrocede y no cuenta
-		{"letras que retroceden", "1. P\nA) Uno\nC) Tres\n<mark>B) Dos</mark>\n", "[1@1-4:etiquetas_ambiguas+sin_clave]"},
+			"[1@1-5:etiquetas_ambiguas]"}, // «C. difficile» abre una C; la B marcada retrocede: el único motivo es la ambigüedad
+		{"letras que retroceden", "1. P\nA) Uno\nC) Tres\n<mark>B) Dos</mark>\n", "[1@1-4:etiquetas_ambiguas]"},
 		{"letras repetidas", "1. P\nA) Uno\n<mark>B) Dos</mark>\nB) Dos otra vez\n", "[1@1-4:etiquetas_ambiguas]"},
 		{"letra repetida con punto", "1. P\na. Uno\n<mark>b. Dos</mark>\nb. otra\n", "[1@1-4:etiquetas_ambiguas]"},
 		{"la etiqueta envuelta en negrita tambien", "1. P\nA) Uno\n<mark>B) Dos</mark>\n**A)** otra\n", "[1@1-4:etiquetas_ambiguas]"},
@@ -541,8 +541,13 @@ func TestParsear_EtiquetasAmbiguas(t *testing.T) {
 		{"va tras el limite de alternativas y antes de la vacia", "1. P\nA) 1\nB) 2\nC) 3\nD) 4\nE) 5\nF) 6\n<mark>- 7</mark>\nA) x\n",
 			"[1@1-9:alternativas_excedidas+etiquetas_ambiguas]"},
 		// What does not look like a label: the shape is a letter A–F plus ")" or "." and a space.
-		{"con guion no parece etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\nA- otra\n", "[]"},
-		{"entre parentesis no parece etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\n(a) otra\n", "[]"},
+		{"con guion tambien es etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\nA- otra\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"entre parentesis tambien es etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\n(a) otra\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"entre parentesis: la clave pegada a la B", "1. P\n(a) Uno\n(b) Dos\n<mark>(a) Tres</mark>\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"con guion: A, C, B", "1. P\nA- Uno\nC- Dos\n<mark>B- Tres</mark>\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"ambigua y sin ninguna marca: los dos motivos", "1. P\nA) Uno\nB) Dos\nA) otra\n", "[1@1-4:etiquetas_ambiguas+sin_clave]"},
+		{"ambigua con la marca en una alternativa valida", "1. P\n<mark>A) Uno</mark>\nB) Dos\nA) otra\n", "[1@1-4:etiquetas_ambiguas]"},
+		{"una marca solo en el enunciado no es clave", "1. <mark>P</mark>\nA) Uno\nB) Dos\nA) otra\n", "[1@1-4:etiquetas_ambiguas+sin_clave]"},
 		{"letra fuera de A-F no parece etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\nG) otra\n", "[]"},
 		{"sin espacio tras el separador no parece etiqueta", "1. P\nA) Uno\n<mark>B) Dos</mark>\nA.otra\n", "[]"},
 		{"antes de la primera alternativa es enunciado", "1. P\nE. coli enterohemorrágica\nA) Uno\n<mark>B) Dos</mark>\n", "[]"},
