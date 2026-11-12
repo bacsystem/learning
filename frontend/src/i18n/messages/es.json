@@ -1325,7 +1325,7 @@
         "error_interno": "Error interno del servidor. Inténtalo de nuevo.",
         "cuerpo_demasiado_grande": "Los datos enviados son demasiado grandes. Reduce el texto e inténtalo de nuevo.",
         "clave_oficial": "La clave oficial de una pregunta de balotario no se puede cambiar.",
-        "fuente_no_activa": "Una de las fuentes ya no está activa. Revisa las citas y vuelve a intentarlo.",
+        "fuente_no_activa": "Una de las fuentes ya no está activa. Recarga la página y vuelve a intentarlo.",
         "limite_citas": "Una pregunta admite como máximo {maximo} citas. Quita alguna para añadir otra.",
         "ultima_cita_activa": "No puedes quitar la última cita activa de una pregunta aprobada. Añade otra cita antes de quitar esta.",
         "generico": "No se pudo completar la operación. Inténtalo de nuevo.",
@@ -1333,7 +1333,15 @@
         "verificacion_requerida": "Marca la casilla de verificación antes de aprobar.",
         "nota_obligatoria": "Escribe una nota de revisión de {min} a {max} caracteres.",
         "conflicto_clave": "Esta pregunta tiene un conflicto de clave sin resolver.",
-        "revision_especializada": "Esta pregunta se revisa en su cola especializada, no desde aquí."
+        "revision_especializada": "Esta pregunta se revisa en su cola especializada, no desde aquí.",
+        "parametro_invalido": "La solicitud no es válida. Recarga la página.",
+        "cuerpo_invalido": "La solicitud no es válida. Recarga la página.",
+        "version_desactualizada": "Se subió una versión nueva de la fuente. Se volvió a analizar; revisa y confirma de nuevo.",
+        "ya_importado": "Esta versión ya se importó. Se actualizó la vista.",
+        "tipo_fuente_invalido": "Solo se importan fuentes de tipo balotario.",
+        "especialidad_invalida": "Esa profesión no está activa o no es de la institución del proceso. Elige otra.",
+        "especialidad_no_corresponde": "Esa profesión no está entre las de la fuente: {profesiones}. Elige una de ellas.",
+        "sin_validas": "No hay preguntas válidas que importar."
       },
       "pesos": {
         "titulo": "Pesos de {especialidad}",
@@ -1563,7 +1571,8 @@
           "restaurar": "Restaurar",
           "reintentar": "Reintentar",
           "marcarOficial": "Marcar como oficial verificada",
-          "desmarcarOficial": "Quitar marca oficial"
+          "desmarcarOficial": "Quitar marca oficial",
+          "importarBalotario": "Importar preguntas del balotario"
         },
         "retirar": {
           "titulo": "Retirar fuente",
@@ -1723,6 +1732,122 @@
           "no_encontrado": "La pregunta ya no existe o fue eliminada.",
           "validacion": "Revisa los datos enviados: un pasaje puede estar repetido.",
           "referencia_invalida": "Uno de los pasajes ya no existe. Se actualizó la lista de citas."
+        }
+      },
+      "balotario": {
+        "titulo": "Importar balotario",
+        "volver": "Volver a la fuente",
+        "importar": "Importar preguntas",
+        "importarAyuda": "Revisa el análisis y crea las preguntas válidas como borradores.",
+        "cargando": "Analizando la versión vigente…",
+        "errorCarga": "No se pudo analizar el balotario.",
+        "recargar": "Volver a analizar",
+        "version": "Versión {numero}",
+        "oficial": "Oficial verificada · {entidad}",
+        "noOficial": "No oficial",
+        "rutaRevision": {
+          "titulo": "Ruta de revisión",
+          "estructural": {
+            "nombre": "Revisión estructural",
+            "ayuda": "La fuente es oficial verificada: basta comprobar que la pregunta se leyó bien."
+          },
+          "verificacion_clave": {
+            "nombre": "Verificación de la clave",
+            "ayuda": "La fuente no es oficial verificada: hay que comprobar cada clave contra la fuente."
+          }
+        },
+        "totales": {
+          "titulo": "Resultado del análisis",
+          "validas": "Válidas",
+          "conProblemas": "Con problemas",
+          "conAlertas": "Con alertas",
+          "tipos": "{unica, number} de respuesta única · {multiple, number} de selección múltiple",
+          "conProblemasAyuda": "No se importan",
+          "conAlertasAyuda": "El texto se ajustó al leerlas"
+        },
+        "preguntas": {
+          "titulo": "Primeras {n, plural, one {# pregunta válida} other {# preguntas válidas}}",
+          "vacio": "El análisis no encontró preguntas válidas.",
+          "numero": "N.º",
+          "lineas": "Líneas {inicio}–{fin}",
+          "enunciado": "Enunciado",
+          "tipo": "Tipo",
+          "alertas": "Alertas",
+          "sinAlertas": "Sin alertas",
+          "correcta": "Correcta",
+          "alternativas": "{n, plural, one {# alternativa} other {# alternativas}}",
+          "tipos": {
+            "unica": "Única",
+            "multiple": "Múltiple"
+          }
+        },
+        "problemas": {
+          "titulo": "Preguntas con problemas",
+          "ayuda": "No se importan. Ubícalas en la fuente por su número de línea.",
+          "vacio": "No hay preguntas con problemas.",
+          "numero": "N.º",
+          "sinNumero": "Sin número",
+          "lineas": "Líneas",
+          "motivos": "Motivos",
+          "unidad": "problemas"
+        },
+        "motivos": {
+          "numeracion_rota": "Numeración rota",
+          "enunciado_vacio": "Enunciado vacío",
+          "enunciado_largo": "Enunciado demasiado largo (más de 2 000 caracteres)",
+          "alternativas_insuficientes": "Menos de 2 alternativas",
+          "alternativas_excedidas": "Más de 6 alternativas",
+          "etiquetas_ambiguas": "Etiqueta de alternativa ambigua (una letra que retrocede o se repite)",
+          "alternativa_vacia": "Alternativa sin texto",
+          "alternativa_larga": "Alternativa demasiado larga (más de 500 caracteres)",
+          "alternativas_duplicadas": "Alternativas repetidas",
+          "sin_clave": "Sin clave marcada",
+          "sin_pasaje": "Sin pasaje de la fuente"
+        },
+        "alertas": {
+          "alternativas_separadas": "Se separaron alternativas que venían en una misma línea.",
+          "vinetas_normalizadas": "Se normalizaron las letras o viñetas de las alternativas.",
+          "html_eliminado": "Se quitó HTML del texto."
+        },
+        "noConfirmable": {
+          "sin_validas": "No hay preguntas válidas que importar.",
+          "ya_importado": "Esta versión ya se importó."
+        },
+        "yaImportado": "Esta versión se importó el {fecha}: {n, plural, one {# pregunta creada} other {# preguntas creadas}}.",
+        "otrasImportaciones": {
+          "titulo": "Hay importaciones de otras versiones",
+          "texto": "Si repites preguntas ya importadas, podrían duplicarse; la detección de duplicados se hace al revisarlas.",
+          "fila": "Versión {version}: {n, plural, one {# pregunta} other {# preguntas}} el {fecha}"
+        },
+        "confirmar": {
+          "titulo": "Importar preguntas",
+          "descripcion": "Se crearán como borradores, con origen balotario y citadas a los pasajes de la versión {version}.",
+          "proceso": "Proceso",
+          "procesoPlaceholder": "Elige un proceso",
+          "especialidad": "Profesión",
+          "especialidadPlaceholder": "Elige una profesión",
+          "area": "Área inicial",
+          "areaPlaceholder": "Elige un área",
+          "areaAyuda": "Provisional: se confirma al revisar cada pregunta.",
+          "areaSinProceso": "Elige primero un proceso.",
+          "areaVacia": "Este proceso no tiene áreas asignadas.",
+          "boton": "Importar",
+          "pendiente": "Importando…",
+          "cancelar": "Cancelar",
+          "requerido": "Este campo es obligatorio.",
+          "errorOpciones": "No se pudieron cargar las opciones."
+        },
+        "exito": {
+          "titulo": "Importación completada",
+          "texto": "{creadas, plural, one {Se creó # pregunta} other {Se crearon # preguntas}} como borrador. {problemas, plural, =0 {Ninguna quedó con problemas.} one {# quedó con problemas y no se importó.} other {# quedaron con problemas y no se importaron.}}",
+          "verListado": "Ver las preguntas importadas",
+          "cerrar": "Cerrar"
+        },
+        "errores": {
+          "no_encontrado": "La fuente ya no existe o no tiene una versión vigente.",
+          "validacion": "Revisa los datos: faltan campos o no son válidos.",
+          "referencia_invalida": "El proceso o el área ya no son válidos. Recarga y vuelve a elegirlos.",
+          "limite_preguntas": "El balotario tiene más de {maximo, number} preguntas ({detectadas, number} detectadas). Divídelo en partes y sube cada una como una versión."
         }
       }
     },
