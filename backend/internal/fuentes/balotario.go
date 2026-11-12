@@ -33,6 +33,12 @@ type VersionBalotario struct {
 // original content and its especialidades. It answers ErrNoEncontrado if the
 // fuente does not exist. Inside a transaction it sees what the transaction
 // has locked.
+//
+// It does not filter by tipo or by estado: a guía or a retired fuente is
+// returned as it is, and the caller (the preview and the confirmation of
+// SIA-E3-03) validates both before using the content. The current version is
+// the one the fuente points to, not the latest: while a newer version is
+// 'procesando', the previous one stays current.
 func VersionVigenteBalotario(ctx context.Context, q sqlx.QueryerContext, fuenteID int64) (VersionBalotario, error) {
 	var fila struct {
 		FuenteID          int64          `db:"id"`

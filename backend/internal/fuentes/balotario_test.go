@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/cbaciliod/learning/internal/db/dbtest"
@@ -83,6 +84,30 @@ func TestVersionVigenteBalotario(t *testing.T) {
 	t.Run("fuente inexistente", func(t *testing.T) {
 		if _, err := fuentes.VersionVigenteBalotario(ctx, db, -1); !errors.Is(err, fuentes.ErrNoEncontrado) {
 			t.Errorf("err = %v, want ErrNoEncontrado", err)
+		}
+	})
+
+	t.Run("una version nueva sin publicar no cambia la vigente", func(t *testing.T) {
+		otra, vOtra := publicarBalotario(t, e, "primera "+dbtest.Uniq(), nil, [][2]int{{1, 1}})
+		e.NuevaVersion(t, otra, []byte("segunda en proceso "+dbtest.Uniq()))
+		got, err := fuentes.VersionVigenteBalotario(ctx, db, otra)
+		if err != nil || got.Numero != vOtra || got.Estado != "activa" || !strings.HasPrefix(got.Contenido, "primera ") {
+			t.Errorf("got %+v, %v; want la versión %d", got, err, vOtra)
+		}
+	})
+
+	t.Run("no filtra por tipo ni por estado", func(t *testing.T) {
+		guia, _, err := e.Repo.GuardarFuente(ctx, fuentes.NuevaFuente{Titulo: "Guía " + dbtest.Uniq(), Tipo: "guia",
+			NombreArchivo: "g.md", Contenido: []byte("g " + dbtest.Uniq())}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := fuentes.VersionVigenteBalotario(ctx, db, guia); err != nil || got.Tipo != "guia" {
+			t.Errorf("guía: %+v, %v", got, err)
+		}
+		e.Retirar(t, id)
+		if got, err := fuentes.VersionVigenteBalotario(ctx, db, id); err != nil || got.Estado != "retirada" || got.VersionID == 0 {
+			t.Errorf("retirada: %+v, %v", got, err)
 		}
 	})
 
