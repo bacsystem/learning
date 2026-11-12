@@ -54,11 +54,11 @@ npm run build      # build de producción
 
 Variables de entorno:
 
-| Variable | Uso |
-|---|---|
-| `NEXT_PUBLIC_API_URL` | URL base de la API del backend (en `.env.local`). |
-| `NEXT_PUBLIC_STORAGE_PREFIX` | Prefijo de la cookie de idioma. |
-| `NEXT_PUBLIC_CONTACT_EMAIL` | Correo público de contacto (política de privacidad, términos y pie de la landing). Por defecto `contact@bacsystemsolutions.com`. |
+| Variable                     | Uso                                                                                                                              |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`        | URL base de la API del backend (en `.env.local`).                                                                                |
+| `NEXT_PUBLIC_STORAGE_PREFIX` | Prefijo de la cookie de idioma.                                                                                                  |
+| `NEXT_PUBLIC_CONTACT_EMAIL`  | Correo público de contacto (política de privacidad, términos y pie de la landing). Por defecto `contact@bacsystemsolutions.com`. |
 
 Las variables `NEXT_PUBLIC_*` se incrustan en el bundle al construir.
 

@@ -145,3 +145,23 @@ type ListaFuentes struct {
 	Page    int             `json:"page"`
 	PerPage int             `json:"per_page"`
 }
+
+// ── Passage search for citing (GET /admin/pasajes; contract E3-07 §2) ─────────
+
+// PasajeBuscado is one hit of the admin search. It carries the extract, never
+// the full text, and nothing about the stored file.
+type PasajeBuscado struct {
+	PasajeID     int64   `json:"pasaje_id"`
+	FuenteID     int64   `json:"fuente_id"`
+	FuenteTitulo string  `json:"fuente_titulo"`
+	Version      int     `json:"version"`
+	Seccion      *string `json:"seccion"`
+	LineaInicio  int     `json:"linea_inicio"`
+	LineaFin     int     `json:"linea_fin"`
+	Extracto     string  `json:"extracto"`
+}
+
+// ListaPasajes is the body of the admin search: at most MaxResultados items.
+type ListaPasajes struct {
+	Data []PasajeBuscado `json:"data"`
+}

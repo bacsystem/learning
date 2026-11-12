@@ -14,11 +14,13 @@ import (
 	"github.com/cbaciliod/learning/internal/auth"
 	"github.com/cbaciliod/learning/internal/catalogs"
 	"github.com/cbaciliod/learning/internal/db/dbtest"
+	"github.com/cbaciliod/learning/internal/fuentes"
 	"github.com/cbaciliod/learning/internal/perfiles"
 	"github.com/cbaciliod/learning/internal/questions"
 	"github.com/cbaciliod/learning/internal/simulations"
 	"github.com/cbaciliod/learning/internal/temas"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -111,12 +113,15 @@ func correr(t *testing.T, db *sqlx.DB, cfg config) string {
 func conteos(t *testing.T, db *sqlx.DB) map[string]int {
 	t.Helper()
 	consultas := map[string]string{
-		"instituciones":        `SELECT COUNT(*) FROM instituciones WHERE nombre IN ($1, $2)`,
-		"especialidades":       `SELECT COUNT(*) FROM especialidades WHERE codigo LIKE 'DEMO-%' AND institucion_id IN (SELECT id FROM instituciones WHERE nombre IN ($1, $2))`,
-		"asignaturas":          `SELECT COUNT(*) FROM asignaturas WHERE codigo LIKE 'DEMO-%' AND $1 <> $2`,
-		"procesos":             `SELECT COUNT(*) FROM procesos WHERE institucion_id IN (SELECT id FROM instituciones WHERE nombre IN ($1, $2))`,
-		"proceso_asignaturas":  `SELECT COUNT(*) FROM proceso_asignaturas WHERE proceso_id IN (SELECT p.id FROM procesos p JOIN instituciones i ON i.id = p.institucion_id WHERE i.nombre IN ($1, $2))`,
-		"preguntas":            `SELECT COUNT(*) FROM preguntas WHERE estado = 'activo' AND proceso_id IN (SELECT p.id FROM procesos p JOIN instituciones i ON i.id = p.institucion_id WHERE i.nombre IN ($1, $2))`,
+		"instituciones":       `SELECT COUNT(*) FROM instituciones WHERE nombre IN ($1, $2)`,
+		"especialidades":      `SELECT COUNT(*) FROM especialidades WHERE codigo LIKE 'DEMO-%' AND institucion_id IN (SELECT id FROM instituciones WHERE nombre IN ($1, $2))`,
+		"asignaturas":         `SELECT COUNT(*) FROM asignaturas WHERE codigo LIKE 'DEMO-%' AND $1 <> $2`,
+		"procesos":            `SELECT COUNT(*) FROM procesos WHERE institucion_id IN (SELECT id FROM instituciones WHERE nombre IN ($1, $2))`,
+		"proceso_asignaturas": `SELECT COUNT(*) FROM proceso_asignaturas WHERE proceso_id IN (SELECT p.id FROM procesos p JOIN instituciones i ON i.id = p.institucion_id WHERE i.nombre IN ($1, $2))`,
+		"preguntas":           `SELECT COUNT(*) FROM preguntas WHERE estado = 'aprobada' AND origen = 'manual' AND proceso_id IN (SELECT p.id FROM procesos p JOIN instituciones i ON i.id = p.institucion_id WHERE i.nombre IN ($1, $2))`,
+		"citas":               `SELECT COUNT(*) FROM pregunta_citas WHERE pregunta_id IN (SELECT id FROM preguntas WHERE estado <> 'eliminada' AND proceso_id IN (SELECT p.id FROM procesos p JOIN instituciones i ON i.id = p.institucion_id WHERE i.nombre IN ($1, $2)))`,
+		"fuentes": `SELECT COUNT(*) FROM fuentes f WHERE f.titulo = '` + tituloFuenteDemo + `' AND f.estado = 'activa' AND $1 <> $2
+			AND NOT EXISTS (SELECT 1 FROM fuente_versiones v WHERE v.fuente_id = f.id AND v.oficial_verificada)`,
 		"configuracion_examen": `SELECT COUNT(*) FROM configuracion_examen WHERE proceso_id IN (SELECT p.id FROM procesos p JOIN instituciones i ON i.id = p.institucion_id WHERE i.nombre IN ($1, $2))`,
 		"temas":                `SELECT COUNT(*) FROM temas WHERE asignatura_id IN (SELECT id FROM asignaturas WHERE codigo LIKE 'DEMO-%') AND $1 <> $2`,
 		"usuarios":             `SELECT COUNT(*) FROM usuarios WHERE username LIKE 'demo\_%' AND $1 <> $2`,
@@ -145,8 +150,13 @@ func limpiar(t *testing.T, db *sqlx.DB, pagoPrevio bool) {
 		`DELETE FROM audit_log WHERE usuario_id IN ` + usuarios,
 		`DELETE FROM usuarios WHERE username LIKE 'demo\_%'`,
 		`DELETE FROM personas WHERE institucion_id IN (SELECT id FROM instituciones WHERE nombre IN ('` + institucionSalud + `', '` + institucionCompat + `'))`,
+		`DELETE FROM pregunta_citas WHERE pregunta_id IN (SELECT id FROM preguntas WHERE proceso_id IN ` + procesos + `)`,
 		`DELETE FROM respuestas WHERE pregunta_id IN (SELECT id FROM preguntas WHERE proceso_id IN ` + procesos + `)`,
 		`DELETE FROM preguntas WHERE proceso_id IN ` + procesos,
+		`UPDATE fuentes SET version_vigente_id = NULL, estado = 'procesando', motivo_retiro = NULL WHERE titulo = '` + tituloFuenteDemo + `'`,
+		`DELETE FROM pasajes WHERE fuente_version_id IN (SELECT v.id FROM fuente_versiones v JOIN fuentes f ON f.id = v.fuente_id WHERE f.titulo = '` + tituloFuenteDemo + `')`,
+		`DELETE FROM fuente_versiones WHERE fuente_id IN (SELECT id FROM fuentes WHERE titulo = '` + tituloFuenteDemo + `')`,
+		`DELETE FROM fuentes WHERE titulo = '` + tituloFuenteDemo + `'`,
 		`DELETE FROM configuracion_examen WHERE proceso_id IN ` + procesos,
 		`DELETE FROM proceso_asignaturas WHERE proceso_id IN ` + procesos,
 		`DELETE FROM procesos WHERE id IN ` + procesos,
@@ -186,7 +196,7 @@ func TestSembrar_Idempotente(t *testing.T) {
 	correr(t, db, cfg)
 	despues := conteos(t, db)
 	want := map[string]int{"instituciones": 2, "especialidades": 5, "asignaturas": 6, "procesos": 3,
-		"proceso_asignaturas": 6 + 3 + 2 + 6, "preguntas": (6 + 3 + 2) * 10, "configuracion_examen": 3,
+		"proceso_asignaturas": 6 + 3 + 2 + 6, "preguntas": (6 + 3 + 2) * 10, "citas": (6 + 3 + 2) * 10, "fuentes": 1, "configuracion_examen": 3,
 		"temas": 2, "usuarios": 5, "inscripciones": 6}
 	if fmt.Sprint(despues) != fmt.Sprint(want) {
 		t.Fatalf("counts = %v, want %v", despues, want)
@@ -211,6 +221,76 @@ func TestSembrar_Idempotente(t *testing.T) {
 	correr(t, db, cfg)
 	if after := conteos(t, db); fmt.Sprint(after) != fmt.Sprint(want) {
 		t.Errorf("counts after repairing a partial state = %v, want %v", after, want)
+	}
+}
+
+// A question a failed run left in borrador, uncited or cited, ends cited and
+// approved; a question an admin already moved on is never overridden.
+func TestSembrar_CompletaPreguntasAMedias(t *testing.T) {
+	db, cfg := preparar(t)
+	correr(t, db, cfg)
+	var ids []int64
+	if err := db.Select(&ids, `SELECT id FROM preguntas WHERE enunciado LIKE 'Pregunta demo 1 de DEMO-%' ORDER BY id LIMIT 3`); err != nil || len(ids) != 3 {
+		t.Fatalf("preguntas demo: %v (%v)", ids, err)
+	}
+	// Two are left in borrador (the second one without its citation) and a third was rejected by an admin.
+	if _, err := db.Exec(`UPDATE preguntas SET estado = 'borrador' WHERE id = ANY($1)`, pq.Array(ids[:2])); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DELETE FROM pregunta_citas WHERE pregunta_id = $1`, ids[1]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE preguntas SET estado = 'rechazada', motivo_rechazo = 'Clave incorrecta' WHERE id = $1`, ids[2]); err != nil {
+		t.Fatal(err)
+	}
+	// A fourth is approved without citation, as the seed of the previous version left it.
+	var huerfana int64
+	if err := db.Get(&huerfana, `SELECT id FROM preguntas WHERE enunciado LIKE 'Pregunta demo 2 de DEMO-%' ORDER BY id LIMIT 1`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DELETE FROM pregunta_citas WHERE pregunta_id = $1`, huerfana); err != nil {
+		t.Fatal(err)
+	}
+	if res := correr(t, db, cfg); res != "creados: map[]" {
+		t.Errorf("completing created rows: %s", res)
+	}
+	var estados []string
+	if err := db.Select(&estados, `SELECT estado || ':' || (SELECT COUNT(*) FROM pregunta_citas c WHERE c.pregunta_id = p.id) FROM preguntas p WHERE id = ANY($1) ORDER BY id`, pq.Array(ids)); err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(estados) != "[aprobada:1 aprobada:1 rechazada:1]" {
+		t.Errorf("estado:citas = %v, want [aprobada:1 aprobada:1 rechazada:1]", estados)
+	}
+	var citas int
+	if err := db.Get(&citas, `SELECT COUNT(*) FROM pregunta_citas WHERE pregunta_id = $1`, huerfana); err != nil || citas != 1 {
+		t.Errorf("approved without citation: citas = %d (%v), want 1", citas, err)
+	}
+}
+
+// A fuente a failed run left in procesando (created, not yet published) is
+// published, not duplicated; a retired one stops the seed with a clear error.
+func TestSembrar_FuenteDemoAMedias(t *testing.T) {
+	db, cfg := preparar(t)
+	id, _, err := fuentes.NewPgSource(db).GuardarFuente(context.Background(), fuentes.NuevaFuente{Titulo: tituloFuenteDemo, Tipo: "guia",
+		NombreArchivo: nombreArchivoDemo, Contenido: contenidoFuenteDemo()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	correr(t, db, cfg)
+	var estado string
+	var cuantas int
+	if err := db.Get(&estado, `SELECT estado FROM fuentes WHERE id = $1`, id); err != nil || estado != "activa" {
+		t.Fatalf("fuente = %s (%v), want activa", estado, err)
+	}
+	if err := db.Get(&cuantas, `SELECT COUNT(*) FROM fuentes WHERE titulo = $1`, tituloFuenteDemo); err != nil || cuantas != 1 {
+		t.Errorf("fuentes demo = %d (%v), want 1", cuantas, err)
+	}
+	if _, err := db.Exec(`UPDATE fuentes SET estado = 'retirada', motivo_retiro = 'Prueba' WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	rawKey, _ := hex.DecodeString(cfg.EncryptionKey)
+	if _, err := sembrar(context.Background(), db, dbtest.GCM(t), rawKey, cfg); err == nil || !strings.Contains(err.Error(), "retirada") {
+		t.Errorf("con la fuente retirada: err = %v, want un error que diga retirada", err)
 	}
 }
 

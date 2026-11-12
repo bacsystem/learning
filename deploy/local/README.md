@@ -78,7 +78,7 @@ No uses los puertos de otra fila: así nada choca.
 | `make local/up TAG=…` o `BUILD=1` | Levanta todo y espera a que esté sano |
 | `make local/seed` | Carga los datos sintéticos (`cmd/seed/demo`), idempotente. Usuarios `demo_admin`, `demo_enfermeria`, `demo_medicina`, `demo_pendiente` y `demo_esp_inactiva`, todos activos y con el tour completado; contraseñas `PREPROD_DEMO_*` de `preprod.vars` (valores falsos, solo de preproducción). Requiere `cmd/seed/demo` (#114) |
 | `make local/reset TAG=…` o `BUILD=1` | **Borra** la base (pide escribir `borrar`, o `CONFIRM=borrar`), vuelve a levantar (migra) y siembra |
-| `make local/logs` (`s=backend`) | Logs en vivo |
+| `make local/logs` (`s=backend`) | Logs en vivo: sigue sin terminar (Ctrl-C para salir). Para una captura puntual, por ejemplo para adjuntar a un reporte: `docker logs --tail 200 capacitate-preprod-backend-1` (o `-db-1`, `-frontend-1`, `-mailpit-1`) |
 | `make local/ps` | Estado de los contenedores |
 | `make local/psql` | Consola psql en la base de preproducción |
 | `make local/down` | Detiene todo (conserva los datos) |

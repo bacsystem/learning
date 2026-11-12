@@ -195,8 +195,10 @@ func (f *Fixture) addPregunta(t *testing.T, asigID int64, tipo string, nResp, nC
 	ctx := context.Background()
 	p := Pregunta{AsignaturaID: asigID, Tipo: tipo}
 	must(t, f.DB.QueryRowContext(ctx,
-		`INSERT INTO preguntas (institucion_id, proceso_id, asignatura_id, enunciado, tipo)
-		 VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+		// 'activo' explicitly: the fixture stands for the inherited bank, which
+		// is served; the column default is 'borrador' since 065 (SIA-E3-02).
+		`INSERT INTO preguntas (institucion_id, proceso_id, asignatura_id, enunciado, tipo, estado)
+		 VALUES ($1, $2, $3, $4, $5, 'activo') RETURNING id`,
 		f.InstitucionID, f.ProcesoID, asigID, "Enunciado "+f.Suffix, tipo).Scan(&p.ID), "pregunta")
 	for i := 1; i <= nResp; i++ {
 		var rid int64
@@ -306,6 +308,10 @@ func (f *Fixture) cleanup(t *testing.T) {
 		}
 	}
 	for _, u := range f.usuarios {
+		// The review endpoints audit their actor (SIA-E3-07).
+		if _, err := f.DB.ExecContext(ctx, `DELETE FROM audit_log WHERE usuario_id = $1`, u); err != nil {
+			t.Errorf("cleanup audit_log: %v", err)
+		}
 		if _, err := f.DB.ExecContext(ctx, `DELETE FROM usuarios WHERE id = $1`, u); err != nil {
 			t.Errorf("cleanup usuario: %v", err)
 		}
