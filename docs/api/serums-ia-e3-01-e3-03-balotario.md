@@ -92,6 +92,8 @@ type Problema struct {
 - **El texto guardado es texto plano.** La UI lo muestra siempre como texto.
 - **Letras:** las alternativas se guardan con las letras A, B, C… por posición.
 - **Alerta `vinetas_normalizadas`:** se pone si alguna alternativa llegó **sin letra** (viñeta), si sus alternativas **mezclan estilos** de etiqueta o si sus letras no estaban en orden (A, B, D se guardan como A, B, C). Un balotario que usa siempre `a.` no genera alerta.
+  - **Estilo de etiqueta** = mayúscula o minúscula + forma: `X)`, `X.`, `X-` o `(X)`. `D)` seguida de `E.` mezcla estilos.
+  - **Borde aceptado por el PO** (2026-11-12): `D) Infección por` / `E. coli` al final de la lista abre una E falsa, que está justo en su posición, así que no hay salto. La alerta sale por la mezcla de estilos. Si el balotario usa `.` en todas sus etiquetas, la E falsa no se distingue de una real y no genera alerta. Aun así la clave no cambia, y E3-05 muestra 5 alternativas.
 - **Alerta `alternativas_separadas`:** se pone si se partió alguna línea.
 
 ### 2.4 Motivos de «con problemas» (D2; regla 4)
@@ -122,7 +124,7 @@ Fixtures **sintéticos** en `internal/balotario/testdata/`, nunca de `assets/`: 
 
 - alternativas pegadas en una línea, también con el enunciado en esa misma línea; «vitamina b)» sin partir;
 - alternativas separadas por líneas en blanco;
-- «Nombre científico dentro de las alternativas»: `A) Antibiótico contra` / `C. difficile con vancomicina` / `<mark>B) Metronidazol</mark>` / `C) Otro` → «con problemas» con `etiquetas_ambiguas`. «Letras que retroceden»: A, C, B → `etiquetas_ambiguas`. Letras repetidas: A, B, B → `etiquetas_ambiguas`. Salto hacia adelante: A, B, D → válida, reetiquetada y con `vinetas_normalizadas`. «E. coli» en el enunciado → continuación;
+- «Nombre científico dentro de las alternativas»: `A) Antibiótico contra` / `C. difficile con vancomicina` / `<mark>B) Metronidazol</mark>` / `C) Otro` → «con problemas» con `etiquetas_ambiguas`. «Letras que retroceden»: A, C, B → `etiquetas_ambiguas`. Letras repetidas: A, B, B → `etiquetas_ambiguas`. Salto hacia adelante: A, B, D → válida, reetiquetada y con `vinetas_normalizadas`. «E. coli» en el enunciado → continuación. `A)`–`D)` + `E. coli` al final → 5 alternativas con `vinetas_normalizadas` (estilos mezclados); con todo en `.` → 5 alternativas sin alerta (riesgo aceptado);
 - una lista numerada en el enunciado, con números no esperados (continuación) y con «2.» dentro de la pregunta 1 (la regla c la parte, y se fija el resultado esperado);
 - una pregunta sin alternativas seguida de la siguiente (`alternativas_insuficientes` en la primera, la segunda válida);
 - numeración que vuelve a 1 tras un encabezado (sin problema) y que vuelve a 1 sin encabezado (`numeracion_rota`);
