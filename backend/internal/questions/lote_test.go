@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/lib/pq"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -73,10 +75,23 @@ func TestInsertarLote_GuardaBorradoresConSusRespuestas(t *testing.T) {
 			t.Errorf("pregunta %d: especialidad_id = %v", i, got.Especialidad)
 		}
 	}
-	// The order of the answers and of the key are those of the lote.
-	var orden []int
-	if err := f.DB.Select(&orden, `SELECT orden FROM respuestas WHERE pregunta_id = $1 ORDER BY id`, ids[2]); err != nil || fmt.Sprint(orden) != "[1 2 3]" {
-		t.Errorf("orden = %v (%v)", orden, err)
+	// Every answer keeps its text, its key and its order, pregunta by pregunta.
+	for i, id := range ids {
+		var filas []struct {
+			Texto      string
+			EsCorrecta bool `db:"es_correcta"`
+			Orden      int
+		}
+		if err := f.DB.Select(&filas, `SELECT texto, es_correcta, orden FROM respuestas WHERE pregunta_id = $1 ORDER BY orden`, id); err != nil {
+			t.Fatal(err)
+		}
+		got := make([]CreateRespuestaItem, len(filas))
+		for j, fila := range filas {
+			got[j] = CreateRespuestaItem{Texto: fila.Texto, EsCorrecta: fila.EsCorrecta, Orden: fila.Orden}
+		}
+		if !reflect.DeepEqual(got, lote[i].Respuestas) {
+			t.Errorf("respuestas de la pregunta %d = %+v, want %+v", i, got, lote[i].Respuestas)
+		}
 	}
 }
 
@@ -104,6 +119,12 @@ func TestInsertarLote_Rechazos(t *testing.T) {
 		}, true},
 		{"tipo invalido", func(p *NuevaPregunta) { p.Tipo = "otro" }, true},
 		{"origen invalido", func(p *NuevaPregunta) { p.Origen = "otro" }, false},
+		{"enunciado vacio", func(p *NuevaPregunta) { p.Enunciado = "  " }, true},
+		{"respuesta sin texto", func(p *NuevaPregunta) { p.Respuestas[1].Texto = "" }, true},
+		{"respuesta de 501", func(p *NuevaPregunta) { p.Respuestas[1].Texto = strings.Repeat("a", 501) }, true},
+		{"orden cero", func(p *NuevaPregunta) { p.Respuestas[0].Orden = 0 }, true},
+		{"orden repetido", func(p *NuevaPregunta) { p.Respuestas[1].Orden = 1 }, true},
+		{"orden fuera de rango", func(p *NuevaPregunta) { p.Respuestas[1].Orden = 9 }, true},
 		{"proceso inexistente", func(p *NuevaPregunta) { p.ProcesoID = -1 }, false},
 	}
 	for _, tt := range tests {

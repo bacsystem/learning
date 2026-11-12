@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -27,13 +29,14 @@ type NuevaPregunta struct {
 // transaction, with one statement per table whatever the size of the lote, and
 // returns the new ids in the order of the lote. Unlike CreatePregunta it does
 // not check the classification (proceso, asignatura, etiquetas): the caller
-// has already done it for the whole lote.
+// has already done it for the whole lote. Each pregunta is validated here
+// (validarNueva), so a lote can not leave a pregunta that cannot be served.
 func InsertarLote(ctx context.Context, tx *sqlx.Tx, lote []NuevaPregunta) ([]int64, error) {
 	if len(lote) == 0 {
 		return []int64{}, nil
 	}
 	for i, p := range lote {
-		if err := ValidateRespuestas(p.Tipo, p.Respuestas); err != nil {
+		if err := validarNueva(p); err != nil {
 			return nil, fmt.Errorf("pregunta %d del lote: %w", i+1, err)
 		}
 	}
@@ -48,6 +51,32 @@ func InsertarLote(ctx context.Context, tx *sqlx.Tx, lote []NuevaPregunta) ([]int
 		return nil, err
 	}
 	return ids, nil
+}
+
+// Limits of the columns respuestas.texto (VARCHAR(500)).
+const maxTextoRespuesta = 500
+
+// validarNueva checks what the schema does not: the statement and the answers
+// are not empty, the order is 1, 2, 3… without repeats and the key matches
+// the tipo. The caller validates the classification.
+func validarNueva(p NuevaPregunta) error {
+	if strings.TrimSpace(p.Enunciado) == "" {
+		return fmt.Errorf("%w: el enunciado está vacío", ErrValidation)
+	}
+	if err := ValidateRespuestas(p.Tipo, p.Respuestas); err != nil {
+		return err
+	}
+	ordenes := make(map[int]bool, len(p.Respuestas))
+	for _, r := range p.Respuestas {
+		if strings.TrimSpace(r.Texto) == "" || utf8.RuneCountInString(r.Texto) > maxTextoRespuesta {
+			return fmt.Errorf("%w: el texto de una respuesta está vacío o supera %d caracteres", ErrValidation, maxTextoRespuesta)
+		}
+		if r.Orden < 1 || r.Orden > len(p.Respuestas) || ordenes[r.Orden] {
+			return fmt.Errorf("%w: el orden de las respuestas debe ser 1…n sin repetir", ErrValidation)
+		}
+		ordenes[r.Orden] = true
+	}
+	return nil
 }
 
 // reservarIDs takes n ids of the sequence at once, in ascending order.
