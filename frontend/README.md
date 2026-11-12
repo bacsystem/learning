@@ -62,6 +62,8 @@ Variables de entorno:
 
 Las variables `NEXT_PUBLIC_*` se incrustan en el bundle al construir.
 
+`package.json` fuerza `minimatch ^11.0.1` para `@typescript-eslint/typescript-estree` (`overrides`): `minimatch` < 11.0.1 tiene un aviso de DoS (GHSA-g3hv-75wg-m249) y `typescript-eslint` aún pide `^10`. Es solo de desarrollo (lint). Se quita cuando `typescript-eslint` pida `minimatch ^11` por su cuenta; `npm audit` debe seguir en 0.
+
 ## Docker
 
 ```bash
