@@ -203,8 +203,9 @@ Según [backups](https://docs.railway.com/reference/backups) y
 - **Copia diaria fuera de Railway, en Cloudflare R2** (ADR 0004, D11). La crea
   un cron con `pg_dump` 16, cifrada con age, y el bucket lleva ciclo de vida y
   bucket lock de **30 días**.
-  - El bucket, el token y las reglas los crea el usuario cuando el diseño esté
-    aprobado. La implementación va en un PR aparte (`deploy/backup/`).
+  - El bucket, el token y las reglas los crea el usuario. El cron y su runbook
+    (aprovisionamiento, variables y restauración) están en
+    [deploy/backup/README.md](../../deploy/backup/README.md).
   - La jurisdicción del bucket la decide el usuario (C12).
 - **Plan Pro:** la documentación no dice si backups, PITR, HA y cron jobs
   dependen del plan. **A confirmar en el panel** (C1).

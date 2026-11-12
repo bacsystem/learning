@@ -98,6 +98,20 @@ Las lee `config.Load` del backend (lo implementa E6-01).
 doble), `deploy/local` `preprod` (lo usa), compose de desarrollo `development`
 y CI `test`.
 
+## Cron de copia a R2 (`deploy/backup/backup.sh`)
+
+Solo en el servicio cron de Railway. Detalle y aprovisionamiento en
+[deploy/backup/README.md](../../deploy/backup/README.md).
+
+| Variable | Para qué sirve | Por defecto | Secreto | Si falta |
+|---|---|---|---|---|
+| `BACKUP_DATABASE_URL` | Rol `backup_ro` por la URL privada, con `sslmode=require` | — | **Sí** | Sale con 2: `falta la variable …` |
+| `AGE_RECIPIENT` | Clave **pública** age (`age1…`) con la que se cifra | — | No | Sale con 2. También si no empieza por `age1` |
+| `R2_ENDPOINT` | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` | — | **Sí** (lleva el ID de cuenta) | Sale con 2 |
+| `R2_BUCKET` | Bucket privado y dedicado | — | No | Sale con 2 |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Token Object Read & Write limitado al bucket | — | **Sí** | Sale con 2 |
+| `BACKUP_TIMEOUT` | Segundos máximos para el dump y para la subida | `1800` | No | Usa 1800 |
+
 ## Decidida pero sin implementar
 
 | Variable | Estado |
