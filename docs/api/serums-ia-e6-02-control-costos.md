@@ -85,7 +85,7 @@ func (s) Liberar(ctx context.Context, r *Reserva, acciones int) error
 | ★0 | `r.Acciones ≥ 1` y actor válido | `ErrSinReserva` (error de programación): `500`, sin llamar ni registrar |
 | ★1 | Caché vigente (§4) | Si hay respuesta: `Liberar(r, 1)` y una fila en `ia_usos` con `desde_cache = true`, `resultado = 'ok'`, `proveedor = ''` (no se llamó a ninguno, como en `no_disponible`), `modelo = NULL`, costo 0 e intentos 0. Se devuelve la salida. Este paso va antes que «habilitado» (paso 2), así que la caché se sirve también con el servicio deshabilitado |
 | 2–4 | Pasos 1–3 de E6-01: habilitado, tamaño, redacción | Error de E6-01 y `Liberar(r, 1)` |
-| ★5 | Presupuesto: `gastado ≥ presupuesto` (D14) | `ErrPresupuestoAgotado`, `Liberar(r, 1)` y `ia_usos` con `presupuesto_agotado` |
+| ★5 | Presupuesto: `gastado ≥ presupuesto` (D14) | `ErrPresupuestoAgotado`, `Liberar(r, 1)` y `ia_usos` con `presupuesto_agotado`. Si falla la BD al leer el presupuesto: `ErrCostos`, `Liberar(r, 1)`, `ia_usos` con `error_interno` y no se llama al proveedor (review del #202, H2) |
 | 6–8 | Pasos 4–6 de E6-01: llamada, reintentos, validación | — |
 | ★9 | En una transacción: fila del mes `FOR UPDATE` (se crea si no existe); `gastado_usd += uso.CostoUSD` de **todos** los intentos, también si falló (D15); evaluación de la alerta (§2.4) | Si falla, log con `op`; no invalida la salida |
 | ★10 | Si salió bien: `r.Acciones--` y se escribe la caché. Si falló: `Liberar(r, 1)` | — |
@@ -201,6 +201,7 @@ Lleva **todos** los campos de §3.2 salvo `updated_at`. Es un reemplazo completo
 | `*ErrLimite{Ventana:"mes"}` | **`limite_ia_mensual`** | 429 | `{"limite", "usados", "reinicia_at"}` |
 | `*ErrLimite{Ventana:"dia"}` | **`limite_ia`** | 429 | `{"limite", "usados", "reinicia_at"}`; E3-04 suma `caben_preguntas` |
 | `ErrSinReserva` | `error_interno` | 500 | — |
+| `ErrCostos` (falla la BD al leer el presupuesto en ★5) | `error_interno` | 500 | —. En `ia_usos`, resultado `error_interno` |
 
 - `ia.Codigo(err)` mapea estos errores y mantiene la firma `(codigo, http)` de E6-01. Para `*ErrLimite`, elige `limite_ia` o `limite_ia_mensual` según `Ventana`.
 - El `detalle` lo da una función aparte, **`ia.Detalle(err) map[string]any`**, que devuelve `nil` si el error no trae detalle. Acordado con backend-dev-2, para no volver a cambiar la firma de `Codigo`.
@@ -267,10 +268,11 @@ CREATE INDEX idx_ia_cache_expira ON ia_cache (expira_en);
 ALTER TABLE ia_usos DROP CONSTRAINT ia_usos_resultado_check;
 ALTER TABLE ia_usos ADD CONSTRAINT ck_ia_usos_resultado CHECK (resultado IN ('ok', 'no_disponible',
     'entrada_demasiado_grande', 'datos_personales', 'timeout', 'cancelado', 'salida_invalida',
-    'error_proveedor', 'presupuesto_agotado'));
+    'error_proveedor', 'presupuesto_agotado', 'error_interno'));
 
 -- +goose Down
 UPDATE ia_usos SET resultado = 'no_disponible' WHERE resultado = 'presupuesto_agotado';
+UPDATE ia_usos SET resultado = 'error_proveedor' WHERE resultado = 'error_interno';
 ALTER TABLE ia_usos DROP CONSTRAINT IF EXISTS ck_ia_usos_resultado;
 ALTER TABLE ia_usos ADD CONSTRAINT ia_usos_resultado_check CHECK (resultado IN ('ok', 'no_disponible',
     'entrada_demasiado_grande', 'datos_personales', 'timeout', 'cancelado', 'salida_invalida', 'error_proveedor'));
@@ -281,7 +283,7 @@ DROP TABLE IF EXISTS ia_configuracion;
 ```
 
 - **Efecto sobre los datos existentes:** ninguno. Las tablas son nuevas y en `ia_usos` solo se amplía el `CHECK`.
-- **Qué pierde el Down:** la configuración (vuelve a los valores por defecto), los contadores, el gasto del mes y la caché. Además, las filas con resultado `presupuesto_agotado` pasan a `no_disponible`.
+- **Qué pierde el Down:** la configuración (vuelve a los valores por defecto), los contadores, el gasto del mes y la caché. Además, las filas con resultado `presupuesto_agotado` pasan a `no_disponible`, y las de `error_interno`, a `error_proveedor`.
 - **Nombre del `CHECK`:** confirmado en el #166 (b474ec6). El `CHECK` de `resultado` de la 066 no tiene nombre explícito, así que Postgres lo llama `ia_usos_resultado_check`, e incluye `cancelado`.
 - **Purga perezosa** (como en 056): las filas vencidas de `ia_cuotas` se borran al reservar, hasta 100 cada vez.
 
