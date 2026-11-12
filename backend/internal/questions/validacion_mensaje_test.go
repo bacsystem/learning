@@ -32,6 +32,11 @@ func TestValidacion_MensajePropioSinTextoDelValidador(t *testing.T) {
 			"dificultad":"medio","respuestas":[{"texto":"A","es_correcta":true,"orden":1},{"texto":"B","es_correcta":false,"orden":2}]}`, f.ProcesoID, asig),
 			[]string{"enunciado", "tipo"}},
 		{"etiqueta without name", "POST", "/etiquetas", fmt.Sprintf(`{"asignatura_id":%d}`, asig), []string{"nombre"}},
+		{"pregunta update with a bad dificultad", "PUT", fmt.Sprintf("/preguntas/%d", f.Preguntas[0].ID), fmt.Sprintf(`{"asignatura_id":%d,"enunciado":"Pregunta de validación %s",
+			"tipo":"unica","dificultad":"imposible","respuestas":[{"texto":"A","es_correcta":true,"orden":1},{"texto":"B","es_correcta":false,"orden":2}]}`, asig, f.Suffix),
+			[]string{"dificultad"}},
+		{"generate-set with zero questions", "POST", "/preguntas/generate-set", fmt.Sprintf(`{"proceso_id":%d,"asignaturas":[{"asignatura_id":%d,"numero_preguntas":0}]}`, f.ProcesoID, asig),
+			[]string{"asignaturas[0].numero_preguntas"}},
 		{"etiqueta update with a bad estado", "PUT", "/etiquetas/1", `{"nombre":"x","estado":"borrado"}`, []string{"estado"}},
 	}
 	for _, tt := range tests {
