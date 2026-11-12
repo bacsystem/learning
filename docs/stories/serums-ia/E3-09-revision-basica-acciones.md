@@ -109,7 +109,7 @@ SIA-E3-07 (API) y SIA-E3-08 (detalle con citas). Si khipu no tiene un componente
 Guard de rol admin. Las guardas viven en el servidor; el cliente solo las anticipa. La nota y el motivo no se escriben en la consola ni en los logs del navegador.
 
 ## i18n
-Todo en es/en. Esta historia es dueña de `dashboard.serumsIa.revision.acciones.*` (acciones, casilla, nota, motivo y «Se revisa en su cola»). Añade a `dashboard.serumsIa.revision.errores.*` (de SIA-E3-08) los textos de `falta_cita`, `verificacion_requerida`, `nota_obligatoria`, `conflicto_clave`, `revision_especializada`, `estado_invalido` y el de la recarga por 409. Cada clave existe en ambos archivos.
+Todo en es/en. Esta historia es dueña de `dashboard.serumsIa.revision.acciones.*`: acciones, casilla, nota, motivo, «Se revisa en su cola» y el texto de la recarga por 409. Los errores van en `dashboard.serumsIa.errores.<codigo>`, una clave por código compartida por todas las pantallas (convención de `docs/api/README.md` §8), para `falta_cita`, `verificacion_requerida`, `nota_obligatoria`, `conflicto_clave` y `revision_especializada`. `estado_invalido` es uno de los códigos comunes que se traducen por recurso (`docs/api/README.md` §8), así que va en `dashboard.serumsIa.preguntas.errores.estado_invalido`, compartida con SIA-E3-10. Si una clave ya existe, se reutiliza y no se duplica. Para un código sin clave se usa el genérico del módulo, `dashboard.serumsIa.errores.generico`, nunca el `message` de la API. Cada clave existe en ambos archivos.
 
 ## Definición de terminado
 - `tsc`, `lint` y `build` en verde.
