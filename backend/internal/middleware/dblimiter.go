@@ -15,7 +15,8 @@ import (
 // attempt and Release refunds it when the outcome should not count.
 //
 // Windows are fixed and aligned to the Postgres clock (ventana_inicio =
-// NOW() truncated to a multiple of the window), the same for all replicas.
+// NOW() truncated to a multiple of the window), the same for all replicas
+// (tests can fix the instant with ConReloj).
 // As with any fixed window, up to 2×limit events can fit around a boundary;
 // that is accepted in exchange for a single-statement atomic reservation.
 //
@@ -27,6 +28,10 @@ type DBLimiter struct {
 	limit  int
 	window time.Duration
 
+	// ahora, when set, gives the instant whose window counts (tests only,
+	// see ConReloj); nil uses now() of Postgres.
+	ahora func() time.Time
+
 	sweepMu   sync.Mutex
 	lastSweep time.Time
 }
@@ -34,10 +39,37 @@ type DBLimiter struct {
 // dbLimiterSweepEvery bounds how often one process deletes expired windows.
 const dbLimiterSweepEvery = time.Minute
 
+// dbLimiterSweepMargin is how long an expired window is kept before the
+// sweep deletes it. It is a constant so the sweep can use the expira_en index;
+// it must stay above the test window (ventanaPrueba, 15 min), so a window that
+// a test still counts is never swept.
+const dbLimiterSweepMargin = time.Hour
+
 // NewDBLimiter returns a limiter allowing limit events per window per key.
 // prefix namespaces the keys of this limiter (several share the table).
 func NewDBLimiter(db *sql.DB, prefix string, limit int, window time.Duration) *DBLimiter {
 	return &DBLimiter{db: db, prefix: prefix, limit: limit, window: window}
+}
+
+// ConReloj makes the limiter compute its window from ahora instead of now() of
+// Postgres, and returns l. Only for tests: in production the window comes from
+// now() of Postgres so that every replica shares one clock. A test fixes ahora
+// at its real start instant, so requests that cross a window boundary while it
+// runs still count in one window. Release uses the reserved window, and the
+// sweep keeps every row dbLimiterSweepMargin after it expires, so a test that
+// crosses a real boundary does not lose its fixed window.
+func (l *DBLimiter) ConReloj(ahora func() time.Time) *DBLimiter {
+	l.ahora = ahora
+	return l
+}
+
+// instante is the window instant for the SQL: nil (NULL → now() of Postgres)
+// unless a test clock is set.
+func (l *DBLimiter) instante() any {
+	if l.ahora == nil {
+		return nil
+	}
+	return l.ahora()
 }
 
 // Reservation identifies the unit taken by TryAcquire so that Release refunds
@@ -85,14 +117,14 @@ type rowQuerier interface {
 func (l *DBLimiter) tryAcquire(ctx context.Context, q rowQuerier, key string) (res Reservation, ok bool, err error) {
 	res.key = l.prefix + key
 	err = q.QueryRowContext(ctx, `
-		WITH w AS (SELECT to_timestamp(floor(extract(epoch FROM now()) / $2::float8) * $2::float8) AS inicio)
+		WITH w AS (SELECT to_timestamp(floor(extract(epoch FROM COALESCE($4::timestamptz, now())) / $2::float8) * $2::float8) AS inicio)
 		INSERT INTO auth_intentos_fallidos (clave, ventana_inicio, intentos, expira_en)
 		SELECT $1, w.inicio, 1, w.inicio + make_interval(secs => $2::float8) FROM w
 		ON CONFLICT (clave, ventana_inicio) DO UPDATE
 			SET intentos = auth_intentos_fallidos.intentos + 1
 			WHERE auth_intentos_fallidos.intentos < $3
 		RETURNING ventana_inicio, intentos`,
-		res.key, l.window.Seconds(), l.limit).Scan(&res.window, &res.count)
+		res.key, l.window.Seconds(), l.limit, l.instante()).Scan(&res.window, &res.count)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Reservation{}, false, nil
 	}
@@ -122,12 +154,12 @@ func (l *DBLimiter) Count(ctx context.Context, key string) (int, error) {
 	var n int
 	err := l.db.QueryRowContext(ctx, `
 		SELECT COALESCE(SUM(intentos), 0) FROM auth_intentos_fallidos
-		WHERE clave = $1 AND ventana_inicio = to_timestamp(floor(extract(epoch FROM now()) / $2::float8) * $2::float8)`,
-		l.prefix+key, l.window.Seconds()).Scan(&n)
+		WHERE clave = $1 AND ventana_inicio = to_timestamp(floor(extract(epoch FROM COALESCE($3::timestamptz, now())) / $2::float8) * $2::float8)`,
+		l.prefix+key, l.window.Seconds(), l.instante()).Scan(&n)
 	return n, err
 }
 
-// maybeSweep deletes expired windows of every limiter, at most once per
+// maybeSweep deletes windows of every limiter expired more than dbLimiterSweepMargin ago, at most once per
 // dbLimiterSweepEvery per process (lazy cleanup, no cron). Errors are ignored:
 // stale rows never affect correctness, only table size.
 func (l *DBLimiter) maybeSweep(ctx context.Context) {
@@ -138,5 +170,12 @@ func (l *DBLimiter) maybeSweep(ctx context.Context) {
 	}
 	l.lastSweep = time.Now()
 	l.sweepMu.Unlock()
-	_, _ = l.db.ExecContext(ctx, `DELETE FROM auth_intentos_fallidos WHERE expira_en < now()`)
+	// Rows are kept dbLimiterSweepMargin after they expire. Production never
+	// reads an expired window, so the margin only delays the cleanup; it keeps
+	// a test whose clock is fixed (ConReloj) from losing its window when the
+	// test crosses a real boundary and any limiter sweeps (#139). The bound
+	// is a constant on expira_en so idx_auth_intentos_fallidos_expira is used.
+	_, _ = l.db.ExecContext(ctx, `
+		DELETE FROM auth_intentos_fallidos WHERE expira_en < now() - make_interval(secs => $1)`,
+		dbLimiterSweepMargin.Seconds())
 }
