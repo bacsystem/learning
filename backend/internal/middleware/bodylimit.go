@@ -3,6 +3,8 @@ package middleware
 import (
 	"mime"
 	"net/http"
+
+	"github.com/cbaciliod/learning/internal/httpx"
 )
 
 // Default request body limits applied globally in cmd/server.
@@ -20,7 +22,9 @@ const (
 // JSON endpoint would otherwise be read up to multipartLimit.
 //
 // A request whose declared Content-Length already exceeds the limit is
-// rejected with 413 before the handler runs. Bodies of unknown length are
+// rejected with 413 in the coded error format before the handler runs:
+// archivo_demasiado_grande on a registered upload route, cuerpo_demasiado_grande
+// anywhere else. Bodies of unknown length are
 // wrapped in http.MaxBytesReader, so reading past the limit fails with
 // *http.MaxBytesError (handlers should map it to 413).
 func MaxBodySize(jsonLimit, multipartLimit int64, uploadRoutes ...string) func(http.Handler) http.Handler {
@@ -34,23 +38,17 @@ func MaxBodySize(jsonLimit, multipartLimit int64, uploadRoutes ...string) func(h
 				next.ServeHTTP(w, r)
 				return
 			}
-			limit := jsonLimit
+			limit, code := jsonLimit, httpx.CodeBodyTooLarge
 			if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err == nil && mt == "multipart/form-data" &&
 				uploads[r.Method+" "+r.URL.Path] {
-				limit = multipartLimit
+				limit, code = multipartLimit, httpx.CodeFileTooLarge
 			}
 			if r.ContentLength > limit {
-				writeJSONError(w, http.StatusRequestEntityTooLarge, "El cuerpo de la solicitud es demasiado grande.")
+				httpx.JSONErrorCode(w, http.StatusRequestEntityTooLarge, code, httpx.MsgBodyTooLarge, nil)
 				return
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, limit)
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-func writeJSONError(w http.ResponseWriter, status int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_, _ = w.Write([]byte(`{"error":"` + msg + `"}`))
 }

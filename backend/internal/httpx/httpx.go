@@ -26,9 +26,13 @@ const (
 	CodeInternal     = "error_interno"
 	CodeInvalidBody  = "cuerpo_invalido"
 	CodeBodyTooLarge = "cuerpo_demasiado_grande"
+	// CodeFileTooLarge is the 413 of the multipart uploads (E2 S1).
+	CodeFileTooLarge = "archivo_demasiado_grande"
 
-	msgInvalidBody  = "Cuerpo de solicitud inválido."
-	msgBodyTooLarge = "El cuerpo de la solicitud es demasiado grande."
+	// MsgBodyTooLarge is the message of every 413 for a body over the limit.
+	MsgBodyTooLarge = "El cuerpo de la solicitud es demasiado grande."
+
+	msgInvalidBody = "Cuerpo de solicitud inválido."
 )
 
 // DecodeJSONStrict decodes the JSON body into v rejecting unknown fields. On
@@ -45,7 +49,7 @@ func DecodeJSONStrict(w http.ResponseWriter, r *http.Request, v any) bool {
 	}
 	var mbe *http.MaxBytesError
 	if errors.As(err, &mbe) {
-		JSONErrorCode(w, http.StatusRequestEntityTooLarge, CodeBodyTooLarge, msgBodyTooLarge, nil)
+		JSONErrorCode(w, http.StatusRequestEntityTooLarge, CodeBodyTooLarge, MsgBodyTooLarge, nil)
 	} else {
 		JSONErrorCode(w, http.StatusBadRequest, CodeInvalidBody, msgInvalidBody, nil)
 	}
