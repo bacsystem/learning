@@ -169,7 +169,7 @@ func (p *lector) linea(n int, cruda string) {
 		}
 		// A letter G–Z after a blank line is text that follows the question (a
 		// reference like "S. Pérez, 2020"): the blank line closes it below.
-		if p.cur.pareceEtiqueta(et) && !(enBlanco && et.letra > 'F') {
+		if p.cur.pareceEtiqueta(et) && (!enBlanco || et.letra <= 'F') {
 			p.cur.ambiguaLinea(n, l)
 			return
 		}
