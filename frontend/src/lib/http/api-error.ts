@@ -31,18 +31,39 @@ function parseErrorBody(raw: unknown): ErrorBody {
   };
 }
 
-/** Construye el `ApiError` de una respuesta no exitosa leyendo su cuerpo JSON (si lo hay). */
-export async function apiErrorFrom(res: Response): Promise<ApiError> {
-  const body = parseErrorBody(await res.json().catch(() => null));
-  return Object.assign(new Error(body.message ?? body.error ?? res.statusText), {
-    status: res.status,
-    code: body.message !== undefined ? body.error : undefined,
-    detalle: body.detalle,
-  });
+/**
+ * Construye el `ApiError` de una respuesta no exitosa leyendo su cuerpo JSON (si lo hay). `extras` son campos numéricos
+ * de primer nivel del cuerpo que el cliente necesita además (p. ej. `resultado_id` en el 409 `tiempo_agotado`).
+ */
+export async function apiErrorFrom<K extends string = never>(
+  res: Response,
+  extras: readonly K[] = [],
+): Promise<ApiError & Partial<Record<K, number>>> {
+  const raw: unknown = await res.json().catch(() => null);
+  const body = parseErrorBody(raw);
+  const record = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+  const campos = Object.fromEntries(extras.flatMap((k) => (typeof record[k] === "number" ? [[k, record[k]]] : [])));
+  return Object.assign(
+    new Error(body.message ?? body.error ?? res.statusText),
+    { status: res.status, code: body.message !== undefined ? body.error : undefined, detalle: body.detalle },
+    campos,
+  ) as ApiError & Partial<Record<K, number>>;
 }
 
 /** Código estable del error (`tema_duplicado`, …) o `undefined` si la respuesta usa el formato heredado. */
 export function apiErrorCode(err: unknown): string | undefined {
   const code = (err as { code?: unknown } | null)?.code;
   return typeof code === "string" ? code : undefined;
+}
+
+/**
+ * Código de un 409 de práctica o simulacro (`tiempo_agotado`, `simulacro_en_curso`, …). Esos endpoints responden
+ * `{"error": "<codigo>"}` (el código queda en `message`) y, en el formato 2, `{"error": "<codigo>", "message": "<texto>"}`
+ * (el código queda en `code`): se leen los dos.
+ */
+export function codigoDeConflicto(err: unknown): string | undefined {
+  const { status, code, message } = (err ?? {}) as { status?: unknown; code?: unknown; message?: unknown };
+  if (status !== 409) return undefined;
+  if (typeof code === "string") return code;
+  return typeof message === "string" ? message : undefined;
 }
