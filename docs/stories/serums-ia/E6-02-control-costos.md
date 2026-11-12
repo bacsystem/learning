@@ -209,7 +209,7 @@ SIA-E6-01.
 Los contadores son por `HMAC(usuario_id)`; el secreto del HMAC vive solo en variables de entorno. El consumo de un usuario solo lo ve él y los admins en agregado.
 
 ## i18n
-Panel de admin (límites, presupuesto, gasto en USD y porcentaje, consumo propio del día), la notificación del 80 % y los errores `limite_ia`, `limite_ia_mensual`, `presupuesto_agotado` y `validacion` en es/en, con formato de moneda y de hora del locale. Ningún código se muestra crudo.
+Panel de admin (límites, presupuesto, gasto en USD y porcentaje, consumo propio del día), la notificación del 80 % y los errores `limite_ia`, `limite_ia_mensual`, `presupuesto_agotado` y `validacion` en es/en, con la hora en el formato del locale. Ningún código se muestra crudo. **Excepción de moneda** (decisión del PO, 12-nov, review del #204): los montos en USD usan siempre la receta `formatearMonto` de khipu (`$ 1,234.56`), sin importar el idioma de la pantalla. Es el formato habitual en Perú (punto decimal), el panel es solo para admins y adaptarlo exigiría cambiar khipu antes. Las etiquetas que acompañan al monto («Gasto del mes», «USD») sí van en es/en.
 
 ## Definición de terminado
 Tests de concurrencia, de corte al 100 %, de reinicio diario y mensual por zona horaria Lima y de persistencia del contador tras borrado; migración con Down; `tsc`, `lint`, `build`; review limpio.
