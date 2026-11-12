@@ -16,6 +16,7 @@ import {
   aValores,
   type CampoConfiguracion,
   CAMPOS_CONFIGURACION,
+  camposRechazados,
   esquemaConfiguracion,
   RANGOS,
 } from "@/lib/serums-ia/ia/reglas";
@@ -62,6 +63,11 @@ export function FormularioLimites({
         await onGuardar(aCambio(valores));
       } catch (e) {
         setErrorServidor(t(claveErrorIa(e, t.has)));
+        // El servidor dice qué campos rechazó: se marcan sin perder lo escrito.
+        for (const campo of camposRechazados(e)) {
+          void formik.setFieldTouched(campo, true, false);
+          formik.setFieldError(campo, t("serumsIa.ia.configuracion.validacion.rechazado"));
+        }
       }
     },
   });

@@ -1,4 +1,4 @@
-import type { CambioConfiguracionIa, ConfiguracionIa, GastoIa } from "./api";
+import type { CambioConfiguracionIa, ConfiguracionIa, GastoIa, VentanaConsumo } from "./api";
 import * as yup from "yup";
 
 /** Rangos de la configuración (D19, contrato §3.3). El servidor los vuelve a aplicar y manda. */
@@ -29,12 +29,19 @@ export interface MensajesConfiguracion {
   diaMayorQueMes: string;
 }
 
+/** Número escrito por una persona: acepta coma o punto decimal; vacío o ilegible da `NaN`. */
+export function parseNumero(valor: unknown): number {
+  if (typeof valor === "number") return valor;
+  if (typeof valor !== "string" || valor.trim() === "") return Number.NaN;
+  return Number(valor.trim().replace(",", "."));
+}
+
 /** El formulario edita texto; `""` es «vacío» y no pasa por `Number`. */
 export const aValores = (c: CambioConfiguracionIa | ConfiguracionIa): ValoresConfiguracion =>
   Object.fromEntries(CAMPOS_CONFIGURACION.map((campo) => [campo, String(c[campo])])) as ValoresConfiguracion;
 
 export const aCambio = (v: ValoresConfiguracion): CambioConfiguracionIa =>
-  Object.fromEntries(CAMPOS_CONFIGURACION.map((campo) => [campo, Number(v[campo])])) as CambioConfiguracionIa;
+  Object.fromEntries(CAMPOS_CONFIGURACION.map((campo) => [campo, parseNumero(v[campo])])) as CambioConfiguracionIa;
 
 /** ¿Tiene a lo sumo 2 decimales? (`dec2`, docs/api/README.md §1). Tolera el error de coma flotante de `n * 100`. */
 const tieneDosDecimales = (n: number): boolean => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6;
@@ -42,7 +49,12 @@ const tieneDosDecimales = (n: number): boolean => Math.abs(n * 100 - Math.round(
 export function esquemaConfiguracion(m: MensajesConfiguracion) {
   const numero = (campo: CampoConfiguracion) => {
     const { min, max } = RANGOS[campo];
-    const base = yup.number().typeError(m.rango(campo)).required(m.rango(campo)).min(min, m.rango(campo));
+    const base = yup
+      .number()
+      .transform((_, original) => parseNumero(original))
+      .typeError(m.rango(campo))
+      .required(m.rango(campo))
+      .min(min, m.rango(campo));
     const acotado = base.max(max, m.rango(campo));
     return esEntero(campo)
       ? acotado.integer(m.rango(campo))
@@ -50,7 +62,7 @@ export function esquemaConfiguracion(m: MensajesConfiguracion) {
   };
   return yup.object({
     limite_usuario_dia: numero("limite_usuario_dia").test("dia-mes", m.diaMayorQueMes, function (dia) {
-      const mes = Number(this.parent.limite_usuario_mes);
+      const mes = parseNumero(this.parent.limite_usuario_mes);
       return dia == null || Number.isNaN(mes) || dia <= mes;
     }),
     limite_usuario_mes: numero("limite_usuario_mes"),
@@ -71,3 +83,17 @@ export function estadoGasto(g: Pick<GastoIa, "agotado" | "alerta_80_at">): Estad
 
 /** Porcentaje para la barra de progreso: entre 0 y 100, aunque el gasto supere el presupuesto (D14). */
 export const porcentajeBarra = (g: Pick<GastoIa, "porcentaje">): number => Math.min(100, Math.max(0, g.porcentaje));
+
+/** Campos que el servidor rechazó en un 422 `validacion` (`detalle.campos`), solo los que el formulario tiene. */
+export function camposRechazados(err: unknown): CampoConfiguracion[] {
+  const detalle = (err as { detalle?: unknown } | null)?.detalle;
+  const campos = typeof detalle === "object" && detalle !== null ? (detalle as { campos?: unknown }).campos : undefined;
+  if (typeof campos !== "object" || campos === null) return [];
+  return CAMPOS_CONFIGURACION.filter((c) => Object.hasOwn(campos, c));
+}
+
+/** Avance de una ventana de consumo para la barra: 0–100; con límite 0 no hay nada que gastar y se ve llena. */
+export function porcentajeConsumo(v: Pick<VentanaConsumo, "usados" | "limite">): number {
+  if (v.limite <= 0) return 100;
+  return Math.min(100, Math.max(0, (v.usados / v.limite) * 100));
+}

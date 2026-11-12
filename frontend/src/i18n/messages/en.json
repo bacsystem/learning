@@ -1795,11 +1795,23 @@
             "rango": "Between {min, number} and {max, number}, a whole number.",
             "presupuesto": "Between {min, number} and {max, number}.",
             "decimales": "Up to 2 decimals.",
-            "diaMayorQueMes": "The daily limit cannot exceed the monthly one."
+            "diaMayorQueMes": "The daily limit cannot exceed the monthly one.",
+            "rechazado": "The server rejected this value. Check it."
           }
         },
         "errores": {
           "validacion": "Check the values: some fields are out of range."
+        },
+        "consumo": {
+          "titulo": "Your usage today",
+          "usadas": "Actions used",
+          "usados": "{usados, number} of {limite, number}",
+          "disponibles": "{disponibles, plural, =0 {No actions available} one {# action available} other {# actions available}}",
+          "reinicia": "Resets on {fecha}.",
+          "agotado": "The monthly budget is used up: AI actions cannot be used until it resets.",
+          "avance": "Daily limit progress",
+          "errorCarga": "Your usage could not be loaded.",
+          "ayuda": "This is the admin limit; users have their own."
         }
       }
     },

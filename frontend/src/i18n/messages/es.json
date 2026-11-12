@@ -1795,11 +1795,23 @@
             "rango": "Entre {min, number} y {max, number}, número entero.",
             "presupuesto": "Entre {min, number} y {max, number}.",
             "decimales": "Hasta 2 decimales.",
-            "diaMayorQueMes": "El límite diario no puede superar al mensual."
+            "diaMayorQueMes": "El límite diario no puede superar al mensual.",
+            "rechazado": "El servidor rechazó este valor. Revísalo."
           }
         },
         "errores": {
           "validacion": "Revisa los valores: hay campos fuera de rango."
+        },
+        "consumo": {
+          "titulo": "Tu consumo de hoy",
+          "usadas": "Acciones usadas",
+          "usados": "{usados, number} de {limite, number}",
+          "disponibles": "{disponibles, plural, =0 {Sin acciones disponibles} one {# acción disponible} other {# acciones disponibles}}",
+          "reinicia": "Se reinicia el {fecha}.",
+          "agotado": "El presupuesto mensual está agotado: no se pueden usar acciones de IA hasta que se reinicie.",
+          "avance": "Avance del límite diario",
+          "errorCarga": "No se pudo cargar tu consumo.",
+          "ayuda": "Es el límite de administradores; los usuarios tienen el suyo."
         }
       }
     },

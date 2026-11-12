@@ -2,9 +2,12 @@ import {
   aCambio,
   aValores,
   CAMPOS_CONFIGURACION,
+  camposRechazados,
   esquemaConfiguracion,
   estadoGasto,
+  parseNumero,
   porcentajeBarra,
+  porcentajeConsumo,
   RANGOS,
   type ValoresConfiguracion,
 } from "./reglas";
@@ -107,5 +110,62 @@ describe("estadoGasto y porcentajeBarra", () => {
     expect(porcentajeBarra({ porcentaje: 80.25 })).toBe(80.25);
     expect(porcentajeBarra({ porcentaje: 104.5 })).toBe(100);
     expect(porcentajeBarra({ porcentaje: -1 })).toBe(0);
+  });
+});
+
+describe("decimal comma", () => {
+  it.each([
+    ["40,5", 40.5],
+    ["40.5", 40.5],
+    [" 12 ", 12],
+  ])("parseNumero(%j) is %d", (texto, esperado) => {
+    expect(parseNumero(texto)).toBe(esperado);
+  });
+
+  it.each(["", "  ", "abc"])("parseNumero(%j) is NaN", (texto) => {
+    expect(parseNumero(texto)).toBeNaN();
+  });
+
+  it("the budget accepts a comma and still limits the decimals", async () => {
+    expect(await errores({ presupuesto_mensual_usd: "40,5" })).toEqual([]);
+    expect(await errores({ presupuesto_mensual_usd: "40,255" })).toContain("decimales");
+  });
+
+  it("an empty field is rejected, not read as 0", async () => {
+    expect(await errores({ limite_usuario_dia: "" })).toContain("rango:limite_usuario_dia");
+  });
+
+  it("sends the comma value as a number", () => {
+    expect(aCambio({ ...BASE, presupuesto_mensual_usd: "40,5" }).presupuesto_mensual_usd).toBe(40.5);
+  });
+});
+
+describe("camposRechazados", () => {
+  const error = (detalle?: unknown) => Object.assign(new Error("x"), { status: 422, code: "validacion", detalle });
+
+  it("keeps only the form fields named by the server", () => {
+    expect(
+      camposRechazados(
+        error({ campos: { limite_admin_dia: "max", desconocido: "x", presupuesto_mensual_usd: "dec2" } }),
+      ),
+    ).toEqual(["limite_admin_dia", "presupuesto_mensual_usd"]);
+  });
+
+  it("is empty without detail or with another shape", () => {
+    expect(camposRechazados(error())).toEqual([]);
+    expect(camposRechazados(error({ campos: "x" }))).toEqual([]);
+    expect(camposRechazados(null)).toEqual([]);
+  });
+});
+
+describe("porcentajeConsumo", () => {
+  it.each([
+    [0, 5, 0],
+    [3, 5, 60],
+    [5, 5, 100],
+    [7, 5, 100],
+    [0, 0, 100],
+  ])("%i of %i is %i %%", (usados, limite, esperado) => {
+    expect(porcentajeConsumo({ usados, limite })).toBe(esperado);
   });
 });

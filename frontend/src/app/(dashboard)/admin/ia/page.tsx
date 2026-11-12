@@ -1,6 +1,7 @@
 "use client";
 
 import { FormularioLimites } from "./_componentes/formulario-limites";
+import { TarjetaConsumo } from "./_componentes/tarjeta-consumo";
 import { TarjetaGasto } from "./_componentes/tarjeta-gasto";
 import { useTranslations } from "next-intl";
 
@@ -19,6 +20,7 @@ export default function IaPage() {
   const t = useTranslations("dashboard");
   const toast = useToast();
   const gasto = useCarga(token ? "ia-gasto" : null, () => iaApi.gasto(token ?? ""));
+  const consumo = useCarga(token ? "ia-consumo" : null, () => iaApi.consumo(token ?? ""));
   const configuracion = useCarga(token ? "ia-configuracion" : null, () => iaApi.configuracion(token ?? ""));
 
   return (
@@ -36,6 +38,16 @@ export default function IaPage() {
         <TarjetaGasto gasto={gasto.datos} />
       ) : (
         <Skeleton className="h-96 w-full rounded-xl" />
+      )}
+
+      {consumo.error ? (
+        <Alerta tono="error" accion={<BotonReintentar onReintentar={consumo.recargar} />}>
+          {t("serumsIa.ia.consumo.errorCarga")}
+        </Alerta>
+      ) : consumo.datos ? (
+        <TarjetaConsumo consumo={consumo.datos} />
+      ) : (
+        <Skeleton className="h-40 w-full rounded-xl" />
       )}
 
       {configuracion.error ? (
