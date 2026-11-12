@@ -202,6 +202,12 @@ func (p *lector) cerrar() {
 	if p.cur == nil {
 		return
 	}
+	if p.detectados > MaxPreguntas {
+		// Past the limit the result is discarded (ErrLimitePreguntas): the
+		// blocks are only counted, so a huge file does not keep every question in memory.
+		p.cur = nil
+		return
+	}
 	if pregunta, problema, valida := p.cur.resolver(); valida {
 		p.res.Validas = append(p.res.Validas, pregunta)
 	} else {

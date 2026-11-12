@@ -584,3 +584,23 @@ func TestParsear_ScriptDeVariasLineasDentroDeUnaAlternativa(t *testing.T) {
 	r = parsear(t, "1. P\nA) Uno\n<mark>B) Dos</mark>\n<script>\nx\n</script>\n\nPie de página\n")
 	comprobarValidas(t, r.Validas, []esperada{{1, 1, 3, "P", "unica", alts("Uno", "*Dos"), []string{AlertaHTMLEliminado}}})
 }
+
+// Past the limit of 1 000 the parser only counts: it does not keep the
+// questions it is going to discard (memory is bounded by the limit, not by the
+// size of the file).
+func TestParsear_PasadoElLimiteSoloCuenta(t *testing.T) {
+	var p lector
+	for i, linea := range strings.Split(bloquesSinar(5000), "\n") {
+		p.linea(i+1, linea)
+	}
+	p.cerrar()
+	if p.detectados != 5000 {
+		t.Errorf("detectados = %d, want 5000", p.detectados)
+	}
+	if guardadas := len(p.res.Validas) + len(p.res.Problemas); guardadas > MaxPreguntas {
+		t.Errorf("guardadas = %d, want at most %d", guardadas, MaxPreguntas)
+	}
+	if _, err := Parsear([]byte(bloquesSinar(5000))); err == nil {
+		t.Error("5000 bloques deben dar ErrLimitePreguntas")
+	}
+}
