@@ -5,6 +5,7 @@ package httpx
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -35,15 +36,18 @@ const (
 	msgInvalidBody = "Cuerpo de solicitud inválido."
 )
 
-// DecodeJSONStrict decodes the JSON body into v rejecting unknown fields. On
-// failure it writes the coded error and returns false: 413
-// cuerpo_demasiado_grande when the body went past the http.MaxBytesReader
-// limit while reading (no Content-Length, docs/api/README.md §3), 400
-// cuerpo_invalido otherwise.
+// DecodeJSONStrict decodes the JSON body into v rejecting unknown fields and
+// anything after the first value (only white space may follow). On failure it
+// writes the coded error and returns false: 413 cuerpo_demasiado_grande when
+// the body went past the http.MaxBytesReader limit while reading (no
+// Content-Length, docs/api/README.md §3), 400 cuerpo_invalido otherwise.
 func DecodeJSONStrict(w http.ResponseWriter, r *http.Request, v any) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	err := dec.Decode(v)
+	if err == nil {
+		err = soloEspaciosDespues(dec)
+	}
 	if err == nil {
 		return true
 	}
@@ -54,6 +58,24 @@ func DecodeJSONStrict(w http.ResponseWriter, r *http.Request, v any) bool {
 		JSONErrorCode(w, http.StatusBadRequest, CodeInvalidBody, msgInvalidBody, nil)
 	}
 	return false
+}
+
+// errDatosDeMas: the body has something after its JSON value.
+var errDatosDeMas = errors.New("httpx: datos después del cuerpo JSON")
+
+// soloEspaciosDespues checks that the decoder has nothing left but white
+// space: a second value, or garbage, is an error. A read error (such as the
+// size limit) is returned as it is.
+func soloEspaciosDespues(dec *json.Decoder) error {
+	var resto json.RawMessage
+	err := dec.Decode(&resto)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return errDatosDeMas
 }
 
 // codedError is the error body of the SERUMS IA endpoints: a stable code, a
