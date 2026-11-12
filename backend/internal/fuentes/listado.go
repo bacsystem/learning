@@ -3,9 +3,9 @@ package fuentes
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
+	"github.com/cbaciliod/learning/internal/db"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -75,7 +75,7 @@ func (f filaResumen) resumen(especialidades []EspecialidadRef) ResumenFuente {
 // Listar returns one page of S3, newest change first: the count, the rows,
 // and the especialidades of the whole page in one query (no N+1).
 func (r *Repository) Listar(ctx context.Context, f FiltroListado) (ListaFuentes, error) {
-	args := []any{f.Estado, f.Tipo, f.EspecialidadID, f.Oficial, escaparLike(f.Q)}
+	args := []any{f.Estado, f.Tipo, f.EspecialidadID, f.Oficial, db.EscapeLike(f.Q)}
 	lista := ListaFuentes{Data: []ResumenFuente{}, Page: f.Page, PerPage: f.PerPage}
 	if err := sqlx.GetContext(ctx, r.db, &lista.Total, `SELECT COUNT(*)`+desdeResumen+filtrosListado, args...); err != nil {
 		return ListaFuentes{}, fmt.Errorf("contar fuentes: %w", err)
@@ -120,6 +120,3 @@ func especialidadesConNombre(ctx context.Context, q sqlx.QueryerContext, fuenteI
 	}
 	return por, nil
 }
-
-// escaparLike makes s a literal for LIKE … ESCAPE '\'.
-var escaparLike = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace
