@@ -41,6 +41,9 @@ func ConEsperas(esperas ...time.Duration) Opcion {
 	return func(s *servicio) { s.esperas = esperas }
 }
 
+// ConCache turns on the cache of validated outputs (SIA-E6-02 §4).
+func ConCache(c Cache) Opcion { return func(s *servicio) { s.cache = c } }
+
 // ConReloj sets the clock that measures the duration of each invocation.
 func ConReloj(ahora func() time.Time) Opcion { return func(s *servicio) { s.ahora = ahora } }
 
@@ -48,6 +51,7 @@ type servicio struct {
 	prov          Proveedor // nil = disabled (no IA_PROVEEDOR)
 	reg           Registrador
 	costos        Costos
+	cache         Cache // nil = no cache
 	validate      *validator.Validate
 	tiempoLlamada time.Duration
 	esperas       []time.Duration
@@ -75,27 +79,27 @@ func NewServicio(prov Proveedor, reg Registrador, costos Costos, opciones ...Opc
 }
 
 func (s *servicio) Clasificar(ctx context.Context, r *Reserva, in EntradaClasificar) (SalidaClasificar, error) {
-	return ejecutar(ctx, s, r, in.solicitud(), func(o SalidaClasificar) error { return o.validar(in) })
+	return ejecutar[SalidaClasificar](ctx, s, r, in)
 }
 
 func (s *servicio) GenerarPreguntas(ctx context.Context, r *Reserva, in EntradaGenerarPreguntas) (SalidaGenerarPreguntas, error) {
-	return ejecutar(ctx, s, r, in.solicitud(), func(o SalidaGenerarPreguntas) error { return o.validar(in) })
+	return ejecutar[SalidaGenerarPreguntas](ctx, s, r, in)
 }
 
 func (s *servicio) GenerarMaterial(ctx context.Context, r *Reserva, in EntradaGenerarMaterial) (SalidaGenerarMaterial, error) {
-	return ejecutar(ctx, s, r, in.solicitud(), func(o SalidaGenerarMaterial) error { return o.validar(in) })
+	return ejecutar[SalidaGenerarMaterial](ctx, s, r, in)
 }
 
 func (s *servicio) GenerarExplicacion(ctx context.Context, r *Reserva, in EntradaGenerarExplicacion) (SalidaGenerarExplicacion, error) {
-	return ejecutar(ctx, s, r, in.solicitud(), func(o SalidaGenerarExplicacion) error { return o.validar(in) })
+	return ejecutar[SalidaGenerarExplicacion](ctx, s, r, in)
 }
 
 // ejecutar runs one invocation of the reservation r and records its usage,
-// whatever the outcome. An invalid actor is a programming error of the
+// whatever the outcome (a cache hit included, E6-02 ★1). An invalid actor is a programming error of the
 // consumer: it would break ck_ia_usos_actor, so nothing is called nor
 // recorded; the same for a reservation with no action left (contract E6-02
 // §2.3 ★0).
-func ejecutar[S any](ctx context.Context, s *servicio, r *Reserva, sol Solicitud, validar func(S) error) (S, error) {
+func ejecutar[S any](ctx context.Context, s *servicio, r *Reserva, in Entrada[S]) (S, error) {
 	var cero S
 	if r == nil || !actorValido(r.Actor) {
 		return cero, ErrActorInvalido
@@ -103,9 +107,13 @@ func ejecutar[S any](ctx context.Context, s *servicio, r *Reserva, sol Solicitud
 	if r.Acciones < 1 {
 		return cero, ErrSinReserva
 	}
+	sol := in.solicitud()
 	inicio := s.ahora()
+	if out, ok := servirDeCache(ctx, s, r, sol, in, inicio); ok { // ★1
+		return out, nil
+	}
 	uso := Uso{Operacion: sol.Operacion, Actor: r.Actor}
-	out, err := llamar(ctx, s, sol, &uso, validar)
+	out, err := llamar(ctx, s, sol, &uso, in.validarSalida)
 	uso.Duracion = s.ahora().Sub(inicio)
 	uso.Resultado = resultadoDe(err)
 	s.cerrarCostos(ctx, r, uso, err)
@@ -113,7 +121,28 @@ func ejecutar[S any](ctx context.Context, s *servicio, r *Reserva, sol Solicitud
 	if err != nil {
 		return cero, err
 	}
+	s.guardarCache(ctx, sol, out)
 	return out, nil
+}
+
+// servirDeCache is ★1: a valid cached output is served before anything else
+// (also with the service disabled or the budget spent). The action is given
+// back and the cache hit is recorded; no cost.
+func servirDeCache[S any](ctx context.Context, s *servicio, r *Reserva, sol Solicitud, in Entrada[S], inicio time.Time) (S, bool) {
+	var out S
+	_, ok := s.leerCache(ctx, sol, func(raw json.RawMessage) bool {
+		var aceptada bool
+		out, aceptada = decodificarCache(raw, in)
+		return aceptada
+	})
+	if !ok {
+		return out, false
+	}
+	if err := s.costos.Liberar(ctx, r, 1); err != nil {
+		log.Error().Str("op", "ia.liberar").Str("operacion", sol.Operacion).Msg("ia: action not released")
+	}
+	s.registrar(ctx, usoDeCache(sol, r.Actor, s.ahora().Sub(inicio)))
+	return out, true
 }
 
 // cerrarCostos settles the invocation (contract E6-02 §2.3 ★9 and ★10): what
