@@ -47,6 +47,8 @@ yarn-error.log*
 # se agrega la excepción explícita aquí abajo.
 .env
 .env.*
+# direnv: suele traer secretos exportados.
+.envrc
 *.pem
 
 # Datos locales (balotarios, datos personales, prompts): nunca se versionan.
