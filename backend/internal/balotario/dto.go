@@ -101,3 +101,25 @@ type OtraImportacion struct {
 	Creadas   int       `json:"creadas"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// ConfirmarRequest is the body of POST /admin/fuentes/{id}/balotario/importaciones
+// (§4). AsignaturaID is the initial and provisional area of every question
+// (option A of the PO): E3-05 asks for the confirmed one on approval.
+type ConfirmarRequest struct {
+	Version        int   `json:"version"`
+	ProcesoID      int64 `json:"proceso_id"`
+	EspecialidadID int64 `json:"especialidad_id"`
+	AsignaturaID   int64 `json:"asignatura_id"`
+}
+
+// ConfirmarResponse is the 201 of the import.
+type ConfirmarResponse struct {
+	ImportacionID int64 `json:"importacion_id"`
+	FuenteID      int64 `json:"fuente_id"`
+	Version       int   `json:"version"`
+	Creadas       int   `json:"creadas"`
+	ConProblemas  int   `json:"con_problemas"`
+	Unica         int   `json:"unica"`
+	Multiple      int   `json:"multiple"`
+	ConAlertas    int   `json:"con_alertas"`
+}

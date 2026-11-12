@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/fuentes"
 	qt "github.com/cbaciliod/learning/internal/questions/questionstest"
 	"github.com/jmoiron/sqlx"
@@ -33,7 +34,7 @@ func nuevoFx(t *testing.T) *fx {
 	}
 	t.Cleanup(func() { limpiarFuentes(t, db, desde) })
 	mux := http.NewServeMux()
-	Mount(mux, NewService(NewRepository(db)), qt.JWTSecret, qt.AllowSession)
+	Mount(mux, NewService(NewRepository(db)), audit.New(db), qt.JWTSecret, qt.AllowSession)
 	return &fx{f: f, db: db, mux: mux, admin: f.Token(t, f.UsuarioID, "admin"), usuario: f.Token(t, f.UsuarioID, "usuario"), src: fuentes.NewPgSource(db)}
 }
 
@@ -41,7 +42,9 @@ func nuevoFx(t *testing.T) *fx {
 func limpiarFuentes(t *testing.T, db *sqlx.DB, desde int64) {
 	t.Helper()
 	for _, q := range []string{
-		`DELETE FROM pregunta_balotario WHERE importacion_id IN (SELECT id FROM balotario_importaciones WHERE fuente_id > $1)`,
+		// The questions of an import hold citations to the passages: they go first.
+		`DELETE FROM preguntas WHERE id IN (SELECT pregunta_id FROM pregunta_balotario
+			WHERE importacion_id IN (SELECT id FROM balotario_importaciones WHERE fuente_id > $1))`,
 		`DELETE FROM balotario_importaciones WHERE fuente_id > $1`,
 		`UPDATE fuentes SET version_vigente_id = NULL, estado = 'procesando', motivo_retiro = NULL WHERE id > $1`,
 		`DELETE FROM pasajes WHERE fuente_version_id IN (SELECT id FROM fuente_versiones WHERE fuente_id > $1)`,
@@ -59,9 +62,15 @@ func limpiarFuentes(t *testing.T, db *sqlx.DB, desde int64) {
 // as ranges of lines.
 func (x *fx) publicar(t *testing.T, tipo, contenido string, rangos [][2]int) int64 {
 	t.Helper()
+	return x.publicarPara(t, tipo, contenido, rangos, nil)
+}
+
+// publicarPara is publicar for the given especialidades (empty = every one).
+func (x *fx) publicarPara(t *testing.T, tipo, contenido string, rangos [][2]int, especialidades []int64) int64 {
+	t.Helper()
 	ctx := context.Background()
 	id, v, err := x.src.GuardarFuente(ctx, fuentes.NuevaFuente{Titulo: "Fuente " + fmt.Sprint(len(contenido)) + tipo, Tipo: tipo,
-		NombreArchivo: "secreto.md", Contenido: []byte(contenido)}, nil)
+		EspecialidadIDs: especialidades, NombreArchivo: "secreto.md", Contenido: []byte(contenido)}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

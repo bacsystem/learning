@@ -12,18 +12,25 @@ type Lector interface {
 	Leer(ctx context.Context, fuenteID int64) (lectura, error)
 }
 
+// Datos is the data layer of the import: the reads of the preview and the
+// transaction of the confirmation.
+type Datos interface {
+	Lector
+	EnTransaccion(ctx context.Context, fn func(Operaciones) error) error
+}
+
 // Service is the business logic of the balotario import: it knows neither HTTP
 // nor SQL.
 type Service struct {
-	lector Lector
+	datos Datos
 }
 
-func NewService(lector Lector) *Service { return &Service{lector: lector} }
+func NewService(datos Datos) *Service { return &Service{datos: datos} }
 
 // VistaPrevia parses the current version of a balotario without saving
 // anything (contract §3). page and perPage paginate only the problems.
 func (s *Service) VistaPrevia(ctx context.Context, fuenteID int64, page, perPage int) (VistaPreviaResponse, error) {
-	l, err := s.lector.Leer(ctx, fuenteID)
+	l, err := s.datos.Leer(ctx, fuenteID)
 	if errors.Is(err, fuentes.ErrNoEncontrado) {
 		return VistaPreviaResponse{}, ErrNoEncontrado
 	}

@@ -1,18 +1,26 @@
 package balotario
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 
+	"github.com/cbaciliod/learning/internal/audit"
+	"github.com/cbaciliod/learning/internal/auth"
 	"github.com/cbaciliod/learning/internal/httpx"
+	"github.com/jmoiron/sqlx"
 )
 
 const (
 	codigoParametro = "parametro_invalido"
 	msgParametro    = "Parámetro inválido."
 	msgNoEncontrado = "Registro no encontrado."
+
+	msgNoAutenticado = "No autenticado."
+	// accionImportar is the action of the audit row of §4.4.
+	accionImportar = "balotario.importar"
 )
 
 // reglasHTTP maps each rule code to its status and fallback message (§7).
@@ -34,10 +42,13 @@ var reglasHTTP = map[string]struct {
 
 // Handler is the transport of the balotario import.
 type Handler struct {
-	svc *Service
+	svc    *Service
+	audLog *audit.Logger
 }
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+func NewHandler(svc *Service, audLog *audit.Logger) *Handler {
+	return &Handler{svc: svc, audLog: audLog}
+}
 
 // VistaPrevia handles GET /admin/fuentes/{id}/balotario (§3).
 func (h *Handler) VistaPrevia(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +72,36 @@ func (h *Handler) VistaPrevia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, http.StatusOK, resp)
+}
+
+// Confirmar handles POST /admin/fuentes/{id}/balotario/importaciones (§4).
+func (h *Handler) Confirmar(w http.ResponseWriter, r *http.Request) {
+	id, ok := idDeRuta(w, r)
+	if !ok {
+		return
+	}
+	var req ConfirmarRequest
+	if !httpx.DecodeJSONStrict(w, r, &req) {
+		return
+	}
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		httpx.JSONError(w, http.StatusUnauthorized, msgNoAutenticado)
+		return
+	}
+	resp, err := h.svc.Confirmar(r.Context(), id, req, claims.UserID, h.auditor(claims.UserID, id, audit.ClientIP(r), r.UserAgent()))
+	if err != nil {
+		responderError(w, "balotario.confirmar", err)
+		return
+	}
+	jsonOK(w, http.StatusCreated, resp)
+}
+
+// auditor binds the admin, the IP and the user agent to the audit row of the import (§4.4).
+func (h *Handler) auditor(actor, fuenteID int64, ip, ua string) Auditor {
+	return func(ctx context.Context, tx sqlx.ExecerContext, detalle map[string]any) error {
+		return h.audLog.LogTx(ctx, tx, &actor, accionImportar, "fuente", &fuenteID, detalle, ip, ua)
+	}
 }
 
 func idDeRuta(w http.ResponseWriter, r *http.Request) (int64, bool) {
