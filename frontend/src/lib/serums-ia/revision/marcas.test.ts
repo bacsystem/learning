@@ -35,6 +35,14 @@ describe("segmentarMarcas", () => {
     expect(claves("A) uno <mark>B) dos")).toEqual([]);
   });
 
+  it("keeps the case of a mark that is never closed, without rewriting it", () => {
+    expect(segmentarMarcas("<MARK>sin cerrar")).toEqual([{ texto: "<MARK>sin cerrar", clave: false }]);
+    expect(segmentarMarcas("<Mark>a <MARK>b</mark>")).toEqual([
+      { texto: "<Mark>a ", clave: false },
+      { texto: "b", clave: true },
+    ]);
+  });
+
   it("leaves a closing mark without opening as plain text", () => {
     expect(segmentarMarcas("B) dos</mark> C)")).toEqual([{ texto: "B) dos</mark> C)", clave: false }]);
   });
@@ -48,7 +56,16 @@ describe("segmentarMarcas", () => {
   });
 
   it("never loses text: putting the paired marks back gives the original text", () => {
-    for (const texto of ["sin marcas", "a <mark>b</mark> c", "<mark>x</mark>", "", "a <mark>b", "b</mark> c"]) {
+    for (const texto of [
+      "sin marcas",
+      "a <mark>b</mark> c",
+      "<mark>x</mark>",
+      "",
+      "a <mark>b",
+      "b</mark> c",
+      "a <MARK>b",
+      "</MARK> x",
+    ]) {
       expect(unido(texto)).toBe(texto);
     }
   });

@@ -29,12 +29,15 @@ export function segmentarMarcas(texto: string): SegmentoTexto[] {
   };
 
   let abierto = false;
+  // La apertura tal como llegó (`<MARK>`): si no tiene pareja, vuelve a ser texto sin reescribirse.
+  let apertura = "";
   let contenido = "";
   for (const parte of texto.split(ETIQUETAS)) {
     if (esApertura(parte)) {
       // Un segundo `<mark>` con otro abierto: el primero no tenía pareja y vuelve a ser texto.
-      if (abierto) agregar(`<mark>${contenido}`, false);
+      if (abierto) agregar(`${apertura}${contenido}`, false);
       abierto = true;
+      apertura = parte;
       contenido = "";
     } else if (esCierre(parte)) {
       if (abierto) {
@@ -51,7 +54,7 @@ export function segmentarMarcas(texto: string): SegmentoTexto[] {
     }
   }
   // `<mark>` sin cerrar al final: texto.
-  if (abierto) agregar(`<mark>${contenido}`, false);
+  if (abierto) agregar(`${apertura}${contenido}`, false);
   return segmentos;
 }
 
