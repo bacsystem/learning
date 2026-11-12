@@ -5,7 +5,14 @@
 - **ADR:** [0006](../adr/0006-puerto-servicio-ia.md)
 - **Tipo:** servicio Go **sin rutas HTTP propias**. Lo consumen E3-04, E6-03, E6-06, E6-08, etc. Los códigos HTTP de §5 son los que **deben** usar esos consumidores al exponer un error del servicio.
 - **Migración reservada:** **066** (`ia_usos`).
-- **Sin proveedor real:** E6-01 entrega el puerto, el registro, la redacción y el **doble determinista**. Elegir proveedor, modelo y prompts es SIA-E6-02, con la aprobación del usuario. No se agrega ningún SDK ni dependencia.
+- **Lo extiende SIA-E6-02** ([contrato](serums-ia-e6-02-control-costos.md) §1 y §2). El cambio se hace en las tareas K1–K5 de E6-02, **no** en el PR #166, que se entrega con este contrato:
+  - las operaciones reciben una `*Reserva` en vez del `Actor`;
+  - `Solicitud` suma `Fuentes`;
+  - el flujo de §2 suma la caché, las acciones y el presupuesto (los pasos ★).
+- **Sin proveedor real:** E6-01 entrega el puerto, el registro, la redacción y el **doble determinista**.
+  - Elegir el proveedor, el modelo y los prompts es **SIA-E6-10** (#173), con la aprobación del usuario y su propia ADR.
+  - Antes figuraba en E6-02; se corrigió el 2026-11-12.
+  - No se agrega ningún SDK ni dependencia.
 
 ## 1. Paquete `internal/ia`
 
@@ -88,7 +95,7 @@ type ErrorTransitorio struct{ Causa error }
 
 | Variable | Valores | Notas |
 |---|---|---|
-| `IA_PROVEEDOR` | vacío \| `doble` \| *nombre del adaptador real* (lo define E6-02) | Vacío = **deshabilitado**: toda operación da `ErrNoDisponible` y el resto de la aplicación funciona |
+| `IA_PROVEEDOR` | vacío \| `doble` \| *nombre del adaptador real* (lo define E6-10) | Vacío = **deshabilitado**: toda operación da `ErrNoDisponible` y el resto de la aplicación funciona |
 | `IA_API_KEY` | secreto | Solo con un adaptador real. Va como **sealed variable** (ADR 0004). Nunca en el código ni en los logs |
 | `IA_MODELO` | texto | Solo con un adaptador real |
 
@@ -220,4 +227,4 @@ DROP TABLE IF EXISTS ia_usos;
 | A4 | Migración 066 y `registro.go`, fuera de la transacción del consumidor; una fila por invocación con su resultado | 2 |
 | A5 | `doble.go` con sus modos de fallo, y un test por cada escenario de la historia | 3 |
 | A6 | Test de logs: con un logger de captura, ninguna línea contiene la entrada, la salida ni el patrón detectado | 1 |
-| D1 | devops: `IA_PROVEEDOR`, `IA_API_KEY` e `IA_MODELO` en `deploy/` y en `docs/ops`. Vacío en producción hasta E6-02; `doble` en preproducción | 1 |
+| D1 | devops: `IA_PROVEEDOR`, `IA_API_KEY` e `IA_MODELO` en `deploy/` y en `docs/ops`. Vacío en producción hasta E6-10; `doble` en preproducción | 1 |

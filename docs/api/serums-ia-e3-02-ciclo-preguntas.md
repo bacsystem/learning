@@ -235,7 +235,7 @@ Implementaciones en `internal/questions`, registradas en `cmd/server/main.go` al
 | `validacion`, `referencia_invalida` | 422 | §4 |
 | `falta_cita` | 422 | §4.1 |
 | `clave_oficial` | 422 | §4.5 (origen `balotario`) |
-| `revision_especializada`, `ultima_cita_activa`, `conflicto_clave` (reservado) | 409 | SIA-E3-07 §3, §4 |
+| `revision_especializada`, `ultima_cita_activa`, `conflicto_clave` (reservado; lo activa SIA-E3-06) | 409 | SIA-E3-07 §3, §4 |
 | `verificacion_requerida`, `nota_obligatoria`, `limite_citas`, `fuente_no_activa`, `consulta_invalida` | 422 | SIA-E3-07 §2, §3, §4 |
 
 Los códigos de esta tabla usan el **formato 2** (`{"error": "<codigo>", "message": "…", "detalle"?}`, README §3). También usa el formato 2 el `409 estado_invalido` del `DELETE` existente. El resto de los errores heredados de `internal/questions` no cambia.

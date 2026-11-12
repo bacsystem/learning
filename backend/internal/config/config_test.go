@@ -412,6 +412,8 @@ func TestLoad_AntifraudKeys(t *testing.T) {
 		{"valid", strings.Repeat("a", 64), "", "", ""},
 		{"valid with a previous key", strings.Repeat("a", 64), otraClave, "", ""},
 		{"longer than 32 bytes is valid", strings.Repeat("a", 96), "", "", ""},
+		{"surrounding spaces are trimmed", "  " + strings.Repeat("a", 64) + "\n", " " + strings.Repeat("b", 64) + " ", "", ""},
+		{"equal to ENCRYPTION_KEY after trimming", " " + strings.Repeat("0", 64) + " ", "", "", "ENCRYPTION_KEY"},
 		{"missing", "", "", "", "ANTIFRAUD_HMAC_KEY"},
 		{"not hex", strings.Repeat("z", 64), "", "", "ANTIFRAUD_HMAC_KEY"},
 		{"odd length hex", strings.Repeat("a", 63), "", "", "ANTIFRAUD_HMAC_KEY"},

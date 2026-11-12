@@ -70,7 +70,11 @@ describe("mensajeErrorPesos", () => {
     );
   });
 
-  it("falls back to the server message, and to the generic text without a response", () => {
+  it("shows the translated generic text for a code without translation, never the server message", () => {
+    expect(mensajeErrorPesos(err(422, "Otro error.", "codigo_nuevo"), t, "gen")).toBe("t:serumsIa.errores.generico");
+  });
+
+  it("falls back to the server message without a code, and to the generic text without a response", () => {
     expect(mensajeErrorPesos(err(403, "Acceso denegado."), t, "gen")).toBe("Acceso denegado.");
     expect(mensajeErrorPesos(new TypeError("Failed to fetch"), t, "gen")).toBe("gen");
   });

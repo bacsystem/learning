@@ -19,7 +19,7 @@ CREATE TABLE ia_configuracion (
 INSERT INTO ia_configuracion (id) VALUES (1);
 
 CREATE TABLE ia_cuotas (
-    clave          TEXT        NOT NULL CHECK (clave LIKE 'ia_cuota:%'),
+    clave          TEXT        NOT NULL CHECK (left(clave, 9) = 'ia_cuota:'),
     ventana        VARCHAR(3)  NOT NULL CHECK (ventana IN ('dia', 'mes')),
     ventana_inicio TIMESTAMPTZ NOT NULL,
     usados         INT         NOT NULL CHECK (usados >= 0),
