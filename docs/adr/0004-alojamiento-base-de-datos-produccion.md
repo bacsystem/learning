@@ -5,6 +5,7 @@
   - Antes de Railway se valida en una **preproducción local** (`deploy/`), donde prueba qa (Decisión 10).
   - Despliegue por imagen publicada en Docker Hub (Decisión 9). Copia diaria cifrada fuera de Railway en **Cloudflare R2**, aprobada por el usuario (Decisión 11).
   - Plan **Railway Pro** (decisión del usuario, U1 resuelto).
+  - Monitor con alertas por correo: **Uptime Kuma** en Railway, aprobado por el usuario (Decisión 12).
   - Objetivos fijados por el usuario: **RPO 5 min** con PITR, y 24 h si solo queda la copia de R2; **RTO 2 h**; **retención de 30 días** en R2 (U2–U4).
 - **Fecha:** 2026-11-11
 - **Pedido por:** devops, para el primer despliegue. Su plan operativo está en `docs/ops/plan-base-produccion.md` (PR #97).
@@ -198,7 +199,10 @@ Descartada: el usuario eligió Railway. Además, sin PITR se pierden hasta 24 h 
       - Se usa **cifrado asimétrico**: devops propone `age`, una herramienta nueva dentro de la imagen del cron que aprueba el tech-lead. El cron solo tiene la **clave pública** (`AGE_RECIPIENT`): aunque se comprometa, no puede descifrar los dumps.
       - El dump se cifra en tubería (`pg_dump | age`). Al disco temporal solo llega el archivo cifrado, que se sube por la API S3 (`curl --aws-sigv4`, PUT simple más un HEAD de verificación) y después se borra.
       - La **clave privada** la custodia el usuario fuera de Railway y fuera de R2. Está **separada de `ENCRYPTION_KEY`**: son claves distintas, guardadas en lugares distintos. Una restauración completa necesita las dos.
-    - **Bucket:** privado, sin acceso público ni dominio público, dedicado solo a estos dumps. Nombre de objeto con fecha UTC, p. ej. `pg/AAAA-MM-DD.dump.age`.
+    - **Bucket:** privado, sin acceso público ni dominio público, dedicado solo a estos dumps. Nombre de objeto con fecha **y hora** UTC: `pg/AAAA-MM-DD/HHMMSSZ.dump.age` (PR #122).
+      - Con la hora, repetir el cron el mismo día nunca choca con el bucket lock, que impide sobrescribir. Tampoco deja una ejecución `fallida` falsa en `copias_bd` ni pone el panel en degradado.
+      - Cada objeto queda protegido sus 30 días.
+      - Para restaurar se toma la clave más reciente bajo `pg/`.
     - **Credenciales:**
       - Un token de R2 **Object Read & Write limitado a ese bucket**. R2 no tiene un permiso solo de escritura, así que es el mínimo posible.
       - El Access Key ID, el Secret y el endpoint van como **sealed variables** del servicio de cron. El backend **no** las recibe.
@@ -213,6 +217,27 @@ Descartada: el usuario eligió Railway. Además, sin PITR se pierden hasta 24 h 
       - **Restauración de prueba periódica desde R2**, al menos mensual y antes del lanzamiento: descargar, descifrar con la clave privada, `pg_restore` en un Postgres 16 **efímero y aislado** y comprobar conteos de tablas.
       - Esa base efímera **no** es la preproducción de `deploy/`, porque ahí nunca van datos de producción (Decisión 10). Se destruye al terminar, y la clave privada se carga solo durante la prueba.
     - Es un servicio externo nuevo **aprobado por el usuario**. El costo es el almacenamiento de R2.
+12. **Monitor de disponibilidad con alertas: Uptime Kuma** (aprobado por el usuario; diseño de devops en el [PR #130](https://github.com/bacsystem/learning/pull/130), `docs/ops/railway.md` §7.1). Cubre lo que el panel de salud no hace: el panel solo muestra el estado cuando un admin lo abre y no envía alertas (épica PLT-E1, `docs/stories/plataforma/README.md`).
+    - **Dónde corre:** un servicio `uptime-kuma` en el mismo proyecto y entorno `production` de Railway.
+      - Imagen `louislam/uptime-kuma` con la versión **fijada** (`2.5.9` en el PR #130; nunca `latest`).
+      - Una réplica, con un volumen en `/app/data` para su SQLite (monitores y configuración).
+      - Su interfaz **no** tiene dominio público por defecto. Si el usuario genera uno, la cuenta admin lleva contraseña fuerte y 2FA.
+    - **Qué vigila:** solo URLs **sin credenciales**.
+
+      | Monitor | Destino | Intervalo |
+      |---|---|---|
+      | Backend, público | `/health` del dominio público | 60 s, 2 reintentos |
+      | Backend, red privada | `/health` por `*.railway.internal` | 120 s |
+      | Frontend | `/` del dominio público | 120 s |
+      | Cron de copia a R2 (opcional, *push*) | El cron lo avisa al terminar bien | 26 h sin señal = caído |
+
+      - No usa `GET /admin/salud`, que necesita sesión de admin: el monitor no guarda credenciales de la app.
+    - **Por dónde alerta:** solo correo, por SMTP, al usuario, con el mismo proveedor que el backend y un remitente propio.
+      - Del proyecto solo sale el estado (caído o recuperado) y el nombre del monitor. Sin datos personales.
+      - La contraseña SMTP queda en el volumen de Uptime Kuma, fuera del repo. Los backups de ese volumen la contienen.
+      - Si se usa el monitor *push* del cron, su URL de push es un secreto: va como sealed variable del cron.
+    - **Relación con C13:** la notificación de Railway por un cron fallido sigue siendo la alerta principal del backup. El monitor *push* la **complementa**, porque detecta también un cron que **no corrió**.
+    - **Límite aceptado:** al correr dentro de Railway, una caída **completa** de Railway (o del proyecto) también apaga el monitor, y no llega alerta. Para cubrirlo haría falta un monitor fuera de Railway, que sería otro servicio externo con su propia aprobación del usuario. Se acepta para el inicio.
 
 ## Decisiones del usuario
 
@@ -242,6 +267,7 @@ Lo verifica devops en el panel, con soporte o con pruebas, y registra el resulta
 | C11 | Las imágenes públicas no llevan secretos, datos ni `.env` | `make docker/verify` (`deploy/verify-image.sh`): revisa `/app`, `docker history` y ENV, y `docker/push` no publica si falla |
 | C12 | **Ubicación o jurisdicción del bucket de R2** para los datos personales. R2 ofrece buckets jurisdiccionales (endpoints `.eu.`, `.fedramp.`) | **La decide el usuario** antes de crear el bucket |
 | C13 | El cron alerta si falla o no corre | Ejecución fallida provocada a propósito |
+| C14 | Uptime Kuma vigila `/health` y avisa por correo al usuario (Decisión 12; `docs/ops/railway.md` §7.1) | Un monitor temporal hacia una ruta 404 hace llegar el correo de **caído**. Al cambiar ese mismo monitor para que apunte a `/health`, llega el de **recuperado**. Pausar un monitor no envía aviso. Después se borra. Lo crea el usuario |
 
 ## Consecuencias
 

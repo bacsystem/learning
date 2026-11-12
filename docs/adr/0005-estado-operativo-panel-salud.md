@@ -40,6 +40,7 @@ El PO pide un panel admin con la salud de la API, la BD, el correo, el worker de
    - El 401 queda solo para «no existe, expiró, fue revocada, otro usuario o estado ≠ activo».
    - Nunca deja pasar la petición con un error.
    - Aplica a **todos** los endpoints autenticados.
+   - **Extensión al login** (2026-11-11, issue #133): `POST /auth/login` también responde 503 ante cualquier error de la BD, y 500 ante otro error inesperado, en lugar del 401 actual. Las respuestas de credenciales inválidas (401), bloqueo (429) y cuenta pendiente, rechazada o inactiva (403) no cambian. Nunca se entrega token si algo de la BD falló. Detalle en `docs/api/plataforma-salud.md`.
    - El frontend **no** dispara `auth:expired` con 503 ni con 403.
    - Tareas:
      - backend-dev: middleware y tests de sesión inexistente → 401, error de BD → 503 y sesión válida → pasa;

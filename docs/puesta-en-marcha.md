@@ -217,7 +217,18 @@ Solo aplica a bases locales que ya tenían datos antes de la rama
 Lo mismo que el CI, con las versiones fijadas, desde la raíz:
 `make lint`, `make test TEST_DATABASE_URL=...` (base desechable: hace
 `down-to 0`) y `make build`. Ver `docs/ops/paridad-ci-local.md`; la
-operación de producción está en `docs/ops/`. Paso a paso:
+operación de producción está en `docs/ops/`.
+
+**Build del frontend y `NEXT_PUBLIC_API_URL`:** el `next build` de producción
+**falla a propósito** si la variable falta o está vacía (`next.config.mjs`),
+para que ningún bundle apunte en silencio a localhost (hallazgo H-4).
+
+- `make build` ya la pasa: la del entorno o, como el CI, `http://localhost:8080`.
+- `npm run build` suelto en `frontend/` no la pone. Hay que pasarla:
+  `NEXT_PUBLIC_API_URL=http://localhost:8080 npm run build`.
+- Las imágenes de release la exigen explícita (`make docker/build … NEXT_PUBLIC_API_URL=…`).
+
+Paso a paso:
 
 ```bash
 cd backend

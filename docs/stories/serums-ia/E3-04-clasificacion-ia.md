@@ -18,7 +18,7 @@ Clasificación masiva y barata. La IA solo propone; nunca aplica una clasificaci
 
 ## Reglas de negocio
 1. Se clasifica por lotes de máx. 20 preguntas por llamada al LLM y máx. 500 preguntas por ejecución (25 lotes). Un balotario mayor se clasifica en varias ejecuciones (ej. 580 preguntas = 500 + 80).
-2. La salida es estructurada: `asignatura_id`, `tema_id` (o nulo), `confianza` 0–1 y `justificacion` (≤300 caracteres). Si el id no existe en la taxonomía de la profesión, la propuesta se descarta y la pregunta queda «sin clasificar».
+2. La salida es estructurada: `asignatura_id`, `tema_id` (o nulo), `confianza` 0–1 y `justificacion` (≤300 caracteres). Si el id no existe en la taxonomía de la profesión, la propuesta se descarta y la pregunta queda «sin clasificar». «Sin clasificar» significa sin propuesta válida. La pregunta conserva su área inicial provisional de SIA-E3-03, que nunca cuenta como clasificación (SIA-E3-05, regla 10). La IA nunca cambia `asignatura_id`: solo guarda la propuesta.
 3. Confianza < 0,70 o respuesta inválida marca la pregunta como `incierta` (revisión obligatoria y prioritaria).
 4. La IA no recibe ni devuelve la clave como si fuera su decisión: la clave oficial no se modifica.
 5. Cuota (decisión del tech-lead sobre P3, issue #65): cada llamada al LLM, es decir cada lote, cuenta 1 acción IA real contra el límite de 200 por día del admin (SIA-E6-02). Clasificar 580 preguntas son 29 lotes y 29 acciones. Se registra el uso (tokens, costo en USD, operación) y el gasto se descuenta del presupuesto global de 40 USD/mes.

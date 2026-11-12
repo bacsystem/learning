@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cbaciliod/learning/internal/httpx"
 	internalmw "github.com/cbaciliod/learning/internal/middleware"
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog/log"
@@ -161,14 +162,17 @@ func SetTrustedProxies(list string) { internalmw.SetTrustedProxies(list) }
 func clientIP(r *http.Request) string { return internalmw.ClientIP(r) }
 
 func NewHandler(svc *Service) *Handler {
+	limitador := func(prefix string, limit int, window time.Duration) *internalmw.DBLimiter {
+		return internalmw.NewDBLimiter(svc.repo.db.DB, prefix, limit, window).ConReloj(svc.relojLimites)
+	}
 	return &Handler{
 		svc:                    svc,
-		registerFailures:       internalmw.NewDBLimiter(svc.repo.db.DB, registerPairPrefix, registerFailuresPerDNIAndIP, registerFailureWindow),
-		registerFailuresPerDNI: internalmw.NewDBLimiter(svc.repo.db.DB, registerDNIPrefix, registerFailuresPerDNI, registerFailurePerDNIWindow),
-		verifyAttempts:         internalmw.NewDBLimiter(svc.repo.db.DB, "verify_tok:", verifyAttemptsPerToken, verifyAttemptWindow),
-		checkDNIPair:           internalmw.NewDBLimiter(svc.repo.db.DB, checkDNIPairPrefix, checkDNIPerDNIAndIP, checkDNIWindow),
-		checkDNIPerDNIAll:      internalmw.NewDBLimiter(svc.repo.db.DB, checkDNIPerDNIPrefix, checkDNIPerDNI, checkDNIPerDNIWindow),
-		checkDNIPerIP:          internalmw.NewDBLimiter(svc.repo.db.DB, checkDNIPerIPPrefix, checkDNIDistinctPerIP, checkDNIWindow),
+		registerFailures:       limitador(registerPairPrefix, registerFailuresPerDNIAndIP, registerFailureWindow),
+		registerFailuresPerDNI: limitador(registerDNIPrefix, registerFailuresPerDNI, registerFailurePerDNIWindow),
+		verifyAttempts:         limitador("verify_tok:", verifyAttemptsPerToken, verifyAttemptWindow),
+		checkDNIPair:           limitador(checkDNIPairPrefix, checkDNIPerDNIAndIP, checkDNIWindow),
+		checkDNIPerDNIAll:      limitador(checkDNIPerDNIPrefix, checkDNIPerDNI, checkDNIPerDNIWindow),
+		checkDNIPerIP:          limitador(checkDNIPerIPPrefix, checkDNIDistinctPerIP, checkDNIWindow),
 		registerMinDuration:    registerMinDuration,
 		now:                    time.Now,
 		sleep:                  sleepCtx,
@@ -437,8 +441,20 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusForbidden, err.Error())
 		case errors.Is(err, ErrAccountRejected), errors.Is(err, ErrAccountInactive):
 			jsonError(w, http.StatusForbidden, err.Error())
-		default:
+		case errors.Is(err, ErrInvalidCredentials):
 			jsonError(w, http.StatusUnauthorized, ErrInvalidCredentials.Error())
+		case errors.Is(err, ErrServicioNoDisponible):
+			// The driver error may carry connection details: log the op and
+			// the failed step only, never the cause or the username.
+			ev := log.Error().Str("op", "auth.login")
+			var f *fallaBD
+			if errors.As(err, &f) {
+				ev = ev.Str("paso", f.paso)
+			}
+			ev.Msg("login unavailable: database error")
+			jsonError(w, http.StatusServiceUnavailable, ErrServicioNoDisponible.Error())
+		default:
+			httpx.InternalError(w, "auth.login", err)
 		}
 		return
 	}

@@ -27,6 +27,7 @@ import (
 	"github.com/cbaciliod/learning/internal/perfiles"
 	"github.com/cbaciliod/learning/internal/practices"
 	"github.com/cbaciliod/learning/internal/questions"
+	"github.com/cbaciliod/learning/internal/salud"
 	"github.com/cbaciliod/learning/internal/simulations"
 	"github.com/cbaciliod/learning/internal/temas"
 	"github.com/cbaciliod/learning/internal/testimonios"
@@ -47,6 +48,7 @@ func main() {
 // run wires and runs the server. It returns the process exit code so that
 // deferred cleanups (DB pool) always execute before exiting.
 func run() int {
+	arranque := time.Now() // uptime of GET /admin/salud (PLT-01)
 	cfg, err := config.Load()
 	if err != nil {
 		log.Error().Err(err).Msg("config load failed")
@@ -117,11 +119,19 @@ func run() int {
 	inscripciones.Mount(mux, insSvc, audLog, cfg.JWTSecret, checkSession)
 	testimonios.Mount(mux, tesSvc, audLog, cfg.JWTSecret, checkSession)
 	catalogs.Mount(mux, catSvc, cfg.JWTSecret, checkSession)
-	questions.Mount(mux, qSvc, cfg.JWTSecret, checkSession)
+	questions.Mount(mux, qSvc, audLog, cfg.JWTSecret, checkSession)
 	temas.Mount(mux, temas.NewService(temas.NewRepository(database)), audLog, cfg.JWTSecret, checkSession)
 	perfiles.Mount(mux, perfiles.NewService(perfiles.NewRepository(database), catSvc), cfg.JWTSecret, checkSession)
-	fuentes.Mount(mux, fuentes.NewService(fuentes.NewRepository(database), nil), audLog, cfg.JWTSecret, checkSession)
+	fuentes.Mount(mux, fuentes.NewService(fuentes.NewRepository(database), questions.Citantes{}, questions.SuscriptorRetiro{}), audLog, cfg.JWTSecret, checkSession)
 	practices.Mount(mux, pSvc, cfg.JWTSecret, checkSession)
+	// Health of the services for admins, in the contract order (PLT-01).
+	salud.Mount(mux, salud.NewService([]salud.Comprobacion{
+		salud.ComprobarAPI(version, arranque, time.Now),
+		salud.ComprobarBD(database),
+		// SMTP is only optional in development/test (config.Load).
+		salud.ComprobarCorreo(database, notifier.MaxRetries, cfg.SMTPHost != ""),
+		salud.ComprobarCopia(database, time.Now),
+	}, time.Now), cfg.JWTSecret, checkSession)
 	simulations.Mount(mux, simSvc, cfg.JWTSecret, checkSession)
 	notifications.Mount(mux, database, audLog, cfg.JWTSecret, checkSession)
 	admin.RegisterRoutes(mux, database, gcm, rawKey, cfg.JWTSecret, checkSession, audLog)

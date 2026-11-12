@@ -218,7 +218,9 @@ func PreviewPreguntas(rows []importRow) PreviewResponse {
 }
 
 // ImportPreguntas processes parsed rows and creates valid questions.
-// Duplicate or invalid rows are skipped and reported in the result.
+// Invalid rows are skipped and reported in the result. Repeated statements are
+// not detected here: preguntas has no unique key on enunciado (the
+// deduplication belongs to SIA-E3-06).
 func ImportPreguntas(ctx context.Context, rows []importRow, procesoID, asignaturaID int64, svc *Service) ImportResultResponse {
 	result := ImportResultResponse{
 		Errors: []ImportErrorRow{},
@@ -258,13 +260,9 @@ func ImportPreguntas(ctx context.Context, rows []importRow, procesoID, asignatur
 
 		_, err := svc.CreatePregunta(ctx, req)
 		if err != nil {
-			msg := err.Error()
-			if errors.Is(err, ErrConflict) {
-				msg = "pregunta duplicada (mismo enunciado para este proceso y asignatura)"
-			}
 			result.Errors = append(result.Errors, ImportErrorRow{
 				Row:     rowNum,
-				Message: msg,
+				Message: err.Error(),
 			})
 			continue
 		}

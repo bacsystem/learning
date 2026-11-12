@@ -167,27 +167,46 @@ func (s *PgSource) BuscarPasajes(ctx context.Context, b Busqueda) ([]PasajeEncon
 	if err != nil {
 		return nil, err
 	}
-	var filas []filaPasaje
-	if err := sqlx.SelectContext(ctx, s.db, &filas, `
-		WITH q AS (SELECT websearch_to_tsquery('spanish', $1) AS q)
-		SELECT `+columnasPasaje+`, ts_rank_cd(p.tsv, q.q) AS rank
-		FROM q
-		JOIN pasajes p          ON p.tsv @@ q.q
-		JOIN fuente_versiones v ON v.id = p.fuente_version_id
-		JOIN fuentes f          ON f.version_vigente_id = v.id
-		WHERE f.estado = 'activa'
-		  AND (NOT EXISTS (SELECT 1 FROM fuente_especialidades fe WHERE fe.fuente_id = f.id)
-		       OR EXISTS (SELECT 1 FROM fuente_especialidades fe
-		                  WHERE fe.fuente_id = f.id AND fe.especialidad_id = $2))
-		ORDER BY rank DESC, p.id ASC
-		LIMIT $3`, texto.Plegar(consulta), b.EspecialidadID, limite); err != nil {
-		return nil, fmt.Errorf("buscar pasajes (especialidad %d): %w", b.EspecialidadID, err)
+	filas, err := buscarPasajesActivos(ctx, s.db, consulta, b.EspecialidadID, limite)
+	if err != nil {
+		return nil, err
 	}
 	encontrados := make([]PasajeEncontrado, 0, len(filas))
 	for _, f := range filas {
 		encontrados = append(encontrados, f.pasaje())
 	}
 	return encontrados, nil
+}
+
+// filaBusqueda is a search hit with the title of its fuente.
+type filaBusqueda struct {
+	filaPasaje
+	TituloFuente string `db:"titulo_fuente"`
+}
+
+// buscarPasajesActivos is the single search SQL (ADR 0007), shared by the port
+// and by the admin search: the folded query over the current version of
+// 'activa' fuentes, by ts_rank_cd then id. especialidadID 0 means no
+// especialidad filter. The query is already validated.
+func buscarPasajesActivos(ctx context.Context, q sqlx.QueryerContext, consulta string, especialidadID int64, limite int) ([]filaBusqueda, error) {
+	var filas []filaBusqueda
+	if err := sqlx.SelectContext(ctx, q, &filas, `
+		WITH q AS (SELECT websearch_to_tsquery('spanish', $1) AS q)
+		SELECT `+columnasPasaje+`, f.titulo AS titulo_fuente, ts_rank_cd(p.tsv, q.q) AS rank
+		FROM q
+		JOIN pasajes p          ON p.tsv @@ q.q
+		JOIN fuente_versiones v ON v.id = p.fuente_version_id
+		JOIN fuentes f          ON f.version_vigente_id = v.id
+		WHERE f.estado = 'activa'
+		  AND ($2::bigint = 0
+		       OR NOT EXISTS (SELECT 1 FROM fuente_especialidades fe WHERE fe.fuente_id = f.id)
+		       OR EXISTS (SELECT 1 FROM fuente_especialidades fe
+		                  WHERE fe.fuente_id = f.id AND fe.especialidad_id = $2))
+		ORDER BY rank DESC, p.id ASC
+		LIMIT $3`, texto.Plegar(consulta), especialidadID, limite); err != nil {
+		return nil, fmt.Errorf("buscar pasajes (especialidad %d): %w", especialidadID, err)
+	}
+	return filas, nil
 }
 
 // ResolverCita returns the passage of (fuente, versión, pasaje) whatever the
@@ -239,16 +258,14 @@ func (s *PgSource) PublicarVersion(ctx context.Context, fuenteID int64, version 
 		versionID, len(pasajes)); err != nil {
 		return fmt.Errorf("marcar lista la versión %d: %w", versionID, err)
 	}
-	var cambio struct {
-		Anterior string `db:"anterior"`
-		Nuevo    string `db:"nuevo"`
+	var cambio cambioEstado
+	if cambio.Anterior, err = bloquearFuente(ctx, tx, fuenteID); err != nil {
+		return err
 	}
-	if err := tx.GetContext(ctx, &cambio, `
-		UPDATE fuentes f SET version_vigente_id = $2, updated_at = NOW(),
-		       estado = CASE WHEN f.estado = 'retirada' THEN 'retirada' ELSE 'activa' END
-		FROM (SELECT estado FROM fuentes WHERE id = $1) AS antes
-		WHERE f.id = $1
-		RETURNING antes.estado AS anterior, f.estado AS nuevo`, fuenteID, versionID); err != nil {
+	if err := tx.GetContext(ctx, &cambio.Nuevo, `
+		UPDATE fuentes SET version_vigente_id = $2, updated_at = NOW(),
+		       estado = CASE WHEN estado = 'retirada' THEN 'retirada' ELSE 'activa' END
+		WHERE id = $1 RETURNING estado`, fuenteID, versionID); err != nil {
 		return fmt.Errorf("publicar la versión %d de la fuente %d: %w", version, fuenteID, err)
 	}
 	if err := auditar(ctx, tx, aud, Evento{Accion: AccionProcesar, Entidad: EntidadFuente, EntidadID: fuenteID, Detalle: map[string]any{
@@ -280,16 +297,14 @@ func (s *PgSource) MarcarVersionFallida(ctx context.Context, fuenteID int64, ver
 		versionID, motivo); err != nil {
 		return fmt.Errorf("marcar fallida la versión %d: %w", versionID, err)
 	}
-	var cambio struct {
-		Anterior string `db:"anterior"`
-		Nuevo    string `db:"nuevo"`
+	var cambio cambioEstado
+	if cambio.Anterior, err = bloquearFuente(ctx, tx, fuenteID); err != nil {
+		return err
 	}
-	if err := tx.GetContext(ctx, &cambio, `
-		UPDATE fuentes f SET updated_at = NOW(),
-		       estado = CASE WHEN f.version_vigente_id IS NULL THEN 'fallida' ELSE f.estado END
-		FROM (SELECT estado FROM fuentes WHERE id = $1) AS antes
-		WHERE f.id = $1
-		RETURNING antes.estado AS anterior, f.estado AS nuevo`, fuenteID); err != nil {
+	if err := tx.GetContext(ctx, &cambio.Nuevo, `
+		UPDATE fuentes SET updated_at = NOW(),
+		       estado = CASE WHEN version_vigente_id IS NULL THEN 'fallida' ELSE estado END
+		WHERE id = $1 RETURNING estado`, fuenteID); err != nil {
 		return fmt.Errorf("marcar fallida la fuente %d: %w", fuenteID, err)
 	}
 	if err := auditar(ctx, tx, aud, Evento{Accion: AccionFallar, Entidad: EntidadFuente, EntidadID: fuenteID, Detalle: map[string]any{
@@ -301,6 +316,26 @@ func (s *PgSource) MarcarVersionFallida(ctx context.Context, fuenteID int64, ver
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// cambioEstado is the fuente's state before and after a worker transition,
+// for the audit (ADR 0003 § Auditoría).
+type cambioEstado struct {
+	Anterior string
+	Nuevo    string
+}
+
+// bloquearFuente locks the fuente and returns its state. The worker reads
+// estado_anterior here, after the lock, so a transaction that changed the
+// state while the worker waited is seen (a subquery of the UPDATE would keep
+// the snapshot taken before the wait). The worker already holds the version,
+// so its order stays version → fuente.
+func bloquearFuente(ctx context.Context, tx *sqlx.Tx, fuenteID int64) (string, error) {
+	var estado string
+	if err := tx.GetContext(ctx, &estado, `SELECT estado FROM fuentes WHERE id = $1 FOR UPDATE`, fuenteID); err != nil {
+		return "", fmt.Errorf("bloquear la fuente %d: %w", fuenteID, err)
+	}
+	return estado, nil
+}
 
 // auditar calls aud when there is one (a nil Auditor audits nothing).
 func auditar(ctx context.Context, tx *sqlx.Tx, aud Auditor, ev Evento) error {

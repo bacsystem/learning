@@ -1,0 +1,14 @@
+# Opción de build local (make local/up BUILD=1): los MISMOS Dockerfiles que el
+# release, para probar antes de publicar. El frontend se construye para este
+# entorno (NEXT_PUBLIC_API_URL se incrusta al construir).
+services:
+  backend:
+    build:
+      context: ../../backend
+      args:
+        VERSION: 0.0.0-preprod
+  frontend:
+    build:
+      context: ../../frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8180

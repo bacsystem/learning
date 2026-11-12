@@ -8,7 +8,7 @@ Fuente: «Prompt 1» del requerimiento (capacidades 1–9 y restricciones). Alca
 |---|---|---|---|
 | E1 Taxonomía SERUMS | [E1-epica-taxonomia.md](E1-epica-taxonomia.md) | 4 | #2 |
 | E2 Repositorio de fuentes académicas | [E2-epica-fuentes.md](E2-epica-fuentes.md) | 8 | #3 |
-| E3 Banco SERUMS | [E3-epica-banco.md](E3-epica-banco.md) | 6 | #4 |
+| E3 Banco SERUMS | [E3-epica-banco.md](E3-epica-banco.md) | 10 | #4 |
 | E4 Diagnóstico y modelo de dominio | [E4-epica-diagnostico-dominio.md](E4-epica-diagnostico-dominio.md) | 4 | #5 |
 | E5 Dashboard de rendimiento y acciones rápidas | [E5-epica-dashboard.md](E5-epica-dashboard.md) | 6 | #6 |
 | E6 Generación con IA, citas y aprobación | [E6-epica-generacion-ia.md](E6-epica-generacion-ia.md) | 9 | #7 |
@@ -16,7 +16,7 @@ Fuente: «Prompt 1» del requerimiento (capacidades 1–9 y restricciones). Alca
 | E8 Cronograma, alertas y reporte semanal | [E8-epica-cronograma-alertas.md](E8-epica-cronograma-alertas.md) | 5 | #9 |
 | E9 Aprendizaje continuo | [E9-epica-aprendizaje-continuo.md](E9-epica-aprendizaje-continuo.md) | 7 | #10 |
 
-Total: 53 historias. Cada historia vive en `E<n>-<nn>-<slug>.md` en esta carpeta.
+Total: 57 historias (SIA-E3-07 a SIA-E3-10 se añadieron por la decisión P1 del contrato #152; la pantalla se dividió en E3-08, E3-09 y E3-10 en el review del PR #153). Cada historia vive en `E<n>-<nn>-<slug>.md` en esta carpeta.
 
 ## Ajuste a las épicas propuestas
 
@@ -70,6 +70,12 @@ flowchart TD
   E3-06 --> E3-05
   E2-06 --> E3-05
   E3-03 --> E3-06
+  E3-02 --> E3-07
+  E2-02 --> E3-07
+  E3-07 --> E3-08
+  E3-07 --> E3-09
+  E3-08 --> E3-09
+  E3-02 --> E3-10
   E3-05 --> E4-01
   E1-04 --> E4-01
   E4-01 --> E4-02
@@ -85,6 +91,7 @@ flowchart TD
   E6-06 --> E5-06
   E6-07 --> E5-06
   E6-01 --> E6-02
+  E6-02 --> E6-10
   E6-02 --> E6-03
   E2-06 --> E6-03
   E3-02 --> E6-03
@@ -138,7 +145,7 @@ flowchart TD
 
 10. **Sin generación en vivo para el postulante:** el postulante nunca dispara una generación que llegue a él sin aprobación; solicita al equipo (SIA-E5-06 / SIA-E6-06) y recibe contenido solo tras aprobación de admin. La cuota de IA cuenta solo **acciones IA reales** (al menos una llamada al LLM): encolar una solicitud administrativa no descuenta cuota del postulante; la generación del admin descuenta de la cuota del admin (P3, SIA-E6-02).
 11. **Segundo revisor:** no es obligatorio en el MVP. Se gobierna con `revision.segundo_revisor_obligatorio` en `configuracion_sistema` (por defecto `false`, cambios auditados en `audit_log`). La verificación de cita y la nota para contenido incierto siguen obligatorias (P4, SIA-E6-05).
-12. **Fases:** MVP 32 historias / 141 pts, v2 16 historias / 58 pts, v3 5 historias / 20 pts (total 53 / 219 pts). Cambios por issue #65: SIA-E2-01 pasa de MVP a v3; SIA-E2-06, SIA-E3-05 y SIA-E7-01 suben de 3 a 5 pts. Cambios por la auditoría: SIA-E4-02 y SIA-E6-09 suben de 3 a 5 pts. Cambios por el contrato MVP E1+E2 (supuesto 23): SIA-E3-02 (recibe el efecto del retiro de fuentes), SIA-E2-07 (edición de metadatos) y SIA-E1-03 (pantalla de pesos) suben de 3 a 5 pts.
+12. **Fases:** MVP 32 historias / 141 pts, v2 16 historias / 58 pts, v3 5 historias / 20 pts (total 53 / 219 pts). Con SIA-E3-07, SIA-E3-08, SIA-E3-09 y SIA-E3-10 (supuesto 24; 3, 3, 3 y 2 pts): MVP 36 historias / 152 pts, total 57 / 230 pts. SIA-E3-02 se mantiene en 5 pts: eliminar y editar ya existen y solo ganan la guarda de estado. Cambios por issue #65: SIA-E2-01 pasa de MVP a v3; SIA-E2-06, SIA-E3-05 y SIA-E7-01 suben de 3 a 5 pts. Cambios por la auditoría: SIA-E4-02 y SIA-E6-09 suben de 3 a 5 pts. Cambios por el contrato MVP E1+E2 (supuesto 23): SIA-E3-02 (recibe el efecto del retiro de fuentes), SIA-E2-07 (edición de metadatos) y SIA-E1-03 (pantalla de pesos) suben de 3 a 5 pts. Cambio por el supuesto 25: SIA-E3-03 sube de 3 a 5 pts (precondiciones, cita a pasajes, `version_desactualizada` y problemas paginados), Además se crea SIA-E6-10 (adaptador del proveedor real, MVP, 3 pts). El MVP queda en 37 historias / 157 pts y el total en 58 / 235 pts.
 13. **Preferencias de notificación** (activar/desactivar alertas, recordatorios y reporte semanal) se definen en SIA-E8-02 y se reutilizan en E8-03 y E8-05.
 14. **Repositorio de fuentes:** MVP y v2 operan al 100 % sobre el `SourceRepository` propio en PostgreSQL; no se crea cuenta ni proyecto de NotebookLM ($0 USD). La búsqueda semántica (pgvector o NotebookLM) se reevalúa en v3 (P1, SIA-E2-01, SIA-E2-08).
 15. **Calendario oficial:** los hitos los carga un admin a mano con enlace obligatorio a una fuente `.gob.pe`; el cambio de fecha del hito `examen` se propaga automáticamente a los planes con fecha de origen `oficial`, no a los de origen `manual` (P5, SIA-E8-01, SIA-E7-01).
@@ -160,6 +167,29 @@ flowchart TD
     - (h) Retirar una fuente emite el aviso «fuente retirada» (SIA-E2-06). El efecto sobre las preguntas lo implementa SIA-E3-02 y el efecto sobre el material lo implementa SIA-E6-06. En ambos casos el efecto es todo o nada junto con el retiro.
     - (i) La carga de pesos tiene una pantalla simple de admin en el MVP, con suma en vivo y la misma validación que el servidor (SIA-E1-03, Q9).
     - (j) El límite de 60 temas cuenta solo los activos. La unicidad de nombre incluye los archivados, y reactivar un tema revalida el límite (SIA-E1-01, SIA-E1-02, Q10).
+24. **Decisiones de los contratos de SIA-E3-02 y SIA-E6-01** (PR #152, dudas del architect, resueltas por el PO):
+    - (a) **P1.** Toda pregunta nueva nace en `borrador`: alta manual, Excel, balotario e IA. Para no dejar al admin sin forma de publicar se crean **SIA-E3-07** (API), **SIA-E3-08** (listado y citas), **SIA-E3-09** (acciones de revisión) y **SIA-E3-10** (avisos de las pantallas existentes), que van justo después de SIA-E3-02. La pantalla se dividió en tres en el review del PR #153 (H4), para que ninguna supere 3 pts. **SIA-E3-02 no entra en un release sin las cuatro.**
+      - Por esa vía se **aprueban** solo las preguntas de origen `manual`. Las de `balotario` e `ia` se aprueban en sus colas (SIA-E3-05, SIA-E6-05), con sus exigencias.
+      - Se **revalidan** preguntas de cualquier origen, con nota obligatoria para `balotario` e `ia`, y con `conflicto_clave` sin resolver bloqueando por cualquier vía.
+      - Las guardas viven en el servidor. El seed de demo usa una «Fuente demo (no oficial)» y nunca corre en producción.
+    - (b) **P2.** Se elimina solo desde `aprobada`, `rechazada` o `activo`. Un `borrador` o una `en_revision` se rechazan primero.
+    - (c) **P3.** Editar el enunciado, las alternativas, la clave o la explicación de una pregunta `aprobada` o `activo` la pasa a `en_revision`. Editar la clasificación (área, tema, etiquetas o dificultad) no cambia el estado. La clave del origen `balotario` no se edita (422 `clave_oficial`). Corregir una pregunta heredada sin citas la saca de circulación hasta que se revalide con cita.
+    - (d) **P4.** Aprobar y revalidar exigen ≥1 cita a una fuente **activa**. El origen `balotario` vale solo si su propia fuente está activa.
+    - (e) **Q-IA1. Enmascarar antes de llamar a la IA.** SIA-E6-01 rechaza con `datos_personales` toda entrada con emails, teléfonos o números de 8 dígitos y nunca enmascara por su cuenta. Las historias que arman entradas con contenido de fuentes o de preguntas (SIA-E3-04, E6-03, E6-06 y E6-08) **enmascaran antes de llamar** esos datos de contacto (p. ej. los teléfonos y correos institucionales de una norma del MINSA) con un marcador como `[contacto]`, usando la función común que exporta el servicio de IA (`ia.Enmascarar`, con los mismos patrones que la regla de rechazo), para que todos enmascaren igual. El enmascarado se aplica solo a la copia que se envía: el pasaje guardado no cambia, y la validación de citas (SIA-E6-04) tolera el marcador. Nunca se envían datos de usuarios.
+    - (f) **Decidido por el usuario:** exigir cita a una fuente activa para aprobar y revalidar vale para **todos los procesos**, también los de ascenso que no son SERUMS. Así todo el banco queda trazable.
+    - (g) **Aviso al usuario:** como no hay aprobación masiva para el origen `manual`, un Excel de cientos de preguntas se aprueba una a una, con cita. Si eso es un problema, la aprobación masiva de `manual` sería una historia aparte.
+25. **Decisiones para los contratos de SIA-E3-01, SIA-E3-03 y SIA-E6-02** (PO, 12-nov):
+    - (a) El parser lee el `contenido` original de la versión vigente, con las líneas del original. Tiene una lista cerrada de 9 motivos de problema (incluye `alternativa_vacia`). El límite de 1 000 cuenta todos los bloques. La clave se detecta con `<mark>` en cualquier parte de la alternativa; el resto del HTML se elimina. El parser es determinista y no crea `conflicto_clave`, que nace en SIA-E3-06; el test reservado en SIA-E3-07 se valida allí (SIA-E3-01).
+    - (b) La importación exige una fuente `balotario` y `activa`. Cada pregunta nace con cita a los pasajes de su versión que se solapan con sus líneas, así que cumple la cita obligatoria en todos los procesos (24 (f)). Una pregunta sin pasaje que la cubra no se importa (`sin_pasaje`). Confirmar lleva la versión vista (409 `version_desactualizada`). Se puede importar una versión nueva de la misma fuente; sus duplicados van a SIA-E3-06. Las preguntas con problemas se muestran paginadas. La auditoría va dentro de la transacción. La especialidad debe estar entre las profesiones de la fuente (SIA-E3-03).
+    - (c) Costos: el orden de verificación es caché → presupuesto → mes → día. El corte por presupuesto usa el gasto registrado y acepta el exceso de las llamadas en curso. Una llamada fallida libera su acción, pero suma su costo real. Se pueden reservar N acciones a la vez, todo o nada. El gasto no baja por borrados de SIA-E9-07. Los rangos de configuración están definidos, bajar un límite no es retroactivo y subir el presupuesto rearma la alerta. La alerta del 80 % es in-app (SIA-E6-02).
+    - (d) **Cambio de alcance:** en el MVP el postulante no tiene ninguna acción IA real. SIA-E6-02 entrega sus límites y la API de su consumo; su vista se construye en la primera historia que le dé una acción IA real. **Aprobado por el usuario** (registrado en el issue #40).
+    - (e) **Área inicial** (opción A del architect): `preguntas.asignatura_id` sigue siendo obligatoria, sin cambio de esquema. La confirmación del balotario pide un área inicial del proceso, igual que la importación Excel, y esa área es provisional. SIA-E3-05 exige que la solicitud de aprobación incluya el área confirmada; si falta, 422 `falta_area`. La pantalla solo rellena el área con la propuesta de SIA-E3-04, nunca con el área inicial (SIA-E3-03, E3-04, E3-05).
+    - (f) **Duplicados del Excel (#165):** no se crea un índice único, porque chocaría con «mantener ambas» de SIA-E3-06 y haría fallar entera una importación atómica. La detección queda en SIA-E3-06.
+    - (g) **Proveedor real de IA:** se separa en SIA-E6-10. SIA-E6-02 se diseña y prueba con el doble. Elegir el proveedor requiere la aprobación del usuario.
+    - (h) **P-B4 a P-B6** (contrato de E3-01 y E3-03):
+      - Los balotarios usan la segmentación genérica, con unión, y la cita se resuelve por solape de líneas. Esto revierte la Q7 (ADR 0008).
+      - `vinetas_normalizadas` solo se marca con viñetas sin letra o con estilos mezclados.
+      - La especialidad debe estar entre las profesiones de la fuente (422 `especialidad_no_corresponde`). Si es inexistente, inactiva o de otra institución, responde 422 `especialidad_invalida`, como en SIA-E1-04. Un proceso inexistente o un área ajena al proceso responde 422 `referencia_invalida`.
 
 ## Límites (aplican donde se citan; los de IA, privacidad y cronograma aprobados en issue #65)
 
@@ -177,6 +207,7 @@ flowchart TD
 | Acciones IA reales por postulante | máx. 5 por día y 60 por mes por usuario (configurables); caché, reintentos y solicitudes encoladas sin llamada al LLM no cuentan |
 | Solicitudes al equipo (postulante) | máx. 5 abiertas a la vez; 1 abierta por (área, tema) |
 | Presupuesto global de IA | 40 USD por mes calendario (America/Lima, configurable); alerta a admins al 80 % (32 USD), corte de llamadas al LLM al 100 % |
+| Rangos configurables de IA | postulante 0–50/día y 0–1000/mes (día ≤ mes); admin 1–1000/día; presupuesto 1–1000 USD (SIA-E6-02, supuesto 25) |
 | Hitos del cronograma | máx. 30 por proceso, 1 hito `examen` vigente; enlace obligatorio HTTPS con host `gob.pe` o `*.gob.pe` |
 | Exportación de datos de aprendizaje | máx. 1 por hora por usuario |
 | Borrado de datos de aprendizaje | completado en ≤ 24 h |
@@ -184,6 +215,8 @@ flowchart TD
 | Preguntas por práctica/simulacro dirigido | 5–100 |
 | Plan de estudio | horas por día 0,5–12 en pasos de 0,5; fecha de examen entre mañana y 730 días |
 | Texto libre (notas, motivos) | máx. 500 caracteres |
+| Citas por pregunta | máx. 20 (contrato de SIA-E3-02, #152) |
+| Búsqueda de pasajes (admin) | máx. 20 resultados, solo fuentes `activa` (SIA-E3-07) |
 | Listados | paginación máx. 100 por página, 20 por defecto |
 
 ## Requisitos transversales (se citan como criterios en cada historia donde aplican)

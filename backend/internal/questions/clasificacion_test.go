@@ -177,6 +177,37 @@ func TestH19_ImportRechazaAsignaturaAjena(t *testing.T) {
 	}
 }
 
+// preguntas has no unique key on enunciado (the deduplication is SIA-E3-06):
+// two identical rows are both imported, with no error.
+func TestImport_FilasRepetidasSeImportanAmbas(t *testing.T) {
+	f, mux := newMux(t, qt.Options{Asignaturas: []qt.AsignaturaSpec{{NumeroPreguntas: 1, Peso: 100, Unicas: 1}}})
+	admin := f.Token(t, f.UsuarioID, "admin")
+
+	fila := "Pregunta repetida del import,unica,medio,,,A,si,B,no\n"
+	csv := "enunciado,tipo,dificultad,grado_id,especialidad_id,respuesta_1,correcta_1,respuesta_2,correcta_2\n" + fila + fila
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("proceso_id", fmt.Sprint(f.ProcesoID))
+	_ = mw.WriteField("asignatura_id", fmt.Sprint(f.Asignaturas[0]))
+	fw, err := mw.CreateFormFile("file", "p.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = fw.Write([]byte(csv))
+	_ = mw.Close()
+	req := httptest.NewRequest("POST", "/preguntas/import", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+admin)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("import: %d %s", w.Code, w.Body.String())
+	}
+	if got := strings.TrimSpace(w.Body.String()); got != `{"imported":2,"errors":[]}` {
+		t.Errorf("body = %s, want {\"imported\":2,\"errors\":[]}", got)
+	}
+}
+
 func TestH20_GetPreguntaDevuelveIDsDeGradoYEspecialidad(t *testing.T) {
 	f, mux := newMux(t, qt.Options{Asignaturas: []qt.AsignaturaSpec{{NumeroPreguntas: 1, Peso: 100, Unicas: 1}}})
 	admin := f.Token(t, f.UsuarioID, "admin")

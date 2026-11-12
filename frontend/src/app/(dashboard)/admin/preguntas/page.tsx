@@ -1,4 +1,5 @@
 "use client";
+import { PillEstadoPregunta } from "./_componentes/estado-pregunta";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -29,11 +30,21 @@ import {
   CONTENEDOR_PAGINA,
 } from "@/lib/estilos";
 import { type ColumnaExportable, descargarCsv, imprimirTabla } from "@/lib/exportar";
+import { apiErrorCode } from "@/lib/http/api-error";
 import { POR_PAGINA_DEFECTO } from "@/lib/paginacion";
-import { Pregunta, questionsApi } from "@/lib/questions/api";
+import { type EstadoPregunta, type OrigenPregunta, Pregunta, questionsApi } from "@/lib/questions/api";
+import {
+  claveErrorEliminacion,
+  claveEstadoPregunta,
+  claveOrigenPregunta,
+  ESTADOS_FILTRABLES,
+  ORIGENES_PREGUNTA,
+  puedeEliminar,
+} from "@/lib/questions/estados";
 import { cn } from "@/lib/utils";
 import {
   ArrowClockwiseIcon,
+  BookOpenTextIcon,
   CheckIcon,
   ColumnsIcon,
   DownloadSimpleIcon,
@@ -52,6 +63,9 @@ const DIFICULTAD: Record<string, { tono: "ok" | "aviso" | "error"; etiqueta: str
   medio: { tono: "aviso", etiqueta: "admin-preguntas-dificultad-medio" },
   dificil: { tono: "error", etiqueta: "admin-preguntas-dificultad-dificil" },
 };
+
+/** Valor de una columna sin dato (backend anterior a SIA-E3-02). */
+const SIN_DATO = "—";
 
 /** Clave i18n de cada tipo. */
 const TIPO: Record<string, string> = {
@@ -94,7 +108,8 @@ export default function PreguntasPage() {
   const [filterGradoID, setFilterGradoID] = useState<number>(0);
   const [filterEspecialidadID, setFilterEspecialidadID] = useState<number>(0);
   const [filterDificultad, setFilterDificultad] = useState<string>("");
-  const [filterEstado, setFilterEstado] = useState<string>("");
+  const [filterEstado, setFilterEstado] = useState<Exclude<EstadoPregunta, "eliminada"> | "">("");
+  const [filterOrigen, setFilterOrigen] = useState<OrigenPregunta | "">("");
   const [filterSearch, setFilterSearch] = useState<string>("");
   /** Texto de búsqueda ya estabilizado: es el que dispara la petición. */
   const [busqueda, setBusqueda] = useState<string>("");
@@ -132,6 +147,7 @@ export default function PreguntasPage() {
         especialidad_id: filterEspecialidadID || undefined,
         dificultad: filterDificultad || undefined,
         estado: filterEstado || undefined,
+        origen: filterOrigen || undefined,
         search: busqueda || undefined,
         page: page + 1,
         per_page: pageSize,
@@ -156,6 +172,7 @@ export default function PreguntasPage() {
     filterEspecialidadID,
     filterDificultad,
     filterEstado,
+    filterOrigen,
     busqueda,
     page,
     pageSize,
@@ -204,7 +221,14 @@ export default function PreguntasPage() {
       load();
     } catch (e: unknown) {
       const err = e as { message?: string };
-      toast.error(err.message ?? t("comun-error-eliminar"));
+      const clave = claveErrorEliminacion(e);
+      toast.error(clave ? t(clave) : (err.message ?? t("comun-error-eliminar")));
+      if (apiErrorCode(e) === "estado_invalido") {
+        // El estado cambió mientras tanto: se cierra el diálogo y se muestra el actual.
+        setConfirmDelete({ open: false, row: null, submitting: false });
+        load();
+        return;
+      }
       setConfirmDelete((d) => ({ ...d, submitting: false }));
     }
   };
@@ -247,13 +271,21 @@ export default function PreguntasPage() {
       {
         id: "estado",
         titulo: t("admin-preguntas-estado"),
-        texto: (p) =>
-          p.estado === "activo" ? t("admin-preguntas-estado-activo") : t("admin-preguntas-estado-eliminada"),
-        render: (p) => (
-          <PillEstado tono={p.estado === "activo" ? "ok" : "neutro"}>
-            {p.estado === "activo" ? t("admin-preguntas-estado-activo") : t("admin-preguntas-estado-eliminada")}
-          </PillEstado>
-        ),
+        texto: (p) => t(claveEstadoPregunta(p.estado)),
+        render: (p) => <PillEstadoPregunta estado={p.estado} />,
+      },
+      {
+        id: "origen",
+        titulo: t("serumsIa.revision.listado.columnaOrigen"),
+        texto: (p) => (p.origen ? t(claveOrigenPregunta(p.origen)) : SIN_DATO),
+        render: (p) => (p.origen ? <Chip>{t(claveOrigenPregunta(p.origen))}</Chip> : SIN_DATO),
+      },
+      {
+        id: "citas",
+        titulo: t("serumsIa.revision.listado.columnaCitas"),
+        texto: (p) => (p.citas_count === undefined ? SIN_DATO : String(p.citas_count)),
+        className: "text-right font-mono tabular-nums",
+        render: (p) => (p.citas_count === undefined ? SIN_DATO : p.citas_count),
       },
     ],
     [t],
@@ -270,6 +302,7 @@ export default function PreguntasPage() {
       filterEspecialidadID ||
       filterDificultad ||
       filterEstado ||
+      filterOrigen ||
       filterSearch,
   );
 
@@ -280,6 +313,7 @@ export default function PreguntasPage() {
     setFilterEspecialidadID(0);
     setFilterDificultad("");
     setFilterEstado("");
+    setFilterOrigen("");
     setFilterSearch("");
     setBusqueda("");
     setPage(0);
@@ -455,13 +489,27 @@ export default function PreguntasPage() {
             etiqueta={t("admin-preguntas-estado")}
             valor={filterEstado}
             onCambio={(v) => {
-              setFilterEstado(v);
+              setFilterEstado(ESTADOS_FILTRABLES.find((e) => e === v) ?? "");
               setPage(0);
             }}
             opciones={[
               { value: "", label: t("admin-preguntas-filtro-estado-todos") },
-              { value: "activo", label: t("admin-preguntas-estado-activo") },
-              { value: "eliminada", label: t("admin-preguntas-estado-eliminada") },
+              ...ESTADOS_FILTRABLES.map((e) => ({ value: e, label: t(claveEstadoPregunta(e)) })),
+            ]}
+          />
+        </div>
+        <div className="w-[calc(50%-4px)] sm:w-36">
+          <SelectCampo
+            id="filtro-origen"
+            etiqueta={t("serumsIa.revision.listado.columnaOrigen")}
+            valor={filterOrigen}
+            onCambio={(v) => {
+              setFilterOrigen(ORIGENES_PREGUNTA.find((o) => o === v) ?? "");
+              setPage(0);
+            }}
+            opciones={[
+              { value: "", label: t("serumsIa.revision.listado.filtroOrigenTodos") },
+              ...ORIGENES_PREGUNTA.map((o) => ({ value: o, label: t(claveOrigenPregunta(o)) })),
             ]}
           />
         </div>
@@ -511,10 +559,18 @@ export default function PreguntasPage() {
                           onClick: () => router.push(`/admin/preguntas/${p.id}/edit`),
                         },
                         {
+                          label: t("serumsIa.revision.listado.verDetalle"),
+                          icon: BookOpenTextIcon,
+                          onClick: () => router.push(`/admin/preguntas/${p.id}`),
+                        },
+                        // P2 (SIA-E3-02): un borrador o una en revisión se rechazan antes de eliminarse.
+                        {
                           label: t("comun-eliminar"),
                           icon: TrashIcon,
                           destructiva: true,
                           separador: true,
+                          disabled: !puedeEliminar(p.estado),
+                          ayuda: puedeEliminar(p.estado) ? undefined : t("serumsIa.avisosPregunta.eliminarAyuda"),
                           onClick: () => setConfirmDelete({ open: true, row: p, submitting: false }),
                         },
                       ]}
@@ -526,7 +582,7 @@ export default function PreguntasPage() {
                 <FilaVacia columnas={visibles.length + 1} icon={<ListChecksIcon className="size-6" />}>
                   {hayFiltros ? (
                     <>
-                      {t("admin-preguntas-sin-resultados-filtros")}{" "}
+                      {t("serumsIa.revision.listado.vacio")}{" "}
                       <button
                         type="button"
                         onClick={limpiarFiltros}

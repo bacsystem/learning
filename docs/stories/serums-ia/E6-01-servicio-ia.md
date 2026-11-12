@@ -19,7 +19,7 @@ Las historias hablan de «el servicio de IA». Proveedor, modelo, prompts y prec
 ## Reglas de negocio
 1. Interfaz única por operación: `clasificar`, `generar_preguntas`, `generar_material`, `generar_explicacion`; cada una recibe entrada estructurada y devuelve salida validada contra un esquema; salida que no cumple el esquema = error `salida_invalida` (se reintenta 1 vez como máximo).
 2. Registro de uso por llamada: operación, id de usuario o admin opaco, tokens de entrada/salida, costo estimado, duración, resultado y si vino de caché. Nunca el contenido del prompt ni de la respuesta.
-3. Redacción previa: el servicio rechaza (error `datos_personales`) entradas que contengan patrones de DNI (8 dígitos), emails o teléfonos; solo se aceptan ids opacos y contenido académico.
+3. Redacción previa: el servicio rechaza (error `datos_personales`) entradas que contengan patrones de DNI (8 dígitos), emails o teléfonos; solo se aceptan ids opacos y contenido académico. El servicio **nunca enmascara por su cuenta**: enmascarar los datos de contacto de los pasajes antes de llamar le toca a quien arma la entrada (README, supuesto 24 (e)).
 4. Timeout de 60 s por llamada y 2 reintentos con espera creciente solo ante errores transitorios.
 5. Credenciales solo por variables de entorno; sin ellas, el servicio está «deshabilitado» y las operaciones responden 503 `ia_no_disponible` sin romper el resto de la aplicación.
 6. Tamaño máx. de entrada: 30 000 caracteres por llamada.

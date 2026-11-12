@@ -64,6 +64,33 @@ export interface Estadistica {
   indice_discriminacion: number;
 }
 
+/** Ciclo de vida (SIA-E3-02, docs/api/serums-ia-e3-02-ciclo-preguntas.md §3). `activo` es el banco heredado. */
+export type EstadoPregunta = "borrador" | "en_revision" | "aprobada" | "rechazada" | "activo" | "eliminada";
+export type OrigenPregunta = "manual" | "balotario" | "ia";
+
+/** Cita a un pasaje de una fuente (§4.4); solo en el detalle (`GET /preguntas/{id}`). */
+export interface CitaPregunta {
+  pasaje_id: number;
+  fuente_id: number;
+  version: number;
+  fuente_titulo: string;
+  fuente_estado: string;
+  /** SIA-E3-07 §5: ubicación y texto del pasaje citado (`texto` es el pasaje completo, en texto plano). */
+  seccion: string | null;
+  linea_inicio: number;
+  linea_fin: number;
+  extracto: string;
+  texto: string;
+}
+
+/** Cuerpo de `PATCH /preguntas/{id}/estado` (SIA-E3-07 §3.1). */
+export interface CambiarEstadoPayload {
+  estado: "aprobada" | "rechazada" | "borrador" | "en_revision";
+  motivo?: string | null;
+  verificado?: boolean | null;
+  nota?: string | null;
+}
+
 export interface Pregunta {
   id: number;
   proceso_id: number;
@@ -78,7 +105,14 @@ export interface Pregunta {
   enunciado: string;
   tipo: "unica" | "multiple";
   dificultad: "facil" | "medio" | "dificil";
-  estado: "activo" | "eliminada";
+  estado: EstadoPregunta;
+  /** SIA-E3-02 §4.4. Opcionales hasta que el backend de E3-02 esté desplegado. */
+  origen?: OrigenPregunta;
+  motivo_rechazo?: string | null;
+  /** Solo en el detalle. */
+  citas?: CitaPregunta[];
+  /** Solo en el listado. */
+  citas_count?: number;
   etiquetas: string[];
   /** Ids of `etiquetas` (detail view; empty in list views). */
   etiqueta_ids: number[];
@@ -235,7 +269,9 @@ export interface PreguntaListQuery {
   especialidad_id?: number;
   dificultad?: string;
   etiqueta_id?: number;
-  estado?: string;
+  /** Valor exacto; sin filtro salen todas las no eliminadas (`eliminada` no se lista). */
+  estado?: Exclude<EstadoPregunta, "eliminada">;
+  origen?: OrigenPregunta;
   search?: string;
   page?: number;
   per_page?: number;
@@ -275,6 +311,19 @@ export const questionsApi = {
 
   deletePregunta(token: string, id: number): Promise<void> {
     return req<void>(`/preguntas/${id}`, token, { method: "DELETE" });
+  },
+
+  /** `PATCH /preguntas/{id}/estado` (SIA-E3-07 §3). Sin pantalla hasta SIA-E3-09. */
+  cambiarEstado(token: string, id: number, payload: CambiarEstadoPayload): Promise<Pregunta> {
+    return req<Pregunta>(`/preguntas/${id}/estado`, token, { method: "PATCH", body: JSON.stringify(payload) });
+  },
+
+  /** `PUT /preguntas/{id}/citas` (SIA-E3-07 §4): la lista reemplaza el conjunto de citas, siempre completa. */
+  reemplazarCitas(token: string, id: number, pasajeIds: number[]): Promise<Pregunta> {
+    return req<Pregunta>(`/preguntas/${id}/citas`, token, {
+      method: "PUT",
+      body: JSON.stringify({ pasaje_ids: pasajeIds }),
+    });
   },
 
   getStats(token: string): Promise<StatsGlobales> {

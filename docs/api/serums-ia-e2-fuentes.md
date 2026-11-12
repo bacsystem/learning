@@ -177,7 +177,7 @@ Rol admin. Listado paginado (E2-07 reglas 1–2).
 | `estado` | `procesando` \| `activa` \| `fallida` \| `retirada` |
 | `tipo` | `balotario` \| `guia` \| `norma` \| `otro` |
 | `especialidad_id` | id; incluye las fuentes que aplican a todas |
-| `oficial` | `true` \| `false` (marca de la versión vigente) |
+| `oficial` | `true` \| `false` (marca de la versión vigente). `false` incluye las fuentes **sin** versión vigente (`procesando` o `fallida`), que no tienen marca: `COALESCE(vigente.oficial_verificada, false) = false` |
 | `q` | búsqueda en el título, ≤ 100 caracteres, `ILIKE` con `%` y `_` escapados (como `admin/repository.go:363`) |
 | `page`, `per_page` | 20 por defecto, máx. 100 |
 
@@ -200,7 +200,7 @@ Rol admin. Request con `estado` destino. Mismo patrón que `PATCH /…/estado` d
 |---|---|---|---|
 | `{"estado": "retirada", "motivo": "…"}` | `activa` sin versión en `procesando` | Guarda `motivo_retiro`. En la misma transacción emite **una vez** el aviso «fuente retirada» (id de la fuente, actor) a cada `SuscriptorRetiro` registrado (regla 3; ver abajo). Si un suscriptor falla, se revierte todo y el retiro no se aplica. La fuente deja de aparecer en las búsquedas (regla 4) | `motivo` falta o tiene fuera de 5–500 caracteres → **422 `validacion`** (escenario «Retirar sin motivo»). Desde otro estado (p. ej. `procesando`) → **409 `estado_invalido`** (escenario «Transición inválida») |
 | `{"estado": "activa"}` | `retirada` | Restaura: borra `motivo_retiro` y **no** reaprueba contenido (regla 5). Vuelve a validar el límite de fuentes | 409 `estado_invalido`; 422 `limite_fuentes`, y la fuente sigue `retirada` (escenario «Restaurar por encima del límite») |
-| `{"estado": "procesando"}` (reintentar) | `fallida`, o `activa` cuya última versión está `fallida` | La última versión fallida vuelve a `procesando` (`intentos = 0`, `claimed_at = NULL`, `motivo_fallo = NULL`). La fuente `fallida` pasa a `procesando` tras validar el límite; la `activa` sigue `activa` (ya contaba) | 409 `estado_invalido`; 422 `limite_fuentes` (solo desde `fallida`), sin cambiar el estado |
+| `{"estado": "procesando"}` (reintentar) | `fallida`, o `activa` cuya última versión está `fallida` | La última versión fallida vuelve a `procesando` (`intentos = 0`, `claimed_at = NULL`, `motivo_fallo = NULL`, `procesada_at = NULL`). La fuente `fallida` pasa a `procesando` tras validar el límite; la `activa` sigue `activa` (ya contaba) | 409 `estado_invalido`; 422 `limite_fuentes` (solo desde `fallida`), sin cambiar el estado |
 | Otro valor de `estado` | — | — | 422 `validacion` |
 
 - `motivo` se recorta con `TrimSpace` antes de medir los 5–500 caracteres (runes) y se guarda recortado (README §6).
@@ -219,6 +219,10 @@ Rol admin. Actúa sobre la **versión vigente**.
 | `{"oficial_verificada": false, "motivo": "…"}` | Fuente `activa` o `retirada` con la versión vigente marcada | `motivo` fuera de 5–500 → 422 `validacion`; sin marca → 409 `estado_invalido` |
 
 - `entidad_emisora`, `nota` y `motivo` se recortan con `TrimSpace` antes de medir sus rangos (3–100, 10–500 y 5–500 caracteres, en runes) y se guardan recortados (README §6). Un texto que solo tiene espacios no llega al mínimo: 422 `validacion`.
+- **Validación del cuerpo (precisión del 2026-11-11):**
+  - Si falta `oficial_verificada`, responde 422 `validacion` con `detalle.campos.oficial_verificada = "requerido"`.
+  - Los campos **conocidos** que no aplican al sentido pedido se **ignoran**: `motivo` al marcar; `entidad_emisora` y `nota` al desmarcar. Es el mismo criterio que `motivo` en S5 al restaurar o reintentar.
+  - Un campo desconocido sigue dando 400 `cuerpo_invalido`.
 - **Marcar:** `oficial_verificada = true`, `oficial_entidad`, `oficial_nota`, `oficial_por` (id del admin) y `oficial_at`.
 - **Desmarcar:** pone `false` y borra esos cuatro campos. El historial queda en `audit_log`.
 - Se permite marcar cualquier `tipo`. El caso típico es `balotario`, pero la regla 7 no lo restringe.
@@ -237,11 +241,13 @@ Rol admin. Edita los metadatos editables **sin** crear versión nueva (E2-07 reg
 
 | # | Regla | Error |
 |---|---|---|
-| 1 | `titulo` 3–150 tras `TrimSpace`; `especialidad_ids` 0–50 sin repetidos (vacío = todas). `tipo`, `anio` y `proceso_id` no se editan: si vienen, es un campo desconocido | 400 `cuerpo_invalido` / 422 `validacion` |
-| 2 | Cada especialidad existe y está `activo`, **o** la fuente ya la tenía asociada antes de la edición, aunque hoy esté inactiva (misma regla que T4 de temas, contrato E1) | 422 `referencia_invalida` (inexistente, o inactiva y nueva para la fuente) |
-| 3 | La fuente existe | 404 `no_encontrado` |
+| 1 | `titulo` 3–150 tras `TrimSpace`; `especialidad_ids` **obligatorio**, 0–50 sin repetidos (`[]` = todas). Si falta o es `null`: 422 `validacion` con `detalle.campos.especialidad_ids = "requerido"`. No se interpreta como «todas», para que un cuerpo incompleto no le quite las profesiones a una fuente (precisión del 2026-11-11; excepción a README §1). `tipo`, `anio` y `proceso_id` no se editan: si vienen, es un campo desconocido | 400 `cuerpo_invalido` / 422 `validacion` |
+| 2 | La fuente existe. Va antes de la regla 3 porque esa necesita leer las especialidades actuales de la fuente | 404 `no_encontrado` |
+| 3 | Cada especialidad existe y está `activo`, **o** la fuente ya la tenía asociada antes de la edición, aunque hoy esté inactiva (misma regla que T4 de temas, contrato E1) | 422 `referencia_invalida` (inexistente, o inactiva y nueva para la fuente) |
 | 4 | Estado `activa`, `fallida` o `retirada`; en `procesando` no se puede | 409 `estado_invalido` |
 | 5 | Si la fuente cuenta para el límite (`activa`), el nuevo conjunto de profesiones no supera el límite. Pasar a «todas» cuenta para todas las profesiones | 422 `limite_fuentes`, y nada cambia (escenario «Editar profesiones por encima del límite») |
+
+Las reglas se evalúan en el orden de la tabla y se devuelve el primer error (precisión del 2026-11-11).
 
 - **Especialidades inactivas ya asociadas** (aclaración del 2026-11-11, consulta de frontend-dev):
   - Se aceptan las que la fuente ya tenía, para que editar solo el título no falle porque una especialidad se desactivó después (mismo caso que el H2 del PR #73).
@@ -457,7 +463,7 @@ Notas:
 | E2-07 | Subida sin marca automática | S1 (siempre `false`) |
 | E2-07 | Editar profesiones (misma versión, audit `fuente.editar`) | S7 |
 | E2-07 | Editar profesiones por encima del límite → 422 | S7 regla 5 |
-| E2-07 | Editar una fuente con una especialidad asociada que se desactivó | S7 regla 2: acepta las ya asociadas; una inactiva nueva → 422 `referencia_invalida` |
+| E2-07 | Editar una fuente con una especialidad asociada que se desactivó | S7 regla 3: acepta las ya asociadas; una inactiva nueva → 422 `referencia_invalida` |
 | E2-07 | Regla 7: editar en `procesando` → 409 | S7 regla 4 |
 | E2-07 | Subida duplicada (aviso con título, estado y enlace) | S1 paso 8 `detalle` + UI |
 | E2-07 | Acceso (redirección + 403) | guard admin del layout + `RequireAdmin` |

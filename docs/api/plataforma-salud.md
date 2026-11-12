@@ -55,12 +55,12 @@ Rol admin. Sin query ni cuerpo.
 
 | Campo | Regla |
 |---|---|
-| `estado` | Global: el peor de los individuales, con el orden `caido` > `degradado` = `desconocido` > `operativo`. `no_configurado` no cuenta. Si todos son `no_configurado`, el global es `operativo` |
-| `comprobado_en` | Instante UTC en que se ejecutaron las comprobaciones. Con la caché devuelve el de la ejecución cacheada |
+| `estado` | Global: el peor de los individuales, con el orden `caido` > `degradado` = `desconocido` > `operativo`. `no_configurado` no cuenta. Si todos son `no_configurado`, el global es `operativo`. **El global nunca es `desconocido`: cuenta como `degradado`** (decisión 1 del PO). Solo toma los valores `operativo`, `degradado` y `caido` |
+| `comprobado_en` | Instante UTC en que se ejecutaron las comprobaciones, en RFC 3339 truncado al segundo (sin fracción). Con la caché devuelve el de la ejecución cacheada |
 | `servicios` | Lista **abierta** en orden fijo: `api`, `base_datos`, `correo`, `worker_ingesta` (v2) y `copia_r2` (v2). La UI ignora los `id` que no conoce (PLT-01 regla 7). Un servicio de v2 sale en la lista solo cuando su historia está implementada |
 | `servicios[].estado` | `operativo` \| `degradado` \| `caido` \| `no_configurado` \| `desconocido` |
 | `servicios[].categoria` | `null` o una categoría **cerrada**: `sin_conexion` \| `tiempo_agotado` \| `error_interno` \| `atrasado` \| `sin_datos` (decisión 8). Nunca el mensaje de error |
-| `servicios[].datos` | Objeto propio de cada servicio, solo con números, versiones y fechas UTC. Sin host, IP, puerto, URL, usuario, credenciales, bucket, ruta, direcciones de correo ni texto de error. Un dato que no se pudo obtener va como `null` |
+| `servicios[].datos` | Objeto propio de cada servicio, solo con números, versiones y fechas UTC. Sin host, IP, puerto, URL, usuario, credenciales, bucket, ruta, direcciones de correo ni texto de error. Un dato que no se pudo obtener va como `null` **dentro** del objeto: `datos` **nunca** es `null`. Cuando la comprobación vence o entra en pánico, el servicio responde con todas sus claves en `null` (p. ej. `{"latencia_ms": null}`). Cada comprobación declara esas claves en su campo `SinResultado` (PR #120) |
 
 ### Errores (solo de middleware)
 
@@ -72,10 +72,10 @@ Rol admin. Sin query ni cuerpo.
 
 ### Ejecución de las comprobaciones (PLT-01 reglas 4–6; decisiones 4–5)
 
-- Todas corren **en paralelo**, cada una con su `context.WithTimeout` de **2 s**.
+- Todas corren **en paralelo**, cada una con su `context.WithTimeout` de **2 s**, derivado de `context.WithoutCancel` de la petición. Así un cliente que corta la conexión no deja un `tiempo_agotado` en la caché para los demás.
   - Si no termina, el servicio se informa como `caido` / `tiempo_agotado`, sin esperar más.
   - La respuesta tarda como máximo unos 2 s más la serialización, por debajo de los 3 s.
-- **Caché en proceso de 15 s:** la primera petición ejecuta las comprobaciones y las demás, dentro de los 15 s, reciben el mismo resultado y el mismo `comprobado_en`.
+- **Caché en proceso de 15 s:** la primera petición ejecuta las comprobaciones y las demás, dentro de los 15 s, reciben el mismo resultado y el mismo `comprobado_en`. Vence en `comprobado_en + 15 s`: una petición en el segundo 15 o después ejecuta de nuevo.
   - Con varias réplicas, cada una tiene su caché. Se acepta: el peor caso es una ejecución por réplica cada 15 s.
   - Peticiones simultáneas con la caché vencida comparten **una** ejecución: un `sync.Mutex` con doble comprobación. No se agrega ninguna dependencia: `golang.org/x/sync` no está en `go.mod`.
   - «Actualizar» no salta la caché (decisión 6).
@@ -179,6 +179,29 @@ Contrato nuevo, que aplica a **todos** los endpoints autenticados:
 - **Tareas:**
   - backend-dev: middleware y tests de los tres casos (sesión inexistente → 401, error de BD → 503, sesión válida → pasa);
   - frontend-dev: verificar que 403 y 503 no disparan `auth:expired`.
+
+### `POST /auth/login` con la BD caída (extensión del mismo criterio; issue #133)
+
+Hoy el handler mapea a 401 «Credenciales inválidas.» todo error que no sea de cuenta (`backend/internal/auth/handler.go:440-441`), incluidos los de la BD. Con la BD caída, el usuario ve «credenciales inválidas» y cree que su contraseña está mal. Contrato:
+
+| Caso | Respuesta (formato heredado, `{"error": "…"}`) |
+|---|---|
+| Usuario inexistente o contraseña incorrecta | **401** «Credenciales inválidas.» (`ErrInvalidCredentials`, `auth/errors.go:10`). Sin cambios, y sin revelar si el usuario existe |
+| Cuenta bloqueada por intentos fallidos | **429** «Demasiados intentos fallidos. Cuenta bloqueada temporalmente. Intente en 15 minutos.» (`ErrAccountLocked`, `errors.go:11`; `handler.go:434-435`). Sin cambios |
+| Cuenta pendiente de activación | **403** «Tu cuenta está pendiente de activación por el administrador.» (`ErrAccountPending`, `errors.go:12`; `handler.go:436-437`). Sin cambios |
+| Cuenta rechazada o desactivada | **403** «Tu cuenta ha sido rechazada. Contacta al administrador.» o «Tu cuenta está desactivada.» (`ErrAccountRejected` / `ErrAccountInactive`, `errors.go:13-14`; `handler.go:438-439`). Sin cambios |
+| **Cualquier error de la BD dentro del login**: lectura del usuario, registro o reinicio de intentos, perfil, sesiones | **503** «Servicio no disponible.» (centinela nuevo `ErrServicioNoDisponible`) |
+| Cualquier otro error inesperado (p. ej. al firmar el JWT) | **500** genérico con `httpx.InternalError` (regla de 500 del README §3). Deja de ser 401 |
+
+- **Falla cerrado:** si algo de la BD falló, **nunca** se devuelve token ni queda una sesión creada. Si `CreateSesion` falla después de firmar el JWT, el token no se entrega.
+- **Logs:** solo `op=auth.login`, sin el usuario, la contraseña ni el error crudo.
+- **Frontend:** sin cambios. Un 5xx ya se muestra como error del servidor (`frontend/src/lib/auth/errores-auth.ts:19`), y el login no lleva `Authorization`, así que no dispara `auth:expired`.
+- **Tests mínimos** (backend-dev-2):
+  - usuario inexistente → 401;
+  - contraseña incorrecta → 401;
+  - error de BD al leer el usuario → 503;
+  - error de BD en `CreateSesion` → 503 sin token;
+  - cuenta bloqueada → 429.
 
 ## Modelo de datos
 

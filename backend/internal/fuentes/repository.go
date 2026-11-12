@@ -50,7 +50,7 @@ func (r *Repository) CrearFuente(ctx context.Context, f NuevaFuente, aud Auditor
 		if err := comprobarDuplicado(ctx, tx, sha); err != nil {
 			return err
 		}
-		if err := comprobarLimite(ctx, tx, f.EspecialidadIDs); err != nil {
+		if err := comprobarLimite(ctx, tx, f.EspecialidadIDs, sinExcluir); err != nil {
 			return err
 		}
 		var err error
@@ -68,20 +68,9 @@ func (r *Repository) NuevaVersion(ctx context.Context, fuenteID int64, nombre st
 	creadoPor *int64, citantes Citantes, aud Auditor) (int, error) {
 	var numero int
 	err := r.enTxBloqueada(ctx, func(tx *sqlx.Tx) error {
-		var fuente struct {
-			Estado     string        `db:"estado"`
-			VigenteID  sql.NullInt64 `db:"version_vigente_id"`
-			Procesando bool          `db:"procesando"`
-		}
-		err := tx.GetContext(ctx, &fuente, `
-			SELECT estado, version_vigente_id,
-			       EXISTS (SELECT 1 FROM fuente_versiones WHERE fuente_id = f.id AND estado = 'procesando') AS procesando
-			FROM fuentes f WHERE id = $1 FOR UPDATE`, fuenteID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNoEncontrado
-		}
+		fuente, err := bloquearParaCambio(ctx, tx, fuenteID)
 		if err != nil {
-			return fmt.Errorf("bloquear fuente %d: %w", fuenteID, err)
+			return err
 		}
 		admite := fuente.Estado == EstadoFallida || (fuente.Estado == EstadoActiva && !fuente.Procesando)
 		if !admite {
@@ -96,7 +85,7 @@ func (r *Repository) NuevaVersion(ctx context.Context, fuenteID int64, nombre st
 			if err != nil {
 				return err
 			}
-			if err := comprobarLimite(ctx, tx, especialidades); err != nil {
+			if err := comprobarLimite(ctx, tx, especialidades, sinExcluir); err != nil {
 				return err
 			}
 		}
@@ -126,42 +115,36 @@ func (r *Repository) NuevaVersion(ctx context.Context, fuenteID int64, nombre st
 	return numero, err
 }
 
-// Detalle returns the FuenteDetalle of a fuente, or ErrNoEncontrado.
+// Detalle returns the FuenteDetalle of a fuente, or ErrNoEncontrado: its
+// summary (listado.go), metadata, the mark of the current version, every
+// version newest first and the citing contents.
 func (r *Repository) Detalle(ctx context.Context, id int64, citantes Citantes) (FuenteDetalle, error) {
 	var f struct {
-		ID           int64          `db:"id"`
-		Titulo       string         `db:"titulo"`
-		Tipo         string         `db:"tipo"`
-		Estado       string         `db:"estado"`
+		filaResumen
 		Anio         *int           `db:"anio"`
 		ProcesoID    sql.NullInt64  `db:"proceso_id"`
 		Proceso      sql.NullString `db:"proceso"`
 		MotivoRetiro *string        `db:"motivo_retiro"`
 		VigenteID    sql.NullInt64  `db:"version_vigente_id"`
-		CreatedAt    time.Time      `db:"created_at"`
-		UpdatedAt    time.Time      `db:"updated_at"`
 	}
 	err := sqlx.GetContext(ctx, r.db, &f, `
-		SELECT f.id, f.titulo, f.tipo, f.estado, f.anio, f.proceso_id, p.nombre AS proceso, f.motivo_retiro,
-		       f.version_vigente_id, f.created_at, f.updated_at
-		FROM fuentes f LEFT JOIN procesos p ON p.id = f.proceso_id WHERE f.id = $1`, id)
+		SELECT`+columnasResumen+`, f.anio, f.proceso_id, p.nombre AS proceso, f.motivo_retiro, f.version_vigente_id`+
+		desdeResumen+` LEFT JOIN procesos p ON p.id = f.proceso_id WHERE f.id = $1`, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return FuenteDetalle{}, ErrNoEncontrado
 	}
 	if err != nil {
 		return FuenteDetalle{}, fmt.Errorf("leer fuente %d: %w", id, err)
 	}
-	d := FuenteDetalle{ID: f.ID, Titulo: f.Titulo, Tipo: f.Tipo, Estado: f.Estado, Anio: f.Anio, MotivoRetiro: f.MotivoRetiro,
-		CreatedAt: f.CreatedAt.UTC(), UpdatedAt: f.UpdatedAt.UTC(), Especialidades: []EspecialidadRef{}, Versiones: []VersionDetalle{}}
+	especialidades, err := especialidadesConNombre(ctx, r.db, []int64{id})
+	if err != nil {
+		return FuenteDetalle{}, err
+	}
+	d := FuenteDetalle{ResumenFuente: f.resumen(especialidades[id]), Anio: f.Anio, MotivoRetiro: f.MotivoRetiro,
+		Versiones: []VersionDetalle{}}
 	if f.ProcesoID.Valid {
 		d.Proceso = &ProcesoRef{ID: f.ProcesoID.Int64, Nombre: f.Proceso.String}
 	}
-	if err := sqlx.SelectContext(ctx, r.db, &d.Especialidades, `
-		SELECT e.id, e.nombre FROM fuente_especialidades fe JOIN especialidades e ON e.id = fe.especialidad_id
-		WHERE fe.fuente_id = $1 ORDER BY e.nombre, e.id`, id); err != nil {
-		return FuenteDetalle{}, fmt.Errorf("especialidades de la fuente %d: %w", id, err)
-	}
-	d.AplicaATodas = len(d.Especialidades) == 0
 	var versiones []struct {
 		ID int64 `db:"id"`
 		VersionDetalle
@@ -174,27 +157,14 @@ func (r *Repository) Detalle(ctx context.Context, id int64, citantes Citantes) (
 		FROM fuente_versiones WHERE fuente_id = $1 ORDER BY numero DESC`, id); err != nil {
 		return FuenteDetalle{}, fmt.Errorf("versiones de la fuente %d: %w", id, err)
 	}
-	vigente := 0
 	for _, v := range versiones {
 		vd := v.VersionDetalle
 		vd.CreatedAt = vd.CreatedAt.UTC()
 		d.Versiones = append(d.Versiones, vd)
-		if f.VigenteID.Valid && v.ID == f.VigenteID.Int64 {
-			vigente = v.Numero
-			d.VersionVigente = &VersionVigenteResumen{Numero: v.Numero, OficialVerificada: v.OficialVerificada, PasajesCount: v.PasajesCount}
-			if v.OficialVerificada && v.OficialEntidad != nil && v.OficialNota != nil && v.OficialAt != nil {
-				d.Oficial = &Oficial{EntidadEmisora: *v.OficialEntidad, Nota: *v.OficialNota, MarcadoAt: v.OficialAt.UTC()}
-			}
+		esVigente := f.VigenteID.Valid && v.ID == f.VigenteID.Int64
+		if esVigente && v.OficialVerificada && v.OficialEntidad != nil && v.OficialNota != nil && v.OficialAt != nil {
+			d.Oficial = &Oficial{EntidadEmisora: *v.OficialEntidad, Nota: *v.OficialNota, MarcadoAt: v.OficialAt.UTC()}
 		}
-	}
-	// version_en_proceso: the newest version after the current one that is
-	// not 'lista' (versions are sorted newest first).
-	for _, v := range d.Versiones {
-		if v.Numero <= vigente || v.Estado == VersionLista || v.Estado == versionArchivada {
-			continue
-		}
-		d.VersionEnProceso = &VersionEnProceso{Numero: v.Numero, Estado: v.Estado, MotivoFallo: v.MotivoFallo}
-		break
 	}
 	if d.ContenidosCitantes, err = citantes.ContarPorFuente(ctx, r.db, id); err != nil {
 		return FuenteDetalle{}, fmt.Errorf("citantes de la fuente %d: %w", id, err)
@@ -209,8 +179,6 @@ func (r *Repository) DuplicadoDe(ctx context.Context, sha string) error {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const versionArchivada = "archivada"
 
 func (r *Repository) enTxBloqueada(ctx context.Context, fn func(tx *sqlx.Tx) error) error {
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -277,17 +245,22 @@ func comprobarDuplicado(ctx context.Context, q sqlx.QueryerContext, sha string) 
 	return &DuplicadaError{FuenteID: d.FuenteID, Titulo: d.Titulo, Estado: d.Estado, Version: d.Version}
 }
 
+// sinExcluir is the excluir of comprobarLimite when the fuente does not count yet.
+const sinExcluir int64 = 0
+
 // comprobarLimite checks that one more counted fuente (activa or procesando)
 // with these especialidades (none = all) fits: ≤ 100 per active profession,
 // where a fuente without professions counts for every one, then ≤ 500 in
 // total. The first profession that breaks it, by id, goes in the detail.
-func comprobarLimite(ctx context.Context, tx *sqlx.Tx, especialidades []int64) error {
+// excluir leaves out a fuente that already counts and is being changed (S7),
+// so it is counted once, with its new especialidades.
+func comprobarLimite(ctx context.Context, tx *sqlx.Tx, especialidades []int64, excluir int64) error {
 	if especialidades == nil {
 		especialidades = []int64{}
 	}
 	var llena sql.NullInt64
 	if err := tx.GetContext(ctx, &llena, `
-		WITH contadas AS (SELECT id FROM fuentes WHERE estado IN ('activa', 'procesando')),
+		WITH contadas AS (SELECT id FROM fuentes WHERE estado IN ('activa', 'procesando') AND id <> $3),
 		     sin_esp  AS (SELECT COUNT(*) AS n FROM contadas c
 		                  WHERE NOT EXISTS (SELECT 1 FROM fuente_especialidades fe WHERE fe.fuente_id = c.id))
 		SELECT MIN(e.id) FROM especialidades e
@@ -295,7 +268,7 @@ func comprobarLimite(ctx context.Context, tx *sqlx.Tx, especialidades []int64) e
 		  AND (SELECT n FROM sin_esp)
 		      + (SELECT COUNT(*) FROM fuente_especialidades fe JOIN contadas c ON c.id = fe.fuente_id
 		         WHERE fe.especialidad_id = e.id) + 1 > $2`,
-		pq.Array(especialidades), MaxFuentesPorProfesion); err != nil {
+		pq.Array(especialidades), MaxFuentesPorProfesion, excluir); err != nil {
 		return fmt.Errorf("límite por profesión: %w", err)
 	}
 	if llena.Valid {
@@ -303,13 +276,38 @@ func comprobarLimite(ctx context.Context, tx *sqlx.Tx, especialidades []int64) e
 		return &LimiteError{Limite: MaxFuentesPorProfesion, EspecialidadID: &id}
 	}
 	var total int
-	if err := tx.GetContext(ctx, &total, `SELECT COUNT(*) FROM fuentes WHERE estado IN ('activa', 'procesando')`); err != nil {
+	if err := tx.GetContext(ctx, &total, `SELECT COUNT(*) FROM fuentes WHERE estado IN ('activa', 'procesando') AND id <> $1`, excluir); err != nil {
 		return fmt.Errorf("límite total: %w", err)
 	}
 	if total+1 > MaxFuentesTotal {
 		return &LimiteError{Limite: MaxFuentesTotal}
 	}
 	return nil
+}
+
+// fuenteBloqueada is the fuente as a change sees it, with its row locked.
+type fuenteBloqueada struct {
+	Estado     string        `db:"estado"`
+	VigenteID  sql.NullInt64 `db:"version_vigente_id"`
+	Procesando bool          `db:"procesando"` // some version is 'procesando'
+}
+
+// bloquearParaCambio locks the fuente for an admin change (after the fuentes
+// lock, so the order is advisory → fuente → versions; no admin change locks
+// a 'procesando' version, which is the worker's). ErrNoEncontrado if missing.
+func bloquearParaCambio(ctx context.Context, tx *sqlx.Tx, fuenteID int64) (fuenteBloqueada, error) {
+	var f fuenteBloqueada
+	err := tx.GetContext(ctx, &f, `
+		SELECT estado, version_vigente_id,
+		       EXISTS (SELECT 1 FROM fuente_versiones WHERE fuente_id = f.id AND estado = 'procesando') AS procesando
+		FROM fuentes f WHERE id = $1 FOR UPDATE`, fuenteID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fuenteBloqueada{}, ErrNoEncontrado
+	}
+	if err != nil {
+		return fuenteBloqueada{}, fmt.Errorf("bloquear fuente %d: %w", fuenteID, err)
+	}
+	return f, nil
 }
 
 func especialidadesDe(ctx context.Context, q sqlx.QueryerContext, fuenteID int64) ([]int64, error) {
@@ -372,4 +370,19 @@ func mapearVersion(err error) error {
 		return ErrEstadoInvalido
 	}
 	return err
+}
+
+// BuscarPasajes is the admin search for citing (ADR 0007): the same SQL as
+// PgSource.BuscarPasajes, over every especialidad, with the fuente's title.
+// consulta is already validated.
+func (r *Repository) BuscarPasajes(ctx context.Context, consulta string) ([]PasajeConFuente, error) {
+	filas, err := buscarPasajesActivos(ctx, r.db, consulta, 0, MaxResultados)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]PasajeConFuente, 0, len(filas))
+	for _, f := range filas {
+		res = append(res, PasajeConFuente{Pasaje: f.pasaje(), TituloFuente: f.TituloFuente})
+	}
+	return res, nil
 }
