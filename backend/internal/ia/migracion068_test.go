@@ -2,6 +2,7 @@ package ia_test
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"os"
 	"strings"
@@ -9,7 +10,7 @@ import (
 
 	"github.com/cbaciliod/learning/internal/db/dbtest"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 const migracion068 = "../../migrations/068_create_ia_control_costos.sql"
@@ -147,6 +148,10 @@ func TestMigracion068_UpdatedByNoImpideBorrarAlAdmin(t *testing.T) {
 	}
 }
 
+// sqlstateInsufficientPrivilege is the only CREATE DATABASE failure that skips
+// the test: anything else (a bad name, a dead server) is a real failure.
+const sqlstateInsufficientPrivilege = "42501"
+
 const migracion066 = "../../migrations/066_create_ia_usos.sql"
 
 // baseDesechable068 creates a database of its own on the test server, with the
@@ -167,7 +172,11 @@ func baseDesechable068(t *testing.T) *sqlx.DB {
 	}
 	t.Cleanup(func() { _ = admin.Close() })
 	if _, err := admin.Exec(`CREATE DATABASE ` + nombre); err != nil {
-		t.Skipf("cannot create a disposable database (%v)", err)
+		var pgErr *pq.Error
+		if errors.As(err, &pgErr) && pgErr.Code == sqlstateInsufficientPrivilege {
+			t.Skipf("the test user cannot create databases (%v)", err)
+		}
+		t.Fatalf("create database %s: %v", nombre, err)
 	}
 	t.Cleanup(func() {
 		if _, err := admin.Exec(`DROP DATABASE IF EXISTS ` + nombre + ` WITH (FORCE)`); err != nil {
