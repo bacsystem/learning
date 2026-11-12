@@ -7,6 +7,7 @@ import {
   type RespuestaRow,
   type TipoPregunta,
 } from "../../_componentes/editor-pregunta";
+import { PillEstadoPregunta } from "../../_componentes/estado-pregunta";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -18,6 +19,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, Especialidad, Grado, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
 import { CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { Etiqueta, Pregunta, questionsApi, UpdatePreguntaPayload } from "@/lib/questions/api";
+import { claveErrorPregunta, editarContenidoLaRetira } from "@/lib/questions/estados";
 
 /** Renumbers orden after a move/removal; ids stay attached to their text. */
 const renumber = (rows: RespuestaRow[]) => rows.map((r, i) => ({ ...r, orden: i + 1 }));
@@ -226,6 +228,12 @@ export default function EditPreguntaPage() {
       router.push("/admin/preguntas");
     } catch (e: unknown) {
       const err = e as { message?: string; status?: number };
+      const clave = claveErrorPregunta(e);
+      if (clave) {
+        setError(t(clave));
+        setSubmitting(false);
+        return;
+      }
       // The backend sends a specific message for every 409 (alternative with
       // attempts, duplicated statement…) and 400 (invalid subject/tags). The
       // key change on a question that already graded attempts (H133) gets its
@@ -278,7 +286,15 @@ export default function EditPreguntaPage() {
           proceso: pregunta.proceso,
           b: (c) => <strong className="text-foreground font-semibold">{c}</strong>,
         })}
+        acciones={<PillEstadoPregunta estado={pregunta.estado} />}
       />
+
+      {editarContenidoLaRetira(pregunta.estado) ? (
+        <Alerta tono="aviso" titulo={t("admin-preguntas-aviso-edicion-titulo")}>
+          {t("admin-preguntas-aviso-edicion-texto")}
+          {pregunta.origen === "balotario" ? ` ${t("admin-preguntas-aviso-clave-oficial")}` : null}
+        </Alerta>
+      ) : null}
 
       <EditorPregunta
         proceso={{ modo: "fijo", nombre: pregunta.proceso }}
