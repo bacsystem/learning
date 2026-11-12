@@ -98,7 +98,7 @@ type Problema struct {
 
 ### 2.4 Motivos de «con problemas» (D2; regla 4)
 
-Lista cerrada. Se informan **todos** los que aplican, en este orden. La única excepción explícita (E3-01 regla 10) es que no se informa `sin_clave` junto a `etiquetas_ambiguas` cuando la pregunta tiene una marca en su rango. Ninguna pregunta se descarta en silencio.
+Lista cerrada. Se informan **todos** los que aplican, en este orden. La única excepción explícita (E3-01 regla 10) es que no se informa `sin_clave` junto a `etiquetas_ambiguas` cuando la pregunta tiene una marca en las alternativas de su rango. Ninguna pregunta se descarta en silencio.
 
 | Motivo | Condición |
 |---|---|
@@ -111,7 +111,7 @@ Lista cerrada. Se informan **todos** los que aplican, en este orden. La única e
 | `alternativa_vacia` | Una etiqueta sin texto, por ejemplo «B)» sola (P-B7; E3-01 regla 10) |
 | `alternativa_larga` | Una alternativa tiene más de **500** runes (`respuestas.texto VARCHAR(500)`, `015_create_respuestas.sql:5`) |
 | `alternativas_duplicadas` | Dos alternativas tienen el mismo texto plegado (`texto.Plegar`) |
-| `sin_clave` | No hay **ninguna marca válida** (`<mark>…</mark>` bien emparejada, §2.3) en las **alternativas** del rango (desde la línea de la primera alternativa hasta el final del rango, incluidas las líneas ambiguas). Una marca en el enunciado no cuenta como clave (§2.3). Si el rango sí tiene una marca, pero la pregunta es ambigua y la marca quedó en una línea que no abrió alternativa, el único motivo es `etiquetas_ambiguas`, sin `sin_clave`: el archivo sí tiene la clave, y decir que falta confundiría al admin (H5 del review 3 del #193) |
+| `sin_clave` | No hay **ninguna marca válida** (`<mark>…</mark>` bien emparejada, §2.3) en las **alternativas** del rango (desde la línea de la primera alternativa hasta el final del rango, incluidas las líneas ambiguas). Una marca en el enunciado no cuenta como clave (§2.3). Si las alternativas sí tienen una marca, pero la pregunta es ambigua y la marca quedó en una línea que no abrió alternativa, el único motivo es `etiquetas_ambiguas`, sin `sin_clave`: el archivo sí tiene la clave, y decir que falta confundiría al admin (H5 del review 3 del #193) |
 
 - **Tipo** (regla 3): 1 marca da `unica` y 2 o más dan `multiple`. Cumple `ValidateRespuestas` (`questions/validation.go:12-38`).
 - **Límite (D3):** si el total de bloques detectados (válidos + con problemas) supera **1 000**, se devuelve `ErrLimitePreguntas` y ningún resultado.
