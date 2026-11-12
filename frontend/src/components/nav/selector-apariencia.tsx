@@ -101,7 +101,15 @@ function GrupoMuestras({
 }
 
 /** Muestras de las paletas (acento, acento 2 y acento 3 en un círculo). No pinta nada sin `AparienciaProvider`. */
-export function SelectorPaleta({ className, grande }: { className?: string; grande?: boolean }) {
+export function SelectorPaleta({
+  className,
+  grande,
+  etiqueta = "Paleta de color",
+}: {
+  className?: string;
+  grande?: boolean;
+  etiqueta?: string;
+}) {
   const { paleta, setPaleta, paletas } = useApariencia();
   if (paletas.length < 2) return null;
   const opciones = paletas.map((p) => ({
@@ -114,7 +122,7 @@ export function SelectorPaleta({ className, grande }: { className?: string; gran
       <GrupoMuestras
         grande={grande}
         forma="circulo"
-        etiqueta="Paleta de color"
+        etiqueta={etiqueta}
         opciones={opciones}
         valor={paleta}
         onCambio={setPaleta}
@@ -127,7 +135,15 @@ export function SelectorPaleta({ className, grande }: { className?: string; gran
  * Muestras de los tonos del modo oscuro: lienzo, tarjeta y acento de la paleta en diagonal, para que se distingan (tres
  * círculos casi negros no se diferenciaban). Se puede elegir estando en claro: se aplica al pasar a oscuro.
  */
-export function SelectorTonoOscuro({ className, grande }: { className?: string; grande?: boolean }) {
+export function SelectorTonoOscuro({
+  className,
+  grande,
+  etiqueta = "Tono del modo oscuro",
+}: {
+  className?: string;
+  grande?: boolean;
+  etiqueta?: string;
+}) {
   const { tonoOscuro, setTonoOscuro, tonosOscuro } = useApariencia();
   if (tonosOscuro.length < 2) return null;
   const opciones = tonosOscuro.map((t) => ({
@@ -142,7 +158,7 @@ export function SelectorTonoOscuro({ className, grande }: { className?: string; 
       <GrupoMuestras
         grande={grande}
         forma="tarjeta"
-        etiqueta="Tono del modo oscuro"
+        etiqueta={etiqueta}
         opciones={opciones}
         valor={tonoOscuro}
         onCambio={setTonoOscuro}
@@ -152,7 +168,15 @@ export function SelectorTonoOscuro({ className, grande }: { className?: string; 
 }
 
 /** Tipografías de interfaz: un «Aa» dibujado en cada fuente. Los datos siguen en JetBrains Mono. */
-export function SelectorTipografia({ className, grande }: { className?: string; grande?: boolean }) {
+export function SelectorTipografia({
+  className,
+  grande,
+  etiqueta = "Tipografía",
+}: {
+  className?: string;
+  grande?: boolean;
+  etiqueta?: string;
+}) {
   const { fuente, setFuente, fuentes } = useApariencia();
   if (fuentes.length < 2) return null;
   const opciones = fuentes.map((f) => ({
@@ -166,7 +190,7 @@ export function SelectorTipografia({ className, grande }: { className?: string; 
       <GrupoMuestras
         grande={grande}
         forma="texto"
-        etiqueta="Tipografía"
+        etiqueta={etiqueta}
         opciones={opciones}
         valor={fuente}
         onCambio={setFuente}

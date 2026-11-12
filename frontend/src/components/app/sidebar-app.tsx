@@ -7,6 +7,7 @@ import { useState } from "react";
 import { AcercaDe } from "@/components/app/acerca-de";
 import { MarcaSidebar } from "@/components/app/marca";
 import { ICONO_PERFIL, NAVEGACION } from "@/components/app/navegacion";
+import { useTextosMenuUsuario } from "@/components/app/use-textos-khipu";
 import { MenuUsuario } from "@/components/nav/menu-usuario";
 import { SidebarContent } from "@/components/nav/sidebar";
 import type { GrupoNav } from "@/components/nav/sidebar-nav";
@@ -16,6 +17,7 @@ import { InfoIcon } from "@phosphor-icons/react";
 /** Sidebar de la app: grupos de NAVEGACION traducidos y filtrados por rol, y el menú de usuario al pie. */
 export function SidebarApp() {
   const t = useTranslations("dashboard");
+  const textos = useTextosMenuUsuario();
   const { user, logout } = useAuth();
   const router = useRouter();
   const [acercaDe, setAcercaDe] = useState(false);
@@ -43,6 +45,7 @@ export function SidebarApp() {
                 { label: t("acerca-de"), icon: InfoIcon, onClick: () => setAcercaDe(true) },
               ]}
               textoCerrarSesion={t("user-sign-out")}
+              textos={textos}
               mostrarApariencia
               onCerrarSesion={async () => {
                 await logout();
