@@ -11,7 +11,7 @@ ejemplo, `SMTP_PORT` vale 0 en el código y 587 en compose.
 
 > Cruzado con la plantilla `env.example` de la raíz (11-11-2026): están todas las
 > variables de `docker-compose.yml`, con valores por defecto coherentes.
-> `ANTIFRAUD_HMAC_KEY` no figura porque todavía no está implementada.
+> `ANTIFRAUD_HMAC_KEY` (ADR 0002, D2 de E6-02) ya figura en la plantilla y en compose.
 
 En producción (Railway) cada variable se carga como variable de servicio, y
 los secretos van sellados. Ver [railway.md](railway.md) §5. Los secretos van **solo** en el gestor de secretos del entorno. Nunca en el
@@ -88,7 +88,8 @@ Las migraciones corren **en cada arranque** del contenedor, antes del servidor
 
 | Variable | Estado |
 |---|---|
-| `ANTIFRAUD_HMAC_KEY`, `ANTIFRAUD_HMAC_KEY_PREVIOUS` | Las define el [ADR 0002](../adr/0002-secreto-hmac-contadores-antifraude.md): secreto obligatorio en todos los entornos, 64 caracteres hex, distinto de `ENCRYPTION_KEY` y de `JWT_SECRET`. **No hay código que la lea en `develop`** ni en ninguna rama. Cuando llegue el PR que la implementa, devops agrega en el mismo cambio: `ANTIFRAUD_HMAC_KEY: ${ANTIFRAUD_HMAC_KEY:?…}` en compose, su generación en `make compose/init`, la línea en `env.example` y esta tabla. Si compose la exige antes de que `compose/init` la genere, `make compose/up` se rompe |
+| `ANTIFRAUD_HMAC_KEY` | Clave HMAC de los contadores antifraude ([ADR 0002](../adr/0002-secreto-hmac-contadores-antifraude.md)): 64 caracteres hex, distinta de `ENCRYPTION_KEY` y de `JWT_SECRET` | — / obligatoria en compose (`make compose/init` la genera) / Railway: sellada | **Sí** | Compose no arranca (`ANTIFRAUD_HMAC_KEY es obligatorio`); `make compose/up` avisa antes. `config.Load` la exige en todos los entornos (K1 de E6-02) |
+| `ANTIFRAUD_HMAC_KEY_PREVIOUS` | Clave anterior, solo lectura, durante una rotación (31 días) | — / vacía / solo en rotación (sellada) | **Sí** | Vacía = sin rotación en curso |
 
 ## Frontend (Next.js)
 

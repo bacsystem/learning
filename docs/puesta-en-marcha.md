@@ -31,17 +31,24 @@ requiere ninguna acción.
 make compose/init     # crea .env desde env.example
 ```
 
-`make compose/init` no pisa un `.env` existente. Genera `JWT_SECRET` y
-`POSTGRES_PASSWORD` aleatorios y toma `ENCRYPTION_KEY` de `backend/.env` si es
+`make compose/init` no pisa un `.env` existente. Genera `JWT_SECRET`,
+`POSTGRES_PASSWORD` y `ANTIFRAUD_HMAC_KEY` aleatorios y toma `ENCRYPTION_KEY` de `backend/.env` si es
 válida (para que los datos cifrados sean compatibles) o genera una nueva. Sin
 `make`: `cp env.example .env` y completar los obligatorios (`JWT_SECRET`,
-`ENCRYPTION_KEY`, `POSTGRES_PASSWORD`); `docker compose` falla si falta alguno.
+`ENCRYPTION_KEY`, `ANTIFRAUD_HMAC_KEY`, `POSTGRES_PASSWORD`); `docker compose` falla si falta alguno.
 
 `POSTGRES_PASSWORD` no tiene valor por defecto. Postgres solo lo aplica al
 **crear** el volumen `pgdata`: un volumen existente conserva la contraseña con
 la que se creó. Para cambiarla, `make compose/reset` (borra los datos) o
 `ALTER USER learning PASSWORD '...'` desde `make compose/psql`, y después
 actualizar `.env`.
+
+**Si ya tenías un `.env`** (creado antes de `ANTIFRAUD_HMAC_KEY`), `make
+compose/up` se detiene con un mensaje claro. Añade la clave a mano:
+
+```bash
+echo "ANTIFRAUD_HMAC_KEY=$(openssl rand -hex 32)" >> .env
+```
 
 Los puertos (Postgres `5433`, backend `8080`, frontend `3000`; configurables con
 `DB_PORT`, `BACKEND_PORT`, `FRONTEND_PORT`) se publican solo en `127.0.0.1`.
@@ -69,6 +76,7 @@ Variables que el backend valida al arrancar:
 | `DATABASE_URL` | obligatoria (en compose se arma con `POSTGRES_*`) |
 | `JWT_SECRET` | obligatoria, al menos 32 bytes |
 | `ENCRYPTION_KEY` | obligatoria, 64 caracteres hex (AES-256-GCM y HMAC de DNI/email). **No se puede cambiar después de cargar personas**: los datos cifrados y los HMAC dependen de ella |
+| `ANTIFRAUD_HMAC_KEY` | obligatoria en **todos** los entornos, 64 caracteres hex ([ADR 0002](adr/0002-secreto-hmac-contadores-antifraude.md)). Distinta de `ENCRYPTION_KEY` y de `JWT_SECRET`: **no copies** `ENCRYPTION_KEY` aquí. Cambiarla sin rotar pierde los contadores de cuota y de espera (no hay datos personales). Rotación: mover el valor vigente a `ANTIFRAUD_HMAC_KEY_PREVIOUS`, poner uno nuevo (`openssl rand -hex 32`) y reiniciar; a los 31 días vaciar `ANTIFRAUD_HMAC_KEY_PREVIOUS` |
 | `CORS_ORIGINS` | obligatoria salvo con `ENV=development` o `ENV=test` (un `ENV` vacío o mal escrito también la exige) |
 | `FRONTEND_BASE_URL` | URL válida; se usa en los enlaces de los correos. Obligatoria salvo con `ENV=development`/`test` (allí, vacía, usa `http://localhost:3000`), igual que `CORS_ORIGINS`, `SMTP_HOST`, `SMTP_PORT` y `SMTP_FROM` |
 | `TRUSTED_PROXIES` | CIDRs de los proxies de confianza; sin ella se ignora `X-Forwarded-For` |

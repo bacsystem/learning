@@ -45,7 +45,7 @@ aprovisionamiento.
 - **Variables selladas.** Una variable sellada no se ve en el panel, no se lee
   por la API y no se puede «des-sellar».
   ([variables](https://docs.railway.com/guides/variables))
-  - Antes de sellar `ENCRYPTION_KEY`, `JWT_SECRET` o (cuando exista)
+  - Antes de sellar `ENCRYPTION_KEY`, `JWT_SECRET` o
     `ANTIFRAUD_HMAC_KEY`, se guarda una copia en el gestor de secretos del
     equipo. Si no, perder el proyecto de Railway hace irrecuperables los datos
     cifrados.
@@ -152,7 +152,7 @@ En Railway se cargan como **variables de servicio**. Los secretos van
 | Servicio | Variable | Valor en Railway |
 |---|---|---|
 | backend | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}?sslmode=require`: la URL privada, por referencia. Con H-5 (backend-dev-2), el backend exigirá un `sslmode` explícito en producción. Comprobar que la URL de referencia no traiga ya parámetros (si trae `?`, hay que agregar `&sslmode=require`) |
-| backend | `JWT_SECRET`, `ENCRYPTION_KEY`, `ANTIFRAUD_HMAC_KEY` (cuando exista) | Sellados. Se generan con `openssl rand -hex 32` y nunca se pegan en mensajes ni en el PR. **El usuario** guarda una copia de `ENCRYPTION_KEY` fuera de Railway antes de sellarla |
+| backend | `JWT_SECRET`, `ENCRYPTION_KEY`, `ANTIFRAUD_HMAC_KEY` (y `ANTIFRAUD_HMAC_KEY_PREVIOUS` solo en una rotación) | Sellados. Se generan con `openssl rand -hex 32` y nunca se pegan en mensajes ni en el PR. **El usuario** guarda una copia de `ENCRYPTION_KEY` fuera de Railway antes de sellarla |
 | backend | `ENV` | `production` |
 | backend | `CORS_ORIGINS`, `FRONTEND_BASE_URL` | El dominio público del frontend |
 | backend | `TRUSTED_PROXIES` | El rango del proxy de Railway, sin confirmar: la documentación consultada no lo publica. Mientras no se confirme, el rate limit y la auditoría ven la IP del proxy. **Pendiente**, ver H-3 |
