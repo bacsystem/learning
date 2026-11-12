@@ -456,4 +456,7 @@ func TestConfigurar_VolverAUnPresupuestoYaAvisado(t *testing.T) {
 	if err := s.db.Get(&marca, `SELECT alerta_80_presupuesto_usd::float8 FROM ia_gasto_mes`); err != nil || marca == nil || *marca != 40 {
 		t.Errorf("mark after a PUT without budget change = %v (%v), want 40", marca, err)
 	}
+	if n := len(alertas(t, s.db)); n != 2 {
+		t.Errorf("%d alerts after a PUT without budget change, want still 2 (a duplicate would be sent if the mark were cleared)", n)
+	}
 }
