@@ -1497,7 +1497,8 @@
           "fallida": "Version {numero, number} failed"
         },
         "oficial": {
-          "insignia": "Officially verified"
+          "insignia": "Officially verified",
+          "insigniaEntidad": "Officially verified · {entidad}"
         },
         "col": {
           "titulo": "Title",
@@ -1743,7 +1744,6 @@
         "errorCarga": "The question bank could not be analysed.",
         "recargar": "Analyse again",
         "version": "Version {numero}",
-        "oficial": "Verified official · {entidad}",
         "noOficial": "Not official",
         "rutaRevision": {
           "titulo": "Review route",

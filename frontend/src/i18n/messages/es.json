@@ -1497,7 +1497,8 @@
           "fallida": "La versión {numero, number} falló"
         },
         "oficial": {
-          "insignia": "Oficial verificada"
+          "insignia": "Oficial verificada",
+          "insigniaEntidad": "Oficial verificada · {entidad}"
         },
         "col": {
           "titulo": "Título",
@@ -1743,7 +1744,6 @@
         "errorCarga": "No se pudo analizar el balotario.",
         "recargar": "Volver a analizar",
         "version": "Versión {numero}",
-        "oficial": "Oficial verificada · {entidad}",
         "noOficial": "No oficial",
         "rutaRevision": {
           "titulo": "Ruta de revisión",
