@@ -99,6 +99,14 @@ func TestClaveCache(t *testing.T) {
 	if a, b := claveCache(Solicitud{Datos: []Bloque{{Etiqueta: "a", Texto: "bc"}}}), claveCache(Solicitud{Datos: []Bloque{{Etiqueta: "ab", Texto: "c"}}}); a == b {
 		t.Error("label and text can be shifted without changing the key")
 	}
+	// Where one block ends and the next begins matters: the same characters
+	// split in another way are another request (a join without a separator
+	// between blocks would make these two equal).
+	partido1 := Solicitud{Datos: []Bloque{{Etiqueta: "x", Texto: "yz"}, {Etiqueta: "w", Texto: "q"}}}
+	partido2 := Solicitud{Datos: []Bloque{{Etiqueta: "x", Texto: "y"}, {Etiqueta: "zw", Texto: "q"}}}
+	if claveCache(partido1) == claveCache(partido2) {
+		t.Error("the boundary between two blocks does not change the key")
+	}
 	if len(claveCache(base)) != 64 {
 		t.Errorf("key length = %d, want 64 hex", len(claveCache(base)))
 	}
