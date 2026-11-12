@@ -580,7 +580,6 @@
     "admin-preguntas-limpiar-filtros": "Clear filters",
     "admin-preguntas-acciones": "Actions",
     "admin-preguntas-acciones-de": "Actions for question {id}",
-    "admin-preguntas-sin-resultados-filtros": "No questions match the selected filters.",
     "admin-preguntas-vacio": "There are no questions in the bank yet. Create the first one with “New question” or import them from a CSV.",
     "admin-preguntas-unidad": "questions in the bank",
     "admin-preguntas-eliminar-titulo": "Delete question",
@@ -1320,6 +1319,9 @@
         "error_interno": "Internal server error. Please try again.",
         "cuerpo_demasiado_grande": "The data sent is too large. Shorten the text and try again.",
         "clave_oficial": "The official answer key of a past-exam question cannot be changed.",
+        "fuente_no_activa": "One of the sources is no longer active. Review the citations and try again.",
+        "limite_citas": "A question allows at most {maximo} citations. Remove one to add another.",
+        "ultima_cita_activa": "You cannot remove the last active citation of an approved question. Add another citation before removing this one.",
         "generico": "The operation could not be completed. Try again."
       },
       "pesos": {
@@ -1633,6 +1635,60 @@
         "activo": "Active (legacy)",
         "eliminada": "Deleted"
       },
+      "revision": {
+        "listado": {
+          "columnaOrigen": "Origin",
+          "columnaCitas": "Citations",
+          "filtroOrigenTodos": "Origin: all",
+          "origenes": {
+            "manual": "Manual",
+            "balotario": "Past exam",
+            "ia": "AI"
+          },
+          "vacio": "No questions match that filter",
+          "verDetalle": "View citations"
+        },
+        "citas": {
+          "tituloPagina": "Citations of question #{id}",
+          "volver": "Questions",
+          "enunciado": "Statement",
+          "titulo": "Current citations",
+          "contador": "{n, plural, one {# citation} other {# citations}} of {maximo}",
+          "vacio": "This question has no citations yet.",
+          "cargando": "Loading the question…",
+          "errorCarga": "The question could not be loaded.",
+          "noEncontrada": "The question does not exist or was deleted.",
+          "version": "Version {n}",
+          "lineas": "Lines {inicio}–{fin}",
+          "seccion": "Section: {seccion}",
+          "fuenteRetirada": "Source withdrawn",
+          "fuenteActiva": "Active source",
+          "verTexto": "View the full passage",
+          "quitar": "Remove citation",
+          "quitarDe": "Remove the citation from “{fuente}”",
+          "guardando": "Saving citations…",
+          "guardadas": "Citations updated.",
+          "acciones": {
+            "titulo": "Review",
+            "motivoRechazo": "Rejection reason"
+          },
+          "buscador": {
+            "titulo": "Search passages",
+            "etiqueta": "Search the active sources",
+            "placeholder": "E.g.: arterial hypertension",
+            "ayuda": "Type between {min} and {max} characters.",
+            "buscar": "Search",
+            "buscando": "Searching…",
+            "sinResultados": "No results",
+            "errorBusqueda": "The search failed. Try again.",
+            "resultados": "{n, plural, one {# result} other {# results}}",
+            "anadir": "Add citation",
+            "anadirDe": "Add the citation from “{fuente}”",
+            "yaCitado": "Already cited",
+            "limiteAlcanzado": "The maximum number of citations was reached."
+          }
+        }
+      },
       "preguntas": {
         "errores": {
           "estado_invalido": "This question changed state; the view was refreshed."
@@ -1702,12 +1758,6 @@
         "correcta": "Successful",
         "fallida": "Failed"
       }
-    },
-    "admin-preguntas-origen": "Origin",
-    "admin-preguntas-origen-manual": "Manual",
-    "admin-preguntas-origen-balotario": "Question bank",
-    "admin-preguntas-origen-ia": "AI",
-    "admin-preguntas-filtro-origen-todos": "Origin: all",
-    "admin-preguntas-citas": "Citations"
+    }
   }
 }

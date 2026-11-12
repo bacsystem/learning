@@ -580,7 +580,6 @@
     "admin-preguntas-limpiar-filtros": "Limpiar filtros",
     "admin-preguntas-acciones": "Acciones",
     "admin-preguntas-acciones-de": "Acciones de la pregunta {id}",
-    "admin-preguntas-sin-resultados-filtros": "No hay preguntas con los filtros seleccionados.",
     "admin-preguntas-vacio": "Todavía no hay preguntas en el banco. Crea la primera con «Nueva pregunta» o impórtalas desde un CSV.",
     "admin-preguntas-unidad": "preguntas en el banco",
     "admin-preguntas-eliminar-titulo": "Eliminar pregunta",
@@ -1320,6 +1319,9 @@
         "error_interno": "Error interno del servidor. Inténtalo de nuevo.",
         "cuerpo_demasiado_grande": "Los datos enviados son demasiado grandes. Reduce el texto e inténtalo de nuevo.",
         "clave_oficial": "La clave oficial de una pregunta de balotario no se puede cambiar.",
+        "fuente_no_activa": "Una de las fuentes ya no está activa. Revisa las citas y vuelve a intentarlo.",
+        "limite_citas": "Una pregunta admite como máximo {maximo} citas. Quita alguna para añadir otra.",
+        "ultima_cita_activa": "No puedes quitar la última cita activa de una pregunta aprobada. Añade otra cita antes de quitar esta.",
         "generico": "No se pudo completar la operación. Inténtalo de nuevo."
       },
       "pesos": {
@@ -1633,6 +1635,60 @@
         "activo": "Activa (heredada)",
         "eliminada": "Eliminada"
       },
+      "revision": {
+        "listado": {
+          "columnaOrigen": "Origen",
+          "columnaCitas": "Citas",
+          "filtroOrigenTodos": "Origen: todos",
+          "origenes": {
+            "manual": "Manual",
+            "balotario": "Balotario",
+            "ia": "IA"
+          },
+          "vacio": "No hay preguntas con ese filtro",
+          "verDetalle": "Ver citas"
+        },
+        "citas": {
+          "tituloPagina": "Citas de la pregunta #{id}",
+          "volver": "Preguntas",
+          "enunciado": "Enunciado",
+          "titulo": "Citas actuales",
+          "contador": "{n, plural, one {# cita} other {# citas}} de {maximo}",
+          "vacio": "Esta pregunta aún no tiene citas.",
+          "cargando": "Cargando la pregunta…",
+          "errorCarga": "No se pudo cargar la pregunta.",
+          "noEncontrada": "La pregunta no existe o fue eliminada.",
+          "version": "Versión {n}",
+          "lineas": "Líneas {inicio}–{fin}",
+          "seccion": "Sección: {seccion}",
+          "fuenteRetirada": "Fuente retirada",
+          "fuenteActiva": "Fuente activa",
+          "verTexto": "Ver el pasaje completo",
+          "quitar": "Quitar cita",
+          "quitarDe": "Quitar la cita de «{fuente}»",
+          "guardando": "Guardando citas…",
+          "guardadas": "Citas actualizadas.",
+          "acciones": {
+            "titulo": "Revisión",
+            "motivoRechazo": "Motivo del rechazo"
+          },
+          "buscador": {
+            "titulo": "Buscar pasajes",
+            "etiqueta": "Buscar en las fuentes activas",
+            "placeholder": "Ej.: hipertensión arterial",
+            "ayuda": "Escribe entre {min} y {max} caracteres.",
+            "buscar": "Buscar",
+            "buscando": "Buscando…",
+            "sinResultados": "Sin resultados",
+            "errorBusqueda": "No se pudo buscar. Inténtalo de nuevo.",
+            "resultados": "{n, plural, one {# resultado} other {# resultados}}",
+            "anadir": "Añadir cita",
+            "anadirDe": "Añadir la cita de «{fuente}»",
+            "yaCitado": "Ya citado",
+            "limiteAlcanzado": "Se alcanzó el máximo de citas."
+          }
+        }
+      },
       "preguntas": {
         "errores": {
           "estado_invalido": "Esta pregunta cambió de estado; se actualizó la vista."
@@ -1702,12 +1758,6 @@
         "correcta": "Correcta",
         "fallida": "Fallida"
       }
-    },
-    "admin-preguntas-origen": "Origen",
-    "admin-preguntas-origen-manual": "Manual",
-    "admin-preguntas-origen-balotario": "Balotario",
-    "admin-preguntas-origen-ia": "IA",
-    "admin-preguntas-filtro-origen-todos": "Origen: todos",
-    "admin-preguntas-citas": "Citas"
+    }
   }
 }
