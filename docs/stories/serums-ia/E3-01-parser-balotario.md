@@ -138,6 +138,11 @@ Escenario: Marca sin cerrar
   Cuando se parsea
   Entonces se lista como "con problemas" con motivo "sin_clave"
 
+Escenario: Nombre científico con inicial en el enunciado
+  Dado el enunciado "¿Cuál es el tratamiento de la infección por" seguido de la línea "E. coli enterohemorrágica?" y luego las alternativas A–D
+  Cuando se parsea
+  Entonces "E. coli enterohemorrágica?" sigue siendo parte del enunciado y la pregunta tiene 4 alternativas A–D
+
 Escenario: Etiquetas uniformes con letra
   Dado una pregunta con alternativas "a.", "b.", "c." y "d.", una por línea
   Cuando se parsea
