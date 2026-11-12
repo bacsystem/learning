@@ -231,3 +231,56 @@ func TestT8_ListarPorTema(t *testing.T) {
 		t.Errorf("tema_id=abc: %d, want 400", w.Code)
 	}
 }
+
+// #185: every item of the list carries the ids of its proceso, asignatura,
+// grado and especialidad (the table has them), not zeros.
+func TestListarPreguntas_ItemsTraenSusIDs(t *testing.T) {
+	f, mux := newMux(t, qt.Options{Asignaturas: []qt.AsignaturaSpec{{NumeroPreguntas: 2, Peso: 100, Unicas: 3}}})
+	admin := f.Token(t, f.UsuarioID, "admin")
+	w := qt.Do(mux, "GET", fmt.Sprintf("/preguntas?proceso_id=%d", f.ProcesoID), admin, "")
+	var list struct {
+		Data []struct {
+			ID             int64  `json:"id"`
+			ProcesoID      int64  `json:"proceso_id"`
+			AsignaturaID   int64  `json:"asignatura_id"`
+			GradoID        *int64 `json:"grado_id"`
+			EspecialidadID *int64 `json:"especialidad_id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &list); err != nil || w.Code != http.StatusOK || len(list.Data) == 0 {
+		t.Fatalf("list: %d %s (%v)", w.Code, w.Body, err)
+	}
+	for _, it := range list.Data {
+		var want struct {
+			ProcesoID, AsignaturaID int64
+			GradoID, EspecialidadID *int64
+		}
+		if err := f.DB.QueryRow(`SELECT proceso_id, asignatura_id, grado_id, especialidad_id FROM preguntas WHERE id = $1`, it.ID).
+			Scan(&want.ProcesoID, &want.AsignaturaID, &want.GradoID, &want.EspecialidadID); err != nil {
+			t.Fatal(err)
+		}
+		if it.ProcesoID == 0 || it.AsignaturaID == 0 || it.ProcesoID != want.ProcesoID || it.AsignaturaID != want.AsignaturaID {
+			t.Errorf("question %d: proceso_id %d, asignatura_id %d; want %d and %d", it.ID, it.ProcesoID, it.AsignaturaID, want.ProcesoID, want.AsignaturaID)
+		}
+		if (it.GradoID == nil) != (want.GradoID == nil) || (it.GradoID != nil && *it.GradoID != *want.GradoID) ||
+			(it.EspecialidadID == nil) != (want.EspecialidadID == nil) || (it.EspecialidadID != nil && *it.EspecialidadID != *want.EspecialidadID) {
+			t.Errorf("question %d: grado_id %v, especialidad_id %v; want %v and %v", it.ID, it.GradoID, it.EspecialidadID, want.GradoID, want.EspecialidadID)
+		}
+	}
+	// With a grado and an especialidad set, the list shows them.
+	var grado, esp int64
+	if err := f.DB.QueryRow(`SELECT id FROM grados LIMIT 1`).Scan(&grado); err != nil {
+		t.Skip("no grado in the fixture catalog")
+	}
+	if err := f.DB.QueryRow(`SELECT id FROM especialidades LIMIT 1`).Scan(&esp); err != nil {
+		t.Skip("no especialidad in the fixture catalog")
+	}
+	if _, err := f.DB.Exec(`UPDATE preguntas SET grado_id = $1, especialidad_id = $2 WHERE id = $3`, grado, esp, list.Data[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	w = qt.Do(mux, "GET", fmt.Sprintf("/preguntas?proceso_id=%d&grado_id=%d", f.ProcesoID, grado), admin, "")
+	if err := json.Unmarshal(w.Body.Bytes(), &list); err != nil || len(list.Data) == 0 ||
+		list.Data[0].GradoID == nil || *list.Data[0].GradoID != grado || list.Data[0].EspecialidadID == nil || *list.Data[0].EspecialidadID != esp {
+		t.Errorf("filtered list = %+v (%v), want grado %d and especialidad %d", list.Data, err, grado, esp)
+	}
+}
