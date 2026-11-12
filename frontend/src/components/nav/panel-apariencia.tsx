@@ -44,6 +44,8 @@ export type TextosPanelApariencia = {
   paletaColor: string;
   tonoModoOscuro: string;
   tipografiaFuente: string;
+  /** `aria-label` del botón de cerrar el panel. */
+  cerrar: string;
 };
 
 export const TEXTOS_PANEL_APARIENCIA_ES: TextosPanelApariencia = {
@@ -66,6 +68,7 @@ export const TEXTOS_PANEL_APARIENCIA_ES: TextosPanelApariencia = {
   paletaColor: "Paleta de color",
   tonoModoOscuro: "Tono del modo oscuro",
   tipografiaFuente: "Tipografía",
+  cerrar: "Cerrar",
 };
 
 /**
@@ -94,6 +97,7 @@ export function PanelApariencia({
       titulo={textos.aparienciaTitulo}
       descripcion={textos.aparienciaDescripcion}
       ancho="sm:max-w-sm"
+      etiquetaCerrar={textos.cerrar}
     >
       <div className="grid gap-6 pb-4">
         <Seccion titulo={textos.tema}>

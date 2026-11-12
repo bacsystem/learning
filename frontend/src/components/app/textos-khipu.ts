@@ -67,6 +67,7 @@ export function textosMenuUsuario(t: Traductor): TextosMenuUsuario & TextosPanel
     paletaColor: t("menu-usuario-paleta-color"),
     tonoModoOscuro: t("menu-usuario-tono-modo-oscuro"),
     tipografiaFuente: t("menu-usuario-tipografia-fuente"),
+    cerrar: t("menu-usuario-cerrar"),
     temaInterfaz: t("menu-usuario-tema-interfaz"),
     claro: t("menu-usuario-claro"),
     oscuro: t("menu-usuario-oscuro"),
