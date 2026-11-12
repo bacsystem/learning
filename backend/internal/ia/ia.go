@@ -39,12 +39,21 @@ type Actor struct {
 	ID  *int64
 }
 
-// Servicio is what consumers use; every method records one usage row.
+// Servicio is what consumers use. Every operation spends one action of the
+// reservation r (SIA-E6-02) and records one usage row. Reservar, Liberar and
+// Consumo are the quota API of the consumers (contract E6-02 §2.2).
 type Servicio interface {
-	Clasificar(ctx context.Context, a Actor, in EntradaClasificar) (SalidaClasificar, error)
-	GenerarPreguntas(ctx context.Context, a Actor, in EntradaGenerarPreguntas) (SalidaGenerarPreguntas, error)
-	GenerarMaterial(ctx context.Context, a Actor, in EntradaGenerarMaterial) (SalidaGenerarMaterial, error)
-	GenerarExplicacion(ctx context.Context, a Actor, in EntradaGenerarExplicacion) (SalidaGenerarExplicacion, error)
+	Clasificar(ctx context.Context, r *Reserva, in EntradaClasificar) (SalidaClasificar, error)
+	GenerarPreguntas(ctx context.Context, r *Reserva, in EntradaGenerarPreguntas) (SalidaGenerarPreguntas, error)
+	GenerarMaterial(ctx context.Context, r *Reserva, in EntradaGenerarMaterial) (SalidaGenerarMaterial, error)
+	GenerarExplicacion(ctx context.Context, r *Reserva, in EntradaGenerarExplicacion) (SalidaGenerarExplicacion, error)
+
+	// Reservar takes n actions all or nothing (D17), in the order budget,
+	// month, day. Errors: *ErrorPresupuesto, *ErrLimite.
+	Reservar(ctx context.Context, a Actor, n int) (Reserva, error)
+	// Liberar gives n actions back; the consumer releases what it does not use.
+	Liberar(ctx context.Context, r *Reserva, n int) error
+	Consumo(ctx context.Context, a Actor) (Consumo, error)
 }
 
 // Errors of the service (contract §5). Their text is the stable code.
