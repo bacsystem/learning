@@ -1321,7 +1321,7 @@
         "clave_oficial": "La clave oficial de una pregunta de balotario no se puede cambiar.",
         "fuente_no_activa": "Una de las fuentes ya no está activa. Revisa las citas y vuelve a intentarlo.",
         "limite_citas": "Una pregunta admite como máximo {maximo} citas. Quita alguna para añadir otra.",
-        "ultima_cita_activa": "No puedes quitar la última cita activa de una pregunta aprobada. Añade otra antes o rechaza la pregunta.",
+        "ultima_cita_activa": "No puedes quitar la última cita activa de una pregunta aprobada. Añade otra cita antes de quitar esta.",
         "generico": "No se pudo completar la operación. Inténtalo de nuevo."
       },
       "pesos": {

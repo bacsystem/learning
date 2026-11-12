@@ -558,12 +558,12 @@ export default function PreguntasPage() {
                           icon: PencilSimpleIcon,
                           onClick: () => router.push(`/admin/preguntas/${p.id}/edit`),
                         },
-                        // P2 (SIA-E3-02): un borrador o una en revisión se rechazan antes de eliminarse.
                         {
                           label: t("serumsIa.revision.listado.verDetalle"),
                           icon: BookOpenTextIcon,
                           onClick: () => router.push(`/admin/preguntas/${p.id}`),
                         },
+                        // P2 (SIA-E3-02): un borrador o una en revisión se rechazan antes de eliminarse.
                         {
                           label: t("comun-eliminar"),
                           icon: TrashIcon,
