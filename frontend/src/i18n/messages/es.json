@@ -1688,6 +1688,11 @@
             "limiteAlcanzado": "Se alcanzó el máximo de citas."
           }
         }
+      },
+      "preguntas": {
+        "errores": {
+          "estado_invalido": "Esta pregunta cambió de estado; se actualizó la vista."
+        }
       }
     },
     "sesion-servidor-no-disponible-titulo": "El servidor no responde",
