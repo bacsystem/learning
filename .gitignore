@@ -41,10 +41,12 @@ yarn-debug.log*
 yarn-error.log*
 
 # Secrets / env
-/.env
-backend/.env
-frontend/.env
-frontend/.env.production
+# Cualquier .env y sus variantes (.env.local, .env.production, …) en cualquier
+# carpeta. Las plantillas versionadas se llaman env.example (sin punto): no
+# encajan en este patrón. Si alguna vez hace falta versionar un archivo .env.*,
+# se agrega la excepción explícita aquí abajo.
+.env
+.env.*
 *.pem
 
 # Datos locales (balotarios, datos personales, prompts): nunca se versionan.
