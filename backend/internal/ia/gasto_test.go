@@ -152,7 +152,14 @@ func TestSumarGasto_ExactitudYBordes(t *testing.T) {
 	if err := c.SumarGasto(cancelado, 0.5); err != nil {
 		t.Fatalf("SumarGasto with a cancelled ctx: %v", err)
 	}
-	if _, err := db.Exec(`DELETE FROM ia_usos`); err != nil {
+	// The amount does not depend on ia_usos: a usage row of this test is
+	// inserted and deleted (only its own), and the amount stays.
+	var uso int64
+	if err := db.Get(&uso, `INSERT INTO ia_usos (operacion, actor_rol, proveedor, duracion_ms, costo_usd, resultado)
+		VALUES ('clasificar', 'sistema', 'doble', 1, 0.5, 'ok') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DELETE FROM ia_usos WHERE id = $1`, uso); err != nil {
 		t.Fatal(err)
 	}
 	if g := gastado(t, db); g != "1.500000" {
