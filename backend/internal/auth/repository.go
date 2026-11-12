@@ -12,6 +12,7 @@ import (
 
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/crypto"
+	"github.com/cbaciliod/learning/internal/db"
 	internalmw "github.com/cbaciliod/learning/internal/middleware"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -855,9 +856,6 @@ func (r *Repository) FindActiveUserIDsByEmail(ctx context.Context, email string)
 
 // ── Audit Log ─────────────────────────────────────────────────────────────────
 
-// likeEscaper escapes LIKE metacharacters so a prefix matches literally.
-var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
-
 // ClearLimiterCounters deletes the DBLimiter rows (auth_intentos_fallidos)
 // whose key is one of keys or starts with one of prefixes, in every window,
 // and returns how many rows were deleted. Keys/prefixes are full stored keys
@@ -867,7 +865,7 @@ var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 func (r *Repository) ClearLimiterCounters(ctx context.Context, keys, prefixes []string, auditFn func(deleted int64) AuditEntry) (int64, error) {
 	patterns := make([]string, len(prefixes))
 	for i, p := range prefixes {
-		patterns[i] = likeEscaper.Replace(p) + "%"
+		patterns[i] = db.EscapeLike(p) + "%"
 	}
 	var n int64
 	err := r.withAuditTx(ctx, nil, func(tx *sqlx.Tx) error {
