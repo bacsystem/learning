@@ -2028,6 +2028,8 @@
         "fallida": "Failed"
       }
     },
-    "menu-admin-ia": "AI"
+    "menu-admin-ia": "AI",
+    "barra-superior-abrir-menu": "Open menu",
+    "barra-superior-ubicacion": "Location"
   }
 }
