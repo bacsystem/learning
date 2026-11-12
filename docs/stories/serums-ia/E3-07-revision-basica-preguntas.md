@@ -40,7 +40,7 @@ Todas se validan en el servidor, en la transición o en la operación, sea cual 
 4. **Revalidar** (`en_revision` → `aprobada`) por esta vía: cualquier origen, porque una pregunta llega a `en_revision` por fuente retirada, reportes o edición, y no existe otra pantalla para revalidarla en el MVP.
    - Exige lo mismo que aprobar: cita activa y confirmación.
    - Para origen `balotario` o `ia` exige además una **nota de 10–500 caracteres**: 422 `nota_obligatoria`.
-   - Si la pregunta tiene `conflicto_clave` sin resolver (SIA-E3-06), responde 409 `conflicto_clave` por cualquier vía. Ese dato lo crean SIA-E3-01/E3-03; hasta entonces la regla no se activa, sin columna nueva ahora. El código 409 `conflicto_clave` queda reservado en el contrato, y su escenario y su test **se validan con SIA-E3-01/E3-03**, no al cerrar esta historia (decisión del PO).
+   - Si la pregunta tiene `conflicto_clave` sin resolver (SIA-E3-06), responde 409 `conflicto_clave` por cualquier vía. Ese dato lo crea la deduplicación SIA-E3-06 (corrección del PO, 12-nov: el parser y la importación no lo crean); hasta entonces la regla no se activa, sin columna nueva ahora. El código 409 `conflicto_clave` queda reservado en el contrato, y su escenario y su test **se validan con SIA-E3-06**, no al cerrar esta historia (decisión del PO).
    - El área siempre existe (`asignatura_id` es obligatoria) y el tema es opcional en el MVP, así que aprobar y revalidar no exigen tema.
 5. **Rechazar** (`borrador` o `en_revision` → `rechazada`): cualquier origen, con motivo de 5–500 caracteres.
 6. **Reabrir** (`rechazada` → `borrador`): cualquier origen.
@@ -79,7 +79,7 @@ Escenario: Revalidar una de IA sin nota
   Cuando el admin la revalida sin nota
   Entonces recibe 422 "nota_obligatoria"
 
-# Se valida con SIA-E3-01/E3-03; no bloquea el cierre de SIA-E3-07.
+# Se valida con SIA-E3-06; no bloquea el cierre de SIA-E3-07.
 Escenario: Conflicto de clave
   Dado una pregunta "en_revision" con conflicto de clave sin resolver
   Cuando el admin intenta revalidarla
@@ -144,4 +144,4 @@ Solo admin, con 401/403 y `jsonError`. Guardas en el servidor. La búsqueda no e
 Sin texto visible; los códigos de error de citas los traduce SIA-E3-08 y los de transición SIA-E3-09.
 
 ## Definición de terminado
-Tests de API de cada regla y escenario (búsqueda de pasajes, guardas por origen, nota, límite de citas, `ultima_cita_activa` solo en `aprobada`, texto completo de la cita, 403 y 409). El test de conflicto de clave se valida con SIA-E3-01/E3-03. Contrato en `docs/api/` (PR #159). Review limpio.
+Tests de API de cada regla y escenario (búsqueda de pasajes, guardas por origen, nota, límite de citas, `ultima_cita_activa` solo en `aprobada`, texto completo de la cita, 403 y 409). El test de conflicto de clave se valida con SIA-E3-06. Contrato en `docs/api/` (PR #159). Review limpio.
