@@ -89,15 +89,16 @@ func (e *ErrorDatosPersonales) Error() string {
 func (e *ErrorDatosPersonales) Unwrap() error { return ErrDatosPersonales }
 
 // Codigo maps an error of the service to the code (format 2) and the HTTP
-// status a consumer must use to expose it (contract §5); ok is false for an
-// error that is not of the service.
-func Codigo(err error) (codigo string, status int, ok bool) {
+// status a consumer must use to expose it (contract §5). It returns ("", 0)
+// for nil, for ErrCancelado (the consumer caused it) and for an error that is
+// not of the service.
+func Codigo(err error) (codigo string, status int) {
 	for _, m := range mapaErrores {
 		if errors.Is(err, m.err) {
-			return m.err.Error(), m.status, true
+			return m.err.Error(), m.status
 		}
 	}
-	return "", 0, false
+	return "", 0
 }
 
 var mapaErrores = []struct {

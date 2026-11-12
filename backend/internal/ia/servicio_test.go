@@ -226,8 +226,8 @@ func TestServicio_Rechazos(t *testing.T) {
 				t.Fatalf("err %v, want %v", err, c.wantErr)
 			}
 			if c.wantErr != nil {
-				if _, status, ok := Codigo(err); !ok || status != c.wantStatus {
-					t.Errorf("Codigo: %d, %v; want %d", status, ok, c.wantStatus)
+				if _, status := Codigo(err); status != c.wantStatus {
+					t.Errorf("Codigo: status %d, want %d", status, c.wantStatus)
 				}
 			}
 			u := reg.unico(t)
@@ -303,9 +303,6 @@ func TestServicio_FinDelCtxDelConsumidor(t *testing.T) {
 			}
 			if u := reg.unico(t); u.Resultado != tt.wantResultado || u.Intentos != 0 {
 				t.Errorf("usage %+v", u)
-			}
-			if _, _, ok := Codigo(err); ok && tt.wantErr == ErrCancelado {
-				t.Error("ErrCancelado must not map to HTTP")
 			}
 		})
 	}
@@ -450,13 +447,15 @@ func TestCodigo(t *testing.T) {
 		{ErrTimeout, "ia_timeout", 504},
 		{ErrSalidaInvalida, "salida_invalida", 502},
 		{ErrProveedor, "ia_error", 502},
+		{nil, "", 0},
+		{fmt.Errorf("%w: %w", ErrCancelado, context.Canceled), "", 0},
 	}
 	for _, c := range cases {
-		if codigo, status, ok := Codigo(c.err); !ok || codigo != c.codigo || status != c.status {
-			t.Errorf("Codigo(%v) = %q %d %v", c.err, codigo, status, ok)
+		if codigo, status := Codigo(c.err); codigo != c.codigo || status != c.status {
+			t.Errorf("Codigo(%v) = %q %d", c.err, codigo, status)
 		}
 	}
-	if _, _, ok := Codigo(errors.New("otro")); ok {
+	if codigo, status := Codigo(errors.New("otro")); codigo != "" || status != 0 {
 		t.Error("an unrelated error mapped")
 	}
 }
