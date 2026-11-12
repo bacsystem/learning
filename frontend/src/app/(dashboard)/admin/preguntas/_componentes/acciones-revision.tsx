@@ -23,6 +23,7 @@ import {
   NOTA_MAX,
   NOTA_MIN,
   notaObligatoria,
+  notaParaAprobar,
 } from "@/lib/serums-ia/revision/acciones";
 
 /**
@@ -51,7 +52,10 @@ export function AccionesRevision({
   const cuerpoAprobacion = origen ? cuerpoAprobar(origen, verificado, nota) : null;
   const cuerpoRechazo = cuerpoRechazar(motivo);
   const exigeNota = origen !== undefined && acciones.revalidar && notaObligatoria(origen);
-  const notaFaltante = exigeNota && nota.trim() === "";
+  // Vacía o demasiado corta: «Revalidar» queda deshabilitado y el campo dice por qué.
+  const notaInvalida = exigeNota && origen !== undefined && notaParaAprobar(origen, nota) === undefined;
+  const motivoInvalido = motivo.trim() !== "" && !motivoValido(motivo);
+  const ayudaNota = notaInvalida ? "error" : exigeNota ? undefined : "ayuda";
   const hayAlgunaAccion = puedeAprobar || acciones.rechazar || acciones.reabrir || acciones.seRevisaEnCola;
   const t_ = (clave: string, valores?: Record<string, string | number>) =>
     t(`serumsIa.revision.acciones.${clave}`, valores);
@@ -89,17 +93,17 @@ export function AccionesRevision({
               etiqueta={t_("nota")}
               opcional={!exigeNota}
               ayuda={exigeNota ? undefined : t_("notaOpcional", { max: NOTA_MAX })}
-              error={notaFaltante ? t_("notaObligatoria", { min: NOTA_MIN }) : undefined}
+              error={notaInvalida ? t_("notaObligatoria", { min: NOTA_MIN }) : undefined}
             >
               <AreaTexto
                 id={`${id}-nota`}
                 value={nota}
                 maxLength={NOTA_MAX}
                 disabled={ocupado}
-                invalido={notaFaltante}
+                invalido={notaInvalida}
                 required={exigeNota}
                 onChange={(e) => setNota(e.target.value)}
-                aria-describedby={`${id}-nota-${notaFaltante ? "error" : "ayuda"}`}
+                aria-describedby={ayudaNota && `${id}-nota-${ayudaNota}`}
               />
             </Campo>
           ) : null}
@@ -123,14 +127,16 @@ export function AccionesRevision({
             id={`${id}-motivo`}
             etiqueta={t_("motivo")}
             ayuda={t_("motivoAyuda", { min: MOTIVO_MIN, max: MOTIVO_MAX })}
-            error={motivo.trim() !== "" && !motivoValido(motivo) ? t_("motivoMinimo", { min: MOTIVO_MIN }) : undefined}
+            error={motivoInvalido ? t_("motivoMinimo", { min: MOTIVO_MIN }) : undefined}
           >
             <AreaTexto
               id={`${id}-motivo`}
               value={motivo}
               maxLength={MOTIVO_MAX}
               disabled={ocupado}
+              invalido={motivoInvalido}
               onChange={(e) => setMotivo(e.target.value)}
+              aria-describedby={`${id}-motivo-${motivoInvalido ? "error" : "ayuda"}`}
             />
           </Campo>
           <div>
