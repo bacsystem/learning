@@ -10,7 +10,13 @@ export function claveDeError(err: unknown, claves: ClavesDeError): string | null
 }
 
 /** Códigos que cambian de sentido según el recurso: tienen texto propio de cada recurso y uno neutro del módulo. */
-const CODIGOS_COMUNES = new Set(["estado_invalido", "no_encontrado", "validacion", "referencia_invalida"]);
+const CODIGOS_COMUNES = new Set([
+  "estado_invalido",
+  "no_encontrado",
+  "validacion",
+  "referencia_invalida",
+  "limite_preguntas",
+]);
 
 /**
  * Clave i18n de un error del módulo SERUMS IA (docs/api/README.md §8). Orden: `serumsIa.<recurso>.errores.<codigo>`
