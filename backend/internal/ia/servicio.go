@@ -172,6 +172,10 @@ func (s *servicio) Liberar(ctx context.Context, r *Reserva, n int) error {
 	return s.costos.Liberar(ctx, r, n)
 }
 
+func (s *servicio) Configuracion(ctx context.Context) (Configuracion, error) {
+	return s.costos.Configuracion(ctx)
+}
+
 func (s *servicio) Consumo(ctx context.Context, a Actor) (Consumo, error) {
 	return s.costos.Consumo(ctx, a)
 }

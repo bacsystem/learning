@@ -75,6 +75,9 @@ type Costos interface {
 	// Liberar returns n actions to the windows of r and removes them from it.
 	Liberar(ctx context.Context, r *Reserva, n int) error
 	Consumo(ctx context.Context, a Actor) (Consumo, error)
+	// Configuracion is the current limits and budget (the consumers read
+	// max_preguntas_solicitud and lote_clasificacion).
+	Configuracion(ctx context.Context) (Configuracion, error)
 	// ComprobarPresupuesto answers *ErrorPresupuesto when spent ≥ budget.
 	ComprobarPresupuesto(ctx context.Context) error
 	// SumarGasto adds usd to the month's spent amount and evaluates the 80 % alert.
