@@ -13,12 +13,6 @@ const (
 	DefaultMultipartBodyLimit int64 = 20 << 20 // 20 MB ceiling for multipart uploads
 )
 
-const bodyTooLargeMsg = "El cuerpo de la solicitud es demasiado grande."
-
-// codeFileTooLarge is the 413 code of the multipart uploads (E2 S1); it is
-// the one the upload handlers answer when they cut the file themselves.
-const codeFileTooLarge = "archivo_demasiado_grande"
-
 // MaxBodySize caps the request body. Every request is limited to jsonLimit
 // except multipart/form-data requests to one of uploadRoutes ("METHOD /path",
 // exact match on r.Method and r.URL.Path), which get the larger
@@ -47,10 +41,10 @@ func MaxBodySize(jsonLimit, multipartLimit int64, uploadRoutes ...string) func(h
 			limit, code := jsonLimit, httpx.CodeBodyTooLarge
 			if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err == nil && mt == "multipart/form-data" &&
 				uploads[r.Method+" "+r.URL.Path] {
-				limit, code = multipartLimit, codeFileTooLarge
+				limit, code = multipartLimit, httpx.CodeFileTooLarge
 			}
 			if r.ContentLength > limit {
-				httpx.JSONErrorCode(w, http.StatusRequestEntityTooLarge, code, bodyTooLargeMsg, nil)
+				httpx.JSONErrorCode(w, http.StatusRequestEntityTooLarge, code, httpx.MsgBodyTooLarge, nil)
 				return
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, limit)
