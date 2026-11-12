@@ -2,11 +2,12 @@ package fuentes
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 )
 
-// Errors of the admin upload (S1, S2; contract E2). The handler maps them to
+// Errors of the admin endpoints (S1–S7; contract E2). The handler maps them to
 // status and code; the texts are the Spanish fallback message.
 var (
 	ErrArchivoDemasiadoGrande = errors.New("El archivo supera el máximo de 2 MiB.")
@@ -15,7 +16,7 @@ var (
 	ErrValidacion             = errors.New("Datos de la fuente inválidos.")
 	ErrReferenciaInvalida     = errors.New("Alguna especialidad o el proceso no existe o está inactivo.")
 	ErrLimiteFuentes          = errors.New("Se alcanzó el máximo de fuentes.")
-	ErrEstadoInvalido         = errors.New("La fuente no admite una versión nueva en su estado actual.")
+	ErrEstadoInvalido         = errors.New("La fuente no admite esta operación en su estado actual.")
 	ErrLimiteVersiones        = errors.New("La fuente ya tiene 20 versiones y ninguna se puede archivar.")
 )
 
@@ -64,6 +65,21 @@ type DuplicadaError struct {
 
 func (e *DuplicadaError) Error() string { return ErrFuenteDuplicada.Error() }
 func (e *DuplicadaError) Unwrap() error { return ErrFuenteDuplicada }
+
+// SuscriptorError is a SuscriptorRetiro that failed. Its text names only the
+// subscriber and the fuente, because the handler logs it (contract S5: op and
+// the subscriber's name, never personal data); the cause stays reachable
+// through errors.Is and errors.As.
+type SuscriptorError struct {
+	Nombre   string
+	FuenteID int64
+	Causa    error
+}
+
+func (e *SuscriptorError) Error() string {
+	return fmt.Sprintf("falló el suscriptor de retiro %s (fuente %d)", e.Nombre, e.FuenteID)
+}
+func (e *SuscriptorError) Unwrap() error { return e.Causa }
 
 // LimiteError is ErrLimiteFuentes with the limit that was reached: per
 // profession (EspecialidadID set) or the total.

@@ -20,7 +20,7 @@ type FormularioFuente struct {
 	EspecialidadIDs []string
 }
 
-// ── FuenteDetalle (S1, S2, and S4–S6 later; contract E2 § Objetos) ────────────
+// ── FuenteResumen and FuenteDetalle (S1–S6; contract E2 § Objetos) ───────────
 
 // EspecialidadRef is an especialidad of a fuente.
 type EspecialidadRef struct {
@@ -71,22 +71,97 @@ type VersionDetalle struct {
 	ProcesadaAt       *time.Time `json:"procesada_at" db:"procesada_at"`
 }
 
-// FuenteDetalle is the admin view of a fuente (contract E2 § FuenteDetalle).
+// ResumenFuente is one row of the admin listing (contract E2 § FuenteResumen,
+// S3). It is not the port's FuenteResumen, which carries ids only.
+type ResumenFuente struct {
+	ID               int64                  `json:"id"`
+	Titulo           string                 `json:"titulo"`
+	Tipo             string                 `json:"tipo"`
+	Estado           string                 `json:"estado"`
+	AplicaATodas     bool                   `json:"aplica_a_todas"`
+	Especialidades   []EspecialidadRef      `json:"especialidades"`
+	VersionVigente   *VersionVigenteResumen `json:"version_vigente"`
+	VersionEnProceso *VersionEnProceso      `json:"version_en_proceso"`
+	CreatedAt        time.Time              `json:"created_at"`
+	UpdatedAt        time.Time              `json:"updated_at"`
+}
+
+// FuenteDetalle is the admin view of a fuente: its ResumenFuente plus the
+// fields of contract E2 § FuenteDetalle.
 type FuenteDetalle struct {
-	ID                 int64                  `json:"id"`
-	Titulo             string                 `json:"titulo"`
-	Tipo               string                 `json:"tipo"`
-	Estado             string                 `json:"estado"`
-	AplicaATodas       bool                   `json:"aplica_a_todas"`
-	Especialidades     []EspecialidadRef      `json:"especialidades"`
-	VersionVigente     *VersionVigenteResumen `json:"version_vigente"`
-	VersionEnProceso   *VersionEnProceso      `json:"version_en_proceso"`
-	CreatedAt          time.Time              `json:"created_at"`
-	UpdatedAt          time.Time              `json:"updated_at"`
-	Anio               *int                   `json:"anio"`
-	Proceso            *ProcesoRef            `json:"proceso"`
-	MotivoRetiro       *string                `json:"motivo_retiro"`
-	Oficial            *Oficial               `json:"oficial"`
-	ContenidosCitantes int                    `json:"contenidos_citantes"`
-	Versiones          []VersionDetalle       `json:"versiones"`
+	ResumenFuente
+	Anio               *int             `json:"anio"`
+	Proceso            *ProcesoRef      `json:"proceso"`
+	MotivoRetiro       *string          `json:"motivo_retiro"`
+	Oficial            *Oficial         `json:"oficial"`
+	ContenidosCitantes int              `json:"contenidos_citantes"`
+	Versiones          []VersionDetalle `json:"versiones"`
+	// ContenidosMarcados is only in the answer of a retirement (S5), where 0
+	// is still sent; nil leaves it out of every other answer.
+	ContenidosMarcados *int `json:"contenidos_marcados,omitempty"`
+}
+
+// ── Admin changes (S5–S7) ─────────────────────────────────────────────────────
+
+// CambioEstadoRequest is the body of S5: retirar (with motivo), restaurar
+// (activa) or reintentar (procesando).
+type CambioEstadoRequest struct {
+	Estado string  `json:"estado"`
+	Motivo *string `json:"motivo"`
+}
+
+// OficialRequest is the body of S6: mark with entidad and nota, or unmark
+// with motivo.
+type OficialRequest struct {
+	OficialVerificada *bool   `json:"oficial_verificada"`
+	EntidadEmisora    *string `json:"entidad_emisora"`
+	Nota              *string `json:"nota"`
+	Motivo            *string `json:"motivo"`
+}
+
+// EditarRequest is the body of S7: it replaces both fields; an empty
+// especialidad_ids means every especialidad, a missing one is invalid.
+type EditarRequest struct {
+	Titulo          string   `json:"titulo"`
+	EspecialidadIDs *[]int64 `json:"especialidad_ids"`
+}
+
+// ── Listing (S3) ──────────────────────────────────────────────────────────────
+
+// FiltroListado is the S3 query once parsed; zero values mean no filter.
+type FiltroListado struct {
+	Estado         string
+	Tipo           string
+	EspecialidadID int64
+	Oficial        *bool // mark of the current version; a fuente without one is not marked
+	Q              string
+	Page, PerPage  int
+}
+
+// ListaFuentes is the S3 page (docs/api/README.md §5).
+type ListaFuentes struct {
+	Data    []ResumenFuente `json:"data"`
+	Total   int             `json:"total"`
+	Page    int             `json:"page"`
+	PerPage int             `json:"per_page"`
+}
+
+// ── Passage search for citing (GET /admin/pasajes; contract E3-07 §2) ─────────
+
+// PasajeBuscado is one hit of the admin search. It carries the extract, never
+// the full text, and nothing about the stored file.
+type PasajeBuscado struct {
+	PasajeID     int64   `json:"pasaje_id"`
+	FuenteID     int64   `json:"fuente_id"`
+	FuenteTitulo string  `json:"fuente_titulo"`
+	Version      int     `json:"version"`
+	Seccion      *string `json:"seccion"`
+	LineaInicio  int     `json:"linea_inicio"`
+	LineaFin     int     `json:"linea_fin"`
+	Extracto     string  `json:"extracto"`
+}
+
+// ListaPasajes is the body of the admin search: at most MaxResultados items.
+type ListaPasajes struct {
+	Data []PasajeBuscado `json:"data"`
 }
