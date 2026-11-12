@@ -11,6 +11,8 @@
 #     8. la contraseña de Postgres no aparece en argv de pg_dump ni de psql
 #     9. pg_dump colgado → timeout lo corta (motivo=tiempo_agotado)
 #    10. copias_bd no existe (064 sin aplicar) → copia subida, exit 3, motivo=no_existe
+#    11. BACKUP_PUSH_URL: latido a Uptime Kuma solo tras copia correcta; si el aviso falla,
+#        la copia sigue correcta; el token no está en argv ni en los logs
 # Uso: make backup/test  (BACKUP_TEST_IMAGE=<imagen> prueba una ya construida,
 #      p. ej. la de release linux/amd64). Todo se borra al terminar.
 set -eu
@@ -20,7 +22,7 @@ cd "$(dirname "$0")/../.."
 # otro agente) no se pisan ni se borran entre sí.
 RUN="bkt$$"
 NET="capacitate-backup-test-$$"
-PGC="$RUN-pg"; S3C="$RUN-s3"; RSC="$RUN-restore"
+PGC="$RUN-pg"; S3C="$RUN-s3"; RSC="$RUN-restore"; KUC="$RUN-kuma"
 IMG="${BACKUP_TEST_IMAGE:-capacitate-backup:test-$$}"
 # Solo para esta prueba (aprobado por el tech-lead), nunca en producción.
 S3IMG=versity/versitygw:v1.10.0@sha256:89cad13cc981986ee284cbafea4613f9533ce6fd5f37a2c96c4c4fb8adb3a316
@@ -29,7 +31,7 @@ GO=golang:1.27.4-alpine3.23@sha256:146e3b9c7c1e2ec3d3f5348c8a686151a75e1976e50ef
 TMP=$(mktemp -d)
 fail() { echo "✗ $*" >&2; exit 1; }
 cleanup() {
-  docker rm -f "$PGC" "$S3C" "$RSC" >/dev/null 2>&1 || true
+  docker rm -f "$PGC" "$S3C" "$RSC" "$KUC" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
   [ -n "${BACKUP_TEST_IMAGE:-}" ] || docker rmi "$IMG" >/dev/null 2>&1 || true
   rm -rf "$TMP"
@@ -109,7 +111,7 @@ chmod 755 "$TMP/stubs/"*
 
 copia() { # $1=usuario:clave $2=endpoint $3=bucket $4=secret de S3 [$5=stub] [$6=base] [$7=timeout]
   docker run --rm --network "$NET" -v "$TMP/stubs:/usr/local/sbin:ro" -v "$TMP/out:/stubs-out" \
-    -e STUB="${5:-}" \
+    -e STUB="${5:-}" -e BACKUP_PUSH_URL="${PUSH:-}" \
     -e BACKUP_DATABASE_URL="postgres://$1@$PGC:5432/${6:-capacitate}?sslmode=require" \
     -e AGE_RECIPIENT="$PUB" -e R2_ENDPOINT="$2" -e R2_BUCKET="$3" -e R2_ACCESS_KEY_ID=testkey \
     -e R2_SECRET_ACCESS_KEY="$4" -e BACKUP_TIMEOUT="${7:-5}" "$IMG"
@@ -154,6 +156,28 @@ echo "✓ 10. sin copias_bd (064 sin aplicar) → copia subida, exit 3, motivo=n
 filas=$(docker exec "$PGC" psql -U owner -d capacitate -Atc "select string_agg(resultado, ',' order by id) from copias_bd")
 [ "$filas" = "fallida,correcta,correcta,fallida,fallida,fallida,fallida,correcta,fallida" ] || fail "copias_bd: $filas"
 echo "✓ copias_bd: $filas"
+
+# 11. Latido a Uptime Kuma (monitor Push). Receptor: nc de busybox que responde 200 y
+#     guarda la línea de cada petición en /tmp/push.log.
+docker run -d --name "$KUC" --network "$NET" --entrypoint sh "$IMG" -c \
+  'while :; do printf "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok" | nc -l -p 3001 | head -1 >> /tmp/push.log; done' >/dev/null
+sleep 2
+PUSH="http://$KUC:3001/api/push/tokensecreto"
+out=$(PUSH="$PUSH" copia "$OK_DB" "$S3" "$B" "$SEC" 2>&1) || fail "la copia con BACKUP_PUSH_URL falló: $out"
+echo "$out" | grep -q 'aviso a Uptime Kuma enviado' || fail "no avisó a Kuma: $out"
+pushes() { docker exec "$KUC" sh -c 'grep -c "api/push/tokensecreto" /tmp/push.log 2>/dev/null || true'; }
+[ "$(pushes)" = 1 ] || fail "Kuma no recibió el latido (peticiones: $(pushes))"
+! echo "$out" | grep -q 'tokensecreto' || fail "el token aparece en los logs de la copia"
+echo "✓ 11a. copia correcta con BACKUP_PUSH_URL → latido recibido, sin token en los logs"
+rc=0; out=$(PUSH="http://10.255.255.1/api/push/tokensecreto" copia "$OK_DB" "$S3" "$B" "$SEC" 2>&1) || rc=$?
+[ "$rc" = 0 ] && echo "$out" | grep -q 'no se pudo avisar a Uptime Kuma' && ! echo "$out" | grep -q 'tokensecreto' \
+  || fail "aviso caído: rc=$rc $out"
+echo "✓ 11b. Kuma inalcanzable → la copia sigue correcta (exit 0), sin token en los logs"
+antes=$(pushes)
+PUSH="$PUSH" copia "$OK_DB" "$S3" no-existe "$SEC" >/dev/null 2>&1 && fail "bucket inexistente no falló" || true
+despues=$(pushes)
+[ "$antes" = "$despues" ] || fail "una copia fallida avisó a Kuma"
+echo "✓ 11c. copia fallida → no manda latido"
 
 # 6. Restauración (RTO de prueba): bajar, descifrar con la privada, pg_restore en una base nueva.
 t0=$(date +%s)

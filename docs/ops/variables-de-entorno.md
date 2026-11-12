@@ -97,6 +97,7 @@ Solo en el servicio cron de Railway. Detalle y aprovisionamiento en
 | `R2_BUCKET` | Bucket privado y dedicado | — | No | Sale con 2 |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Token Object Read & Write limitado al bucket | — | **Sí** | Sale con 2 |
 | `BACKUP_TIMEOUT` | Segundos máximos para el dump y para la subida | `1800` | No | Usa 1800 |
+| `BACKUP_PUSH_URL` | URL del monitor Push de Uptime Kuma (`http://uptime-kuma.railway.internal:3001/api/push/<token>`). Opcional | vacía | **Sí** (lleva el token) | No avisa a Kuma: la copia no se ve afectada. Si el aviso falla, solo deja una línea en el log |
 
 ## Decidida pero sin implementar
 
