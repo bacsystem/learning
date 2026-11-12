@@ -1364,7 +1364,10 @@
         "tipo_fuente_invalido": "Only sources of type past-exam bank can be imported.",
         "especialidad_invalida": "That profession is not active or does not belong to the process institution. Choose another.",
         "especialidad_no_corresponde": "That profession is not among those of the source: {profesiones}. Choose one of them.",
-        "sin_validas": "There are no valid questions to import."
+        "sin_validas": "There are no valid questions to import.",
+        "presupuesto_agotado": "The monthly AI budget is used up. It resets on {reinicia}.",
+        "limite_ia": "You reached the daily limit of AI actions ({limite, number}). It resets on {reinicia}.",
+        "limite_ia_mensual": "You reached the monthly limit of AI actions ({limite, number}). It resets on {reinicia}."
       },
       "pesos": {
         "titulo": "Weights for {especialidad}",
@@ -1873,6 +1876,92 @@
           "referencia_invalida": "The process or the area is no longer valid. Reload and choose them again.",
           "limite_preguntas": "The question bank has more than {maximo, number} questions ({detectadas, number} detected). Split it into parts and upload each as a version."
         }
+      },
+      "ia": {
+        "titulo": "AI: limits and spending",
+        "descripcion": "Control how much users can use the AI and how much is spent each month.",
+        "menu": "AI",
+        "gasto": {
+          "titulo": "Spending this month",
+          "mes": "Month of {mes}",
+          "presupuesto": "Budget",
+          "gastado": "Spent",
+          "porcentaje": "{porcentaje}% of the budget",
+          "reinicia": "Resets on {fecha}.",
+          "estado": {
+            "normal": "Within budget.",
+            "alerta": "80% of the budget was reached on {fecha}.",
+            "agotado": "Budget used up: the AI is stopped until {fecha}."
+          },
+          "porOperacion": "By operation",
+          "operacion": "Operation",
+          "invocaciones": "Invocations",
+          "desdeCache": "From cache",
+          "costo": "Cost",
+          "vacio": "There are no invocations this month yet.",
+          "errorCarga": "The spending of the month could not be loaded.",
+          "operaciones": {
+            "clasificar": "Classify questions"
+          },
+          "sinCifrasPorUsuario": "Per-user figures are not shown: everyone sees only their own usage.",
+          "avance": "Budget progress"
+        },
+        "configuracion": {
+          "titulo": "Limits and budget",
+          "ayuda": "Lowering a limit does not affect what was already used: the next actions are rejected until the window resets.",
+          "guardar": "Save",
+          "guardando": "Saving…",
+          "guardada": "Settings saved.",
+          "errorCarga": "The settings could not be loaded.",
+          "actualizada": "Last updated: {fecha}",
+          "campos": {
+            "limite_usuario_dia": {
+              "etiqueta": "Actions per day (user)",
+              "ayuda": "From 0 to 50. 0 turns the AI off for users."
+            },
+            "limite_usuario_mes": {
+              "etiqueta": "Actions per month (user)",
+              "ayuda": "From 0 to 1,000. It cannot be lower than the daily limit."
+            },
+            "limite_admin_dia": {
+              "etiqueta": "Actions per day (admin)",
+              "ayuda": "From 1 to 1,000."
+            },
+            "presupuesto_mensual_usd": {
+              "etiqueta": "Monthly budget (USD)",
+              "ayuda": "From 1 to 1,000, with up to 2 decimals."
+            },
+            "max_preguntas_solicitud": {
+              "etiqueta": "Questions per request",
+              "ayuda": "From 1 to 50."
+            },
+            "lote_clasificacion": {
+              "etiqueta": "Questions per classification batch",
+              "ayuda": "From 1 to 50."
+            }
+          },
+          "validacion": {
+            "rango": "Between {min, number} and {max, number}, a whole number.",
+            "presupuesto": "Between {min, number} and {max, number}.",
+            "decimales": "Up to 2 decimals.",
+            "diaMayorQueMes": "The daily limit cannot exceed the monthly one.",
+            "rechazado": "The server rejected this value. Check it."
+          }
+        },
+        "errores": {
+          "validacion": "Check the values: some fields are out of range."
+        },
+        "consumo": {
+          "titulo": "Your usage today",
+          "usadas": "Actions used",
+          "usados": "{usados, number} of {limite, number}",
+          "disponibles": "{disponibles, plural, =0 {No actions available} one {# action available} other {# actions available}}",
+          "reinicia": "Resets on {fecha}.",
+          "agotado": "The monthly budget is used up: AI actions cannot be used until it resets.",
+          "avance": "Daily limit progress",
+          "errorCarga": "Your usage could not be loaded.",
+          "ayuda": "This is the admin limit; users have their own."
+        }
       }
     },
     "sesion-servidor-no-disponible-titulo": "The server is not responding",
@@ -1938,6 +2027,7 @@
         "correcta": "Successful",
         "fallida": "Failed"
       }
-    }
+    },
+    "menu-admin-ia": "AI"
   }
 }
