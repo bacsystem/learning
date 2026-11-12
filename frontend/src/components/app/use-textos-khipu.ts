@@ -1,6 +1,6 @@
 "use client";
 
-import { textosPieTabla, textosTablaDatos, textosTablaListado } from "./textos-khipu";
+import { textosMenuUsuario, textosPieTabla, textosTablaDatos, textosTablaListado } from "./textos-khipu";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 
@@ -20,4 +20,10 @@ export function useTextosTablaDatos() {
 export function useTextosTablaListado() {
   const t = useTranslations("dashboard");
   return useMemo(() => textosTablaListado(t), [t]);
+}
+
+/** Textos del menú de usuario, del selector de tema y del panel de apariencia. */
+export function useTextosMenuUsuario() {
+  const t = useTranslations("dashboard");
+  return useMemo(() => textosMenuUsuario(t), [t]);
 }

@@ -11,8 +11,10 @@ var (
 	// reInicio: number of 1–4 digits plus ".", ")", "-" or ":"; optional
 	// "Pregunta"/"Nº" prefix and optional **/__ around the number (§2.2).
 	reInicio = regexp.MustCompile(`^(?:\*\*|__)?(?:(?i:pregunta)\s*|N[º°]\s*)?(\d{1,4})(?:\*\*|__)?[.):\-](?:\*\*|__)?(?:\s|$)`)
-	// reLetra: A–F with ")", "." or "-", or in parentheses, optionally in **.
-	reLetra = regexp.MustCompile(`^(\*\*)?(?:\(([A-Fa-f])\)|([A-Fa-f])([).\-]))(\*\*)?(?:\s|$)`)
+	// reLetra: a letter with ")", "." or "-", or in parentheses, optionally in **.
+	// A–F can be alternatives; G–Z never are, but a line shaped like that is not
+	// plain continuation after the first alternative (contract §2.2, rule 17).
+	reLetra = regexp.MustCompile(`^(\*\*)?(?:\(([A-Za-z])\)|([A-Za-z])([).\-]))(\*\*)?(?:\s|$)`)
 	// reVineta: a bullet without letter must be followed by a space, so that
 	// "**bold**" is not one.
 	reVineta = regexp.MustCompile(`^[-*•+▪◦](?:\s+|$)`)
@@ -30,7 +32,7 @@ type estilo struct {
 
 // etiqueta is a parsed alternative label. letra is 0 for a bullet.
 type etiqueta struct {
-	letra rune // 'A'..'F', always upper case
+	letra rune // 'A'..'Z', always upper case
 	// confirmada / tentativa: the label itself is inside a closed / still open <mark>.
 	confirmada, tentativa bool
 	estilo

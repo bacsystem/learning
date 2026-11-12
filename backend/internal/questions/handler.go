@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/httpx"
@@ -13,7 +15,44 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var validate = validator.New()
+// validate names the fields by their JSON name, so a validation failure can
+// tell the client which field broke a rule without the Go struct names.
+var validate = newValidator()
+
+func newValidator() *validator.Validate {
+	v := validator.New()
+	v.RegisterTagNameFunc(func(f reflect.StructField) string {
+		nombre, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if nombre == "-" {
+			return ""
+		}
+		return nombre
+	})
+	return v
+}
+
+// maxCamposEnMensaje bounds how many fields a validation message lists.
+const maxCamposEnMensaje = 5
+
+// mensajeValidacion is the 400 message of a body that broke a rule: it names
+// the JSON fields (respuestas[0].orden) and never quotes the validator's text,
+// which carries Go type names and rule tags. The message is for the client; the
+// rule that failed is not part of the contract.
+func mensajeValidacion(err error) string {
+	var verrs validator.ValidationErrors
+	if !errors.As(err, &verrs) || len(verrs) == 0 {
+		return "Cuerpo de solicitud inválido."
+	}
+	var campos []string
+	for _, fe := range verrs {
+		_, ruta, _ := strings.Cut(fe.Namespace(), ".") // drop the struct name
+		campos = append(campos, ruta)
+	}
+	if len(campos) > maxCamposEnMensaje {
+		campos = campos[:maxCamposEnMensaje]
+	}
+	return "Campos inválidos o faltantes: " + strings.Join(campos, ", ") + "."
+}
 
 // Handler exposes the questions HTTP handlers.
 type Handler struct {
@@ -160,7 +199,7 @@ func (h *Handler) CreatePregunta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := validate.Struct(req); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+		jsonError(w, http.StatusBadRequest, mensajeValidacion(err))
 		return
 	}
 	result, err := h.svc.CreatePregunta(r.Context(), req)
@@ -183,7 +222,7 @@ func (h *Handler) UpdatePregunta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := validate.Struct(req); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+		jsonError(w, http.StatusBadRequest, mensajeValidacion(err))
 		return
 	}
 	aud, ok := h.auditor(w, r)
@@ -234,7 +273,7 @@ func (h *Handler) GenerateSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := validate.Struct(req); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+		jsonError(w, http.StatusBadRequest, mensajeValidacion(err))
 		return
 	}
 	total := 0
@@ -374,7 +413,7 @@ func (h *Handler) CreateEtiqueta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := validate.Struct(req); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+		jsonError(w, http.StatusBadRequest, mensajeValidacion(err))
 		return
 	}
 	result, err := h.svc.CreateEtiqueta(r.Context(), req)
@@ -397,7 +436,7 @@ func (h *Handler) UpdateEtiqueta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := validate.Struct(req); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+		jsonError(w, http.StatusBadRequest, mensajeValidacion(err))
 		return
 	}
 	result, err := h.svc.UpdateEtiqueta(r.Context(), id, req)

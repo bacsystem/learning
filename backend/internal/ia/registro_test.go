@@ -48,36 +48,37 @@ func TestPgRegistro_UnaFilaPorInvocacion(t *testing.T) {
 	t.Cleanup(func() { _, _ = db.Exec(`DELETE FROM ia_usos WHERE id > $1`, desde) })
 
 	reg := ia.NewPgRegistro(db)
+	costos := nuevoPgCostos(t, db)
 	ctx := context.Background()
 	in := ia.EntradaClasificar{Items: []ia.ItemTexto{{ID: 1, Texto: "Vacunas"}},
 		Taxonomia: []ia.OpcionTaxonomia{{AsignaturaID: 3, Nombre: "Salud"}}}
 	actorAdmin := ia.Actor{Rol: ia.RolAdmin, ID: &admin.ID}
 	sistema := ia.Actor{Rol: ia.RolSistema}
 
-	ok := ia.NewServicio(ia.NewDoble(), reg)
-	if _, err := ok.Clasificar(ctx, actorAdmin, in); err != nil {
+	ok := ia.NewServicio(ia.NewDoble(), reg, costos)
+	if _, err := ok.Clasificar(ctx, reserva(actorAdmin), in); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ia.NewServicio(nil, reg).Clasificar(ctx, sistema, in); !errors.Is(err, ia.ErrNoDisponible) {
+	if _, err := ia.NewServicio(nil, reg, costos).Clasificar(ctx, reserva(sistema), in); !errors.Is(err, ia.ErrNoDisponible) {
 		t.Fatal(err)
 	}
 	pii := in
 	pii.Items = []ia.ItemTexto{{ID: 1, Texto: "persona@example.com"}}
-	if _, err := ok.Clasificar(ctx, sistema, pii); !errors.Is(err, ia.ErrDatosPersonales) {
+	if _, err := ok.Clasificar(ctx, reserva(sistema), pii); !errors.Is(err, ia.ErrDatosPersonales) {
 		t.Fatal(err)
 	}
 	// Timeout with the consumer's ctx already done: the row is still written.
-	lento := ia.NewServicio(ia.NewDoble(ia.Lento()), reg, ia.ConTiempoLlamada(20*time.Millisecond))
+	lento := ia.NewServicio(ia.NewDoble(ia.Lento()), reg, costos, ia.ConTiempoLlamada(20*time.Millisecond))
 	cctx, cancel := context.WithTimeout(ctx, 30*time.Millisecond)
 	defer cancel()
-	if _, err := lento.Clasificar(cctx, sistema, in); !errors.Is(err, ia.ErrTimeout) {
+	if _, err := lento.Clasificar(cctx, reserva(sistema), in); !errors.Is(err, ia.ErrTimeout) {
 		t.Fatal(err)
 	}
 
 	// Cancelled by the consumer: its own row, written with a detached ctx.
 	cancelada, cancelar := context.WithCancel(ctx)
 	cancelar()
-	if _, err := ok.Clasificar(cancelada, sistema, in); !errors.Is(err, ia.ErrCancelado) {
+	if _, err := ok.Clasificar(cancelada, reserva(sistema), in); !errors.Is(err, ia.ErrCancelado) {
 		t.Fatal(err)
 	}
 

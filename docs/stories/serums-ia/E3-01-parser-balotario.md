@@ -36,10 +36,10 @@ Formato observado: preguntas numeradas, alternativas A–D, clave dentro de `<ma
 15. El parser **no** detecta duplicados contra el banco ni crea `conflicto_clave`: eso es de SIA-E3-06, sobre los borradores ya importados.
 16. **HTML residual:** solo se eliminan las etiquetas HTML reconocibles (`<b>dosis</b>` queda «dosis»). Las etiquetas `<script>` y `<style>` se eliminan junto con su contenido. Todo esto genera la alerta `html_eliminado`. Un `<` o `>` que no forma una etiqueta («PA < 90», «Hb <7 g/dL») es texto y se conserva tal cual, sin alerta.
 17. **Ante la duda, «con problemas»** (decisión del PO, 12-nov, por el caso «C. difficile»): el parser nunca une, parte ni reetiqueta alternativas si eso puede cambiar qué texto queda marcado como clave. Una vez abierta la primera alternativa de una pregunta, va a «con problemas» con `etiquetas_ambiguas` si ocurre cualquiera de estas dos cosas:
-    - una línea empieza con algo que parece una etiqueta (letra seguida de `)` o `.`), pero el parser la trataría como continuación de la alternativa anterior;
+    - una línea empieza con algo que parece una etiqueta (una letra con cualquiera de las formas `A)`, `A.`, `A-` o `(A)`), pero el parser la trataría como continuación de la alternativa anterior;
     - las letras de las etiquetas retroceden o se repiten (por ejemplo A, C, B).
     
-    Dentro del enunciado, antes de la primera alternativa, una línea como «E. coli…» sigue siendo continuación sin problema. Un salto hacia adelante sin retroceso (A, B, D) sigue la regla 10: se reetiqueta con la alerta `vinetas_normalizadas`. Preferimos que el admin corrija el archivo antes que importar una clave equivocada.
+    Dentro del enunciado, antes de la primera alternativa, una línea como «E. coli…» sigue siendo continuación sin problema. Un salto hacia adelante sin retroceso (A, B, D) sigue la regla 10: se reetiqueta con la alerta `vinetas_normalizadas`. Preferimos que el admin corrija el archivo antes que importar una clave equivocada. **Letras G–Z** (decisión del PO, 12-nov, borde encontrado por qa): una vez abierta una alternativa, una línea con forma de etiqueta y letra G–Z nunca se une en silencio a la anterior. Si es justo la letra siguiente a la última alternativa abierta (G después de F), abre una alternativa nueva, y la pregunta va a «con problemas» con `alternativas_excedidas` (más de 6). En cualquier otro caso va a `etiquetas_ambiguas`. Esto vale solo para las líneas pegadas a una alternativa. **Tras una línea en blanco** (decisión del PO, 12-nov, review del #232), una línea G–Z con forma de etiqueta que sea justo la letra siguiente continúa la pregunta (y da `alternativas_excedidas`). Cualquier otra cierra la pregunta y queda como texto fuera de ella (regla 7), por ejemplo una referencia «S. Pérez, 2020» al pie. No se une a nada, así que la clave no puede corromperse. Excepción a «se informan todos» (regla 10): si la pregunta es ambigua pero hay una `<mark>` en su rango, solo se informa `etiquetas_ambiguas`, no `sin_clave`. Así no se le dice al admin que falta una clave que sí está.
 
 ## Criterios de aceptación
 ```gherkin
@@ -152,6 +152,26 @@ Escenario: Nombre científico dentro de las alternativas
   Dado las líneas "A) Antibiótico contra", "C. difficile con vancomicina", "<mark>B) Metronidazol</mark>" y "C) Otro"
   Cuando se parsea
   Entonces la pregunta se lista como "con problemas" con motivo "etiquetas_ambiguas" y nunca como válida con una clave unida a otro texto
+
+Escenario: Etiqueta entre paréntesis que retrocede
+  Dado las líneas "(a) Uno", "(c) Dos", "<mark>(b) Tres</mark>" y "(d) Cuatro"
+  Cuando se parsea
+  Entonces se lista como "con problemas" solo con el motivo "etiquetas_ambiguas", sin "sin_clave", porque la marca existe
+
+Escenario: Séptima alternativa con letra
+  Dado una pregunta con alternativas A) a F) y "<mark>G) Siete</mark>"
+  Cuando se parsea
+  Entonces se lista como "con problemas" con motivo "alternativas_excedidas" y ninguna alternativa contiene "G) Siete" unido a otro texto
+
+Escenario: Letra lejana dentro de las alternativas
+  Dado las líneas "A) Uno", "S. aureus resistente", "B) Dos" y "C) Tres"
+  Cuando se parsea
+  Entonces se lista como "con problemas" con motivo "etiquetas_ambiguas"
+
+Escenario: Referencia al pie tras línea en blanco
+  Dado la última pregunta con alternativas A) a D), una línea en blanco y la línea "S. Pérez, 2020"
+  Cuando se parsea
+  Entonces la pregunta es válida con 4 alternativas y "S. Pérez, 2020" queda fuera de ella, sin motivo "etiquetas_ambiguas"
 
 Escenario: Letras que retroceden
   Dado una pregunta con alternativas etiquetadas A, C, B y D

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"testing"
 
 	qt "github.com/cbaciliod/learning/internal/questions/questionstest"
@@ -276,5 +277,54 @@ func TestListarPreguntas_ItemsTraenSusIDs(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &list); err != nil || len(list.Data) == 0 ||
 		list.Data[0].GradoID == nil || *list.Data[0].GradoID != grado || list.Data[0].EspecialidadID == nil || *list.Data[0].EspecialidadID != esp {
 		t.Errorf("filtered list = %+v (%v), want grado %d and especialidad %d", list.Data, err, grado, esp)
+	}
+}
+
+// #184: the search is a literal substring; `%` and `_` in the term match
+// themselves, not «anything» or «one character».
+func TestListarPreguntas_BusquedaEsLiteral(t *testing.T) {
+	f, mux := newMux(t, qt.Options{Asignaturas: []qt.AsignaturaSpec{{NumeroPreguntas: 3, Peso: 100, Unicas: 3}}})
+	admin := f.Token(t, f.UsuarioID, "admin")
+	enunciados := []string{"Cobertura del 100% de vacunas", "Cobertura del 100 de vacunas", "Dosis a_b y a-b"}
+	for i, e := range enunciados {
+		if _, err := f.DB.Exec(`UPDATE preguntas SET enunciado = $1 WHERE id = $2`, e, f.Preguntas[i].ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tests := []struct {
+		name string
+		term string
+		want []int64
+	}{
+		{"percent is literal", "100%", []int64{f.Preguntas[0].ID}},
+		{"underscore is literal", "a_b", []int64{f.Preguntas[2].ID}},
+		{"a plain term is still a substring", "cobertura", []int64{f.Preguntas[0].ID, f.Preguntas[1].ID}},
+		{"a lone percent matches only the question that has one", "%", []int64{f.Preguntas[0].ID}},
+		{"a lone underscore matches only the question that has one", "_", []int64{f.Preguntas[2].ID}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := qt.Do(mux, "GET", fmt.Sprintf("/preguntas?proceso_id=%d&search=%s", f.ProcesoID, url.QueryEscape(tt.term)), admin, "")
+			var list struct {
+				Data []struct {
+					ID int64 `json:"id"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &list); err != nil || w.Code != http.StatusOK {
+				t.Fatalf("list: %d %s", w.Code, w.Body)
+			}
+			got := map[int64]bool{}
+			for _, d := range list.Data {
+				got[d.ID] = true
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("ids %v, want %v", got, tt.want)
+			}
+			for _, id := range tt.want {
+				if !got[id] {
+					t.Errorf("missing %d in %v", id, got)
+				}
+			}
+		})
 	}
 }

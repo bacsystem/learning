@@ -4,8 +4,8 @@ import { useState } from "react";
 
 import { useApariencia } from "@/components/apariencia";
 import { useDiseno } from "@/components/diseno";
-import { PanelApariencia } from "@/components/nav/panel-apariencia";
-import { ThemeToggle } from "@/components/nav/theme-toggle";
+import { PanelApariencia, type TextosPanelApariencia } from "@/components/nav/panel-apariencia";
+import { type TextosThemeToggle, ThemeToggle } from "@/components/nav/theme-toggle";
 import { Menu, MenuContent, MenuItem, MenuLinkItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
 import { ROTULO } from "@/lib/estilos";
 import type { IconoComponente } from "@/lib/iconos";
@@ -31,6 +31,24 @@ export type AccionMenu = {
   title?: string;
 };
 
+/** Textos de `MenuUsuario` más los de `ThemeToggle` y `PanelApariencia`: pasa los que quieras traducir, el resto queda en castellano. */
+export type TextosMenuUsuario = {
+  /** `aria-label` del disparador. */
+  menu: string;
+  cuenta: string;
+  /** Rótulo del tema en el menú; el panel de apariencia usa el mismo (`TextosPanelApariencia.tema`). */
+  tema: string;
+  /** Ítem que abre el panel de apariencia. */
+  apariencia: string;
+};
+
+export const TEXTOS_MENU_USUARIO_ES: TextosMenuUsuario = {
+  menu: "Menú de usuario",
+  cuenta: "Tu cuenta",
+  tema: "Tema",
+  apariencia: "Apariencia…",
+};
+
 function iniciales(texto: string): string {
   const local = texto.split("@")[0] ?? texto;
   return local.slice(0, 2).toUpperCase();
@@ -49,6 +67,7 @@ export function MenuUsuario({
   mostrarTema = true,
   mostrarDiseno = true,
   mostrarApariencia = true,
+  textos: textosParciales,
 }: {
   usuario: UsuarioMenu;
   acciones?: AccionMenu[];
@@ -59,7 +78,10 @@ export function MenuUsuario({
   mostrarDiseno?: boolean;
   /** Muestra «Apariencia…» (paleta, tono oscuro y tipografía). Solo con `AparienciaProvider`. */
   mostrarApariencia?: boolean;
+  /** Textos del menú, del selector de tema y del panel de apariencia, en un solo objeto. */
+  textos?: Partial<TextosMenuUsuario & TextosPanelApariencia & TextosThemeToggle>;
 }) {
+  const textos = { ...TEXTOS_MENU_USUARIO_ES, ...textosParciales };
   const [saliendo, setSaliendo] = useState(false);
   const [panelAbierto, setPanelAbierto] = useState(false);
   const { disenos } = useDiseno();
@@ -81,7 +103,7 @@ export function MenuUsuario({
     <>
       <Menu>
         <MenuTrigger
-          aria-label="Menú de usuario"
+          aria-label={textos.menu}
           className={cn(
             "bg-secondary flex w-full min-w-0 cursor-pointer items-center justify-between gap-2 overflow-hidden rounded-xl p-2 text-left transition-colors outline-none select-none",
             "hover:bg-secondary focus-visible:ring-ring/50 data-popup-open:bg-secondary focus-visible:ring-2",
@@ -101,7 +123,7 @@ export function MenuUsuario({
 
         {/* Mismo ancho y alineación que el disparador: no invade el contenido principal. */}
         <MenuContent side="top" align="start" className="w-(--anchor-width) min-w-0">
-          <div className="text-etiqueta text-muted-foreground px-2 pt-1.5 pb-1 font-medium">Tu cuenta</div>
+          <div className="text-etiqueta text-muted-foreground px-2 pt-1.5 pb-1 font-medium">{textos.cuenta}</div>
           <div className="bg-accent text-accent-foreground flex items-start gap-2.5 rounded-lg py-1.5 pr-2 pl-2">
             <div className="bg-acento text-etiqueta text-acento-texto flex size-6 shrink-0 items-center justify-center rounded-full font-bold shadow-xs">
               {iniciales(usuario.nombre ?? usuario.email)}
@@ -120,8 +142,8 @@ export function MenuUsuario({
             <>
               <MenuSeparator />
               <div className="flex items-center justify-between gap-3 px-2 py-1.5">
-                <span className={ROTULO}>Tema</span>
-                <ThemeToggle />
+                <span className={ROTULO}>{textos.tema}</span>
+                <ThemeToggle textos={textosParciales} />
               </div>
             </>
           ) : null}
@@ -129,7 +151,7 @@ export function MenuUsuario({
           {conDiseno || conApariencia ? (
             <MenuItem onClick={() => setPanelAbierto(true)}>
               <PaletteIcon />
-              <span className="flex-1">Apariencia…</span>
+              <span className="flex-1">{textos.apariencia}</span>
               <CaretRightIcon weight="bold" className="text-texto-terciario size-3.5" />
             </MenuItem>
           ) : null}
@@ -161,7 +183,9 @@ export function MenuUsuario({
           </MenuItem>
         </MenuContent>
       </Menu>
-      {conDiseno || conApariencia ? <PanelApariencia open={panelAbierto} onOpenChange={setPanelAbierto} /> : null}
+      {conDiseno || conApariencia ? (
+        <PanelApariencia open={panelAbierto} onOpenChange={setPanelAbierto} textos={textosParciales} />
+      ) : null}
     </>
   );
 }

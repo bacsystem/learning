@@ -1,11 +1,13 @@
 package auth
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/cbaciliod/learning/internal/httpx"
 	internalmw "github.com/cbaciliod/learning/internal/middleware"
 )
 
@@ -39,6 +41,15 @@ func TestDecodeJSON_OwnLimit_413(t *testing.T) {
 	h.Login(w, req)
 	if w.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("want 413, got %d", w.Code)
+	}
+	// The same error reaches the client in the same format whichever layer
+	// cuts it: the coded one (docs/api/README.md §3), like MaxBodySize.
+	var body map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body %q: %v", w.Body, err)
+	}
+	if body["error"] != httpx.CodeBodyTooLarge || body["message"] != httpx.MsgBodyTooLarge {
+		t.Errorf("413 body = %v, want error %s with message %q", body, httpx.CodeBodyTooLarge, httpx.MsgBodyTooLarge)
 	}
 }
 

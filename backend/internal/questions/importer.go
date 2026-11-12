@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rs/zerolog/log"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -262,7 +263,7 @@ func ImportPreguntas(ctx context.Context, rows []importRow, procesoID, asignatur
 		if err != nil {
 			result.Errors = append(result.Errors, ImportErrorRow{
 				Row:     rowNum,
-				Message: err.Error(),
+				Message: mensajeFilaImportada(err, rowNum),
 			})
 			continue
 		}
@@ -271,4 +272,23 @@ func ImportPreguntas(ctx context.Context, rows []importRow, procesoID, asignatur
 	}
 
 	return result
+}
+
+// mensajeInternoFila is what the admin sees for a row that failed for a
+// reason that is not a rule of the questions: the cause stays in the log.
+const mensajeInternoFila = "No se pudo importar la fila. Inténtalo de nuevo; si persiste, avisa al administrador del sistema."
+
+// mensajeFilaImportada is the message of a row that failed. The errors of the
+// domain carry a message written for the user and are shown as they are;
+// anything else (a driver error, say) can carry internals of the database, so
+// the admin gets a generic message and the cause goes to the log with the row
+// number only (the rows hold no personal data).
+func mensajeFilaImportada(err error, fila int) string {
+	for _, dominio := range []error{ErrValidation, ErrNotFound, ErrConflict, ErrTemaInvalido} {
+		if errors.Is(err, dominio) {
+			return err.Error()
+		}
+	}
+	log.Error().Err(err).Str("op", "questions.importar_fila").Int("fila", fila).Msg("questions: import row failed")
+	return mensajeInternoFila
 }

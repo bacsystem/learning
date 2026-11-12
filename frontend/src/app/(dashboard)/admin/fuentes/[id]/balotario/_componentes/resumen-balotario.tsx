@@ -26,10 +26,11 @@ export function ResumenBalotario({ vista }: { vista: VistaPreviaBalotario }) {
           {fuente.titulo}
         </h2>
         <Chip>{t("serumsIa.balotario.version", { numero: fuente.version })}</Chip>
-        {fuente.oficial_verificada ? <InsigniaOficial /> : <Chip>{t("serumsIa.balotario.noOficial")}</Chip>}
-        {fuente.oficial_verificada && fuente.oficial_entidad ? (
-          <span className="text-control text-muted-foreground">{fuente.oficial_entidad}</span>
-        ) : null}
+        {fuente.oficial_verificada ? (
+          <InsigniaOficial entidad={fuente.oficial_entidad} />
+        ) : (
+          <Chip>{t("serumsIa.balotario.noOficial")}</Chip>
+        )}
       </div>
 
       <FilaMetricas columnas={3}>

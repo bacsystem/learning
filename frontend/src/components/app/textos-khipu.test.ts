@@ -1,6 +1,12 @@
 import en from "../../i18n/messages/en.json";
 import es from "../../i18n/messages/es.json";
-import { textosPieTabla, textosTablaDatos, textosTablaListado, type Traductor } from "./textos-khipu";
+import {
+  textosMenuUsuario,
+  textosPieTabla,
+  textosTablaDatos,
+  textosTablaListado,
+  type Traductor,
+} from "./textos-khipu";
 import { describe, expect, it } from "vitest";
 
 /** `t` simulado: devuelve la clave y sus valores, y registra las claves pedidas. */
@@ -69,5 +75,63 @@ describe("textos-khipu", () => {
     }
     expect(dashboardEs["tabla-seleccionar-fila"]).toContain("{id}");
     expect(dashboardEn["tabla-seleccionar-fila"]).toContain("{id}");
+  });
+
+  describe("menu de usuario", () => {
+    it("maps each text of the menu, the appearance panel and the theme toggle to its own key", () => {
+      const { t } = traductor();
+      expect(textosMenuUsuario(t)).toEqual({
+        menu: "menu-usuario-menu",
+        cuenta: "menu-usuario-cuenta",
+        tema: "menu-usuario-tema",
+        apariencia: "menu-usuario-apariencia",
+        aparienciaTitulo: "menu-usuario-apariencia-titulo",
+        aparienciaDescripcion: "menu-usuario-apariencia-descripcion",
+        paleta: "menu-usuario-paleta",
+        paletaAyuda: "menu-usuario-paleta-ayuda",
+        tonoOscuro: "menu-usuario-tono-oscuro",
+        tonoOscuroAyuda: "menu-usuario-tono-oscuro-ayuda",
+        tipografia: "menu-usuario-tipografia",
+        tipografiaAyuda: "menu-usuario-tipografia-ayuda",
+        tipografiaMuestra: "menu-usuario-tipografia-muestra",
+        diseno: "menu-usuario-diseno",
+        disenoInterfaz: "menu-usuario-diseno-interfaz",
+        paletaColor: "menu-usuario-paleta-color",
+        tonoModoOscuro: "menu-usuario-tono-modo-oscuro",
+        tipografiaFuente: "menu-usuario-tipografia-fuente",
+        cerrar: "menu-usuario-cerrar",
+        temaInterfaz: "menu-usuario-tema-interfaz",
+        claro: "menu-usuario-claro",
+        oscuro: "menu-usuario-oscuro",
+        sistema: "menu-usuario-sistema",
+      });
+    });
+
+    it.each([
+      ["es", es.dashboard],
+      ["en", en.dashboard],
+    ])("has a text in %s for every key it uses, and the English one is not the Spanish one", (locale, dashboard) => {
+      const { t, claves } = traductor();
+      textosMenuUsuario(t);
+      for (const clave of new Set(claves)) {
+        expect(typeof (dashboard as Record<string, unknown>)[clave], `${locale}: ${clave}`).toBe("string");
+      }
+      if (locale === "en") {
+        const enDash = en.dashboard as unknown as Record<string, string>;
+        const esDash = es.dashboard as unknown as Record<string, string>;
+        expect(enDash["menu-usuario-menu"]).toBe("User menu");
+        expect(enDash["menu-usuario-menu"]).not.toBe(esDash["menu-usuario-menu"]);
+        for (const clave of [
+          "menu",
+          "cuenta",
+          "paleta-color",
+          "tono-modo-oscuro",
+          "tipografia-fuente",
+          "diseno-interfaz",
+        ]) {
+          expect(enDash[`menu-usuario-${clave}`], clave).not.toBe(esDash[`menu-usuario-${clave}`]);
+        }
+      }
+    });
   });
 });
