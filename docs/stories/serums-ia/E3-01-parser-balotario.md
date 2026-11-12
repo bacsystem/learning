@@ -24,7 +24,7 @@ Formato observado: preguntas numeradas, alternativas A–D, clave dentro de `<ma
 5. Límite: 1 000 preguntas por archivo; enunciado máx. 2 000 caracteres, alternativa máx. 500.
 6. El resultado guarda el rango de líneas de origen de cada pregunta (trazabilidad).
 7. Se excluye cualquier texto fuera de las preguntas (encabezados, pies de página).
-8. Cada pregunta válida lleva una lista de `alertas_estructura` cuando el parser tuvo que intervenir: `alternativas_separadas` (venían pegadas en una línea), `vinetas_normalizadas`, `html_eliminado`. Sirve para que el admin revise la consistencia estructural en SIA-E3-05 (decisión P2, issue #65); una pregunta sin intervención lleva la lista vacía.
+8. Cada pregunta válida lleva una lista de `alertas_estructura` cuando el parser tuvo que intervenir: `alternativas_separadas` (venían pegadas en una línea), `vinetas_normalizadas`, `html_eliminado`. Sirve para que el admin revise la consistencia estructural en SIA-E3-05 (decisión P2, issue #65); una pregunta sin intervención lleva la lista vacía. `vinetas_normalizadas` se marca solo cuando la pregunta tiene alternativas con viñetas sin letra (`-`, `*`, `•`) o mezcla estilos de etiqueta. Un estilo uniforme con letra (`a)`, `A.`, `a.`) se normaliza en silencio y no genera la alerta (decisión del PO P-B5, 12-nov: así no se mete ruido en la revisión de SIA-E3-05).
 9. **Entrada** (decisión del PO, 12-nov): el parser lee el `contenido` original de la versión vigente de la fuente, no los pasajes. Los números de línea son los del archivo original, los mismos de `pasajes.linea_inicio/linea_fin` (ADR 0003).
 10. **Motivos de «con problemas»** (lista cerrada): `sin_clave`, `enunciado_vacio`, `alternativas_insuficientes` (menos de 2), `alternativas_excedidas` (más de 6), `alternativas_duplicadas`, `numeracion_rota`, `enunciado_largo` (más de 2 000 caracteres) y `alternativa_larga` (más de 500). Si una pregunta tiene varios motivos, se informan todos.
 11. **Numeración rota:** se compara solo con la pregunta inmediatamente anterior. Si su número no es el anterior + 1 (salto o repetición), va a «con problemas» con `numeracion_rota` y el parseo sigue contando desde ese número. Una numeración que vuelve a 1 tras un encabezado de sección cuenta como inicio de secuencia nueva, no como numeración rota.
@@ -120,6 +120,16 @@ Escenario: Alerta de estructura
   Dado "A) Uno B) Dos C) Tres D) Cuatro" en una sola línea
   Cuando se parsea
   Entonces la pregunta es válida y lleva la alerta "alternativas_separadas"
+
+Escenario: Etiquetas uniformes con letra
+  Dado una pregunta con alternativas "a.", "b.", "c." y "d.", una por línea
+  Cuando se parsea
+  Entonces se normalizan a A–D y la pregunta no lleva la alerta "vinetas_normalizadas"
+
+Escenario: Viñetas sin letra o mezcladas
+  Dado una pregunta con alternativas "- Uno", "B) Dos", "• Tres" y "D. Cuatro"
+  Cuando se parsea
+  Entonces se normalizan a A–D y la pregunta lleva la alerta "vinetas_normalizadas"
 
 Escenario: Sin intervención
   Dado una pregunta con una alternativa por línea, etiquetas A–D y sin HTML

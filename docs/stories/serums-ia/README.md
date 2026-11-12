@@ -186,6 +186,10 @@ flowchart TD
     - (e) **Área inicial** (opción A del architect): `preguntas.asignatura_id` sigue siendo obligatoria, sin cambio de esquema. La confirmación del balotario pide un área inicial del proceso, igual que la importación Excel, y esa área es provisional. SIA-E3-05 exige que la solicitud de aprobación incluya el área confirmada; si falta, 422 `falta_area`. La pantalla solo rellena el área con la propuesta de SIA-E3-04, nunca con el área inicial (SIA-E3-03, E3-04, E3-05).
     - (f) **Duplicados del Excel (#165):** no se crea un índice único, porque chocaría con «mantener ambas» de SIA-E3-06 y haría fallar entera una importación atómica. La detección queda en SIA-E3-06.
     - (g) **Proveedor real de IA:** se separa en SIA-E6-10. SIA-E6-02 se diseña y prueba con el doble. Elegir el proveedor requiere la aprobación del usuario.
+    - (h) **P-B4 a P-B6** (contrato de E3-01 y E3-03):
+      - Los balotarios usan la segmentación genérica, con unión, y la cita se resuelve por solape de líneas. Esto revierte la Q7 (ADR 0008).
+      - `vinetas_normalizadas` solo se marca con viñetas sin letra o con estilos mezclados.
+      - La especialidad debe estar entre las profesiones de la fuente (422 `especialidad_invalida`).
 
 ## Límites (aplican donde se citan; los de IA, privacidad y cronograma aprobados en issue #65)
 
