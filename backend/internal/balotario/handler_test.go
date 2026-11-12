@@ -6,16 +6,20 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/fuentes"
 	qt "github.com/cbaciliod/learning/internal/questions/questionstest"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // fx is a mux with one admin and one plain usuario, and a way to publish fuentes.
 type fx struct {
+	fuentes []int64 // the fuentes this test created: the only ones its cleanup removes
 	f       *qt.Fixture
 	db      *sqlx.DB
 	mux     *http.ServeMux
@@ -28,31 +32,51 @@ func nuevoFx(t *testing.T) *fx {
 	t.Helper()
 	db := qt.DB(t)
 	f := qt.Seed(t, db, qt.Options{Asignaturas: []qt.AsignaturaSpec{{NumeroPreguntas: 1, Peso: 100, Unicas: 1}}})
-	var desde int64
-	if err := db.Get(&desde, `SELECT COALESCE(MAX(id), 0) FROM fuentes`); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { limpiarFuentes(t, db, desde) })
 	mux := http.NewServeMux()
 	Mount(mux, NewService(NewRepository(db)), audit.New(db), qt.JWTSecret, qt.AllowSession)
-	return &fx{f: f, db: db, mux: mux, admin: f.Token(t, f.UsuarioID, "admin"), usuario: f.Token(t, f.UsuarioID, "usuario"), src: fuentes.NewPgSource(db)}
+	x := &fx{f: f, db: db, mux: mux, admin: f.Token(t, f.UsuarioID, "admin"), usuario: f.Token(t, f.UsuarioID, "usuario"), src: fuentes.NewPgSource(db)}
+	t.Cleanup(func() { limpiarFuentes(t, db, x.fuentes) })
+	return x
 }
 
-// limpiarFuentes removes what the tests above desde created, imports first.
-func limpiarFuentes(t *testing.T, db *sqlx.DB, desde int64) {
+// seq makes every content unique: the hash of a version is unique in the whole
+// database and other packages share it.
+var seq atomic.Int64
+
+// unico appends a heading after a blank line: it closes the last question and
+// adds no question, so the lines of the content do not move.
+func unico(contenido string) string {
+	return fmt.Sprintf("%s\n\n# %d-%d\n", contenido, time.Now().UnixNano(), seq.Add(1))
+}
+
+// guardar stores a fuente (not yet published) and remembers it for the cleanup.
+func (x *fx) guardar(t *testing.T, nueva fuentes.NuevaFuente) (int64, int) {
+	t.Helper()
+	nueva.Contenido = []byte(unico(string(nueva.Contenido)))
+	id, v, err := x.src.GuardarFuente(context.Background(), nueva, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	x.fuentes = append(x.fuentes, id)
+	return id, v
+}
+
+// limpiarFuentes removes the given fuentes, imports first. It never touches
+// the rows of other tests: the packages share the database.
+func limpiarFuentes(t *testing.T, db *sqlx.DB, ids []int64) {
 	t.Helper()
 	for _, q := range []string{
 		// The questions of an import hold citations to the passages: they go first.
 		`DELETE FROM preguntas WHERE id IN (SELECT pregunta_id FROM pregunta_balotario
-			WHERE importacion_id IN (SELECT id FROM balotario_importaciones WHERE fuente_id > $1))`,
-		`DELETE FROM balotario_importaciones WHERE fuente_id > $1`,
-		`UPDATE fuentes SET version_vigente_id = NULL, estado = 'procesando', motivo_retiro = NULL WHERE id > $1`,
-		`DELETE FROM pasajes WHERE fuente_version_id IN (SELECT id FROM fuente_versiones WHERE fuente_id > $1)`,
-		`DELETE FROM fuente_versiones WHERE fuente_id > $1`,
-		`DELETE FROM fuente_especialidades WHERE fuente_id > $1`,
-		`DELETE FROM fuentes WHERE id > $1`,
+			WHERE importacion_id IN (SELECT id FROM balotario_importaciones WHERE fuente_id = ANY($1)))`,
+		`DELETE FROM balotario_importaciones WHERE fuente_id = ANY($1)`,
+		`UPDATE fuentes SET version_vigente_id = NULL, estado = 'procesando', motivo_retiro = NULL WHERE id = ANY($1)`,
+		`DELETE FROM pasajes WHERE fuente_version_id IN (SELECT id FROM fuente_versiones WHERE fuente_id = ANY($1))`,
+		`DELETE FROM fuente_versiones WHERE fuente_id = ANY($1)`,
+		`DELETE FROM fuente_especialidades WHERE fuente_id = ANY($1)`,
+		`DELETE FROM fuentes WHERE id = ANY($1)`,
 	} {
-		if _, err := db.Exec(q, desde); err != nil {
+		if _, err := db.Exec(q, pq.Array(ids)); err != nil {
 			t.Errorf("cleanup %q: %v", q, err)
 		}
 	}
@@ -69,11 +93,8 @@ func (x *fx) publicar(t *testing.T, tipo, contenido string, rangos [][2]int) int
 func (x *fx) publicarPara(t *testing.T, tipo, contenido string, rangos [][2]int, especialidades []int64) int64 {
 	t.Helper()
 	ctx := context.Background()
-	id, v, err := x.src.GuardarFuente(ctx, fuentes.NuevaFuente{Titulo: "Fuente " + fmt.Sprint(len(contenido)) + tipo, Tipo: tipo,
-		EspecialidadIDs: especialidades, NombreArchivo: "secreto.md", Contenido: []byte(contenido)}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	id, v := x.guardar(t, fuentes.NuevaFuente{Titulo: "Fuente " + fmt.Sprint(len(contenido)) + tipo, Tipo: tipo,
+		EspecialidadIDs: especialidades, NombreArchivo: "secreto.md", Contenido: []byte(contenido)})
 	ps := make([]fuentes.PasajeNuevo, len(rangos))
 	for i, r := range rangos {
 		ps[i] = fuentes.PasajeNuevo{Orden: i + 1, LineaInicio: r[0], LineaFin: r[1], Texto: fmt.Sprintf("pasaje %d", i+1), Palabras: 2}
@@ -123,11 +144,8 @@ func TestVistaPrevia_Validaciones(t *testing.T) {
 	if _, err := x.db.Exec(`UPDATE fuentes SET estado = 'retirada', motivo_retiro = 'prueba' WHERE id = $1`, retirada); err != nil {
 		t.Fatal(err)
 	}
-	procesando, _, err := x.src.GuardarFuente(context.Background(), fuentes.NuevaFuente{Titulo: "En proceso", Tipo: "balotario",
-		NombreArchivo: "p.md", Contenido: []byte("proceso " + todo)}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	procesando, _ := x.guardar(t, fuentes.NuevaFuente{Titulo: "En proceso", Tipo: "balotario",
+		NombreArchivo: "p.md", Contenido: []byte("proceso " + todo)})
 	enorme := x.publicar(t, "balotario", bloques(1005), [][2]int{{1, 4020}})
 
 	tests := []struct {

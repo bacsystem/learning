@@ -12,6 +12,7 @@ import (
 
 	"github.com/cbaciliod/learning/internal/fuentes"
 	qt "github.com/cbaciliod/learning/internal/questions/questionstest"
+	"github.com/lib/pq"
 )
 
 func rutaConfirmar(id int64) string {
@@ -129,7 +130,7 @@ func TestConfirmar_Validaciones(t *testing.T) {
 		})
 	}
 	// None of the refusals created anything.
-	if n := x.contar(t, `SELECT COUNT(*) FROM balotario_importaciones WHERE fuente_id > $1`, activo-1); n != 0 {
+	if n := x.contar(t, `SELECT COUNT(*) FROM balotario_importaciones WHERE fuente_id = ANY($1)`, pq.Array(x.fuentes)); n != 0 {
 		t.Errorf("importaciones creadas por las negativas: %d", n)
 	}
 }
@@ -254,6 +255,7 @@ func TestConfirmar_CreaBorradoresConTrazabilidad(t *testing.T) {
 // it with one passage per range of lines; it returns its number.
 func publicarVersion(t *testing.T, x *fx, fuenteID int64, contenido string, rangos [][2]int) int {
 	t.Helper()
+	contenido = unico(contenido)
 	sha, tamano, lineas := fuentes.Huella([]byte(contenido))
 	var numero int
 	if err := x.db.Get(&numero, `INSERT INTO fuente_versiones (fuente_id, numero, nombre_archivo, sha256, tamano_bytes, lineas, contenido)
