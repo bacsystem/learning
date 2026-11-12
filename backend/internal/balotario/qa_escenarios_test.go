@@ -269,6 +269,24 @@ func TestQA_E301(t *testing.T) {
 			t.Fatalf("%+v", pr)
 		}
 	})
+	t.Run("referencia al pie tras línea en blanco (S. Pérez, 2020) → válida, 4 alternativas", func(t *testing.T) {
+		p := unaValida(t, "1. P\nA) a\nB) b\nC) c\n<mark>D) d</mark>\n\nS. Pérez, 2020\n")
+		if letras(p) != "ABCD" || tiene(p.Alertas, "etiquetas_ambiguas") || strings.Contains(p.Alternativas[3].Texto, "Pérez") {
+			t.Fatalf("%+v", p)
+		}
+	})
+	t.Run("tras blanco, G tras F continúa la pregunta → alternativas_excedidas", func(t *testing.T) {
+		pr := unProblema(t, "1. P\nA) a\nB) b\nC) c\nD) d\nE) e\n<mark>F) f</mark>\n\nG) g\n")
+		if !tiene(pr.Motivos, "alternativas_excedidas") {
+			t.Fatalf("%+v", pr)
+		}
+	})
+	t.Run("tras blanco, G–Z que no es la siguiente cierra la pregunta como texto fuera", func(t *testing.T) {
+		p := unaValida(t, "1. P\nA) a\nB) b\nC) c\n<mark>D) d</mark>\n\nG) nota al pie\n")
+		if letras(p) != "ABCD" || p.Alternativas[3].Texto != "d" {
+			t.Fatalf("%+v", p)
+		}
+	})
 	t.Run("regla 10: más de 6 alternativas", func(t *testing.T) {
 		pr := unProblema(t, "1. P\nA) a\nB) b\nC) c\nD) d\nE) e\nF) f\n<mark>G) g</mark>\n")
 		if !tiene(pr.Motivos, "alternativas_excedidas") && !tiene(pr.Motivos, "etiquetas_ambiguas") {

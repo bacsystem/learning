@@ -639,3 +639,19 @@ func TestParsear_LetrasGaZ(t *testing.T) {
 		comprobarValidas(t, r.Validas, []esperada{{1, 1, 4, "Infección por S. aureus", "unica", alts("Uno", "*Dos"), sinAlertas()}})
 	})
 }
+
+// A letter G–Z after a blank line is text that follows the question: the blank
+// line closes it, as it always did. Only the next letter (G after F) goes on.
+func TestParsear_LetrasGaZTrasLineaEnBlanco(t *testing.T) {
+	r := parsear(t, "1. P\nA) Uno\n<mark>B) Dos</mark>\n\nS. Pérez, 2020\n")
+	comprobarValidas(t, r.Validas, []esperada{{1, 1, 3, "P", "unica", alts("Uno", "*Dos"), sinAlertas()}})
+
+	seis := "1. P\nA) 1\nB) 2\nC) 3\nD) 4\nE) 5\n<mark>F) 6</mark>\n\n"
+	if got := fmt.Sprint(motivosDe(parsear(t, seis+"G) 7\n"))); got != "[1@1-9:alternativas_excedidas]" {
+		t.Errorf("G tras F y un blanco: %s", got)
+	}
+	// A–F that go back after a blank line stay ambiguous (the blank line is not a footer).
+	if got := fmt.Sprint(motivosDe(parsear(t, "1. P\nA) Uno\n<mark>B) Dos</mark>\n\nA) otra\n"))); got != "[1@1-5:etiquetas_ambiguas]" {
+		t.Errorf("A tras un blanco: %s", got)
+	}
+}
