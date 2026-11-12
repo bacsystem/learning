@@ -64,6 +64,19 @@ export interface Estadistica {
   indice_discriminacion: number;
 }
 
+/** Ciclo de vida (SIA-E3-02, docs/api/serums-ia-e3-02-ciclo-preguntas.md §3). `activo` es el banco heredado. */
+export type EstadoPregunta = "borrador" | "en_revision" | "aprobada" | "rechazada" | "activo" | "eliminada";
+export type OrigenPregunta = "manual" | "balotario" | "ia";
+
+/** Cita a un pasaje de una fuente (§4.4); solo en el detalle (`GET /preguntas/{id}`). */
+export interface CitaPregunta {
+  pasaje_id: number;
+  fuente_id: number;
+  version: number;
+  fuente_titulo: string;
+  fuente_estado: string;
+}
+
 export interface Pregunta {
   id: number;
   proceso_id: number;
@@ -78,7 +91,14 @@ export interface Pregunta {
   enunciado: string;
   tipo: "unica" | "multiple";
   dificultad: "facil" | "medio" | "dificil";
-  estado: "activo" | "eliminada";
+  estado: EstadoPregunta;
+  /** SIA-E3-02 §4.4. Opcionales hasta que el backend de E3-02 esté desplegado. */
+  origen?: OrigenPregunta;
+  motivo_rechazo?: string | null;
+  /** Solo en el detalle. */
+  citas?: CitaPregunta[];
+  /** Solo en el listado. */
+  citas_count?: number;
   etiquetas: string[];
   /** Ids of `etiquetas` (detail view; empty in list views). */
   etiqueta_ids: number[];
@@ -235,7 +255,9 @@ export interface PreguntaListQuery {
   especialidad_id?: number;
   dificultad?: string;
   etiqueta_id?: number;
-  estado?: string;
+  /** Valor exacto; sin filtro salen todas las no eliminadas (`eliminada` no se lista). */
+  estado?: Exclude<EstadoPregunta, "eliminada">;
+  origen?: OrigenPregunta;
   search?: string;
   page?: number;
   per_page?: number;

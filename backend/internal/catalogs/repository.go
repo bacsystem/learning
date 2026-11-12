@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/cbaciliod/learning/internal/audit"
+	"github.com/cbaciliod/learning/internal/questions"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -764,7 +765,7 @@ func (r *Repository) listProcesoAsignaturas(ctx context.Context, filtro string, 
 		       (SELECT COUNT(*) FROM preguntas p
 		        WHERE p.proceso_id = pa.proceso_id
 		          AND p.asignatura_id = pa.asignatura_id
-		          AND p.estado = 'activo'
+		          AND `+questions.PreguntaServible("p")+`
 		          AND ($2 = 0 OR p.grado_id = $2 OR p.grado_id IS NULL)
 		          AND ($3::bigint = 0 OR p.especialidad_id = $3 OR p.especialidad_id IS NULL)) AS preguntas_disponibles
 		FROM proceso_asignaturas pa

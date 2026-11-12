@@ -31,6 +31,9 @@ una copia fuera de Railway. **Nunca** se reutiliza un valor de
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM` | los del proveedor de correo | no |
 | `SMTP_PASSWORD` | la del proveedor | **sí** |
 | `LOG_LEVEL` | vacío (`info`) | no |
+| `IA_PROVEEDOR` | **vacío** hasta E6-02 (IA deshabilitada). Nunca `doble`: con `ENV=production` el backend no arranca | no |
+| `IA_API_KEY` | solo con el adaptador real (E6-02) | **sí** |
+| `IA_MODELO` | solo con el adaptador real (E6-02) | no |
 | `MIGRATE_LOCK_TIMEOUT` | `10m` | no |
 | `RAILWAY_HEALTHCHECK_TIMEOUT_SEC` | `660` | no |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | `45` | no |
