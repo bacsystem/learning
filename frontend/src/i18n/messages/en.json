@@ -580,7 +580,6 @@
     "admin-preguntas-limpiar-filtros": "Clear filters",
     "admin-preguntas-acciones": "Actions",
     "admin-preguntas-acciones-de": "Actions for question {id}",
-    "admin-preguntas-sin-resultados-filtros": "No questions match the selected filters.",
     "admin-preguntas-vacio": "There are no questions in the bank yet. Create the first one with “New question” or import them from a CSV.",
     "admin-preguntas-unidad": "questions in the bank",
     "admin-preguntas-eliminar-titulo": "Delete question",
@@ -1306,21 +1305,35 @@
           "sinActivos": "There are no active topics to order.",
           "minimo": "At least 2 active topics are needed.",
           "mover": "Move"
+        },
+        "errores": {
+          "validacion": "Check the form data.",
+          "referencia_invalida": "One of the specialties or the subject is no longer active. Reload and try again.",
+          "estado_invalido": "The topic is already in that state. Reload the list.",
+          "no_encontrado": "The topic no longer exists. Reload the list."
         }
       },
       "errores": {
-        "validacion": "Check the form data.",
-        "referencia_invalida": "One of the specialties or the subject is no longer active. Reload and try again.",
+        "validacion": "Check the data and try again.",
+        "referencia_invalida": "A related item is no longer valid. Reload and try again.",
         "tema_duplicado": "A topic with that name already exists in this subject (it may be archived: reactivate it).",
         "limite_temas": "This subject already has 60 active topics. Archive one to free a slot.",
         "orden_invalido": "The order list is not valid.",
         "orden_desactualizado": "The topics changed while you were ordering. Reload the list and order again.",
-        "estado_invalido": "The topic is already in that state. Reload the list.",
-        "no_encontrado": "The topic no longer exists. Reload the list.",
+        "estado_invalido": "The data changed in the meantime. Reload and try again.",
+        "no_encontrado": "The item no longer exists. Reload the list.",
         "error_interno": "Internal server error. Please try again.",
         "cuerpo_demasiado_grande": "The data sent is too large. Shorten the text and try again.",
         "clave_oficial": "The official answer key of a past-exam question cannot be changed.",
-        "generico": "The operation could not be completed. Try again."
+        "fuente_no_activa": "One of the sources is no longer active. Review the citations and try again.",
+        "limite_citas": "A question allows at most {maximo} citations. Remove one to add another.",
+        "ultima_cita_activa": "You cannot remove the last active citation of an approved question. Add another citation before removing this one.",
+        "generico": "The operation could not be completed. Try again.",
+        "falta_cita": "The question needs at least one citation to an active source.",
+        "verificacion_requerida": "Tick the verification box before approving.",
+        "nota_obligatoria": "Write a review note of {min} to {max} characters.",
+        "conflicto_clave": "This question has an unresolved answer-key conflict.",
+        "revision_especializada": "This question is reviewed in its specialised queue, not from here."
       },
       "pesos": {
         "titulo": "Weights for {especialidad}",
@@ -1633,9 +1646,83 @@
         "activo": "Active (legacy)",
         "eliminada": "Deleted"
       },
+      "revision": {
+        "listado": {
+          "columnaOrigen": "Origin",
+          "columnaCitas": "Citations",
+          "filtroOrigenTodos": "Origin: all",
+          "origenes": {
+            "manual": "Manual",
+            "balotario": "Past exam",
+            "ia": "AI"
+          },
+          "vacio": "No questions match that filter",
+          "verDetalle": "View citations"
+        },
+        "citas": {
+          "tituloPagina": "Citations of question #{id}",
+          "volver": "Questions",
+          "enunciado": "Statement",
+          "titulo": "Current citations",
+          "contador": "{n, plural, one {# citation} other {# citations}} of {maximo}",
+          "vacio": "This question has no citations yet.",
+          "cargando": "Loading the question…",
+          "errorCarga": "The question could not be loaded.",
+          "noEncontrada": "The question does not exist or was deleted.",
+          "version": "Version {n}",
+          "lineas": "Lines {inicio}–{fin}",
+          "seccion": "Section: {seccion}",
+          "fuenteRetirada": "Source withdrawn",
+          "fuenteActiva": "Active source",
+          "verTexto": "View the full passage",
+          "quitar": "Remove citation",
+          "quitarDe": "Remove the citation from “{fuente}”",
+          "guardando": "Saving citations…",
+          "guardadas": "Citations updated.",
+          "buscador": {
+            "titulo": "Search passages",
+            "etiqueta": "Search the active sources",
+            "placeholder": "E.g.: arterial hypertension",
+            "ayuda": "Type between {min} and {max} characters.",
+            "buscar": "Search",
+            "buscando": "Searching…",
+            "sinResultados": "No results",
+            "errorBusqueda": "The search failed. Try again.",
+            "resultados": "{n, plural, one {# result} other {# results}}",
+            "anadir": "Add citation",
+            "anadirDe": "Add the citation from “{fuente}”",
+            "yaCitado": "Already cited",
+            "limiteAlcanzado": "The maximum number of citations was reached."
+          }
+        },
+        "acciones": {
+          "titulo": "Review",
+          "motivoRechazo": "Rejection reason",
+          "verificado": "I have verified the question and its key against the citation",
+          "aprobar": "Approve",
+          "revalidar": "Revalidate",
+          "rechazar": "Reject",
+          "reabrir": "Reopen",
+          "seRevisaEnCola": "Reviewed in its queue",
+          "sinAcciones": "There are no review actions for the current state.",
+          "nota": "Review note",
+          "notaObligatoria": "The note is required (at least {min} characters).",
+          "notaOpcional": "Optional, up to {max} characters.",
+          "notaAyuda": "Between {min} and {max} characters.",
+          "motivo": "Rejection reason",
+          "motivoMinimo": "Write at least {min} characters.",
+          "motivoAyuda": "Between {min} and {max} characters.",
+          "procesando": "Saving…",
+          "rechazarTitulo": "Reject the question",
+          "reabrirAyuda": "It goes back to draft so you can fix it and cite it again."
+        }
+      },
       "preguntas": {
         "errores": {
-          "estado_invalido": "This question changed state; the view was refreshed."
+          "estado_invalido": "This question changed state; the view was refreshed.",
+          "no_encontrado": "The question no longer exists or was deleted.",
+          "validacion": "Check the submitted data: a passage may be repeated.",
+          "referencia_invalida": "One of the passages no longer exists. The citation list was refreshed."
         }
       }
     },
@@ -1702,12 +1789,6 @@
         "correcta": "Successful",
         "fallida": "Failed"
       }
-    },
-    "admin-preguntas-origen": "Origin",
-    "admin-preguntas-origen-manual": "Manual",
-    "admin-preguntas-origen-balotario": "Question bank",
-    "admin-preguntas-origen-ia": "AI",
-    "admin-preguntas-filtro-origen-todos": "Origin: all",
-    "admin-preguntas-citas": "Citations"
+    }
   }
 }

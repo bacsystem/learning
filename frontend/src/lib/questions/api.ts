@@ -75,6 +75,20 @@ export interface CitaPregunta {
   version: number;
   fuente_titulo: string;
   fuente_estado: string;
+  /** SIA-E3-07 §5: ubicación y texto del pasaje citado (`texto` es el pasaje completo, en texto plano). */
+  seccion: string | null;
+  linea_inicio: number;
+  linea_fin: number;
+  extracto: string;
+  texto: string;
+}
+
+/** Cuerpo de `PATCH /preguntas/{id}/estado` (SIA-E3-07 §3.1). */
+export interface CambiarEstadoPayload {
+  estado: "aprobada" | "rechazada" | "borrador" | "en_revision";
+  motivo?: string | null;
+  verificado?: boolean | null;
+  nota?: string | null;
 }
 
 export interface Pregunta {
@@ -297,6 +311,19 @@ export const questionsApi = {
 
   deletePregunta(token: string, id: number): Promise<void> {
     return req<void>(`/preguntas/${id}`, token, { method: "DELETE" });
+  },
+
+  /** `PATCH /preguntas/{id}/estado` (SIA-E3-07 §3). Sin pantalla hasta SIA-E3-09. */
+  cambiarEstado(token: string, id: number, payload: CambiarEstadoPayload): Promise<Pregunta> {
+    return req<Pregunta>(`/preguntas/${id}/estado`, token, { method: "PATCH", body: JSON.stringify(payload) });
+  },
+
+  /** `PUT /preguntas/{id}/citas` (SIA-E3-07 §4): la lista reemplaza el conjunto de citas, siempre completa. */
+  reemplazarCitas(token: string, id: number, pasajeIds: number[]): Promise<Pregunta> {
+    return req<Pregunta>(`/preguntas/${id}/citas`, token, {
+      method: "PUT",
+      body: JSON.stringify({ pasaje_ids: pasajeIds }),
+    });
   },
 
   getStats(token: string): Promise<StatsGlobales> {
