@@ -6,10 +6,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/cbaciliod/learning/internal/audit"
+	"github.com/cbaciliod/learning/internal/db"
 	"github.com/cbaciliod/learning/internal/db/pii"
 	"github.com/jmoiron/sqlx"
 )
@@ -337,20 +337,13 @@ type auditLogRow struct {
 	CreatedAt time.Time      `db:"created_at"`
 }
 
-func escapeLike(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `%`, `\%`)
-	s = strings.ReplaceAll(s, `_`, `\_`)
-	return s
-}
-
 func (r *Repository) GetAuditLog(ctx context.Context, page, perPage int, from, to, q string) (*AuditLogResponse, error) {
 	offset := int64(page-1) * int64(perPage)
 
 	// Build dynamic params
 	fromParam := sql.NullString{String: from, Valid: from != ""}
 	toParam := sql.NullString{String: to, Valid: to != ""}
-	q = escapeLike(q)
+	q = db.EscapeLike(q)
 
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT al.id, al.usuario_id, COALESCE(u.username,'') AS username,

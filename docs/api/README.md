@@ -9,8 +9,10 @@ Convenciones transversales para todos los endpoints del módulo «Aprendizaje as
 | [serums-ia-e3-02-ciclo-preguntas.md](serums-ia-e3-02-ciclo-preguntas.md) | E3-02 (MVP) | borrador para revisión (2026-11-11) |
 | [serums-ia-e3-07-revision-basica.md](serums-ia-e3-07-revision-basica.md) | E3-07 (MVP); extiende E3-02 | borrador para revisión (2026-11-11); ADR [0007](../adr/0007-busqueda-pasajes-admin-fuera-del-puerto.md) |
 | [serums-ia-e6-01-servicio-ia.md](serums-ia-e6-01-servicio-ia.md) | E6-01 (MVP), contrato interno Go | borrador para revisión (2026-11-11); ADR [0006](../adr/0006-puerto-servicio-ia.md) |
+| [serums-ia-e3-01-e3-03-balotario.md](serums-ia-e3-01-e3-03-balotario.md) | E3-01 y E3-03 (MVP) | borrador para revisión (2026-11-12), con todas las decisiones del PO aplicadas (D1–D13, P-B1–P-B7); ADR [0008](../adr/0008-balotario-parser-bajo-demanda-y-cita-por-rango.md) |
+| [serums-ia-e6-02-control-costos.md](serums-ia-e6-02-control-costos.md) | E6-02 (MVP); extiende E6-01 | borrador para revisión (2026-11-12); ADR [0009](../adr/0009-control-costos-ia-reserva-sincrona.md) |
 
-ADRs: [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones), [0005](../adr/0005-estado-operativo-panel-salud.md) estado operativo del panel de salud, [0006](../adr/0006-puerto-servicio-ia.md) puerto del servicio de IA, [0007](../adr/0007-busqueda-pasajes-admin-fuera-del-puerto.md) búsqueda de pasajes para el admin. Contrato de la épica de plataforma PLT-E1: [plataforma-salud.md](plataforma-salud.md).
+ADRs: [0008](../adr/0008-balotario-parser-bajo-demanda-y-cita-por-rango.md) parser del balotario bajo demanda y cita por rango de líneas (enmienda la 0003), [0009](../adr/0009-control-costos-ia-reserva-sincrona.md) control de costos de IA con reserva síncrona; [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones), [0005](../adr/0005-estado-operativo-panel-salud.md) estado operativo del panel de salud, [0006](../adr/0006-puerto-servicio-ia.md) puerto del servicio de IA, [0007](../adr/0007-busqueda-pasajes-admin-fuera-del-puerto.md) búsqueda de pasajes para el admin. Contrato de la épica de plataforma PLT-E1: [plataforma-salud.md](plataforma-salud.md).
 
 Un cambio a un contrato ya publicado se avisa directamente a backend-dev, frontend-dev y al tech-lead.
 
@@ -64,15 +66,24 @@ El repo tiene dos formatos:
 - **Excepciones (respuestas que no salen del handler):**
   - `RequireAuth` y `RequireAdmin` responden `{"error": "No autenticado." | "Sesión revocada." | "Acceso denegado."}` (`auth/middleware.go:38,44,52,57,73`);
   - `RequireAuth` responde `503 {"error": "Servicio no disponible."}` cuando la comprobación de la sesión falla por un error de la BD. El 401 queda solo para una sesión inexistente, expirada o revocada ([ADR 0005](../adr/0005-estado-operativo-panel-salud.md); cambio pendiente de implementar);
-  - `MaxBodySize` responde `413 {"error": "El cuerpo de la solicitud es demasiado grande."}` (`middleware/bodylimit.go:42-44`) cuando el `Content-Length` declarado ya supera el límite.
+  - `MaxBodySize` responde 413 (`middleware/bodylimit.go:42-44`) cuando el `Content-Length` declarado ya supera el límite. Hoy responde `{"error": "El cuerpo de la solicitud es demasiado grande."}`. **Cambia con #140 / #172** (backend-dev-2) al formato 2:
+    - `archivo_demasiado_grande` cuando se aplicó el techo multipart, es decir, en una ruta de subida registrada y con `multipart/form-data` (`bodylimit.go:38-41`);
+    - `cuerpo_demasiado_grande` en el resto de los casos.
 
-  El frontend trata esos status (401, 403, 413 y 503 de middleware) **por status** y no por código. Solo el 401 dispara `auth:expired`. Si hay `message`, el código está en `error`; si no, `error` es texto.
+    El mensaje es el mismo y no hay `detalle`.
+
+    **Orden obligatorio (decisión del architect, 2026-11-12, review del #172):** el middleware es global y no distingue rutas del módulo. Los clientes viejos leen `body.error` como texto: `auth-api.ts`, admin (importar personas), inscripciones, notifications, practices y simulations. Si recibieran el formato 2, mostrarían el código crudo (p. ej. `archivo_demasiado_grande`).
+    - Por eso el **#172 se mergea después** de que frontend-dev pase esos clientes a `apiErrorFrom` (`body.message ?? body.error`, con el código aparte), dentro del alcance del #163.
+    - Hasta entonces, el 413 del middleware se queda con el formato heredado.
+    - No se adopta un formato por ruta (heredado fuera de serums-ia): duplicaría la lógica en un middleware global y dejaría dos contratos para el mismo error.
+
+  El frontend trata esos status (401, 403, 503 y, hasta el #172, el 413 del middleware) **por status** y no por código. Solo el 401 dispara `auth:expired`. Si hay `message`, el código está en `error`; si no, `error` es texto.
 - **Cuerpo demasiado grande en el handler (convención):** sin `Content-Length` (p. ej. `Transfer-Encoding: chunked`), el middleware no rechaza la petición: envuelve el cuerpo en `http.MaxBytesReader` (`bodylimit.go:46`). Pasado el límite, la lectura falla dentro del handler con `*http.MaxBytesError`.
   - **Regla:** todo handler del módulo que decodifica un cuerpo JSON comprueba `var mbe *http.MaxBytesError; errors.As(err, &mbe)` **antes** de responder `400 cuerpo_invalido`. Si es ese error, responde `413` con el formato 2: `{"error": "cuerpo_demasiado_grande", "message": "El cuerpo de la solicitud es demasiado grande."}`.
   - Precedente: hoy solo `auth` hace este mapeo (`internal/auth/handler.go:58-65`), con el formato heredado. Los handlers de temas responden 400 (`internal/temas/handler.go:255-264`, `decodificar`) y deben corregirse (tarea de backend-dev).
   - Las subidas multipart siguen usando su propio código, `413 archivo_demasiado_grande` (E2 S1 paso 1).
   - Alcance: los endpoints nuevos del módulo con cuerpo. Los endpoints existentes fuera del módulo no cambian.
-  - El frontend trata `cuerpo_demasiado_grande` por código, con su clave i18n (§8). El 413 del middleware sigue tratándose por status.
+  - El frontend trata `cuerpo_demasiado_grande` por código, con su clave i18n (§8). El 413 del middleware se trata **por status** hasta el #172. Desde entonces lleva código, y el cliente lo resuelve con `apiErrorFrom`.
 - **Frontend (tarea de frontend-dev):** los clientes usan **`body.message ?? body.error`** como texto y guardan el código aparte:
 
   ```ts
@@ -109,9 +120,9 @@ El repo tiene dos formatos:
 | 403 | Sin rol (middleware) o sin inscripción aprobada | `inscripcion_requerida` |
 | 404 | Recurso inexistente o ajeno | `no_encontrado` o uno específico (`profesion_no_definida`) |
 | 409 | Estado del recurso incompatible con la acción, duplicados de identidad, datos desactualizados | `estado_invalido`, `orden_desactualizado`, `peso_duplicado`, `fuente_duplicada`, `confirmacion_requerida`, `formato_no_configurado`, `tiempo_agotado` |
-| 413 | Archivo o cuerpo demasiado grande | `archivo_demasiado_grande` (multipart), `cuerpo_demasiado_grande` (JSON leído en el handler, §3), texto del middleware |
+| 413 | Archivo o cuerpo demasiado grande | `archivo_demasiado_grande` (multipart), `cuerpo_demasiado_grande` (JSON leído en el handler, §3). El middleware responde con texto heredado hasta el #172 y después con esos mismos dos códigos (§3) |
 | 422 | Validación semántica y límites de negocio | `validacion`, `referencia_invalida`, `limite_*`, más los específicos de cada épica |
-| 429 | Límite de uso (cuotas de IA, exportaciones; épicas posteriores) | `limite_uso` |
+| 429 | Límite de uso: cuotas de IA (E6-02), solicitudes abiertas (E5-06) y exportaciones (épicas posteriores) | `limite_ia`, `limite_ia_mensual`, `presupuesto_agotado` (E6-02); cada historia nombra su propio código, y `limite_uso` ya no se usa |
 | 500 | Error inesperado | `error_interno` |
 
 - Los handlers existentes mezclan 400 y 422 para la validación (`catalogs/handler.go:100,190`). En el módulo, **toda** validación de reglas da 422 y 400 queda solo para errores de sintaxis.
@@ -142,7 +153,11 @@ Catálogo de códigos usados por E1, E2 y E3:
 | `cita_invalida` | — (error del puerto Go, sin HTTP en MVP) | E2-02 |
 | `falta_cita`, `clave_oficial` | 422 | E3-02 |
 | `verificacion_requerida`, `nota_obligatoria`, `limite_citas`, `fuente_no_activa` | 422 | E3-07 |
-| `revision_especializada`, `ultima_cita_activa`, `conflicto_clave` (reservado, E3-01/E3-03) | 409 | E3-07 |
+| `revision_especializada`, `ultima_cita_activa` | 409 | E3-07 |
+| `conflicto_clave` (reservado en E3-07 §3.2, paso 8; **nace y se activa con E3-06**) | 409 | E3-06 |
+| `ya_importado`, `version_desactualizada` | 409 | E3-03 |
+| `tipo_fuente_invalido`, `especialidad_no_corresponde`, `sin_validas` (y se reutiliza `especialidad_invalida`, con el sentido de E1-04); `limite_preguntas` con otro sentido (clave de recurso `balotario`) | 422 | E3-01, E3-03 |
+| `limite_ia`, `limite_ia_mensual`, `presupuesto_agotado` | 429 | E6-02 |
 | `error_interno` | 500 | todas |
 
 ## 5. Paginación
@@ -157,7 +172,7 @@ Catálogo de códigos usados por E1, E2 y E3:
 
 | Límite | Valor | Dónde se aplica |
 |---|---|---|
-| Cuerpo JSON | 1 MB: 413 del middleware si el `Content-Length` lo supera; `413 cuerpo_demasiado_grande` del handler si se supera al leer (§3) | `middleware/bodylimit.go:10,42-46`, global en `cmd/server/main.go:138-144` |
+| Cuerpo JSON | 1 MB: 413 del middleware si el `Content-Length` lo supera (formato heredado hasta el #172, después `cuerpo_demasiado_grande`; §3); `413 cuerpo_demasiado_grande` del handler si se supera al leer | `middleware/bodylimit.go:10,42-46`, global en `cmd/server/main.go:138-144` |
 | Subida multipart | techo global de 20 MB solo para rutas registradas; cada handler aplica su propio `http.MaxBytesReader` | `bodylimit.go:11,26-49`. Una ruta de subida nueva **debe** añadirse a la lista de `main.go:138-143`, que compara `r.URL.Path` exacto: no puede llevar `{id}` |
 | Archivo `.md` de fuente | 2 MiB, 20 000 líneas, UTF-8, `.md`, `text/markdown` o `text/plain` | E2 S1/S2 |
 | Texto libre (notas, motivos) | ≤ 500 caracteres; el mínimo lo fija cada regla | README de historias:174 |
@@ -178,6 +193,8 @@ Catálogo de códigos usados por E1, E2 y E3:
 | `pesos.guardar` | `proceso` / id | E1-03 |
 | `fuente.crear`, `fuente.version_crear`, `fuente.editar`, `fuente.retirar`, `fuente.restaurar`, `fuente.reintentar`, `fuente.marcar_oficial`, `fuente.desmarcar_oficial` | `fuente` / id | E2-03, E2-06 |
 | `fuente.procesar`, `fuente.fallar` (actor `NULL`, worker) | `fuente` / id | E2-03, E2-06 |
+| `balotario.importar` | `fuente` / id | E3-03 |
+| `ia.configurar` | `ia_configuracion` / 1 | E6-02 |
 
 - **`detalle`:** antes y después resumido, estados anterior y nuevo, ids y hashes. **Nunca** lleva datos personales, el contenido de fuentes ni textos de preguntas. Los motivos y notas que escribe el admin sí se guardan, porque la regla 9 de E2-06 lo exige.
 - Las acciones del postulante (p. ej. elegir profesión) no se auditan en `audit_log`.
@@ -189,13 +206,15 @@ Catálogo de códigos usados por E1, E2 y E3:
 
   | Nivel | Clave | Qué códigos |
   |---|---|---|
-  | Recurso | `dashboard.serumsIa.<recurso>.errores.<codigo>` | Los **cuatro códigos comunes**, que cambian de sentido según el recurso: `estado_invalido`, `no_encontrado`, `validacion` y `referencia_invalida`. Cada pantalla define los que usa en su recurso: `temas`, `pesos`, `profesion`, `fuentes` y `preguntas` |
+  | Recurso | `dashboard.serumsIa.<recurso>.errores.<codigo>` | Dos grupos:<br>• los **cuatro códigos comunes**, que cambian de sentido según el recurso: `estado_invalido`, `no_encontrado`, `validacion` y `referencia_invalida`;<br>• **los que un contrato marque con «recurso `<recurso>`»** en la columna de clave i18n de su tabla de errores (p. ej. contrato del balotario §7), porque el mismo código ya tiene otro sentido en otra épica. Hoy es solo `limite_preguntas` en `balotario`: en E1-03 es «Σ ≤ 200 preguntas del formato» y en E3-03, «más de 1 000 preguntas en el archivo».<br>Cada pantalla define los que usa en su recurso: `temas`, `pesos`, `profesion`, `fuentes`, `preguntas`, `balotario` e `ia`. Todo código nuevo que choque con uno existente se marca así en su contrato y se suma a esta lista |
   | Módulo | `dashboard.serumsIa.errores.<codigo>` | Los códigos con **un solo sentido** en todo el módulo, una clave por código reutilizada en todas las pantallas: los específicos (`tema_duplicado`, `falta_cita`, `fuente_no_activa`, `limite_citas`, `clave_oficial`…), los transversales (`error_interno`, `cuerpo_demasiado_grande`) y `generico`. Además, los cuatro códigos comunes con un **texto neutro**, válido para cualquier recurso (p. ej. `estado_invalido`: «Los datos cambiaron mientras tanto. Recarga y vuelve a intentarlo.») |
 
   - **Resolución, en orden:** `<recurso>.errores.<codigo>` → `errores.<codigo>` → `errores.generico`. Es la misma función para todas las pantallas del módulo.
   - **Por qué:** cambiar los códigos (p. ej. `pregunta_estado_invalido`) rompería el contrato estable de la API (§3: el código nunca cambia) y los clientes que ya existen. Un texto único para los cuatro códigos comunes pierde contexto («La fuente ya no existe» frente a «El tema ya no existe»). Además, `pesos`, `profesion` y `fuentes` ya usan claves por recurso (`es.json`, `serumsIa.pesos.errores`, `serumsIa.profesion.errores`, `serumsIa.fuentes.errores`): esta regla lo convierte en convención.
   - **Migración (frontend-dev, ~1 h):** los textos de temas que hoy ocupan `serumsIa.errores.{estado_invalido,no_encontrado,validacion,referencia_invalida}` pasan a `serumsIa.temas.errores.*`, y en su lugar quedan los textos neutros. Los demás códigos de `serumsIa.errores` no cambian.
   - **Preguntas (E3-08, E3-09, E3-10):** recurso `preguntas`, con claves `dashboard.serumsIa.preguntas.errores.<codigo>`. Por ejemplo, `estado_invalido`: «Esta pregunta cambió de estado; se actualizó la vista».
+  - **Balotario (E3-03):** recurso `balotario`. Además de los cuatro códigos comunes, lleva aquí **`limite_preguntas`**, porque en E1-03 ese código tiene otro sentido (contrato del balotario §7).
+  - **IA (E6-02):** recurso `ia`, con `validacion` del panel de configuración. Los 429 (`limite_ia`, `limite_ia_mensual` y `presupuesto_agotado`) son de módulo.
 - **Código sin clave** (decisión del PO, 2026-11-11, desde E3-08): la UI muestra el **texto genérico traducido** de la clave única del módulo `dashboard.serumsIa.errores.generico`, nunca `message`. `message` viene siempre en español y se vería en español con la UI en inglés. Solo se usa en la consola o los logs del cliente.
 - Las pantallas existentes de E1 y E2 que hoy muestran `message` se alinean cuando se vuelvan a tocar, sin una tarea aparte.
 - Los estados y enums (`activo`/`archivado`, `procesando`/`activa`/`fallida`/`retirada`, `completa`/`incompleta`, `tipo` de fuente y `motivo_fallo`) viajan como códigos y la UI los traduce con `dashboard.serumsIa.<dominio>.<enum>.<valor>`.
@@ -227,13 +246,18 @@ Los intentos del módulo que **extienden** las tablas existentes usan **exactame
 ## 11. Migraciones
 
 - goose v3 en `backend/migrations/NNN_descripcion.sql` con `-- +goose Up` y `-- +goose Down`. El Down debe funcionar: el CI corre `up → down-to 0 → up` (`.github/workflows/backend.yml:71-73`).
-- Hoy la última es `058_add_simulacro_asignaturas_asignatura_index.sql`. Números propuestos para el MVP E1–E2: **059** temas, **060** `proceso_asignaturas.especialidad_id`, **061** `postulante_profesiones` y **062** fuentes. El tech-lead fija el número definitivo al mergear, porque goose falla ante versiones faltantes si se mergea fuera de orden.
+- Hoy la última es `058_add_simulacro_asignaturas_asignatura_index.sql`. Números propuestos para el MVP E1–E2: **059** temas, **060** `proceso_asignaturas.especialidad_id`, **061** `postulante_profesiones` y **062** fuentes. El tech-lead fija el número definitivo al mergear, porque goose falla ante versiones faltantes si se mergea fuera de orden. Números siguientes: **065** ciclo de preguntas (E3-02) y **066** `ia_usos` (E6-01), ya reservados; **067** importaciones de balotario (E3-03) y **068** control de costos de IA (E6-02), reservados por el tech-lead el 2026-11-12. Orden de merge: 065 → 066 → 067 → 068.
 - Toda migración declara su efecto sobre los datos existentes y qué pierde el Down, si pierde algo.
 - Las FK nuevas llevan índice, por la convención de `054_add_fk_indexes.sql`. Las restricciones llevan nombre explícito cuando el código las mapea a un código de error.
 
 ## 12. Preguntas abiertas
 
-**No queda ninguna pregunta abierta.** Todas se resolvieron el 2026-11-11 y los contratos ya aplican las decisiones.
+**Preguntas abiertas (2026-11-12):**
+
+- Ninguna de contrato. Las decisiones del 2026-11-12 (D1–D21 y P-B1–P-B7) están en el supuesto 25 del README de historias y en el [contrato del balotario](serums-ia-e3-01-e3-03-balotario.md) §9.
+- Fuera de contrato: el proveedor real de IA es **SIA-E6-10** (#173). Está bloqueada hasta que el usuario apruebe el proveedor y el modelo (el tech-lead propone uno). E6-02 se diseñó solo con el doble.
+
+Q1–Q10 y TL1–TL3 se resolvieron el 2026-11-11.
 
 Q1–Q10, resueltas por el PO (supuesto 23 de `docs/stories/serums-ia/README.md`):
 
@@ -245,7 +269,7 @@ Q1–Q10, resueltas por el PO (supuesto 23 de `docs/stories/serums-ia/README.md`
 | Q4 | E2-03, E2-06 | Duplicado global contra todas las versiones de todas las fuentes, en cualquier estado; el 409 trae id, título y estado | E2 S1, S2; `uq_fuente_versiones_sha256` |
 | Q5 | E2-03, E2-06, E2-07 | Cuentan `activa` + `procesando`; una fuente sin profesiones cuenta para cada una; se valida también al reintentar, restaurar y editar profesiones. Endpoint nuevo de edición de metadatos | E2 S1, S2, S5, S7 |
 | Q6 | E2-02 | Área y tema no filtran; van en el texto de la consulta | ADR 0003 |
-| Q7 | E2-05 | Un fragmento de < 150 palabras se une al pasaje anterior (al siguiente si es el primero) y se divide si pasa de 800; un documento de 1–149 palabras es un único pasaje; los balotarios no se unen | ADR 0003 § Normalización |
+| Q7 | E2-05 | Un fragmento de < 150 palabras se une al pasaje anterior (al siguiente si es el primero) y se divide si pasa de 800; un documento de 1–149 palabras es un único pasaje; los balotarios no se unen | ADR 0003 § Normalización. **La ADR 0008 deja sin efecto** «los balotarios no se unen»: cada pregunta cita los pasajes v1 que se solapan con su rango (D8 del PO, 2026-11-12) |
 | Q8 | E2-06 | Retirar emite el aviso «fuente retirada» una vez y dentro de la misma operación; si un suscriptor falla, el retiro no se aplica | E2 S5, `SuscriptorRetiro` |
 | Q9 | E1-03 | Hay pantalla de admin para los pesos en el MVP (reglas 11–13). La pantalla valida en el cliente lo mismo que el servidor y los errores llevan un código distinguible | E1 PE1–PE3 (sin endpoints nuevos) |
 | Q10 | E1-01, E1-02 | El límite de 60 cuenta solo los activos. La unicidad del nombre incluye los archivados. Reactivar revalida el límite, pone el tema al final y, si ya está activo, da 409 `estado_invalido` (E1-01 reglas 6 y 6a; E1-02 regla 9) | E1 T3, T5, T6 |
