@@ -164,5 +164,6 @@ var mapaErrores = []errorMapeado{
 	{ErrProveedor, http.StatusBadGateway, ""},
 	{ErrPresupuestoAgotado, http.StatusTooManyRequests, ""},
 	{ErrSinReserva, http.StatusInternalServerError, "error_interno"},
+	{ErrCostos, http.StatusInternalServerError, "error_interno"},
 	{ErrActorInvalido, http.StatusInternalServerError, "error_interno"},
 }

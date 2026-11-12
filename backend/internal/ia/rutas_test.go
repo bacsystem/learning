@@ -411,3 +411,49 @@ func TestGasto_Mensual(t *testing.T) {
 		}
 	}
 }
+
+// §2.4: changing the budget clears the mark, so going back to a value whose
+// alert was already sent warns again, once: 40 (alerted) → 50 (spent < 80 %,
+// no alert) → 40 (spent ≥ 80 %) alerts again.
+func TestConfigurar_VolverAUnPresupuestoYaAvisado(t *testing.T) {
+	s := nuevoServidorIA(t)
+	admin := dbtest.SeedUser(t, s.db, dbtest.SeedCatalog(t, s.db), "admin", "activo")
+	tok := s.entrar(admin.ID, "admin")
+	t.Cleanup(func() { _, _ = s.db.Exec(`DELETE FROM audit_log WHERE usuario_id = $1`, admin.ID) })
+	gastar(t, s.costos, 35) // 87.5 % of 40: alerted once
+	if n := len(alertas(t, s.db)); n != 1 {
+		t.Fatalf("%d alerts at 87.5 %%, want 1", n)
+	}
+	put := func(presupuesto string) {
+		t.Helper()
+		if w := s.pedir(tok, "PUT", "/admin/ia/configuracion", cuerpoCon("presupuesto_mensual_usd", presupuesto)); w.Code != 200 {
+			t.Fatalf("PUT %s: %d %s", presupuesto, w.Code, w.Body)
+		}
+	}
+	put("50") // 35 is 70 % of 50: no alert
+	if n := len(alertas(t, s.db)); n != 1 {
+		t.Errorf("%d alerts after raising to 50, want still 1", n)
+	}
+	var marca *float64
+	if err := s.db.Get(&marca, `SELECT alerta_80_presupuesto_usd::float8 FROM ia_gasto_mes`); err != nil || marca != nil {
+		t.Errorf("the alert mark after changing the budget = %v (%v), want cleared", marca, err)
+	}
+	put("40") // back to 40 with 35 spent: warns again
+	as := alertas(t, s.db)
+	if len(as) != 2 || as[1].Cuerpo != "Se gastaron 35,00 USD de 40,00 USD en noviembre de 2026." {
+		t.Fatalf("alerts after returning to 40 = %+v, want the second one", as)
+	}
+	gastar(t, s.costos, 1)
+	put("40") // same budget: nothing touched
+	if n := len(alertas(t, s.db)); n != 2 {
+		t.Errorf("%d alerts, want exactly 2 (once per return, never repeated)", n)
+	}
+
+	// A PUT that does not change the budget does not touch the mark.
+	if w := s.pedir(tok, "PUT", "/admin/ia/configuracion", cuerpoCon("limite_usuario_dia", "4", "presupuesto_mensual_usd", "40")); w.Code != 200 {
+		t.Fatal(w.Body)
+	}
+	if err := s.db.Get(&marca, `SELECT alerta_80_presupuesto_usd::float8 FROM ia_gasto_mes`); err != nil || marca == nil || *marca != 40 {
+		t.Errorf("mark after a PUT without budget change = %v (%v), want 40", marca, err)
+	}
+}

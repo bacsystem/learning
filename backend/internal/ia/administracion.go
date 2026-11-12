@@ -187,8 +187,8 @@ func (c *PgCostos) ActualizarConfiguracion(ctx context.Context, adminID int64, r
 	return actual, nil
 }
 
-// rearmarAlerta locks the month's spent amount, if there is any, and
-// evaluates the 80 % alert against the new budget (contract §2.4).
+// rearmarAlerta locks the month's spent amount, if there is any, clears the
+// alert mark and evaluates the 80 % alert against the new budget (contract §2.4).
 func (c *PgCostos) rearmarAlerta(ctx context.Context, tx *sqlx.Tx) error {
 	_, _, primerDia := c.ventanas()
 	var existe int
@@ -198,6 +198,12 @@ func (c *PgCostos) rearmarAlerta(ctx context.Context, tx *sqlx.Tx) error {
 	}
 	if err != nil {
 		return fmt.Errorf("bloquear el gasto del mes: %w", err)
+	}
+	// A changed budget re-arms the alert (architect, contract §2.4): the mark
+	// of the previous value goes away and the condition is evaluated again.
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE ia_gasto_mes SET alerta_80_presupuesto_usd = NULL, alerta_80_at = NULL WHERE mes = $1`, primerDia); err != nil {
+		return fmt.Errorf("rearmar la alerta de presupuesto: %w", err)
 	}
 	return evaluarAlerta80(ctx, tx, primerDia)
 }

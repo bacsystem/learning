@@ -34,6 +34,7 @@ func TestCodigoYDetalle_ControlDeCostos(t *testing.T) {
 			map[string]any{"limite": 5, "usados": 5, "reinicia_at": reinicia}},
 		{"wrapped budget", fmt.Errorf("reservar: %w", &ErrorPresupuesto{ReiniciaAt: reinicia}), "presupuesto_agotado", http.StatusTooManyRequests,
 			map[string]any{"reinicia_at": reinicia}},
+		{"a cost-control failure is an internal error", fmt.Errorf("%w: pq: down", ErrCostos), "error_interno", http.StatusInternalServerError, nil},
 		{"no reservation is an internal error", ErrSinReserva, "error_interno", http.StatusInternalServerError, nil},
 		{"invalid actor is an internal error", ErrActorInvalido, "error_interno", http.StatusInternalServerError, nil},
 		{"cancelled maps to nothing", fmt.Errorf("%w: %w", ErrCancelado, context.Canceled), "", 0, nil},
