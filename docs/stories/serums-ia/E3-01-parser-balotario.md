@@ -39,7 +39,7 @@ Formato observado: preguntas numeradas, alternativas A–D, clave dentro de `<ma
     - una línea empieza con algo que parece una etiqueta (una letra con cualquiera de las formas `A)`, `A.`, `A-` o `(A)`), pero el parser la trataría como continuación de la alternativa anterior;
     - las letras de las etiquetas retroceden o se repiten (por ejemplo A, C, B).
     
-    Dentro del enunciado, antes de la primera alternativa, una línea como «E. coli…» sigue siendo continuación sin problema. Un salto hacia adelante sin retroceso (A, B, D) sigue la regla 10: se reetiqueta con la alerta `vinetas_normalizadas`. Preferimos que el admin corrija el archivo antes que importar una clave equivocada. Excepción a «se informan todos» (regla 10): si la pregunta es ambigua pero hay una `<mark>` en su rango, solo se informa `etiquetas_ambiguas`, no `sin_clave`. Así no se le dice al admin que falta una clave que sí está.
+    Dentro del enunciado, antes de la primera alternativa, una línea como «E. coli…» sigue siendo continuación sin problema. Un salto hacia adelante sin retroceso (A, B, D) sigue la regla 10: se reetiqueta con la alerta `vinetas_normalizadas`. Preferimos que el admin corrija el archivo antes que importar una clave equivocada. **Letras G–Z** (decisión del PO, 12-nov, borde encontrado por qa): una vez abierta una alternativa, una línea con forma de etiqueta y letra G–Z nunca se une en silencio a la anterior. Si es justo la letra siguiente a la última alternativa abierta (G después de F), abre una alternativa nueva, y la pregunta va a «con problemas» con `alternativas_excedidas` (más de 6). En cualquier otro caso va a `etiquetas_ambiguas`. Excepción a «se informan todos» (regla 10): si la pregunta es ambigua pero hay una `<mark>` en su rango, solo se informa `etiquetas_ambiguas`, no `sin_clave`. Así no se le dice al admin que falta una clave que sí está.
 
 ## Criterios de aceptación
 ```gherkin
@@ -157,6 +157,16 @@ Escenario: Etiqueta entre paréntesis que retrocede
   Dado las líneas "(a) Uno", "(c) Dos", "<mark>(b) Tres</mark>" y "(d) Cuatro"
   Cuando se parsea
   Entonces se lista como "con problemas" solo con el motivo "etiquetas_ambiguas", sin "sin_clave", porque la marca existe
+
+Escenario: Séptima alternativa con letra
+  Dado una pregunta con alternativas A) a F) y "<mark>G) Siete</mark>"
+  Cuando se parsea
+  Entonces se lista como "con problemas" con motivo "alternativas_excedidas" y ninguna alternativa contiene "G) Siete" unido a otro texto
+
+Escenario: Letra lejana dentro de las alternativas
+  Dado las líneas "A) Uno", "S. aureus resistente", "B) Dos" y "C) Tres"
+  Cuando se parsea
+  Entonces se lista como "con problemas" con motivo "etiquetas_ambiguas"
 
 Escenario: Letras que retroceden
   Dado una pregunta con alternativas etiquetadas A, C, B y D
