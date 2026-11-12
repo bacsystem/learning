@@ -2,7 +2,8 @@ import { claveDeError, type ClavesDeError, mensajeDeError } from "@/lib/serums-i
 
 /**
  * Códigos de error de los endpoints de temas con traducción propia (docs/api/README.md §8). Un código fuera de la
- * lista, o una respuesta sin código, cae en el `message` del servidor o en el texto genérico de la pantalla.
+ * lista muestra el genérico traducido, nunca el `message`; una respuesta sin código (formato heredado) muestra su
+ * texto, y sin respuesta, el texto genérico de la pantalla (ver `mensajeDeError`).
  */
 const CLAVES_TEMAS: ClavesDeError = Object.fromEntries([
   // Los cuatro códigos comunes cambian de sentido según el recurso: texto propio de temas.

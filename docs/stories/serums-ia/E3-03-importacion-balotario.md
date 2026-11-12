@@ -173,7 +173,7 @@ SIA-E3-01.
 No se importan archivos desde rutas locales; solo fuentes ya ingeridas.
 
 ## i18n
-Pantalla en es/en, con estados de carga, vacío y error. Llevan texto traducido, nunca el código crudo: los nueve motivos y las tres alertas de SIA-E3-01, más el motivo `sin_pasaje`; la insignia, los dos avisos de ruta de revisión y el aviso de área provisional; y los errores `tipo_fuente_invalido`, `fuente_no_activa`, `version_desactualizada`, `ya_importado`, `especialidad_invalida`, `especialidad_no_corresponde`, `referencia_invalida`, `limite_preguntas` y `sin_validas` (el 422 al confirmar y también el motivo del botón deshabilitado en la vista previa).
+Pantalla en es/en, con estados de carga, vacío y error. Llevan texto traducido, nunca el código crudo: los diez motivos y las tres alertas de SIA-E3-01, más el motivo `sin_pasaje`; la insignia, los dos avisos de ruta de revisión y el aviso de área provisional; y los errores `tipo_fuente_invalido`, `fuente_no_activa`, `version_desactualizada`, `ya_importado`, `especialidad_invalida`, `especialidad_no_corresponde`, `referencia_invalida`, `limite_preguntas` y `sin_validas` (el 422 al confirmar y también el motivo del botón deshabilitado en la vista previa).
 
 ## Definición de terminado
 Tests de atomicidad (incluida la auditoría), de idempotencia, de `version_desactualizada` y de la cita creada. El test de `conflicto_clave` reservado en SIA-E3-07 se valida con SIA-E3-06, no aquí (decisión del PO, 12-nov). `tsc`, `lint` y `build` en verde; review limpio.
