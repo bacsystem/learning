@@ -99,6 +99,7 @@ describe("textos-khipu", () => {
         paletaColor: "menu-usuario-paleta-color",
         tonoModoOscuro: "menu-usuario-tono-modo-oscuro",
         tipografiaFuente: "menu-usuario-tipografia-fuente",
+        cerrar: "menu-usuario-cerrar",
         temaInterfaz: "menu-usuario-tema-interfaz",
         claro: "menu-usuario-claro",
         oscuro: "menu-usuario-oscuro",
