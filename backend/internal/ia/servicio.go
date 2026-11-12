@@ -166,7 +166,12 @@ func llamar[S any](ctx context.Context, s *servicio, sol Solicitud, uso *Uso, va
 		if fin := finDelConsumidor(ctx); fin != nil {
 			return cero, fin
 		}
-		return cero, err
+		var agotado *ErrorPresupuesto
+		if errors.As(err, &agotado) {
+			return cero, err
+		}
+		// The budget could not be read: fail closed, as our own failure.
+		return cero, fmt.Errorf("%w: %w", ErrCostos, err)
 	}
 	for range rondasValidacion {
 		resp, err := s.transporte(ctx, sol, uso)
@@ -303,6 +308,8 @@ func resultadoDe(err error) string {
 		return ResultadoCancelado
 	case errors.Is(err, ErrPresupuestoAgotado):
 		return ResultadoPresupuestoAgotado
+	case errors.Is(err, ErrCostos):
+		return ResultadoErrorInterno
 	case errors.Is(err, ErrSalidaInvalida):
 		return ResultadoSalidaInvalida
 	default:

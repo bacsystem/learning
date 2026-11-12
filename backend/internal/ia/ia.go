@@ -67,6 +67,9 @@ var (
 	// ErrCancelado wraps context.Canceled: the consumer cancelled its own ctx,
 	// so it is recorded but never mapped to HTTP (Codigo reports ok=false).
 	ErrCancelado = errors.New("cancelado")
+	// ErrCostos wraps a failure of the cost control itself (the database),
+	// not of the provider: it is recorded as error_interno and answered 500.
+	ErrCostos = errors.New("error_costos")
 	// ErrActorInvalido is a programming error of the consumer: the actor
 	// would break ck_ia_usos_actor, so nothing is called nor recorded.
 	ErrActorInvalido = errors.New("actor_invalido")
