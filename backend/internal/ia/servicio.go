@@ -47,6 +47,7 @@ func ConReloj(ahora func() time.Time) Opcion { return func(s *servicio) { s.ahor
 type servicio struct {
 	prov          Proveedor // nil = disabled (no IA_PROVEEDOR)
 	reg           Registrador
+	costos        Costos
 	validate      *validator.Validate
 	tiempoLlamada time.Duration
 	esperas       []time.Duration
@@ -54,12 +55,13 @@ type servicio struct {
 	dormir        func(ctx context.Context, d time.Duration) bool // dormirReal; tests record the waits
 }
 
-// NewServicio creates the service over prov, recording usage with reg. A nil
+// NewServicio creates the service over prov, recording usage with reg and
+// controlling quota and budget with costos. A nil
 // prov is the disabled service: every operation is ErrNoDisponible and the
 // rest of the application keeps working (regla 5).
-func NewServicio(prov Proveedor, reg Registrador, opciones ...Opcion) Servicio {
+func NewServicio(prov Proveedor, reg Registrador, costos Costos, opciones ...Opcion) Servicio {
 	s := &servicio{
-		prov: prov, reg: reg,
+		prov: prov, reg: reg, costos: costos,
 		validate:      validator.New(validator.WithRequiredStructEnabled()),
 		tiempoLlamada: tiempoLlamadaDefecto,
 		esperas:       esperasDefecto,
@@ -72,35 +74,41 @@ func NewServicio(prov Proveedor, reg Registrador, opciones ...Opcion) Servicio {
 	return s
 }
 
-func (s *servicio) Clasificar(ctx context.Context, a Actor, in EntradaClasificar) (SalidaClasificar, error) {
-	return ejecutar(ctx, s, a, in.solicitud(), func(o SalidaClasificar) error { return o.validar(in) })
+func (s *servicio) Clasificar(ctx context.Context, r *Reserva, in EntradaClasificar) (SalidaClasificar, error) {
+	return ejecutar(ctx, s, r, in.solicitud(), func(o SalidaClasificar) error { return o.validar(in) })
 }
 
-func (s *servicio) GenerarPreguntas(ctx context.Context, a Actor, in EntradaGenerarPreguntas) (SalidaGenerarPreguntas, error) {
-	return ejecutar(ctx, s, a, in.solicitud(), func(o SalidaGenerarPreguntas) error { return o.validar(in) })
+func (s *servicio) GenerarPreguntas(ctx context.Context, r *Reserva, in EntradaGenerarPreguntas) (SalidaGenerarPreguntas, error) {
+	return ejecutar(ctx, s, r, in.solicitud(), func(o SalidaGenerarPreguntas) error { return o.validar(in) })
 }
 
-func (s *servicio) GenerarMaterial(ctx context.Context, a Actor, in EntradaGenerarMaterial) (SalidaGenerarMaterial, error) {
-	return ejecutar(ctx, s, a, in.solicitud(), func(o SalidaGenerarMaterial) error { return o.validar(in) })
+func (s *servicio) GenerarMaterial(ctx context.Context, r *Reserva, in EntradaGenerarMaterial) (SalidaGenerarMaterial, error) {
+	return ejecutar(ctx, s, r, in.solicitud(), func(o SalidaGenerarMaterial) error { return o.validar(in) })
 }
 
-func (s *servicio) GenerarExplicacion(ctx context.Context, a Actor, in EntradaGenerarExplicacion) (SalidaGenerarExplicacion, error) {
-	return ejecutar(ctx, s, a, in.solicitud(), func(o SalidaGenerarExplicacion) error { return o.validar(in) })
+func (s *servicio) GenerarExplicacion(ctx context.Context, r *Reserva, in EntradaGenerarExplicacion) (SalidaGenerarExplicacion, error) {
+	return ejecutar(ctx, s, r, in.solicitud(), func(o SalidaGenerarExplicacion) error { return o.validar(in) })
 }
 
-// ejecutar runs one invocation and records its usage, whatever the outcome.
-// An invalid actor is a programming error of the consumer: it would break
-// ck_ia_usos_actor, so nothing is called nor recorded.
-func ejecutar[S any](ctx context.Context, s *servicio, a Actor, sol Solicitud, validar func(S) error) (S, error) {
+// ejecutar runs one invocation of the reservation r and records its usage,
+// whatever the outcome. An invalid actor is a programming error of the
+// consumer: it would break ck_ia_usos_actor, so nothing is called nor
+// recorded; the same for a reservation with no action left (contract E6-02
+// §2.3 ★0).
+func ejecutar[S any](ctx context.Context, s *servicio, r *Reserva, sol Solicitud, validar func(S) error) (S, error) {
 	var cero S
-	if !actorValido(a) {
+	if r == nil || !actorValido(r.Actor) {
 		return cero, ErrActorInvalido
 	}
+	if r.Acciones < 1 {
+		return cero, ErrSinReserva
+	}
 	inicio := s.ahora()
-	uso := Uso{Operacion: sol.Operacion, Actor: a}
+	uso := Uso{Operacion: sol.Operacion, Actor: r.Actor}
 	out, err := llamar(ctx, s, sol, &uso, validar)
 	uso.Duracion = s.ahora().Sub(inicio)
 	uso.Resultado = resultadoDe(err)
+	s.cerrarCostos(ctx, r, uso, err)
 	s.registrar(ctx, uso)
 	if err != nil {
 		return cero, err
@@ -108,8 +116,39 @@ func ejecutar[S any](ctx context.Context, s *servicio, a Actor, sol Solicitud, v
 	return out, nil
 }
 
-// llamar applies the flow of contract §2: enabled, size, personal data, then
-// up to 2 validation rounds of up to 3 transport attempts each.
+// cerrarCostos settles the invocation (contract E6-02 §2.3 ★9 and ★10): what
+// the attempts cost is added to the month's spent amount even if the call
+// failed (D15); a failed call gives its action back, a good one keeps it. A
+// failure here is logged by op and never replaces the result of the call.
+func (s *servicio) cerrarCostos(ctx context.Context, r *Reserva, uso Uso, err error) {
+	if uso.CostoUSD > 0 {
+		if gerr := s.costos.SumarGasto(ctx, uso.CostoUSD); gerr != nil {
+			log.Error().Str("op", "ia.sumar_gasto").Str("operacion", uso.Operacion).Msg("ia: spent amount not recorded")
+		}
+	}
+	if err == nil {
+		r.Acciones--
+		return
+	}
+	if lerr := s.costos.Liberar(ctx, r, 1); lerr != nil {
+		log.Error().Str("op", "ia.liberar").Str("operacion", uso.Operacion).Msg("ia: action not released")
+	}
+}
+
+func (s *servicio) Reservar(ctx context.Context, a Actor, n int) (Reserva, error) {
+	return s.costos.Reservar(ctx, a, n)
+}
+
+func (s *servicio) Liberar(ctx context.Context, r *Reserva, n int) error {
+	return s.costos.Liberar(ctx, r, n)
+}
+
+func (s *servicio) Consumo(ctx context.Context, a Actor) (Consumo, error) {
+	return s.costos.Consumo(ctx, a)
+}
+
+// llamar applies the flow of contract §2: enabled, size, personal data,
+// budget (E6-02 ★5), then up to 2 validation rounds of up to 3 transport attempts each.
 func llamar[S any](ctx context.Context, s *servicio, sol Solicitud, uso *Uso, validar func(S) error) (S, error) {
 	var cero S
 	if s.prov == nil {
@@ -121,6 +160,18 @@ func llamar[S any](ctx context.Context, s *servicio, sol Solicitud, uso *Uso, va
 	}
 	if err := buscarDatosPersonales(sol); err != nil {
 		return cero, err
+	}
+	if err := s.costos.ComprobarPresupuesto(ctx); err != nil { // ★5
+		// A consumer that gave up makes the check fail with its own ctx error.
+		if fin := finDelConsumidor(ctx); fin != nil {
+			return cero, fin
+		}
+		var agotado *ErrorPresupuesto
+		if errors.As(err, &agotado) {
+			return cero, err
+		}
+		// The budget could not be read: fail closed, as our own failure.
+		return cero, fmt.Errorf("%w: %w", ErrCostos, err)
 	}
 	for range rondasValidacion {
 		resp, err := s.transporte(ctx, sol, uso)
@@ -255,6 +306,10 @@ func resultadoDe(err error) string {
 		return ResultadoTimeout
 	case errors.Is(err, ErrCancelado):
 		return ResultadoCancelado
+	case errors.Is(err, ErrPresupuestoAgotado):
+		return ResultadoPresupuestoAgotado
+	case errors.Is(err, ErrCostos):
+		return ResultadoErrorInterno
 	case errors.Is(err, ErrSalidaInvalida):
 		return ResultadoSalidaInvalida
 	default:

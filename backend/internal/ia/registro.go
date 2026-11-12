@@ -18,6 +18,8 @@ const (
 	ResultadoCancelado              = "cancelado"
 	ResultadoSalidaInvalida         = "salida_invalida"
 	ResultadoErrorProveedor         = "error_proveedor"
+	ResultadoPresupuestoAgotado     = "presupuesto_agotado"
+	ResultadoErrorInterno           = "error_interno"
 )
 
 // tiempoRegistro bounds the usage INSERT, which runs detached from the

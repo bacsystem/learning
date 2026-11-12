@@ -79,6 +79,56 @@ func valida(id int64) paso {
 
 var sistema = Actor{Rol: RolSistema}
 
+// res is a reservation of one action for a.
+func res(a Actor) *Reserva { return &Reserva{Actor: a, Acciones: 1} }
+
+// costosMemoria is the cost control in memory: it records what the service
+// asks for, and errPresupuesto makes ComprobarPresupuesto answer.
+type costosMemoria struct {
+	mu             sync.Mutex
+	errPresupuesto error
+	errGasto       error
+	errLiberar     error
+	gasto          float64
+	liberadas      int
+	comprobaciones int
+	ctxLiberar     context.Context
+	ctxGasto       context.Context
+}
+
+func (c *costosMemoria) Reservar(_ context.Context, a Actor, n int) (Reserva, error) {
+	return Reserva{Actor: a, Acciones: n}, nil
+}
+
+func (c *costosMemoria) Liberar(ctx context.Context, r *Reserva, n int) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.liberadas += n
+	c.ctxLiberar = ctx
+	if c.errLiberar != nil {
+		return c.errLiberar
+	}
+	r.Acciones -= n
+	return nil
+}
+
+func (c *costosMemoria) Consumo(context.Context, Actor) (Consumo, error) { return Consumo{}, nil }
+
+func (c *costosMemoria) ComprobarPresupuesto(context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.comprobaciones++
+	return c.errPresupuesto
+}
+
+func (c *costosMemoria) SumarGasto(ctx context.Context, usd float64) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.gasto += usd
+	c.ctxGasto = ctx
+	return c.errGasto
+}
+
 func entradaClasificar(n int) EntradaClasificar {
 	in := EntradaClasificar{Taxonomia: []OpcionTaxonomia{{AsignaturaID: 3, Nombre: "Salud pública"}}}
 	for i := 1; i <= n; i++ {
@@ -89,7 +139,11 @@ func entradaClasificar(n int) EntradaClasificar {
 
 // nuevo returns a service with short times and the waits it would sleep.
 func nuevo(prov Proveedor, reg Registrador, opciones ...Opcion) (*servicio, *[]time.Duration) {
-	s := NewServicio(prov, reg, append([]Opcion{ConTiempoLlamada(50 * time.Millisecond)}, opciones...)...).(*servicio)
+	return nuevoConCostos(prov, reg, &costosMemoria{}, opciones...)
+}
+
+func nuevoConCostos(prov Proveedor, reg Registrador, costos Costos, opciones ...Opcion) (*servicio, *[]time.Duration) {
+	s := NewServicio(prov, reg, costos, append([]Opcion{ConTiempoLlamada(50 * time.Millisecond)}, opciones...)...).(*servicio)
 	var esperas []time.Duration
 	s.dormir = func(_ context.Context, d time.Duration) bool { esperas = append(esperas, d); return true }
 	return s, &esperas
@@ -100,7 +154,7 @@ func nuevo(prov Proveedor, reg Registrador, opciones ...Opcion) (*servicio, *[]t
 func TestServicio_LlamadaExitosa(t *testing.T) {
 	reg := &registroMemoria{}
 	s, _ := nuevo(NewDoble(), reg)
-	out, err := s.Clasificar(context.Background(), sistema, entradaClasificar(10))
+	out, err := s.Clasificar(context.Background(), res(sistema), entradaClasificar(10))
 	if err != nil || len(out.Resultados) != 10 {
 		t.Fatalf("got %d results, err %v", len(out.Resultados), err)
 	}
@@ -142,7 +196,7 @@ func TestServicio_Reintentos(t *testing.T) {
 			prov := &proveedorGuion{pasos: c.pasos}
 			reg := &registroMemoria{}
 			s, esperas := nuevo(prov, reg)
-			_, err := s.Clasificar(context.Background(), sistema, entradaClasificar(1))
+			_, err := s.Clasificar(context.Background(), res(sistema), entradaClasificar(1))
 			if !errors.Is(err, c.wantErr) || (c.wantErr == nil && err != nil) {
 				t.Fatalf("err %v, want %v", err, c.wantErr)
 			}
@@ -164,7 +218,7 @@ func TestServicio_Reintentos(t *testing.T) {
 func TestServicio_SumaTokensDeTodosLosIntentos(t *testing.T) {
 	reg := &registroMemoria{}
 	s, _ := nuevo(&proveedorGuion{pasos: []paso{invalida, valida(1)}}, reg)
-	if _, err := s.Clasificar(context.Background(), sistema, entradaClasificar(1)); err != nil {
+	if _, err := s.Clasificar(context.Background(), res(sistema), entradaClasificar(1)); err != nil {
 		t.Fatal(err)
 	}
 	if u := reg.unico(t); u.TokensEntrada != 20 || u.TokensSalida != 2 || u.CostoUSD != 0.02 {
@@ -180,7 +234,7 @@ func TestServicio_SalidaInvalidaConElDoble(t *testing.T) {
 	}{{1, nil}, {2, ErrSalidaInvalida}} {
 		reg := &registroMemoria{}
 		s, _ := nuevo(NewDoble(SalidaInvalida(c.n)), reg)
-		_, err := s.Clasificar(context.Background(), sistema, entradaClasificar(3))
+		_, err := s.Clasificar(context.Background(), res(sistema), entradaClasificar(3))
 		if !errors.Is(err, c.wantErr) || (c.wantErr == nil && err != nil) {
 			t.Errorf("SalidaInvalida(%d): err %v, want %v", c.n, err, c.wantErr)
 		}
@@ -221,7 +275,7 @@ func TestServicio_Rechazos(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			reg := &registroMemoria{}
 			s, _ := nuevo(c.prov, reg)
-			_, err := s.Clasificar(context.Background(), sistema, c.in)
+			_, err := s.Clasificar(context.Background(), res(sistema), c.in)
 			if !errors.Is(err, c.wantErr) || (c.wantErr == nil && err != nil) {
 				t.Fatalf("err %v, want %v", err, c.wantErr)
 			}
@@ -246,7 +300,7 @@ func TestServicio_DatosPersonalesSinElTexto(t *testing.T) {
 	in := entradaClasificar(2)
 	in.Items[1].Texto = "Llamar al 987 654 321"
 	s, _ := nuevo(NewDoble(), &registroMemoria{})
-	_, err := s.Clasificar(context.Background(), sistema, in)
+	_, err := s.Clasificar(context.Background(), res(sistema), in)
 	var dp *ErrorDatosPersonales
 	if !errors.As(err, &dp) || dp.Tipo != TipoTelefono || dp.Bloque != 1 {
 		t.Fatalf("got %v, want telefono in block 1", err)
@@ -263,7 +317,7 @@ func TestServicio_IdDeOchoDigitosNoEsDNI(t *testing.T) {
 		Taxonomia: []OpcionTaxonomia{{AsignaturaID: 87654321, Nombre: "Salud pública"}},
 	}
 	s, _ := nuevo(NewDoble(), &registroMemoria{})
-	out, err := s.Clasificar(context.Background(), sistema, in)
+	out, err := s.Clasificar(context.Background(), res(sistema), in)
 	if err != nil || out.Resultados[0].ID != 12345678 || out.Resultados[0].AsignaturaID != 87654321 {
 		t.Fatalf("got %+v, %v", out, err)
 	}
@@ -297,7 +351,7 @@ func TestServicio_FinDelCtxDelConsumidor(t *testing.T) {
 			defer cancel()
 			reg := &registroMemoria{}
 			s, _ := nuevo(NewDoble(), reg)
-			_, err := s.Clasificar(ctx, sistema, entradaClasificar(1))
+			_, err := s.Clasificar(ctx, res(sistema), entradaClasificar(1))
 			if !errors.Is(err, tt.wantErr) || errors.Is(err, context.Canceled) != tt.wantCanceled {
 				t.Fatalf("err %v, want %v (wraps Canceled: %v)", err, tt.wantErr, tt.wantCanceled)
 			}
@@ -328,7 +382,7 @@ func TestServicio_CancelaDuranteLaLlamada(t *testing.T) {
 	prov := &proveedorQueCancela{cancelar: cancel}
 	reg := &registroMemoria{}
 	s, esperas := nuevo(prov, reg)
-	_, err := s.Clasificar(ctx, sistema, entradaClasificar(1))
+	_, err := s.Clasificar(ctx, res(sistema), entradaClasificar(1))
 	if !errors.Is(err, ErrCancelado) || !errors.Is(err, context.Canceled) {
 		t.Fatalf("err %v, want ErrCancelado wrapping context.Canceled", err)
 	}
@@ -346,7 +400,7 @@ func TestServicio_ActorInvalido(t *testing.T) {
 		reg := &registroMemoria{}
 		prov := &proveedorGuion{pasos: []paso{valida(1)}}
 		s, _ := nuevo(prov, reg)
-		if _, err := s.Clasificar(context.Background(), a, entradaClasificar(1)); !errors.Is(err, ErrActorInvalido) {
+		if _, err := s.Clasificar(context.Background(), res(a), entradaClasificar(1)); !errors.Is(err, ErrActorInvalido) {
 			t.Errorf("actor %+v: err %v, want ErrActorInvalido", a, err)
 		}
 		if prov.llamado != 0 || len(reg.usos) != 0 {
@@ -355,7 +409,7 @@ func TestServicio_ActorInvalido(t *testing.T) {
 	}
 	for _, a := range []Actor{{Rol: RolAdmin, ID: &id}, {Rol: RolUsuario, ID: &id}, sistema} {
 		s, _ := nuevo(NewDoble(), &registroMemoria{})
-		if _, err := s.Clasificar(context.Background(), a, entradaClasificar(1)); err != nil {
+		if _, err := s.Clasificar(context.Background(), res(a), entradaClasificar(1)); err != nil {
 			t.Errorf("actor %+v: %v", a, err)
 		}
 	}
@@ -364,7 +418,7 @@ func TestServicio_ActorInvalido(t *testing.T) {
 // A usage row that cannot be written never replaces the result (paso 7).
 func TestServicio_FalloDelRegistroNoInvalidaLaSalida(t *testing.T) {
 	s, _ := nuevo(NewDoble(), &registroMemoria{err: errors.New("db down")})
-	if out, err := s.Clasificar(context.Background(), sistema, entradaClasificar(2)); err != nil || len(out.Resultados) != 2 {
+	if out, err := s.Clasificar(context.Background(), res(sistema), entradaClasificar(2)); err != nil || len(out.Resultados) != 2 {
 		t.Fatalf("got %+v, %v", out, err)
 	}
 }
@@ -377,11 +431,11 @@ func TestDoble_CuatroOperacionesDeterministas(t *testing.T) {
 	correr := func() []string {
 		s, _ := nuevo(NewDoble(), &registroMemoria{})
 		ctx := context.Background()
-		c, err1 := s.Clasificar(ctx, sistema, EntradaClasificar{Items: []ItemTexto{{ID: 1, Texto: "x"}},
+		c, err1 := s.Clasificar(ctx, res(sistema), EntradaClasificar{Items: []ItemTexto{{ID: 1, Texto: "x"}},
 			Taxonomia: []OpcionTaxonomia{{AsignaturaID: 3, TemaID: &tema, Nombre: "Vacunas"}, {AsignaturaID: 5, Nombre: "Otra"}}})
-		p, err2 := s.GenerarPreguntas(ctx, sistema, EntradaGenerarPreguntas{TemaID: 4, Cantidad: 3, Pasajes: pasajes})
-		m, err3 := s.GenerarMaterial(ctx, sistema, EntradaGenerarMaterial{TemaID: 4, Pasajes: pasajes})
-		e, err4 := s.GenerarExplicacion(ctx, sistema, EntradaGenerarExplicacion{PreguntaID: 9, Enunciado: "¿Cuál?",
+		p, err2 := s.GenerarPreguntas(ctx, res(sistema), EntradaGenerarPreguntas{TemaID: 4, Cantidad: 3, Pasajes: pasajes})
+		m, err3 := s.GenerarMaterial(ctx, res(sistema), EntradaGenerarMaterial{TemaID: 4, Pasajes: pasajes})
+		e, err4 := s.GenerarExplicacion(ctx, res(sistema), EntradaGenerarExplicacion{PreguntaID: 9, Enunciado: "¿Cuál?",
 			Alternativas: []string{"a", "b"}, Correcta: 1, Pasajes: pasajes})
 		if err := errors.Join(err1, err2, err3, err4); err != nil {
 			t.Fatal(err)
