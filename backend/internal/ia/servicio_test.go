@@ -112,6 +112,10 @@ func (c *costosMemoria) Liberar(ctx context.Context, r *Reserva, n int) error {
 	return nil
 }
 
+func (c *costosMemoria) Configuracion(context.Context) (Configuracion, error) {
+	return Configuracion{}, nil
+}
+
 func (c *costosMemoria) Consumo(context.Context, Actor) (Consumo, error) { return Consumo{}, nil }
 
 func (c *costosMemoria) ComprobarPresupuesto(context.Context) error {

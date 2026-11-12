@@ -400,3 +400,8 @@ func coma(n string) string {
 	}
 	return string(b)
 }
+
+// Configuracion reads the current limits and budget.
+func (c *PgCostos) Configuracion(ctx context.Context) (Configuracion, error) {
+	return leerConfiguracion(ctx, c.db)
+}
