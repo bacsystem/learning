@@ -29,7 +29,10 @@ Extiende el import con preview existente. Entrada: una fuente de tipo `balotario
 10. **Versión vista = versión importada:** la confirmación envía el número de versión de la vista previa. Si ya no es la vigente, responde 409 `version_desactualizada` y no crea nada.
 11. **Versiones nuevas:** una versión nueva de la misma fuente se puede importar. Sus duplicados frente a la versión anterior los resuelve SIA-E3-06. La idempotencia sigue siendo por (fuente, versión).
 12. **Con problemas:** se listan todas, paginadas (20 por defecto, máx. 100), con número de línea y los motivos traducidos. No se importan. Para recuperarlas, el admin corrige el archivo y sube una versión nueva.
-13. **Especialidad, proceso y área inicial:** los tres deben existir, la especialidad debe estar activa y ser de la institución del proceso (como en SIA-E1-04), y el área debe pertenecer al proceso (la misma validación que el alta de preguntas; una referencia inexistente o ajena, como un área de otro proceso, responde 422 `referencia_invalida`). Si la fuente tiene profesiones asignadas, la especialidad elegida debe ser una de ellas (422 `especialidad_invalida`, el código del contrato; decisión del PO P-B6).
+13. **Especialidad, proceso y área inicial:** los tres deben existir. Códigos (fijados por el architect, coherentes con SIA-E1-04; contrato §4.1, pasos 8b y 9):
+    - Especialidad inexistente, inactiva o de otra institución que la del proceso: 422 `especialidad_invalida`, el mismo chequeo y el mismo código de SIA-E1-04.
+    - Si la fuente tiene profesiones asignadas, la especialidad elegida debe ser una de ellas. Si no lo es: 422 `especialidad_no_corresponde`, y la respuesta indica las profesiones de la fuente (decisión del PO P-B6).
+    - Proceso inexistente o área que no pertenece al proceso (la misma validación que el alta de preguntas): 422 `referencia_invalida`.
 14. **Auditoría:** se registra en la misma transacción que la creación (todo o nada), con el actor, la fuente, la versión, la especialidad, el proceso y los totales.
 15. **Límite:** el error `limite_preguntas` del parser (más de 1 000 bloques) se responde como 422 `limite_preguntas` desde la vista previa.
 
@@ -137,7 +140,12 @@ Escenario: Versión nueva de una fuente ya importada
 Escenario: Especialidad que no corresponde
   Dado un balotario con la profesión Enfermería
   Cuando el admin confirma con la especialidad Medicina
-  Entonces recibe 422 "especialidad_invalida"
+  Entonces recibe 422 "especialidad_no_corresponde" y la pantalla indica que el balotario es de Enfermería
+
+Escenario: Especialidad de otra institución
+  Dado una especialidad activa que no es de la institución del proceso SERUMS 2026-I
+  Cuando el admin confirma con ella
+  Entonces recibe 422 "especialidad_invalida" y no se crea nada
 
 Escenario: Listado de con problemas
   Dado una vista previa con 45 preguntas con problemas
@@ -165,7 +173,7 @@ SIA-E3-01.
 No se importan archivos desde rutas locales; solo fuentes ya ingeridas.
 
 ## i18n
-Pantalla en es/en, con estados de carga, vacío y error. Llevan texto traducido, nunca el código crudo: los nueve motivos y las tres alertas de SIA-E3-01, más el motivo `sin_pasaje`; la insignia, los dos avisos de ruta de revisión y el aviso de área provisional; y los errores `tipo_fuente_invalido`, `fuente_no_activa`, `version_desactualizada`, `ya_importado`, `especialidad_invalida`, `referencia_invalida` y `limite_preguntas`.
+Pantalla en es/en, con estados de carga, vacío y error. Llevan texto traducido, nunca el código crudo: los nueve motivos y las tres alertas de SIA-E3-01, más el motivo `sin_pasaje`; la insignia, los dos avisos de ruta de revisión y el aviso de área provisional; y los errores `tipo_fuente_invalido`, `fuente_no_activa`, `version_desactualizada`, `ya_importado`, `especialidad_invalida`, `especialidad_no_corresponde`, `referencia_invalida` y `limite_preguntas`.
 
 ## Definición de terminado
 Tests de atomicidad (incluida la auditoría), de idempotencia, de `version_desactualizada` y de la cita creada. El test de `conflicto_clave` reservado en SIA-E3-07 se valida con SIA-E3-06, no aquí (decisión del PO, 12-nov). `tsc`, `lint` y `build` en verde; review limpio.

@@ -189,7 +189,7 @@ flowchart TD
     - (h) **P-B4 a P-B6** (contrato de E3-01 y E3-03):
       - Los balotarios usan la segmentación genérica, con unión, y la cita se resuelve por solape de líneas. Esto revierte la Q7 (ADR 0008).
       - `vinetas_normalizadas` solo se marca con viñetas sin letra o con estilos mezclados.
-      - La especialidad debe estar entre las profesiones de la fuente (422 `especialidad_invalida`).
+      - La especialidad debe estar entre las profesiones de la fuente (422 `especialidad_no_corresponde`). Si es inexistente, inactiva o de otra institución, responde 422 `especialidad_invalida`, como en SIA-E1-04. Un proceso inexistente o un área ajena al proceso responde 422 `referencia_invalida`.
 
 ## Límites (aplican donde se citan; los de IA, privacidad y cronograma aprobados en issue #65)
 
