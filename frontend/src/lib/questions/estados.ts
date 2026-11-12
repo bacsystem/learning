@@ -1,6 +1,7 @@
 import type { EstadoPregunta, OrigenPregunta, Pregunta } from "./api";
 
 import { apiErrorCode } from "@/lib/http/api-error";
+import { CLAVE_ERROR_GENERICO } from "@/lib/serums-ia/errores";
 
 /**
  * Reglas de la UI sobre el ciclo de vida de una pregunta (SIA-E3-02, docs/api/serums-ia-e3-02-ciclo-preguntas.md).
@@ -80,9 +81,6 @@ export function cambiaElContenido(guardado: ContenidoPregunta, editado: Contenid
 /** Un mapa por operación: `estado_invalido` significa otra cosa al eliminar que al citar o cambiar de estado. */
 const CLAVES_EDICION: Record<string, string> = { clave_oficial: "serumsIa.errores.clave_oficial" };
 const CLAVES_ELIMINACION: Record<string, string> = { estado_invalido: "serumsIa.preguntas.errores.estado_invalido" };
-
-/** Un código sin traducción propia no muestra el `message` del servidor (siempre en español): usa este texto neutro. */
-const CLAVE_ERROR_GENERICO = "serumsIa.errores.generico";
 
 /** Con código: su clave o la genérica. Sin código (formato heredado de la API): `undefined`, y manda el `message`. */
 const claveDe = (claves: Record<string, string>, err: unknown): string | undefined => {

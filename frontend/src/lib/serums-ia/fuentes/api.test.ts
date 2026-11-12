@@ -116,8 +116,10 @@ describe("errores", () => {
     );
   });
 
-  it("falls back to the server message for unknown motivos and to the generic text on network errors", () => {
-    expect(mensajeErrorFuente(err(422, "archivo_invalido", { motivo: "nuevo" }), t, "g")).toBe("msg");
+  it("shows the translated generic text for unknown motivos and the screen text on network errors", () => {
+    expect(mensajeErrorFuente(err(422, "archivo_invalido", { motivo: "nuevo" }), t, "g")).toBe(
+      "serumsIa.errores.generico",
+    );
     expect(mensajeErrorFuente(new TypeError("Failed to fetch"), t, "g")).toBe("g");
   });
 
