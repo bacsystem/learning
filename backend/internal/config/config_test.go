@@ -14,6 +14,8 @@ func setBaseEnv(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://x")
 	t.Setenv("JWT_SECRET", strings.Repeat("s", 32))
 	t.Setenv("ENCRYPTION_KEY", strings.Repeat("0", 64))
+	t.Setenv("ANTIFRAUD_HMAC_KEY", strings.Repeat("a", 64))
+	t.Setenv("ANTIFRAUD_HMAC_KEY_PREVIOUS", "")
 	t.Setenv("ENV", "development")
 	t.Setenv("CORS_ORIGINS", "")
 	t.Setenv("FRONTEND_BASE_URL", "")
@@ -394,5 +396,70 @@ func TestLoad_IAProveedor(t *testing.T) {
 				t.Errorf("IAProveedor %q", cfg.IAProveedor)
 			}
 		})
+	}
+}
+
+// ADR 0002: ANTIFRAUD_HMAC_KEY is required everywhere and checked at start.
+func TestLoad_AntifraudKeys(t *testing.T) {
+	otraClave := strings.Repeat("b", 64)
+	tests := []struct {
+		name    string
+		vigente string
+		previa  string
+		jwt     string
+		wantErr string // "" = ok; else the variable the error must name
+	}{
+		{"valid", strings.Repeat("a", 64), "", "", ""},
+		{"valid with a previous key", strings.Repeat("a", 64), otraClave, "", ""},
+		{"longer than 32 bytes is valid", strings.Repeat("a", 96), "", "", ""},
+		{"missing", "", "", "", "ANTIFRAUD_HMAC_KEY"},
+		{"not hex", strings.Repeat("z", 64), "", "", "ANTIFRAUD_HMAC_KEY"},
+		{"odd length hex", strings.Repeat("a", 63), "", "", "ANTIFRAUD_HMAC_KEY"},
+		{"shorter than 32 bytes", strings.Repeat("a", 62), "", "", "ANTIFRAUD_HMAC_KEY"},
+		{"equal to ENCRYPTION_KEY", strings.Repeat("0", 64), "", "", "ENCRYPTION_KEY"},
+		{"equal to JWT_SECRET", strings.Repeat("a", 64), "", strings.Repeat("a", 64), "JWT_SECRET"},
+		{"previous invalid", strings.Repeat("a", 64), "xyz", "", "ANTIFRAUD_HMAC_KEY_PREVIOUS"},
+		{"previous too short", strings.Repeat("a", 64), strings.Repeat("b", 10), "", "ANTIFRAUD_HMAC_KEY_PREVIOUS"},
+		{"previous equal to current", strings.Repeat("a", 64), strings.Repeat("a", 64), "", "ANTIFRAUD_HMAC_KEY_PREVIOUS"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv("ANTIFRAUD_HMAC_KEY", tt.vigente)
+			t.Setenv("ANTIFRAUD_HMAC_KEY_PREVIOUS", tt.previa)
+			if tt.jwt != "" {
+				t.Setenv("JWT_SECRET", tt.jwt)
+			}
+			cfg, err := Load()
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Load: %v", err)
+				}
+				if len(cfg.AntifraudHMACKey) < MinAntifraudKeyBytes {
+					t.Errorf("key has %d bytes", len(cfg.AntifraudHMACKey))
+				}
+				if (tt.previa == "") != (cfg.AntifraudHMACKeyPrevious == nil) {
+					t.Errorf("previous key = %v for %q", cfg.AntifraudHMACKeyPrevious, tt.previa)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("want an error naming %s, got %v", tt.wantErr, err)
+			}
+			for _, secret := range []string{tt.vigente, tt.previa} {
+				if len(secret) > 8 && strings.Contains(err.Error(), secret) {
+					t.Errorf("the error quotes a key: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// The key is required in every environment, also in production.
+func TestLoad_AntifraudKeyRequiredInProduction(t *testing.T) {
+	setProductionEnv(t)
+	t.Setenv("ANTIFRAUD_HMAC_KEY", "")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "ANTIFRAUD_HMAC_KEY") {
+		t.Fatalf("want ANTIFRAUD_HMAC_KEY error, got %v", err)
 	}
 }
