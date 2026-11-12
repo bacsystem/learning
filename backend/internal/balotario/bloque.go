@@ -1,0 +1,234 @@
+package balotario
+
+import (
+	"html"
+	"strings"
+	"unicode/utf8"
+
+	plegado "github.com/cbaciliod/learning/internal/texto"
+)
+
+// alternativa is an alternative while its block is being read.
+type alternativa struct {
+	et       etiqueta
+	partes   []string
+	correcta bool
+}
+
+// bloque is a question under construction.
+type bloque struct {
+	numero         int
+	inicio, fin    int
+	numeracionRota bool
+	enunciado      []string
+	alts           []*alternativa
+
+	separadas bool // alternatives glued in one line were split
+	html      bool // some HTML (or an unpaired mark) was removed
+}
+
+func nuevoBloque(numero, linea int, rota bool) *bloque {
+	return &bloque{numero: numero, inicio: linea, fin: linea, numeracionRota: rota}
+}
+
+// enunciadoLinea adds text to the enunciado; if the alternatives start in that
+// same line, the enunciado ends there.
+func (b *bloque) enunciadoLinea(linea int, t texto, hayHTML bool) {
+	b.fin = linea
+	b.html = b.html || hayHTML
+	corte := len(t.r)
+	if b.alternativas() == 0 {
+		if c := corteEnunciado(t); c >= 0 {
+			corte = c
+		}
+	}
+	if cabeza := t.tramo(0, corte).recortar(); len(cabeza.r) > 0 {
+		b.enunciado = append(b.enunciado, cabeza.String())
+		// A mark in the enunciado indicates no key: it is removed like any HTML.
+		b.html = b.html || cabeza.marcado()
+	}
+	if corte < len(t.r) {
+		b.separadas = true
+		b.etiquetadas(t.tramo(corte, len(t.r)))
+	}
+}
+
+func (b *bloque) alternativas() int { return len(b.alts) }
+
+// etiquetadas adds the alternatives of a text that starts with a label,
+// splitting the ones glued in the same line.
+func (b *bloque) etiquetadas(t texto) {
+	for len(t.r) > 0 {
+		et, resto, ok := etiquetaAlternativa(t)
+		if !ok {
+			return
+		}
+		corte := et.siguiente(resto)
+		propio := resto
+		if corte >= 0 {
+			propio = resto.tramo(0, corte)
+			b.separadas = true
+		}
+		alt := &alternativa{et: et, correcta: et.marcada || propio.marcado()}
+		if p := propio.recortar(); len(p.r) > 0 {
+			alt.partes = append(alt.partes, p.String())
+		}
+		b.alts = append(b.alts, alt)
+		if corte < 0 {
+			return
+		}
+		t = resto.tramo(corte, len(resto.r))
+	}
+}
+
+// etiquetadaLinea adds the alternatives of a line that starts with a label.
+func (b *bloque) etiquetadaLinea(linea int, t texto, hayHTML bool) {
+	b.fin = linea
+	b.html = b.html || hayHTML
+	b.etiquetadas(t)
+}
+
+// continuacion adds a line without label to the last element: the last
+// alternative, or the enunciado while there is none.
+func (b *bloque) continuacion(linea int, t texto, hayHTML bool) {
+	if len(b.alts) == 0 {
+		b.enunciadoLinea(linea, t, hayHTML)
+		return
+	}
+	b.fin = linea
+	b.html = b.html || hayHTML
+	ultima := b.alts[len(b.alts)-1]
+	ultima.correcta = ultima.correcta || t.marcado()
+	ultima.partes = append(ultima.partes, t.String())
+}
+
+// limpio decodes the entities after the marks are known (§2.3) and collapses
+// the spaces once more.
+func limpio(partes []string) string {
+	return strings.Join(strings.Fields(html.UnescapeString(strings.Join(partes, " "))), " ")
+}
+
+// Reasons of "con problemas" in the order of §2.4.
+const (
+	MotivoNumeracionRota            = "numeracion_rota"
+	MotivoEnunciadoVacio            = "enunciado_vacio"
+	MotivoEnunciadoLargo            = "enunciado_largo"
+	MotivoAlternativasInsuficientes = "alternativas_insuficientes"
+	MotivoAlternativasExcedidas     = "alternativas_excedidas"
+	MotivoAlternativaVacia          = "alternativa_vacia"
+	MotivoAlternativaLarga          = "alternativa_larga"
+	MotivoAlternativasDuplicadas    = "alternativas_duplicadas"
+	MotivoSinClave                  = "sin_clave"
+)
+
+// Structure alerts (contract §2.3).
+const (
+	AlertaAlternativasSeparadas = "alternativas_separadas"
+	AlertaVinetasNormalizadas   = "vinetas_normalizadas"
+	AlertaHTMLEliminado         = "html_eliminado"
+)
+
+// Limits of §2.4 and of rule 5.
+const (
+	MaxPreguntas    = 1000
+	MaxEnunciado    = 2000 // runes
+	MaxAlternativa  = 500  // runes; respuestas.texto is VARCHAR(500)
+	MinAlternativas = 2
+	MaxAlternativas = 6
+	TipoUnica       = "unica"
+	TipoMultiple    = "multiple"
+)
+
+// resolver closes the block: it returns the valid question or the problem.
+func (b *bloque) resolver() (Pregunta, Problema, bool) {
+	enunciado := limpio(b.enunciado)
+	textos := make([]string, len(b.alts))
+	correctas := 0
+	for i, a := range b.alts {
+		textos[i] = limpio(a.partes)
+		if a.correcta {
+			correctas++
+		}
+	}
+	motivos := b.motivos(enunciado, textos, correctas)
+	if len(motivos) > 0 {
+		n := b.numero
+		return Pregunta{}, Problema{Numero: &n, LineaInicio: b.inicio, LineaFin: b.fin, Motivos: motivos}, false
+	}
+	p := Pregunta{Numero: b.numero, LineaInicio: b.inicio, LineaFin: b.fin, Enunciado: enunciado,
+		Tipo: TipoUnica, Alertas: b.alertas()}
+	if correctas > 1 {
+		p.Tipo = TipoMultiple
+	}
+	for i, a := range b.alts {
+		p.Alternativas = append(p.Alternativas, Alternativa{Letra: string(rune('A' + i)), Texto: textos[i], Correcta: a.correcta})
+	}
+	return p, Problema{}, true
+}
+
+func (b *bloque) motivos(enunciado string, textos []string, correctas int) []string {
+	motivos := []string{}
+	anadir := func(cond bool, motivo string) {
+		if cond {
+			motivos = append(motivos, motivo)
+		}
+	}
+	anadir(b.numeracionRota, MotivoNumeracionRota)
+	anadir(enunciado == "", MotivoEnunciadoVacio)
+	anadir(utf8.RuneCountInString(enunciado) > MaxEnunciado, MotivoEnunciadoLargo)
+	anadir(len(textos) < MinAlternativas, MotivoAlternativasInsuficientes)
+	anadir(len(textos) > MaxAlternativas, MotivoAlternativasExcedidas)
+	anadir(alguna(textos, func(s string) bool { return s == "" }), MotivoAlternativaVacia)
+	anadir(alguna(textos, func(s string) bool { return utf8.RuneCountInString(s) > MaxAlternativa }), MotivoAlternativaLarga)
+	anadir(hayDuplicadas(textos), MotivoAlternativasDuplicadas)
+	anadir(correctas == 0, MotivoSinClave)
+	return motivos
+}
+
+func alguna(textos []string, cond func(string) bool) bool {
+	for _, s := range textos {
+		if cond(s) {
+			return true
+		}
+	}
+	return false
+}
+
+func hayDuplicadas(textos []string) bool {
+	vistos := make(map[string]bool, len(textos))
+	for _, s := range textos {
+		clave := plegado.Plegar(s)
+		if vistos[clave] {
+			return true
+		}
+		vistos[clave] = true
+	}
+	return false
+}
+
+// alertas lists, in a fixed order, where the parser had to intervene.
+func (b *bloque) alertas() []string {
+	alertas := []string{}
+	if b.separadas {
+		alertas = append(alertas, AlertaAlternativasSeparadas)
+	}
+	if b.vinetasNormalizadas() {
+		alertas = append(alertas, AlertaVinetasNormalizadas)
+	}
+	if b.html {
+		alertas = append(alertas, AlertaHTMLEliminado)
+	}
+	return alertas
+}
+
+// vinetasNormalizadas: a bullet without letter, mixed label styles or letters
+// out of order (A, B, D are saved as A, B, C). A uniform lettered style
+// ("a.", "A)") is normalised silently (P-B5).
+func (b *bloque) vinetasNormalizadas() bool {
+	for i, a := range b.alts {
+		if a.et.vineta || a.et.estilo != b.alts[0].et.estilo || a.et.letra != rune('A'+i) {
+			return true
+		}
+	}
+	return false
+}
