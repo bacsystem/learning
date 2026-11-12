@@ -243,6 +243,14 @@ func TestSembrar_CompletaPreguntasAMedias(t *testing.T) {
 	if _, err := db.Exec(`UPDATE preguntas SET estado = 'rechazada', motivo_rechazo = 'Clave incorrecta' WHERE id = $1`, ids[2]); err != nil {
 		t.Fatal(err)
 	}
+	// A fourth is approved without citation, as the seed of the previous version left it.
+	var huerfana int64
+	if err := db.Get(&huerfana, `SELECT id FROM preguntas WHERE enunciado LIKE 'Pregunta demo 2 de DEMO-%' ORDER BY id LIMIT 1`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DELETE FROM pregunta_citas WHERE pregunta_id = $1`, huerfana); err != nil {
+		t.Fatal(err)
+	}
 	if res := correr(t, db, cfg); res != "creados: map[]" {
 		t.Errorf("completing created rows: %s", res)
 	}
@@ -252,6 +260,10 @@ func TestSembrar_CompletaPreguntasAMedias(t *testing.T) {
 	}
 	if fmt.Sprint(estados) != "[aprobada:1 aprobada:1 rechazada:1]" {
 		t.Errorf("estado:citas = %v, want [aprobada:1 aprobada:1 rechazada:1]", estados)
+	}
+	var citas int
+	if err := db.Get(&citas, `SELECT COUNT(*) FROM pregunta_citas WHERE pregunta_id = $1`, huerfana); err != nil || citas != 1 {
+		t.Errorf("approved without citation: citas = %d (%v), want 1", citas, err)
 	}
 }
 

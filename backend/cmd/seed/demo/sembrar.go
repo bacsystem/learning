@@ -384,12 +384,27 @@ func (s *sembrador) preguntas(ctx context.Context, procesoID, asignaturaID int64
 			id, estado = creada.ID, creada.Estado
 			s.creado["preguntas"]++
 		}
-		if estado != questions.EstadoBorrador {
-			continue // already reviewed: the seed never overrides an admin's decision
+		if err := s.completar(ctx, id, estado, pasajes[i%len(pasajes)]); err != nil {
+			return fmt.Errorf("pregunta %d de %s: %w", i, codigo, err)
 		}
-		if err := s.aprobar(ctx, id, pasajes[i%len(pasajes)]); err != nil {
-			return fmt.Errorf("aprobar la pregunta %d de %s: %w", i, codigo, err)
+	}
+	return nil
+}
+
+// completar brings a demo question to cited and approved. A draft is cited and
+// approved; an approved one left without citation (by the seed of an older
+// version) only gets its citation; any other state is an admin's decision and
+// is never overridden.
+func (s *sembrador) completar(ctx context.Context, id int64, estado string, pasajeID int64) error {
+	switch estado {
+	case questions.EstadoBorrador:
+		return s.aprobar(ctx, id, pasajeID)
+	case questions.EstadoAprobada:
+		citada, err := s.buscar(ctx, `SELECT pregunta_id FROM pregunta_citas WHERE pregunta_id = $1 LIMIT 1`, id)
+		if err != nil || citada != 0 {
+			return err
 		}
+		return s.citar(ctx, id, pasajeID)
 	}
 	return nil
 }
@@ -410,12 +425,19 @@ func (s *sembrador) preguntaDemo(ctx context.Context, procesoID, asignaturaID in
 // aprobar cites the passage and approves the draft. The seed is not an admin
 // action, so nothing goes to audit_log (nil Auditor).
 func (s *sembrador) aprobar(ctx context.Context, preguntaID, pasajeID int64) error {
-	if _, err := s.preg.ReemplazarCitas(ctx, preguntaID, questions.ReemplazarCitasRequest{PasajeIDs: &[]int64{pasajeID}}, nil); err != nil {
-		return fmt.Errorf("citar: %w", err)
+	if err := s.citar(ctx, preguntaID, pasajeID); err != nil {
+		return err
 	}
 	verificado := true
 	if _, err := s.preg.CambiarEstado(ctx, preguntaID, questions.CambiarEstadoRequest{Estado: questions.EstadoAprobada, Verificado: &verificado}, nil); err != nil {
 		return fmt.Errorf("aprobar: %w", err)
+	}
+	return nil
+}
+
+func (s *sembrador) citar(ctx context.Context, preguntaID, pasajeID int64) error {
+	if _, err := s.preg.ReemplazarCitas(ctx, preguntaID, questions.ReemplazarCitasRequest{PasajeIDs: &[]int64{pasajeID}}, nil); err != nil {
+		return fmt.Errorf("citar: %w", err)
 	}
 	return nil
 }
