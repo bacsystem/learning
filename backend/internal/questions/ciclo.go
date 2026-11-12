@@ -149,6 +149,19 @@ func validarCuerpoEstado(req CambiarEstadoRequest) error {
 	return nil
 }
 
+// decidirEliminar checks that a pregunta in the state read under the row lock
+// can be deleted. One deleted while we waited for the lock no longer exists
+// (E3-07 §4.2): 404, like the PATCH and PUT …/citas.
+func decidirEliminar(estado string) error {
+	if estado == EstadoEliminada {
+		return ErrNotFound
+	}
+	if !transicionPermitida(estado, EstadoEliminada) {
+		return regla(CodigoEstadoInvalido, map[string]any{"estado_actual": estado})
+	}
+	return nil
+}
+
 // decidirCambioEstado applies steps 6–11 of E3-07 §3.2, in order, to the state
 // read under the row lock. It returns the first rule that fails.
 func decidirCambioEstado(b preguntaBloqueada, req CambiarEstadoRequest) (cambioEstado, error) {

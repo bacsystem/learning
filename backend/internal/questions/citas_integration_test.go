@@ -198,7 +198,7 @@ func TestPutCitas_ConcurrenciaConAprobar(t *testing.T) {
 	}
 }
 
-// R4 of E3-07: citas[] carries seccion, lineas and the excerpt, never the full text.
+// R4 of E3-07: citas[] carries seccion, lineas and the excerpt and the full passage text.
 func TestGetPregunta_CitasConExtracto(t *testing.T) {
 	c := newCicloFx(t)
 	_, a := fuenteDePrueba(t, c.f.DB)

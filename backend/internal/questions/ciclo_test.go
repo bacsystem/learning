@@ -104,6 +104,7 @@ func TestDecidirCambioEstado(t *testing.T) {
 		{"orden: estado_invalido antes que cualquier guarda", preguntaBloqueada{Estado: EstadoRechazada, Origen: OrigenIA}, CambiarEstadoRequest{Estado: EstadoAprobada}, CodigoEstadoInvalido},
 		{"orden: revision_especializada antes que falta_cita", preguntaBloqueada{Estado: EstadoBorrador, Origen: OrigenIA}, CambiarEstadoRequest{Estado: EstadoAprobada}, CodigoRevisionEspecializada},
 		{"orden: falta_cita antes que la casilla", preguntaBloqueada{Estado: EstadoBorrador, Origen: OrigenManual}, CambiarEstadoRequest{Estado: EstadoAprobada}, CodigoFaltaCita},
+		{"orden: falta_cita antes que nota_obligatoria", preguntaBloqueada{Estado: EstadoEnRevision, Origen: OrigenIA}, CambiarEstadoRequest{Estado: EstadoAprobada, Verificado: ptr(true)}, CodigoFaltaCita},
 		{"orden: nota_obligatoria antes que la casilla", preguntaBloqueada{EstadoEnRevision, OrigenIA, citaActiva()}, CambiarEstadoRequest{Estado: EstadoAprobada}, CodigoNotaObligatoria},
 	}
 	for _, tt := range tests {
@@ -114,6 +115,31 @@ func TestDecidirCambioEstado(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDecidirEliminar(t *testing.T) {
+	tests := []struct {
+		estado string
+		want   string
+	}{
+		{EstadoAprobada, ""},
+		{EstadoRechazada, ""},
+		{EstadoActivo, ""},
+		{EstadoBorrador, CodigoEstadoInvalido},
+		{EstadoEnRevision, CodigoEstadoInvalido},
+	}
+	for _, tt := range tests {
+		t.Run(tt.estado, func(t *testing.T) {
+			if got := codigoRegla(t, decidirEliminar(tt.estado)); got != tt.want {
+				t.Errorf("código = %q, want %q", got, tt.want)
+			}
+		})
+	}
+	t.Run("eliminada tras el bloqueo es inexistente", func(t *testing.T) {
+		if err := decidirEliminar(EstadoEliminada); !errors.Is(err, ErrNotFound) {
+			t.Errorf("err = %v, want ErrNotFound", err)
+		}
+	})
 }
 
 func TestDecidirCambioEstado_Detalle(t *testing.T) {

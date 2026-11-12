@@ -257,8 +257,8 @@ func (r *Repository) EliminarPregunta(ctx context.Context, id int64, aud Auditor
 		if err != nil {
 			return err
 		}
-		if !transicionPermitida(b.Estado, EstadoEliminada) {
-			return regla(CodigoEstadoInvalido, map[string]any{"estado_actual": b.Estado})
+		if err := decidirEliminar(b.Estado); err != nil {
+			return err
 		}
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE preguntas SET estado = 'eliminada', updated_at = NOW() WHERE id = $1`, id); err != nil {
