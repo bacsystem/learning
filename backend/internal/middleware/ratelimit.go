@@ -117,3 +117,10 @@ func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// writeJSONError answers the 429 of the IP rate limiter in the legacy format.
+func writeJSONError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(`{"error":"` + msg + `"}`))
+}

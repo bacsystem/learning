@@ -1,4 +1,5 @@
 import { API_BASE } from "@/lib/http/api-base";
+import { apiErrorFrom } from "@/lib/http/api-error";
 import { avisarSiSesionExpirada } from "@/lib/http/sesion";
 
 async function requestMultipart<T>(path: string, token: string, form: FormData): Promise<T> {
@@ -9,8 +10,7 @@ async function requestMultipart<T>(path: string, token: string, form: FormData):
   });
   if (!res.ok) {
     avisarSiSesionExpirada(res.status);
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw Object.assign(new Error(body.error ?? res.statusText), { status: res.status });
+    throw await apiErrorFrom(res);
   }
   return res.json() as Promise<T>;
 }
@@ -61,8 +61,7 @@ async function request<T>(
     // the caller so it can show its own message. `avisarExpiracion: false` lets
     // the caller handle the 401 itself (the initial session restore).
     if (avisarExpiracion && new Headers(options?.headers).has("Authorization")) avisarSiSesionExpirada(res.status);
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw Object.assign(new Error(body.error ?? res.statusText), { status: res.status });
+    throw await apiErrorFrom(res);
   }
   return res.json() as Promise<T>;
 }

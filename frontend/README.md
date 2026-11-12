@@ -52,7 +52,7 @@ npm run lint       # ESLint + Prettier
 npm run build      # build de producción
 ```
 
-Variables de entorno:
+Variables de entorno (plantilla en `env.example`: `cp env.example .env.local`):
 
 | Variable                     | Uso                                                                                                                              |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |

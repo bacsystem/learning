@@ -627,7 +627,7 @@ func TestGuardarPesos_CuerpoDemasiadoGrande(t *testing.T) {
 		code          string
 	}{
 		{"chunked: lo detecta el handler", false, "cuerpo_demasiado_grande"},
-		{"con Content-Length: lo corta el middleware", true, ""},
+		{"con Content-Length: lo corta el middleware", true, "cuerpo_demasiado_grande"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -644,11 +644,8 @@ func TestGuardarPesos_CuerpoDemasiadoGrande(t *testing.T) {
 			if rr.Code != http.StatusRequestEntityTooLarge {
 				t.Fatalf("got %d %v, want 413", rr.Code, body)
 			}
-			if c.code != "" && (body["error"] != c.code || body["message"] == "") {
+			if body["error"] != c.code || body["message"] == "" {
 				t.Errorf("body = %v, want error %s with message", body, c.code)
-			}
-			if c.code == "" && body["message"] != nil {
-				t.Errorf("middleware 413 = %v, want the legacy {error: text}", body)
 			}
 		})
 	}
