@@ -44,7 +44,7 @@ export function TarjetaGasto({ gasto }: { gasto: GastoIa }) {
         <h2 id="ia-gasto" className="text-titulo text-foreground">
           {t("serumsIa.ia.gasto.titulo")}
         </h2>
-        <p className="text-control text-muted-foreground capitalize">{t("serumsIa.ia.gasto.mes", { mes })}</p>
+        <p className="text-control text-muted-foreground">{t("serumsIa.ia.gasto.mes", { mes })}</p>
       </div>
 
       <FilaMetricas columnas={2}>
