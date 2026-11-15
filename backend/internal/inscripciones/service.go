@@ -3,6 +3,7 @@ package inscripciones
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/cbaciliod/learning/internal/audit"
 )
@@ -224,11 +225,11 @@ func toAdminDTOs(rows []InscripcionDetail) []InscripcionAdminDTO {
 			ProcesoAnio:        r.ProcesoAnio,
 			Estado:             r.Estado,
 			Observacion:        r.Observacion,
-			FechaSolicitud:     r.CreatedAt.Format("02/01/2006 15:04"),
+			FechaSolicitud:     r.CreatedAt.Format(time.RFC3339),
 			RevisadoPor:        r.RevisadoPor,
 		}
 		if r.RevisadoAt != nil {
-			s := r.RevisadoAt.Format("02/01/2006 15:04")
+			s := r.RevisadoAt.Format(time.RFC3339)
 			out[i].RevisadoAt = &s
 		}
 	}
