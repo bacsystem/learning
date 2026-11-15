@@ -130,7 +130,9 @@ func inactivoCopy(loc string) inactivoTexts {
 
 // ── Registro pendiente (al usuario) ─────────────────────────────────────────
 
-func emailRegistroPendiente(loc, nombres, apellido, username string) (subject, body string) {
+// emailRegistroPendiente confirms the request. contact is the support address
+// shown for questions (config CONTACT_EMAIL); empty omits that sentence.
+func emailRegistroPendiente(loc, contact, nombres, apellido, username string) (subject, body string) {
 	c := registroPendienteCopy(loc)
 	subject = c.subject
 	content := fmt.Sprintf(`
@@ -148,12 +150,21 @@ func emailRegistroPendiente(loc, nombres, apellido, username string) (subject, b
 
     <p style="margin:20px 0 0;font-size:13px;color:#71717a;">%s</p>`,
 		fmt.Sprintf(c.greeting, html.EscapeString(nombres+" "+apellido)), c.intro, c.usernameLabel,
-		html.EscapeString(username), correo.InfoBox("#f0f9ff", "#0ea5e9", c.notice), c.footer)
+		html.EscapeString(username), correo.InfoBox("#f0f9ff", "#0ea5e9", c.notice), c.footerWithContact(contact))
 	body = correo.Wrap(loc, subject, content)
 	return
 }
 
-type registroPendienteTexts struct{ subject, greeting, intro, usernameLabel, notice, footer string }
+type registroPendienteTexts struct{ subject, greeting, intro, usernameLabel, notice, footer, contactLine string }
+
+// footerWithContact appends the contact sentence (its %s is the mailto link).
+func (c registroPendienteTexts) footerWithContact(contact string) string {
+	if contact == "" {
+		return c.footer
+	}
+	link := fmt.Sprintf(`<a href="mailto:%[1]s" style="color:#4a5e3a;">%[1]s</a>`, html.EscapeString(contact))
+	return c.footer + " " + fmt.Sprintf(c.contactLine, link)
+}
 
 func registroPendienteCopy(loc string) registroPendienteTexts {
 	if loc == locale.EN {
@@ -162,8 +173,9 @@ func registroPendienteCopy(loc string) registroPendienteTexts {
 			greeting:      "Hello, %s",
 			intro:         "We have received your request to access the training platform. Your account is being reviewed by the administrative team.",
 			usernameLabel: "Requested username",
-			notice:        "⏳ Your request is <strong>under review</strong>. The usual response time is 1 to 2 business days.",
-			footer:        "You will receive another e-mail when your account is activated. If you have questions, contact the administration area of your institution.",
+			notice:        "⏳ Your request is <strong>under review</strong>.",
+			footer:        "You will receive another e-mail when your account is activated.",
+			contactLine:   "If you have questions, write to %s.",
 		}
 	}
 	return registroPendienteTexts{
@@ -171,8 +183,9 @@ func registroPendienteCopy(loc string) registroPendienteTexts {
 		greeting:      "Hola, %s",
 		intro:         "Hemos recibido tu solicitud de acceso a la plataforma de capacitación. Tu cuenta está siendo revisada por el equipo administrativo.",
 		usernameLabel: "Usuario solicitado",
-		notice:        "⏳ Tu solicitud está <strong>en revisión</strong>. El tiempo de respuesta habitual es de 1 a 2 días hábiles.",
-		footer:        "Recibirás otro correo cuando tu cuenta sea activada. Si tienes dudas, contacta con el área de administración de tu institución.",
+		notice:        "⏳ Tu solicitud está <strong>en revisión</strong>.",
+		footer:        "Recibirás otro correo cuando tu cuenta sea activada.",
+		contactLine:   "Si tienes dudas, escribe a %s.",
 	}
 }
 

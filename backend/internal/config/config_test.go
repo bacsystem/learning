@@ -27,6 +27,7 @@ func setBaseEnv(t *testing.T) {
 	t.Setenv("IA_PROVEEDOR", "")
 	t.Setenv("IA_API_KEY", "")
 	t.Setenv("IA_MODELO", "")
+	t.Setenv("CONTACT_EMAIL", "")
 }
 
 // setProductionEnv is setBaseEnv plus everything a non-development ENV needs.
@@ -50,6 +51,36 @@ func TestLoad_OK(t *testing.T) {
 	}
 	if cfg.Port != "8080" {
 		t.Errorf("default port %q", cfg.Port)
+	}
+}
+
+func TestLoad_ContactEmail(t *testing.T) {
+	tests := []struct {
+		name, value, want string
+		wantErr           bool
+	}{
+		{"default when unset", "", DefaultContactEmail, false},
+		{"blank uses default", "   ", DefaultContactEmail, false},
+		{"custom", " ayuda@example.com ", "ayuda@example.com", false},
+		{"not an address", "no-es-un-correo", "", true},
+		{"display name", "Ayuda <a@example.com>", "", true},
+		{"two addresses", "a@example.com, b@example.com", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setBaseEnv(t)
+			t.Setenv("CONTACT_EMAIL", tt.value)
+			cfg, err := Load()
+			if tt.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "CONTACT_EMAIL") {
+					t.Fatalf("want a CONTACT_EMAIL error, got %v", err)
+				}
+				return
+			}
+			if err != nil || cfg.ContactEmail != tt.want {
+				t.Fatalf("ContactEmail = %q, %v; want %q", cfg.ContactEmail, err, tt.want)
+			}
+		})
 	}
 }
 

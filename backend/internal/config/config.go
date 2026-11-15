@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/hex"
 	"fmt"
+	"net/mail"
 	"net/url"
 	"slices"
 	"strings"
@@ -18,6 +19,9 @@ import (
 // MinJWTSecretBytes is the minimum JWT_SECRET length: HS256 needs a key of at
 // least 256 bits to keep its security margin.
 const MinJWTSecretBytes = 32
+
+// DefaultContactEmail is used when CONTACT_EMAIL is empty or unset.
+const DefaultContactEmail = "contact@bacsystemsolutions.com"
 
 // logLevels are the accepted LOG_LEVEL values. The list is closed on purpose:
 // zerolog would also take "disabled", "panic" or numbers, which hide errors.
@@ -46,6 +50,11 @@ type Config struct {
 	SMTPFrom     string
 
 	FrontendBaseURL string
+
+	// ContactEmail is the support address the e-mails give for questions
+	// (same default as the frontend's NEXT_PUBLIC_CONTACT_EMAIL). A bare
+	// address; an invalid value fails Load.
+	ContactEmail string
 
 	// LogLevel (trace|debug|info|warn|error, case-insensitive) overrides the
 	// logger's default level (debug in development, info otherwise); empty
@@ -100,6 +109,7 @@ func Load() (*Config, error) {
 		TrustedProxies:  viper.GetString("TRUSTED_PROXIES"),
 		FrontendBaseURL: viper.GetString("FRONTEND_BASE_URL"),
 		LogLevel:        viper.GetString("LOG_LEVEL"),
+		ContactEmail:    strings.TrimSpace(viper.GetString("CONTACT_EMAIL")),
 		IAProveedor:     strings.TrimSpace(viper.GetString("IA_PROVEEDOR")),
 		IAAPIKey:        viper.GetString("IA_API_KEY"),
 		IAModelo:        strings.TrimSpace(viper.GetString("IA_MODELO")),
@@ -132,6 +142,13 @@ func Load() (*Config, error) {
 	cfg.LogLevel = strings.ToLower(strings.TrimSpace(cfg.LogLevel))
 	if cfg.LogLevel != "" && !slices.Contains(logLevels, cfg.LogLevel) {
 		return nil, fmt.Errorf("LOG_LEVEL must be one of %s or empty (got %q)", strings.Join(logLevels, "|"), cfg.LogLevel)
+	}
+
+	if cfg.ContactEmail == "" {
+		cfg.ContactEmail = DefaultContactEmail
+	}
+	if addr, err := mail.ParseAddress(cfg.ContactEmail); err != nil || addr.Address != cfg.ContactEmail {
+		return nil, fmt.Errorf("CONTACT_EMAIL must be a plain e-mail address (e.g. contact@example.com)")
 	}
 
 	if err := validarIA(cfg); err != nil {
