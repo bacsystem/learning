@@ -1,0 +1,649 @@
+# Paquete internal/admin (backend-dev-2). Rutas: backend/internal/admin/routes.go.
+# Los nombres de handler son los del código (minúscula inicial), por trazabilidad con routes.go.
+# Formato de error heredado (`ErrorTexto`); el 500 es `httpx.InternalError`.
+paths:
+  /admin/dashboard:
+    get:
+      operationId: admin.handleDashboard
+      tags: [admin]
+      summary: 'Totales del panel'
+      description: |
+        Solo admin. Contadores generales, la actividad de los últimos 7 días (días de Lima, con
+        ceros en los días sin actividad) y las asignaturas más practicadas.
+      x-rol: admin
+      responses:
+        '200':
+          description: 'Totales del panel.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Dashboard'
+              example:
+                total_usuarios_registrados: 120
+                total_usuarios_activos: 100
+                total_usuarios_pendientes: 5
+                total_practicas_hoy: 12
+                total_simulacros_hoy: 3
+                usuarios_online: 4
+                practicas_ultima_semana:
+                  - fecha: '2026-11-15'
+                    total: 12
+                simulacros_ultima_semana:
+                  - fecha: '2026-11-15'
+                    total: 3
+                top_asignaturas:
+                  - nombre: Asignatura Ejemplo
+                    total: 40
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/dashboard/actividad:
+    get:
+      operationId: admin.handleDashboardActividad
+      tags: [admin]
+      summary: 'Actividad de la última semana'
+      description: |
+        Solo admin. Las tres series del panel, sin los contadores: prácticas y simulacros por día (7 días de Lima, con ceros) y el top de asignaturas.
+      x-rol: admin
+      responses:
+        '200':
+          description: 'Series de actividad.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/DashboardActividad'
+              example:
+                practicas_ultima_semana:
+                  - fecha: '2026-11-15'
+                    total: 12
+                simulacros_ultima_semana:
+                  - fecha: '2026-11-15'
+                    total: 3
+                top_asignaturas:
+                  - nombre: Asignatura Ejemplo
+                    total: 40
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/usuarios/{id}:
+    get:
+      operationId: admin.handleGetUsuarioDetalle
+      tags: [admin]
+      summary: 'Detalle de un usuario'
+      description: |
+        Solo admin. Datos de la persona descifrados (DNI completo, correo, teléfono) y sus estadísticas de práctica y simulacro.
+      x-rol: admin
+      parameters:
+        - $ref: '../openapi.yaml#/components/parameters/Id'
+      responses:
+        '200':
+          description: 'Detalle del usuario.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/UsuarioDetalle'
+              example:
+                id: 2
+                persona_id: 2
+                dni: '00000000'
+                nombres: Persona
+                apellido_paterno: Ejemplo
+                apellido_materno: Muestra
+                grado: Grado Ejemplo
+                especialidad: Especialidad Ejemplo
+                institucion: Institución Ejemplo
+                telefono: '900000000'
+                email: persona@example.com
+                username: personaejemplo
+                rol: usuario
+                estado: activo
+                activated_at: '2026-11-01T10:00:00Z'
+                activated_by: '1'
+                created_at: '2026-10-30T10:00:00Z'
+                updated_at: '2026-11-01T10:00:00Z'
+                total_practicas: 4
+                total_simulacros: 2
+                nota_promedio: 72.5
+        '400':
+          description: 'Id no numérico.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: 'ID de usuario inválido.'
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '404':
+          description: 'No existe el usuario.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: 'Usuario no encontrado.'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/usuarios/{id}/rol:
+    patch:
+      operationId: admin.handlePatchUsuarioRol
+      tags: [admin]
+      summary: 'Cambiar el rol de un usuario'
+      description: |
+        Solo admin. Cambia el rol, revoca las sesiones del usuario y audita el cambio solo si
+        tiene éxito. No se puede quitar el rol al único admin activo (`409`).
+
+        Este handler no exige `Content-Type` y lee el cuerpo sin límite propio (aplica el
+        de 1 MB del middleware global).
+      x-rol: admin
+      parameters:
+        - $ref: '../openapi.yaml#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/RolSolicitud'
+            example:
+              rol: admin
+      responses:
+        '200':
+          description: 'Rol actualizado.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Mensaje'
+              example:
+                message: 'Rol actualizado.'
+        '400':
+          description: 'Id no numérico o JSON mal formado.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: 'ID de usuario inválido.'
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '404':
+          description: 'No existe el usuario.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: 'Usuario no encontrado.'
+        '409':
+          description: 'Es el único administrador activo.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: 'no se puede cambiar el rol: es el único administrador activo'
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: '`rol` ausente o distinto de `admin` y `usuario`. El texto es el del validador, en inglés.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: 'Key: ''UpdateRolRequest.Rol'' Error:Field validation for ''Rol'' failed on the ''oneof'' tag'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/audit-log:
+    get:
+      operationId: admin.handleGetAuditLog
+      tags: [admin]
+      summary: 'Registro de auditoría'
+      description: |
+        Solo admin. Más reciente primero. **Paginación tolerante**: un `page` o `per_page`
+        inválido cae al valor por defecto (nunca da `400`); `per_page` se recorta a 100 y `page`
+        a 1 000 000. Las fechas, en cambio, son estrictas.
+
+        El rango `from`/`to` usa días de Lima y es inclusivo en ambos extremos. `q` busca por
+        nombre de usuario sin distinguir mayúsculas.
+      x-rol: admin
+      parameters:
+        - $ref: '../openapi.yaml#/components/parameters/Page'
+        - $ref: '../openapi.yaml#/components/parameters/PerPage'
+        - name: from
+          in: query
+          required: false
+          description: Fecha inicial (`AAAA-MM-DD`, día de Lima).
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          description: Fecha final (`AAAA-MM-DD`, día de Lima), inclusiva.
+          schema:
+            type: string
+            format: date
+        - name: q
+          in: query
+          required: false
+          description: Texto a buscar en el nombre de usuario.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Página del registro.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/AuditLogRespuesta'
+              example:
+                data:
+                  - id: 10
+                    usuario_id: 1
+                    username: adminejemplo
+                    accion: cambiar_rol
+                    entidad: usuario
+                    entidad_id: 2
+                    detalle:
+                      rol: admin
+                    ip: 203.0.113.10
+                    user_agent: ejemplo
+                    created_at: '2026-11-15T09:30:00Z'
+                total: 1
+                page: 1
+                per_page: 20
+        '400':
+          description: '`from` o `to` no es una fecha `AAAA-MM-DD`.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: 'Fecha inválida. Use el formato AAAA-MM-DD.'
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/ingresos:
+    get:
+      operationId: admin.handleGetIngresos
+      tags: [admin]
+      summary: 'Resumen de ingresos'
+      description: |
+        Solo admin. Suma de los montos de las inscripciones aprobadas. Los importes son
+        **texto decimal exacto con 2 decimales** (`"1234.50"`), nunca números; los periodos
+        son del año y mes de Lima. `serie_mensual` cubre los últimos 12 meses con `"0.00"` en los vacíos.
+      x-rol: admin
+      responses:
+        '200':
+          description: 'Resumen de ingresos.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Ingresos'
+              example:
+                total_recaudado: '1500.00'
+                total_este_anio: '1200.00'
+                total_este_mes: '150.00'
+                total_inscripciones: 10
+                serie_mensual:
+                  - mes: '2026-11'
+                    total: '150.00'
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/ingresos/config:
+    get:
+      operationId: admin.handleGetIngresosConfig
+      tags: [admin]
+      summary: 'Monto de inscripción por año'
+      description: |
+        Solo admin. De más reciente a más antiguo. Lista vacía si no hay configuración.
+      x-rol: admin
+      responses:
+        '200':
+          description: 'Configuración por año.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/schemas/ConfigPago'
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/ingresos/config/{anio}:
+    put:
+      operationId: admin.handlePutIngresosConfig
+      tags: [admin]
+      summary: 'Fijar el monto de inscripción de un año'
+      description: |
+        Solo admin. Crea o reemplaza el monto del año y audita el cambio (con el monto anterior).
+        El monto es un número JSON exacto (sin exponente ni signo), de 0 a 99999999.99 con hasta 2 decimales;
+        falta o fuera de rango es `422`. Este handler no exige `Content-Type`.
+      x-rol: admin
+      parameters:
+        - name: anio
+          in: path
+          required: true
+          description: Año, de 2000 a 2099.
+          schema:
+            type: integer
+            minimum: 2000
+            maximum: 2099
+          example: 2026
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/ConfigPagoSolicitud'
+            example:
+              monto: 150.10
+      responses:
+        '200':
+          description: 'Configuración guardada.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/ConfigPago'
+              example:
+                anio: 2026
+                monto: 150.10
+                updated_at: '2026-11-15T09:30:00Z'
+        '400':
+          description: 'Año fuera de 2000 a 2099, no numérico, o JSON mal formado.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: 'Año inválido. Debe estar entre 2000 y 2099.'
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: '`monto` ausente o con formato inválido.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: 'monto es requerido: número entre 0 y 99999999.99 con hasta 2 decimales.'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+schemas:
+  Mensaje:
+    type: object
+    required: [message]
+    properties:
+      message:
+        type: string
+  DiaMetrica:
+    type: object
+    required: [fecha, total]
+    properties:
+      fecha:
+        type: string
+        format: date
+        description: Día de Lima (`AAAA-MM-DD`).
+      total:
+        type: integer
+        minimum: 0
+  AsignaturaMetrica:
+    type: object
+    required: [nombre, total]
+    properties:
+      nombre:
+        type: string
+      total:
+        type: integer
+        minimum: 0
+  DashboardActividad:
+    type: object
+    required: [practicas_ultima_semana, simulacros_ultima_semana, top_asignaturas]
+    properties:
+      practicas_ultima_semana:
+        type: array
+        items:
+          $ref: '#/schemas/DiaMetrica'
+      simulacros_ultima_semana:
+        type: array
+        items:
+          $ref: '#/schemas/DiaMetrica'
+      top_asignaturas:
+        type: array
+        items:
+          $ref: '#/schemas/AsignaturaMetrica'
+  Dashboard:
+    allOf:
+      - $ref: '#/schemas/DashboardActividad'
+      - type: object
+        required: [total_usuarios_registrados, total_usuarios_activos, total_usuarios_pendientes, total_practicas_hoy, total_simulacros_hoy, usuarios_online]
+        properties:
+          total_usuarios_registrados:
+            type: integer
+            minimum: 0
+          total_usuarios_activos:
+            type: integer
+            minimum: 0
+          total_usuarios_pendientes:
+            type: integer
+            minimum: 0
+          total_practicas_hoy:
+            type: integer
+            minimum: 0
+          total_simulacros_hoy:
+            type: integer
+            minimum: 0
+          usuarios_online:
+            type: integer
+            minimum: 0
+            description: Usuarios con una sesión vista en los últimos 5 minutos.
+  UsuarioDetalle:
+    type: object
+    required: [id, persona_id, dni, nombres, apellido_paterno, apellido_materno, grado, especialidad, institucion, telefono, email, username, rol, estado, created_at, updated_at, total_practicas, total_simulacros, nota_promedio]
+    properties:
+      id:
+        type: integer
+        format: int64
+      persona_id:
+        type: integer
+        format: int64
+      dni:
+        type: string
+      nombres:
+        type: string
+      apellido_paterno:
+        type: string
+      apellido_materno:
+        type: string
+      grado:
+        type: string
+      especialidad:
+        type: string
+      institucion:
+        type: string
+      telefono:
+        type: string
+      email:
+        type: string
+      username:
+        type: string
+      rol:
+        type: string
+        enum: [usuario, admin]
+      estado:
+        type: string
+        enum: [pendiente, activo, rechazado, inactivo]
+      activated_at:
+        type: string
+        format: date-time
+        description: Se omite si el usuario nunca fue activado.
+      activated_by:
+        type: string
+        description: Id (como texto) del admin que lo activó. Se omite si no aplica.
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+      total_practicas:
+        type: integer
+        minimum: 0
+        description: Prácticas completadas.
+      total_simulacros:
+        type: integer
+        minimum: 0
+        description: Simulacros completados.
+      nota_promedio:
+        type: number
+        description: Promedio de la nota centesimal de los simulacros completados; 0 si no hay.
+  RolSolicitud:
+    type: object
+    required: [rol]
+    properties:
+      rol:
+        type: string
+        enum: [admin, usuario]
+  AuditLogItem:
+    type: object
+    required: [id, accion, entidad, created_at]
+    properties:
+      id:
+        type: integer
+        format: int64
+      usuario_id:
+        type: integer
+        format: int64
+        description: Se omite en acciones sin usuario.
+      username:
+        type: string
+        description: Se omite si no hay usuario.
+      accion:
+        type: string
+      entidad:
+        type: string
+      entidad_id:
+        type: integer
+        format: int64
+      detalle:
+        type: object
+        additionalProperties: true
+        description: Datos de la acción, sin datos personales.
+      ip:
+        type: string
+      user_agent:
+        type: string
+      created_at:
+        type: string
+        format: date-time
+  AuditLogRespuesta:
+    allOf:
+      - $ref: '../openapi.yaml#/components/schemas/PaginaMeta'
+      - type: object
+        required: [data]
+        properties:
+          data:
+            type: array
+            items:
+              $ref: '#/schemas/AuditLogItem'
+  Ingresos:
+    type: object
+    required: [total_recaudado, total_este_anio, total_este_mes, total_inscripciones, serie_mensual]
+    properties:
+      total_recaudado:
+        type: string
+        pattern: '^[0-9]+\.[0-9]{2}$'
+        description: Importe decimal exacto con 2 decimales.
+      total_este_anio:
+        type: string
+        pattern: '^[0-9]+\.[0-9]{2}$'
+      total_este_mes:
+        type: string
+        pattern: '^[0-9]+\.[0-9]{2}$'
+      total_inscripciones:
+        type: integer
+        minimum: 0
+      serie_mensual:
+        type: array
+        items:
+          type: object
+          required: [mes, total]
+          properties:
+            mes:
+              type: string
+              pattern: '^[0-9]{4}-[0-9]{2}$'
+              description: Mes de Lima (`AAAA-MM`).
+            total:
+              type: string
+              pattern: '^[0-9]+\.[0-9]{2}$'
+  ConfigPago:
+    type: object
+    required: [anio, monto, updated_at]
+    properties:
+      anio:
+        type: integer
+        minimum: 2000
+        maximum: 2099
+      monto:
+        type: number
+        description: Número JSON exacto (por ejemplo `150.10`), sin pasar por coma flotante.
+      updated_at:
+        type: string
+        format: date-time
+  ConfigPagoSolicitud:
+    type: object
+    required: [monto]
+    properties:
+      monto:
+        type: number
+        minimum: 0
+        maximum: 99999999.99
+        description: Hasta 2 decimales; sin exponente ni signo.
