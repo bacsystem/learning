@@ -11,7 +11,7 @@ import { PillEstadoPregunta } from "../../_componentes/estado-pregunta";
 import { useMensajesValidacionPregunta } from "../../_componentes/use-mensajes-validacion-pregunta";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Alerta } from "@/components/feedback/alerta";
 import { Skeleton } from "@/components/feedback/skeleton";
@@ -91,8 +91,20 @@ export default function EditPreguntaPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmarRevision, setConfirmarRevision] = useState(false);
   const mensajesValidacion = useMensajesValidacionPregunta();
-  const [errores, setErrores] = useState<ErroresPregunta>({});
   const [intentosEnvio, setIntentosEnvio] = useState(0);
+  // Tras el primer envío los errores se recalculan en cada cambio (también al mover o quitar alternativas, que cambian los índices).
+  const valoresValidables = {
+    proceso_id: 1,
+    asignatura_id: asignaturaID,
+    enunciado,
+    respuestas,
+    retro_explicacion: retroExplicacion,
+  };
+  const errores = useMemo<ErroresPregunta>(
+    () => (intentosEnvio === 0 ? {} : validarPregunta(valoresValidables, mensajesValidacion, false)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [intentosEnvio, asignaturaID, enunciado, respuestas, retroExplicacion, mensajesValidacion],
+  );
 
   useEffect(() => {
     if (!token || !preguntaID) return;
@@ -212,14 +224,9 @@ export default function EditPreguntaPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!pregunta) return;
-    const invalidos = validarPregunta(
-      { proceso_id: 1, asignatura_id: asignaturaID, enunciado, respuestas, retro_explicacion: retroExplicacion },
-      mensajesValidacion,
-      false,
-    );
-    setErrores(invalidos);
     setIntentosEnvio((n) => n + 1);
-    if (Object.keys(invalidos).length > 0) return;
+    // `errores` aún es el del render anterior (vacío en el primer envío): se valida con los valores actuales.
+    if (Object.keys(validarPregunta(valoresValidables, mensajesValidacion, false)).length > 0) return;
     const editado = {
       enunciado,
       tipo,
@@ -255,8 +262,8 @@ export default function EditPreguntaPage() {
         es_correcta: r.es_correcta,
         orden: r.orden,
       })),
-      retroalimentacion: retroExplicacion
-        ? { explicacion: retroExplicacion, referencia: retroReferencia || null }
+      retroalimentacion: retroExplicacion.trim()
+        ? { explicacion: retroExplicacion.trim(), referencia: retroReferencia.trim() || null }
         : null,
     };
 

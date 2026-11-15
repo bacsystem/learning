@@ -1772,6 +1772,7 @@
         "titulo": "Import past-exam questions",
         "volver": "Back to the source",
         "noSePuedeImportar": "This source can't be imported",
+        "volverFuentes": "Back to sources",
         "importar": "Import questions",
         "importarAyuda": "Review the analysis and create the valid questions as drafts.",
         "cargando": "Analysing the current version…",

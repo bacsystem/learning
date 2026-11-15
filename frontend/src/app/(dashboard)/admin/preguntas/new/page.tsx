@@ -64,6 +64,7 @@ export default function NuevaPreguntaPage() {
   const [especialidades, setEspecialidades] = useState<Especialidad[]>([]);
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [redirigiendo, setRedirigiendo] = useState(false);
 
   const mensajes = useMensajesValidacionPregunta();
 
@@ -90,12 +91,14 @@ export default function NuevaPreguntaPage() {
           dificultad: valores.dificultad,
           etiqueta_ids: valores.etiqueta_ids,
           respuestas,
-          retroalimentacion: valores.retro_explicacion
-            ? { explicacion: valores.retro_explicacion, referencia: valores.retro_referencia || null }
+          retroalimentacion: valores.retro_explicacion.trim()
+            ? { explicacion: valores.retro_explicacion.trim(), referencia: valores.retro_referencia.trim() || null }
             : null,
         });
         // P1 (SIA-E3-02): toda pregunta nueva nace en borrador y no se sirve hasta aprobarla.
         toast.ok(t("serumsIa.avisosPregunta.creadaBorrador"));
+        // formik apaga `isSubmitting` al terminar, antes de que la navegación acabe: se mantiene pendiente hasta salir.
+        setRedirigiendo(true);
         router.push("/admin/preguntas");
       } catch (e: unknown) {
         const err = e as { message?: string };
@@ -253,7 +256,7 @@ export default function NuevaPreguntaPage() {
         error={error}
         errores={errores as Record<string, string>}
         intentosEnvio={formik.submitCount}
-        enviando={formik.isSubmitting}
+        enviando={formik.isSubmitting || redirigiendo}
         textoEnviar={t("admin-crear-pregunta")}
         textoEnviando={t("comun-guardando")}
         onCancelar={() => router.push("/admin/preguntas")}

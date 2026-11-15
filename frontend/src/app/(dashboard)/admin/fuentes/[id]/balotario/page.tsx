@@ -17,6 +17,7 @@ import { useToast } from "@/components/feedback/toast";
 import { useCarga } from "@/hooks/use-carga";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
+import { apiErrorCode } from "@/lib/http/api-error";
 import {
   balotarioApi,
   type ImportacionCreada,
@@ -58,15 +59,20 @@ export default function ImportarBalotarioPage() {
   );
 
   if (carga.error && !vista && esErrorPermanente(carga.error)) {
+    // Sin fuente no hay a dónde volver: la salida es el listado.
+    const fuenteInexistente = apiErrorCode(carga.error) === "no_encontrado";
     return (
       <div className={CONTENEDOR_PAGINA}>
         <EstadoVacio
           icon={FileXIcon}
           titulo={t("serumsIa.balotario.noSePuedeImportar")}
           accion={
-            <Link href={`/admin/fuentes/${fuenteId}`} className={ACCION_SECUNDARIA}>
+            <Link
+              href={fuenteInexistente ? "/admin/fuentes" : `/admin/fuentes/${fuenteId}`}
+              className={ACCION_SECUNDARIA}
+            >
               <ArrowLeftIcon className="size-4" />
-              {t("serumsIa.balotario.volver")}
+              {t(fuenteInexistente ? "serumsIa.balotario.volverFuentes" : "serumsIa.balotario.volver")}
             </Link>
           }
         >

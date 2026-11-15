@@ -1772,6 +1772,7 @@
         "titulo": "Importar balotario",
         "volver": "Volver a la fuente",
         "noSePuedeImportar": "No se puede importar esta fuente",
+        "volverFuentes": "Volver a fuentes",
         "importar": "Importar preguntas",
         "importarAyuda": "Revisa el análisis y crea las preguntas válidas como borradores.",
         "cargando": "Analizando la versión vigente…",

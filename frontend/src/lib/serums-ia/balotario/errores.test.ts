@@ -93,7 +93,7 @@ describe("especialidadesDeError", () => {
 
 describe("esErrorPermanente", () => {
   it("is true for codes that retrying cannot fix", () => {
-    for (const code of ["tipo_fuente_invalido", "fuente_no_activa", "no_encontrado"]) {
+    for (const code of ["tipo_fuente_invalido", "fuente_no_activa", "no_encontrado", "limite_preguntas"]) {
       expect(esErrorPermanente(error(code))).toBe(true);
     }
   });

@@ -13,8 +13,8 @@ export const pideRecargar = (err: unknown): boolean => {
   return code !== undefined && (CODIGOS_QUE_RECARGAN as readonly string[]).includes(code);
 };
 
-/** Códigos de la vista previa que reintentar no resuelve: la fuente no es un balotario, no está activa o no existe. */
-const CODIGOS_PERMANENTES = ["tipo_fuente_invalido", "fuente_no_activa", "no_encontrado"] as const;
+/** Códigos de la vista previa que reintentar no resuelve: la fuente no es un balotario, no está activa, no existe o el archivo supera el máximo de preguntas. */
+const CODIGOS_PERMANENTES = ["tipo_fuente_invalido", "fuente_no_activa", "no_encontrado", "limite_preguntas"] as const;
 
 /** `true` si el error no cambia al reintentar; la UI ofrece volver a la fuente en vez de «Reintentar». */
 export const esErrorPermanente = (err: unknown): boolean => {

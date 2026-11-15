@@ -185,11 +185,14 @@ export function EditorPregunta({
   }, [error]);
   const formRef = useRef<HTMLFormElement>(null);
   // Con errores de validación tras un envío, el foco va al primer campo inválido.
+  // En el primer envío los errores llegan después del contador: se espera a que estén pintados y se enfoca una vez por envío.
+  const hayErrores = Object.keys(errores).length > 0;
+  const envioEnfocado = useRef(0);
   useEffect(() => {
-    if (intentosEnvio === 0) return;
+    if (intentosEnvio === 0 || !hayErrores || envioEnfocado.current === intentosEnvio) return;
+    envioEnfocado.current = intentosEnvio;
     formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
-    // Solo reacciona a un envío nuevo, no a cada cambio de `errores`.
-  }, [intentosEnvio]);
+  }, [intentosEnvio, hayErrores]);
   // En edición el proceso es fijo: cuenta como elegido.
   const procesoID = proceso.modo === "elegir" ? proceso.valor : 1;
   const correctas = respuestas.filter((r) => r.es_correcta).length;
