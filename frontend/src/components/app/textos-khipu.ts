@@ -46,6 +46,16 @@ export function textosTablaListado(t: Traductor): TextosTablaListado & TextosTab
   };
 }
 
+/** Textos del selector de tema de khipu (`ThemeToggle`), que también se usa fuera del menú de usuario (páginas de auth). */
+export function textosThemeToggle(t: Traductor): TextosThemeToggle {
+  return {
+    temaInterfaz: t("menu-usuario-tema-interfaz"),
+    claro: t("menu-usuario-claro"),
+    oscuro: t("menu-usuario-oscuro"),
+    sistema: t("menu-usuario-sistema"),
+  };
+}
+
 /** Textos del menú de usuario de khipu, con los de `PanelApariencia` y `ThemeToggle` que lleva dentro. */
 export function textosMenuUsuario(t: Traductor): TextosMenuUsuario & TextosPanelApariencia & TextosThemeToggle {
   return {
@@ -68,9 +78,6 @@ export function textosMenuUsuario(t: Traductor): TextosMenuUsuario & TextosPanel
     tonoModoOscuro: t("menu-usuario-tono-modo-oscuro"),
     tipografiaFuente: t("menu-usuario-tipografia-fuente"),
     cerrar: t("menu-usuario-cerrar"),
-    temaInterfaz: t("menu-usuario-tema-interfaz"),
-    claro: t("menu-usuario-claro"),
-    oscuro: t("menu-usuario-oscuro"),
-    sistema: t("menu-usuario-sistema"),
+    ...textosThemeToggle(t),
   };
 }

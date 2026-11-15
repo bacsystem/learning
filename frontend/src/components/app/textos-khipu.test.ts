@@ -5,6 +5,7 @@ import {
   textosPieTabla,
   textosTablaDatos,
   textosTablaListado,
+  textosThemeToggle,
   type Traductor,
 } from "./textos-khipu";
 import { describe, expect, it } from "vitest";
@@ -133,5 +134,16 @@ describe("textos-khipu", () => {
         }
       }
     });
+  });
+
+  it("maps the theme toggle texts, which the auth pages use outside the user menu", () => {
+    const { t } = traductor();
+    expect(textosThemeToggle(t)).toEqual({
+      temaInterfaz: "menu-usuario-tema-interfaz",
+      claro: "menu-usuario-claro",
+      oscuro: "menu-usuario-oscuro",
+      sistema: "menu-usuario-sistema",
+    });
+    expect(textosMenuUsuario(t)).toMatchObject(textosThemeToggle(t));
   });
 });
