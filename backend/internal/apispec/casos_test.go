@@ -165,39 +165,32 @@ func opAdmin(clave string) opSpec { return opSpec{Clave: clave, Rol: "admin", Ta
 func TestComparar(t *testing.T) {
 	codigo := map[string][]rutaCodigo{"a": rutasDe("GET /a"), "b": rutasDe("GET /b")}
 	tests := []struct {
-		name         string
-		spec         infoSpec
-		documentados []string
-		wantErr      string // substring of the only expected error; "" for none
-		wantAviso    bool
+		name    string
+		spec    infoSpec
+		wantErr string // substring of the only expected error; "" for none
 	}{
-		{"todo coincide", infoSpec{Ops: map[string]opSpec{"GET /a": opAdmin("GET /a"), "GET /b": opAdmin("GET /b")}}, []string{"a", "b"}, "", false},
-		{"falta una ruta en paquete documentado", infoSpec{Ops: map[string]opSpec{"GET /a": opAdmin("GET /a")}}, []string{"a", "b"}, "GET /b", false},
-		{"falta una ruta en paquete pendiente solo avisa", infoSpec{Ops: map[string]opSpec{"GET /a": opAdmin("GET /a")}}, []string{"a"}, "", true},
-		{"operación del spec que no existe", infoSpec{Ops: map[string]opSpec{"GET /a": opAdmin("GET /a"), "GET /b": opAdmin("GET /b"), "GET /c": opAdmin("GET /c")}}, []string{"a", "b"}, "GET /c está en el spec pero no en el código", false},
+		{"todo coincide", infoSpec{Ops: map[string]opSpec{"GET /a": opAdmin("GET /a"), "GET /b": opAdmin("GET /b")}}, ""},
+		{"falta una ruta en el spec", infoSpec{Ops: map[string]opSpec{"GET /a": opAdmin("GET /a")}}, "documéntala en docs/api/openapi/paquetes/b.yaml"},
+		{"operación del spec que no existe", infoSpec{Ops: map[string]opSpec{"GET /a": opAdmin("GET /a"), "GET /b": opAdmin("GET /b"), "GET /c": opAdmin("GET /c")}}, "GET /c está en el spec pero no en el código"},
 		{"planificada ausente del código se permite", infoSpec{Ops: map[string]opSpec{
 			"GET /a": opAdmin("GET /a"), "GET /b": opAdmin("GET /b"),
-			"GET /c": {Clave: "GET /c", Rol: "admin", Tags: []string{"x"}, Estado: "planificado"}}}, []string{"a", "b"}, "", false},
-		{"planificada que ya existe", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Rol: "admin", Tags: []string{"x"}, Estado: "planificado"}, "GET /b": opAdmin("GET /b")}}, []string{"a", "b"}, "quite x-estado", false},
-		{"x-estado desconocido", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Rol: "admin", Tags: []string{"x"}, Estado: "borrador"}, "GET /b": opAdmin("GET /b")}}, []string{"a", "b"}, "no permitido", false},
-		{"rol distinto", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Rol: "autenticado", Tags: []string{"x"}}, "GET /b": opAdmin("GET /b")}}, []string{"a", "b"}, `"autenticado" en el spec y "admin" en el código`, false},
-		{"sin x-rol", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Tags: []string{"x"}}, "GET /b": opAdmin("GET /b")}}, []string{"a", "b"}, "x-rol", false},
-		{"sin tag", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Rol: "admin"}, "GET /b": opAdmin("GET /b")}}, []string{"a", "b"}, "exactamente un tag", false},
-		{"dos tags", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Rol: "admin", Tags: []string{"x", "y"}}, "GET /b": opAdmin("GET /b")}}, []string{"a", "b"}, "exactamente un tag", false},
-		{"clave huérfana", infoSpec{Ops: map[string]opSpec{"GET /a": opAdmin("GET /a"), "GET /b": opAdmin("GET /b")}, Huerfanas: []string{"a.yaml: /z"}}, []string{"a", "b"}, "a.yaml: /z no está referenciada", false},
-		{"paquete documentado inexistente", infoSpec{Ops: map[string]opSpec{"GET /a": opAdmin("GET /a"), "GET /b": opAdmin("GET /b")}}, []string{"a", "b", "zzz"}, `"zzz" no es un paquete`, false},
+			"GET /c": {Clave: "GET /c", Rol: "admin", Tags: []string{"x"}, Estado: "planificado"}}}, ""},
+		{"planificada que ya existe", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Rol: "admin", Tags: []string{"x"}, Estado: "planificado"}, "GET /b": opAdmin("GET /b")}}, "quite x-estado"},
+		{"x-estado desconocido", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Rol: "admin", Tags: []string{"x"}, Estado: "borrador"}, "GET /b": opAdmin("GET /b")}}, "no permitido"},
+		{"rol distinto", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Rol: "autenticado", Tags: []string{"x"}}, "GET /b": opAdmin("GET /b")}}, `"autenticado" en el spec y "admin" en el código`},
+		{"sin x-rol", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Tags: []string{"x"}}, "GET /b": opAdmin("GET /b")}}, "x-rol"},
+		{"sin tag", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Rol: "admin"}, "GET /b": opAdmin("GET /b")}}, "exactamente un tag"},
+		{"dos tags", infoSpec{Ops: map[string]opSpec{"GET /a": {Clave: "GET /a", Rol: "admin", Tags: []string{"x", "y"}}, "GET /b": opAdmin("GET /b")}}, "exactamente un tag"},
+		{"clave huérfana", infoSpec{Ops: map[string]opSpec{"GET /a": opAdmin("GET /a"), "GET /b": opAdmin("GET /b")}, Huerfanas: []string{"a.yaml: /z"}}, "a.yaml: /z no está referenciada"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			errores, avisos := comparar(codigo, tt.spec, tt.documentados)
+			errores := comparar(codigo, tt.spec)
 			if tt.wantErr == "" && len(errores) != 0 {
 				t.Fatalf("errores inesperados: %v", errores)
 			}
 			if tt.wantErr != "" && (len(errores) != 1 || !strings.Contains(errores[0], tt.wantErr)) {
 				t.Fatalf("errores %v; se esperaba uno con %q", errores, tt.wantErr)
-			}
-			if (len(avisos) > 0) != tt.wantAviso {
-				t.Fatalf("avisos %v, wantAviso %v", avisos, tt.wantAviso)
 			}
 		})
 	}
