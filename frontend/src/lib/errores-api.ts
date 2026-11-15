@@ -11,11 +11,11 @@ export interface MapasDeError {
 }
 
 /**
- * Qué falló y cómo se traduce. Hace falta la `accion` (texto genérico `comun-error-<acción>`) o un `generico` propio
- * de la pantalla (p. ej. `admin-ingresos-error-tarifa`).
+ * Qué falló y cómo se traduce. Exactamente una de dos: la `accion` (texto genérico `comun-error-<acción>`) o un
+ * `generico` propio de la pantalla (p. ej. `admin-ingresos-error-tarifa`); el tipo no admite las dos.
  */
 export type OpcionesError = MapasDeError &
-  ({ accion: AccionApi; generico?: string } | { accion?: never; generico: string });
+  ({ accion: AccionApi; generico?: never } | { accion?: never; generico: string });
 
 /**
  * Clave i18n del error de una llamada a la API (docs/api/README.md §3 y §8):

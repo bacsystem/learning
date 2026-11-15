@@ -1,9 +1,8 @@
-import en from "../../i18n/messages/en.json";
-import es from "../../i18n/messages/es.json";
 import { ERRORES_ETIQUETA, esquemaEtiqueta, NOMBRE_ETIQUETA_MAX } from "./etiquetas";
 import { describe, expect, it } from "vitest";
 
 import { claveErrorApi } from "@/lib/errores-api";
+import { esperarClavesEnAmbosIdiomas } from "@/lib/errores-api.test-utils";
 
 const mensajes = { asignaturaRequerida: "A", nombreRequerido: "N", nombreLongitud: "L" };
 
@@ -45,9 +44,6 @@ describe("ERRORES_ETIQUETA", () => {
   });
 
   it("only uses keys that exist in both languages", () => {
-    const claves = Object.values(ERRORES_ETIQUETA).flatMap((o) => Object.values(o.porStatus));
-    for (const mensajes of [es.dashboard, en.dashboard] as unknown as Record<string, string>[]) {
-      for (const clave of claves) expect(mensajes[clave], clave).toBeTruthy();
-    }
+    esperarClavesEnAmbosIdiomas(...Object.values(ERRORES_ETIQUETA));
   });
 });

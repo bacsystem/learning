@@ -1,4 +1,5 @@
 import { claveErrorApi } from "./errores-api";
+import { clavesDeOpciones } from "./errores-api.test-utils";
 import { describe, expect, it } from "vitest";
 
 function apiError(status: number, code?: string) {
@@ -32,10 +33,19 @@ describe("claveErrorApi", () => {
     expect(claveErrorApi(apiError(500), { generico: "admin-ingresos-error-tarifa" })).toBe(
       "admin-ingresos-error-tarifa",
     );
-    expect(claveErrorApi(apiError(500), { accion: "guardar", generico: "propia" })).toBe("propia");
   });
 
   it("does not read inherited keys as codes", () => {
     expect(claveErrorApi(apiError(400, "constructor"), { accion: "guardar", ...mapas })).toBe("comun-error-guardar");
+  });
+
+  it("clavesDeOpciones lists the codes, the statuses and the generic key", () => {
+    expect(clavesDeOpciones({ accion: "guardar", ...mapas })).toEqual([
+      "k-codigo",
+      "k-status",
+      "k-404",
+      "comun-error-guardar",
+    ]);
+    expect(clavesDeOpciones({ generico: "propia" })).toEqual(["propia"]);
   });
 });
