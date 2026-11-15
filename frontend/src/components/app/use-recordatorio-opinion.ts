@@ -14,24 +14,33 @@ export interface EstadoRecordatorio {
 
 const SIN_RESOLVER: EstadoRecordatorio = { resuelto: false, pendiente: false };
 
+interface Almacen extends EstadoRecordatorio {
+  /** Sesión a la que pertenece el estado: el de otra persona nunca se muestra. */
+  token: string | null;
+}
+
 // Un solo estado para toda la app: la campana y la página de notificaciones leen la misma invitación, así que descartarla
 // en una se refleja en la otra sin volver a consultar.
-let estado: EstadoRecordatorio = SIN_RESOLVER;
-let tokenConsultado: string | null = null;
+let almacen: Almacen = { token: null, ...SIN_RESOLVER };
 const oyentes = new Set<() => void>();
 
-function publicar(nuevo: EstadoRecordatorio) {
-  estado = nuevo;
+function publicar(nuevo: Almacen) {
+  almacen = nuevo;
   oyentes.forEach((oyente) => oyente());
 }
 
-function suscribir(oyente: () => void) {
+export function suscribirRecordatorio(oyente: () => void) {
   oyentes.add(oyente);
   return () => oyentes.delete(oyente);
 }
 
-/** Estado actual, para quien no es un componente (y para las pruebas). */
-export const estadoRecordatorio = () => estado;
+/** Estado del almacén, tal cual (para `useSyncExternalStore` y las pruebas). */
+export const almacenRecordatorio = () => almacen;
+
+/** Lo que ve la sesión `token`: el estado propio o, si el almacén es de otra sesión (o no hay sesión), «sin resolver». */
+export function recordatorioPara(token: string | null | undefined, actual: Almacen = almacen): EstadoRecordatorio {
+  return token && actual.token === token ? { resuelto: actual.resuelto, pendiente: actual.pendiente } : SIN_RESOLVER;
+}
 
 function estaDescartada(): boolean {
   try {
@@ -43,20 +52,24 @@ function estaDescartada(): boolean {
 
 /** Consulta una vez por sesión si la invitación sigue pendiente (sin testimonio y sin haberla descartado). */
 export function cargarRecordatorio(token: string): void {
-  if (tokenConsultado === token) return;
-  tokenConsultado = token;
+  if (almacen.token === token) return;
   if (estaDescartada()) {
-    publicar({ resuelto: true, pendiente: false });
+    publicar({ token, resuelto: true, pendiente: false });
     return;
   }
-  publicar(SIN_RESOLVER);
+  publicar({ token, ...SIN_RESOLVER });
+  // Una respuesta tardía de otra sesión no pisa a la actual.
+  const siSigueVigente = (estado: EstadoRecordatorio) => {
+    if (almacen.token === token) publicar({ token, ...estado });
+  };
   fetchMiTestimonio(token)
-    .then((mio) => {
-      if (tokenConsultado === token) publicar({ resuelto: true, pendiente: mio === null });
-    })
-    .catch(() => {
-      if (tokenConsultado === token) publicar({ resuelto: true, pendiente: false });
-    });
+    .then((mio) => siSigueVigente({ resuelto: true, pendiente: mio === null }))
+    .catch(() => siSigueVigente({ resuelto: true, pendiente: false }));
+}
+
+/** La invitación ya no está pendiente: se descartó o la persona ya opinó. */
+function resolverSinPendiente(): void {
+  publicar({ ...almacen, resuelto: true, pendiente: false });
 }
 
 export function descartarRecordatorio(): void {
@@ -65,13 +78,15 @@ export function descartarRecordatorio(): void {
   } catch {
     /* sin almacenamiento: solo se oculta en esta sesión */
   }
-  publicar({ resuelto: true, pendiente: false });
+  resolverSinPendiente();
 }
+
+/** La persona envió su opinión: la invitación se resuelve sola, sin tocar lo que se guardó al descartar. */
+export const marcarOpinionEnviada = resolverSinPendiente;
 
 /** Solo para las pruebas. */
 export function reiniciarRecordatorio(): void {
-  tokenConsultado = null;
-  publicar(SIN_RESOLVER);
+  publicar({ token: null, ...SIN_RESOLVER });
 }
 
 /**
@@ -79,10 +94,10 @@ export function reiniciarRecordatorio(): void {
  * historial, solo en la campana. `resuelto` indica que ya se sabe si está pendiente.
  */
 export function useRecordatorioOpinion(token: string | null | undefined) {
-  const actual = useSyncExternalStore(suscribir, estadoRecordatorio, () => SIN_RESOLVER);
+  const actual = useSyncExternalStore(suscribirRecordatorio, almacenRecordatorio, almacenRecordatorio);
   useEffect(() => {
     if (token) cargarRecordatorio(token);
   }, [token]);
   const descartar = useCallback(() => descartarRecordatorio(), []);
-  return { ...actual, descartar };
+  return { ...recordatorioPara(token, actual), descartar };
 }
