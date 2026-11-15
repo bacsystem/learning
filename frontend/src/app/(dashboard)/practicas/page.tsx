@@ -343,6 +343,7 @@ export default function PracticasPage() {
         />
         <div className="min-w-48 flex-1">
           <Buscador
+            etiquetaLimpiar={t("tabla-limpiar-busqueda")}
             etiqueta={t("practicas-filtros")}
             placeholder={`${t("practicas-filtros")}…`}
             valor={busqueda}

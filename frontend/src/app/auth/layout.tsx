@@ -4,6 +4,7 @@ import { Suspense } from "react";
 
 import Loading from "@/app/loading";
 import { Marca } from "@/components/app/marca";
+import { textosThemeToggle } from "@/components/app/textos-khipu";
 import { ThemeToggle } from "@/components/nav/theme-toggle";
 import { FOCO } from "@/lib/estilos";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,7 @@ export default async function AuthLayout({
         >
           <Marca />
         </Link>
-        <ThemeToggle />
+        <ThemeToggle textos={textosThemeToggle(t)} />
       </header>
 
       <main className="flex flex-1 items-start justify-center px-4 pt-4 pb-10 sm:items-center sm:pt-0">

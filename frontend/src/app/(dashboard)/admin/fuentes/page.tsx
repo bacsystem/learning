@@ -107,6 +107,7 @@ export default function FuentesPage() {
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-56 flex-1">
           <Buscador
+            etiquetaLimpiar={t("tabla-limpiar-busqueda")}
             etiqueta={t("serumsIa.fuentes.buscar")}
             placeholder={t("serumsIa.fuentes.buscar")}
             valor={busqueda}

@@ -343,6 +343,7 @@ export default function PreguntasPage() {
       <div className="flex flex-wrap items-center gap-2" data-sin-imprimir>
         <div className="min-w-56 flex-1">
           <Buscador
+            etiquetaLimpiar={t("tabla-limpiar-busqueda")}
             etiqueta={t("admin-buscar-enunciado")}
             placeholder={t("admin-buscar-enunciado")}
             valor={filterSearch}

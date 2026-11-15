@@ -38,11 +38,22 @@ export function textosTablaListado(t: Traductor): TextosTablaListado & TextosTab
   return {
     ...textosTablaDatos(t),
     buscar: t("tabla-buscar"),
+    limpiar: t("tabla-limpiar-busqueda"),
     columnas: t("tabla-columnas"),
     columnasVisibles: t("tabla-columnas-visibles"),
     exportar: t("tabla-exportar"),
     exportarCsv: t("tabla-exportar-csv"),
     imprimir: t("tabla-imprimir"),
+  };
+}
+
+/** Textos del selector de tema de khipu (`ThemeToggle`), que también se usa fuera del menú de usuario (páginas de auth). */
+export function textosThemeToggle(t: Traductor): TextosThemeToggle {
+  return {
+    temaInterfaz: t("menu-usuario-tema-interfaz"),
+    claro: t("menu-usuario-claro"),
+    oscuro: t("menu-usuario-oscuro"),
+    sistema: t("menu-usuario-sistema"),
   };
 }
 
@@ -68,9 +79,6 @@ export function textosMenuUsuario(t: Traductor): TextosMenuUsuario & TextosPanel
     tonoModoOscuro: t("menu-usuario-tono-modo-oscuro"),
     tipografiaFuente: t("menu-usuario-tipografia-fuente"),
     cerrar: t("menu-usuario-cerrar"),
-    temaInterfaz: t("menu-usuario-tema-interfaz"),
-    claro: t("menu-usuario-claro"),
-    oscuro: t("menu-usuario-oscuro"),
-    sistema: t("menu-usuario-sistema"),
+    ...textosThemeToggle(t),
   };
 }

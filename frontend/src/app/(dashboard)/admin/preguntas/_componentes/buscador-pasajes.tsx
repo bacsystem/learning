@@ -66,6 +66,7 @@ export function BuscadorPasajes({
       <form onSubmit={buscar} className="flex flex-wrap items-end gap-2" role="search">
         <div className="min-w-0 flex-1 basis-64">
           <Buscador
+            etiquetaLimpiar={t("tabla-limpiar-busqueda")}
             variante="campo"
             etiqueta={t("serumsIa.revision.citas.buscador.etiqueta")}
             placeholder={t("serumsIa.revision.citas.buscador.placeholder")}
