@@ -11,12 +11,6 @@ import (
 // emailBrand signs the header and footer of every e-mail.
 const emailBrand = "Capacitate"
 
-// emailInstitution is the institution line removed from the e-mails until the
-// product owner confirms whether the client requires it. Restore it as a
-// secondary line in emailLayout (header and footer) if so. Only
-// TestEmailTemplates_Brand uses it today, to assert it stays out of the e-mails.
-const emailInstitution = "Ejército del Perú"
-
 const emailLayout = `<!DOCTYPE html>
 <html lang="%s">
 <head>
@@ -126,11 +120,11 @@ func emailRechazado(nombres, apellido string) (subject, body string) {
     </p>
     %s
     <p style="margin:16px 0 0;font-size:14px;color:#71717a;">
-      Puedes contactar al personal administrativo de tu unidad para obtener más información
+      Puedes contactar al personal administrativo de tu institución para obtener más información
       o presentar una nueva solicitud.
     </p>`,
 		html.EscapeString(nombres+" "+apellido),
-		infoBox("#fef2f2", "#dc2626", "Si crees que esto es un error, comunícate con el área de administración de tu unidad."))
+		infoBox("#fef2f2", "#dc2626", "Si crees que esto es un error, comunícate con el área de administración de tu institución."))
 	body = wrap(locale.ES, subject, content)
 	return
 }
@@ -151,7 +145,7 @@ func emailInactivo(nombres, apellido string) (subject, body string) {
       Contacta con el área de administración para solicitar la reactivación.
     </p>`,
 		html.EscapeString(nombres+" "+apellido),
-		infoBox("#fffbeb", "#d97706", "Si consideras que esta acción fue un error, comunícate con el área de administración de tu unidad."))
+		infoBox("#fffbeb", "#d97706", "Si consideras que esta acción fue un error, comunícate con el área de administración de tu institución."))
 	body = wrap(locale.ES, subject, content)
 	return
 }
@@ -191,7 +185,7 @@ func registroPendienteCopy(loc string) registroPendienteTexts {
 			intro:         "We have received your request to access the training platform. Your account is being reviewed by the administrative team.",
 			usernameLabel: "Requested username",
 			notice:        "⏳ Your request is <strong>under review</strong>. The usual response time is 1 to 2 business days.",
-			footer:        "You will receive another e-mail when your account is activated. If you have questions, contact the administration area of your unit.",
+			footer:        "You will receive another e-mail when your account is activated. If you have questions, contact the administration area of your institution.",
 		}
 	}
 	return registroPendienteTexts{
@@ -200,7 +194,7 @@ func registroPendienteCopy(loc string) registroPendienteTexts {
 		intro:         "Hemos recibido tu solicitud de acceso a la plataforma de capacitación. Tu cuenta está siendo revisada por el equipo administrativo.",
 		usernameLabel: "Usuario solicitado",
 		notice:        "⏳ Tu solicitud está <strong>en revisión</strong>. El tiempo de respuesta habitual es de 1 a 2 días hábiles.",
-		footer:        "Recibirás otro correo cuando tu cuenta sea activada. Si tienes dudas, contacta con el área de administración de tu unidad.",
+		footer:        "Recibirás otro correo cuando tu cuenta sea activada. Si tienes dudas, contacta con el área de administración de tu institución.",
 	}
 }
 
