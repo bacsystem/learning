@@ -10,6 +10,10 @@ const CARPETAS = [join(SRC, "app"), join(SRC, "components", "app")];
 const PROPS_DE_TEXTO = [
   { etiqueta: "ThemeToggle", prop: "textos" },
   { etiqueta: "Buscador", prop: "etiquetaLimpiar" },
+  { etiqueta: "SidebarContent", prop: "textosNav" },
+  { etiqueta: "SidebarNav", prop: "textos" },
+  { etiqueta: "SidebarContent", prop: "textosNav" },
+  { etiqueta: "SidebarNav", prop: "textos" },
 ];
 
 function archivos(dir: string): string[] {
@@ -52,7 +56,7 @@ describe("usosDe", () => {
 });
 
 describe("los componentes de khipu con texto fijo reciben su texto traducido (#242)", () => {
-  it("todo <ThemeToggle> lleva `textos` y todo <Buscador>, `etiquetaLimpiar`", () => {
+  it("todo <ThemeToggle> y <SidebarNav> llevan `textos`, <SidebarContent> `textosNav` y <Buscador> `etiquetaLimpiar`", () => {
     const faltan = CARPETAS.flatMap(archivos).flatMap((ruta) => {
       const fuente = readFileSync(ruta, "utf8");
       return PROPS_DE_TEXTO.flatMap(({ etiqueta, prop }) =>

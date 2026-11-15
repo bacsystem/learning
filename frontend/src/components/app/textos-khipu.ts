@@ -2,6 +2,7 @@ import type { TextosTablaDatos } from "@/components/datos/tabla-datos";
 import type { TextosTablaListado } from "@/components/datos/tabla-listado";
 import type { TextosMenuUsuario } from "@/components/nav/menu-usuario";
 import type { TextosPanelApariencia } from "@/components/nav/panel-apariencia";
+import type { TextosSidebarNav } from "@/components/nav/sidebar-nav";
 import type { TextosThemeToggle } from "@/components/nav/theme-toggle";
 import type { TextosPieTabla } from "@/components/patrones/pie-tabla";
 
@@ -80,5 +81,14 @@ export function textosMenuUsuario(t: Traductor): TextosMenuUsuario & TextosPanel
     tipografiaFuente: t("menu-usuario-tipografia-fuente"),
     cerrar: t("menu-usuario-cerrar"),
     ...textosThemeToggle(t),
+  };
+}
+
+/** Textos del botón de los grupos colapsables del sidebar. */
+export function textosSidebarNav(t: Traductor): TextosSidebarNav {
+  return {
+    // `{grupo}` se pasa tal cual: lo sustituye SidebarNav, que conoce el título.
+    expandirGrupo: t("menu-expandir-grupo", { grupo: "{grupo}" }),
+    contraerGrupo: t("menu-contraer-grupo", { grupo: "{grupo}" }),
   };
 }

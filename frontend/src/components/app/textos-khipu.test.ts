@@ -3,6 +3,7 @@ import es from "../../i18n/messages/es.json";
 import {
   textosMenuUsuario,
   textosPieTabla,
+  textosSidebarNav,
   textosTablaDatos,
   textosTablaListado,
   textosThemeToggle,
@@ -146,5 +147,21 @@ describe("textos-khipu", () => {
       sistema: "menu-usuario-sistema",
     });
     expect(textosMenuUsuario(t)).toMatchObject(textosThemeToggle(t));
+  });
+
+  it("maps the collapsible group texts and leaves {grupo} for SidebarNav to fill in", () => {
+    const { t } = traductor();
+    expect(textosSidebarNav(t)).toEqual({
+      expandirGrupo: 'menu-expandir-grupo:{"grupo":"{grupo}"}',
+      contraerGrupo: 'menu-contraer-grupo:{"grupo":"{grupo}"}',
+    });
+  });
+
+  it("has the group texts in es and en, each with the {grupo} placeholder", () => {
+    const dashboard = { es: es.dashboard, en: en.dashboard } as unknown as Record<"es" | "en", Record<string, string>>;
+    for (const clave of ["menu-expandir-grupo", "menu-contraer-grupo"]) {
+      for (const idioma of ["es", "en"] as const) expect(dashboard[idioma][clave]).toContain("{grupo}");
+      expect(dashboard.en[clave]).not.toBe(dashboard.es[clave]);
+    }
   });
 });

@@ -1,6 +1,12 @@
 "use client";
 
-import { textosMenuUsuario, textosPieTabla, textosTablaDatos, textosTablaListado } from "./textos-khipu";
+import {
+  textosMenuUsuario,
+  textosPieTabla,
+  textosSidebarNav,
+  textosTablaDatos,
+  textosTablaListado,
+} from "./textos-khipu";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 
@@ -26,4 +32,10 @@ export function useTextosTablaListado() {
 export function useTextosMenuUsuario() {
   const t = useTranslations("dashboard");
   return useMemo(() => textosMenuUsuario(t), [t]);
+}
+
+/** Textos del botón de los grupos colapsables del sidebar. */
+export function useTextosNav() {
+  const t = useTranslations("dashboard");
+  return useMemo(() => textosSidebarNav(t), [t]);
 }

@@ -1,10 +1,12 @@
-import { type GrupoNav, SidebarNav } from "./sidebar-nav";
 import type { ReactNode } from "react";
+
+import { type GrupoNav, SidebarNav, type TextosSidebarNav } from "@/components/nav/sidebar-nav";
 
 /**
  * Contenido del sidebar (248px en desktop, cajón lateral en móvil). Se compone por slots para no acoplarlo a ninguna app:
  * `marca` (LogoMarca), `chip` (p. ej. versión/estándar), `selector` (SelectorContexto), `grupos` (SidebarNav),
  * `pie` (tarjetas de plan, avisos) y `usuario` (MenuUsuario).
+ * Solo la navegación se desplaza (`min-h-0 flex-1 overflow-y-auto`): la marca, el selector, el pie y el usuario quedan siempre a la vista, aunque haya decenas de ítems.
  */
 export function SidebarContent({
   marca,
@@ -12,6 +14,7 @@ export function SidebarContent({
   selector,
   grupos,
   etiquetaMenu,
+  textosNav,
   pie,
   usuario,
 }: {
@@ -21,22 +24,24 @@ export function SidebarContent({
   grupos: GrupoNav[];
   /** Nombre accesible del menú (`aria-label` de su `nav`). */
   etiquetaMenu?: string;
+  /** Textos del botón de los grupos colapsables (`SidebarNav textos`). */
+  textosNav?: Partial<TextosSidebarNav>;
   pie?: ReactNode;
   usuario?: ReactNode;
 }) {
   return (
-    <div className="flex h-full w-full min-w-0 flex-col justify-between overflow-hidden select-none">
-      <div className="flex w-full min-w-0 flex-col">
-        <div className="flex h-14 w-full min-w-0 shrink-0 items-center justify-between gap-2 overflow-hidden px-4">
-          {marca}
-          {chip}
-        </div>
-        {selector ? <div className="px-3 pt-3 pb-2">{selector}</div> : null}
-        <SidebarNav grupos={grupos} etiqueta={etiquetaMenu} />
+    <div className="flex h-full w-full min-w-0 flex-col overflow-hidden select-none">
+      <div className="flex h-14 w-full min-w-0 shrink-0 items-center justify-between gap-2 overflow-hidden px-4">
+        {marca}
+        {chip}
+      </div>
+      {selector ? <div className="shrink-0 px-3 pt-3 pb-2">{selector}</div> : null}
+      <div className="min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+        <SidebarNav grupos={grupos} etiqueta={etiquetaMenu} textos={textosNav} />
       </div>
 
       {pie || usuario ? (
-        <div className="flex w-full min-w-0 flex-col gap-2.5 p-3">
+        <div className="border-border/60 flex w-full min-w-0 shrink-0 flex-col gap-2.5 border-t p-3">
           {pie}
           {usuario}
         </div>
