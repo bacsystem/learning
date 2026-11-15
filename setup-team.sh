@@ -6,7 +6,7 @@
 #   bash setup-team.sh          # escribe .claude/agents/*, .claude/settings.json (si no existe) y CLAUDE.md
 #   bash setup-team.sh --check  # solo compara: falla si este script y .claude/ no coinciden
 #
-# Fuente de verdad: este script. Si cambias un agente o .claude/settings.json, actualiza también
+# Fuente de verdad: este script. Si cambias un agente, un hook o .claude/settings.json, actualiza también
 # este archivo en el mismo PR y verifica con --check.
 set -euo pipefail
 
@@ -357,6 +357,52 @@ Comunicación activa (obligatorio para todo el equipo):
 - Mensajes cortos y concretos: qué hiciste, qué necesitas, de quién y enlace o ruta si aplica.
 AGENT_EOF
 
+# ---------------------------------------------------------------- hooks
+# Guardia de file_upload (Claude in Chrome): solo se suben archivos del scratchpad de la
+# sesión (/tmp/claude-*), nunca assets/ ni .env*. Es la barrera real; la regla del qa es texto.
+emit .claude/hooks/guard-file-upload.py <<'HOOK_EOF'
+"""PreToolUse de mcp__claude-in-chrome__file_upload: bloquea (exit 2) rutas no permitidas."""
+import json
+import os
+import sys
+
+PERMITIDAS = ("/private/tmp/claude-", "/tmp/claude-")
+
+
+def motivo_rechazo(ruta):
+    real = os.path.realpath(ruta)
+    partes = real.split(os.sep)
+    if "assets" in partes:
+        return "está dentro de assets/"
+    if any(p.startswith(".env") for p in partes):
+        return "es un archivo .env"
+    if not real.startswith(PERMITIDAS):
+        return "no está en el scratchpad de la sesión (/tmp/claude-*)"
+    return None
+
+
+def main():
+    try:
+        datos = json.load(sys.stdin)
+        rutas = datos.get("tool_input", {}).get("paths") or []
+    except (ValueError, AttributeError):
+        print("guard-file-upload: entrada ilegible; subida bloqueada", file=sys.stderr)
+        return 2
+    if not isinstance(rutas, list) or not rutas:
+        print("guard-file-upload: sin rutas; subida bloqueada", file=sys.stderr)
+        return 2
+    for ruta in rutas:
+        motivo = motivo_rechazo(str(ruta))
+        if motivo:
+            print(f"guard-file-upload: {ruta} {motivo}; subida bloqueada", file=sys.stderr)
+            return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+HOOK_EOF
+
 if [ "$MODE" = "--check" ] || [ ! -f .claude/settings.json ]; then
 emit .claude/settings.json <<'SETTINGS_EOF'
 {
@@ -388,6 +434,19 @@ emit .claude/settings.json <<'SETTINGS_EOF'
       "Read(./assets/**)",
       "Bash(cat *.env*)",
       "Bash(grep * *.env*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__claude-in-chrome__file_upload",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-file-upload.py\""
+          }
+        ]
+      }
     ]
   }
 }
