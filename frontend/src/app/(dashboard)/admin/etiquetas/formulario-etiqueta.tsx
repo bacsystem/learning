@@ -60,7 +60,7 @@ export function FormularioEtiqueta({
       try {
         await onGuardar({ ...valores, nombre: valores.nombre.trim() });
       } catch (e) {
-        setErrorServidor(t(claveErrorApi(e, "guardar", ERRORES_ETIQUETA.guardar)));
+        setErrorServidor(t(claveErrorApi(e, ERRORES_ETIQUETA.guardar)));
       }
     },
   });

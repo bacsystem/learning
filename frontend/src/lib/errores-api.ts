@@ -6,21 +6,30 @@ export type AccionApi = "cargar" | "guardar" | "estado" | "eliminar";
 export interface MapasDeError {
   /** Código estable del error (docs/api/README.md §3) → clave i18n. */
   porCodigo?: Readonly<Record<string, string>>;
-  /** Status HTTP → clave i18n, para las respuestas en formato heredado, sin `code`. */
+  /** Status HTTP → clave i18n, solo para las respuestas en formato heredado, sin `code`. */
   porStatus?: Readonly<Record<number, string>>;
 }
 
 /**
- * Clave i18n del error de una llamada a la API. Orden: traducción del código, traducción del status y, si no hay
- * ninguna (5xx, red, código desconocido), el texto genérico de la acción. Nunca el `message` del servidor: viene
- * siempre en español y a veces con nombres internos de campo (docs/api/README.md §8).
+ * Qué falló y cómo se traduce. Hace falta la `accion` (texto genérico `comun-error-<acción>`) o un `generico` propio
+ * de la pantalla (p. ej. `admin-ingresos-error-tarifa`).
+ */
+export type OpcionesError = MapasDeError &
+  ({ accion: AccionApi; generico?: string } | { accion?: never; generico: string });
+
+/**
+ * Clave i18n del error de una llamada a la API (docs/api/README.md §3 y §8):
+ * 1. con `code`: su traducción en `porCodigo` o, si no la tiene, el genérico; el status no se mira, porque un código
+ *    desconocido no significa lo que significaría su status;
+ * 2. sin `code` (formato heredado): la traducción del status en `porStatus` o el genérico.
+ * Nunca el `message` del servidor: viene siempre en español y a veces con nombres internos de campo.
  *
  * `claveErrorAuth` (lib/auth) no se apoya en este helper: tiene claves propias por status y distingue el error de red.
  */
-export function claveErrorApi(err: unknown, accion: AccionApi, { porCodigo, porStatus }: MapasDeError = {}): string {
+export function claveErrorApi(err: unknown, { accion, generico, porCodigo, porStatus }: OpcionesError): string {
+  const claveGenerica = generico ?? `comun-error-${accion}`;
   const code = apiErrorCode(err);
-  if (code && porCodigo && Object.hasOwn(porCodigo, code)) return porCodigo[code];
+  if (code) return porCodigo && Object.hasOwn(porCodigo, code) ? porCodigo[code] : claveGenerica;
   const { status } = (err ?? {}) as { status?: unknown };
-  if (typeof status === "number" && porStatus?.[status]) return porStatus[status];
-  return `comun-error-${accion}`;
+  return (typeof status === "number" && porStatus?.[status]) || claveGenerica;
 }

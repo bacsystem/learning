@@ -1,6 +1,6 @@
 import * as yup from "yup";
 
-import type { AccionApi, MapasDeError } from "@/lib/errores-api";
+import type { OpcionesError } from "@/lib/errores-api";
 
 /** Largo máximo del nombre de una etiqueta (`CreateEtiquetaRequest` y `UpdateEtiquetaRequest` del backend). */
 export const NOMBRE_ETIQUETA_MAX = 100;
@@ -32,9 +32,8 @@ const NO_EXISTE = { 404: "admin-etiquetas-error-no-existe" } as const;
  * Las etiquetas responden en el formato heredado, sin `code`: se traducen por status. Un 409 solo ocurre al
  * guardar (nombre repetido en la asignatura); un 404, en cualquier operación (la etiqueta ya no existe).
  */
-export const ERRORES_ETIQUETA: Record<AccionApi, MapasDeError> = {
-  cargar: { porStatus: NO_EXISTE },
-  guardar: { porStatus: { ...NO_EXISTE, 409: "admin-etiquetas-error-duplicada" } },
-  estado: { porStatus: NO_EXISTE },
-  eliminar: { porStatus: NO_EXISTE },
-};
+export const ERRORES_ETIQUETA = {
+  guardar: { accion: "guardar", porStatus: { ...NO_EXISTE, 409: "admin-etiquetas-error-duplicada" } },
+  estado: { accion: "estado", porStatus: NO_EXISTE },
+  eliminar: { accion: "eliminar", porStatus: NO_EXISTE },
+} satisfies Record<string, OpcionesError>;

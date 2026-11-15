@@ -121,7 +121,7 @@ export default function EtiquetasPage() {
       load();
       return null;
     } catch (e: unknown) {
-      return t(claveErrorApi(e, "estado", ERRORES_ETIQUETA.estado));
+      return t(claveErrorApi(e, ERRORES_ETIQUETA.estado));
     }
   };
 
@@ -136,7 +136,7 @@ export default function EtiquetasPage() {
       load();
       return null;
     } catch (e: unknown) {
-      return t(claveErrorApi(e, "eliminar", ERRORES_ETIQUETA.eliminar));
+      return t(claveErrorApi(e, ERRORES_ETIQUETA.eliminar));
     }
   };
 

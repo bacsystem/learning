@@ -1,3 +1,5 @@
+import en from "../../i18n/messages/en.json";
+import es from "../../i18n/messages/es.json";
 import { ERRORES_ETIQUETA, esquemaEtiqueta, NOMBRE_ETIQUETA_MAX } from "./etiquetas";
 import { describe, expect, it } from "vitest";
 
@@ -29,16 +31,23 @@ describe("esquemaEtiqueta", () => {
 
 describe("ERRORES_ETIQUETA", () => {
   it("maps 409 on save to the duplicate-name text", () => {
-    expect(claveErrorApi(apiError(409), "guardar", ERRORES_ETIQUETA.guardar)).toBe("admin-etiquetas-error-duplicada");
+    expect(claveErrorApi(apiError(409), ERRORES_ETIQUETA.guardar)).toBe("admin-etiquetas-error-duplicada");
   });
 
   it("maps 404 to the missing-tag text on every action, saving included", () => {
-    for (const accion of ["guardar", "estado", "eliminar"] as const) {
-      expect(claveErrorApi(apiError(404), accion, ERRORES_ETIQUETA[accion])).toBe("admin-etiquetas-error-no-existe");
+    for (const opciones of Object.values(ERRORES_ETIQUETA)) {
+      expect(claveErrorApi(apiError(404), opciones)).toBe("admin-etiquetas-error-no-existe");
     }
   });
 
   it("does not read a 409 as a duplicate outside saving", () => {
-    expect(claveErrorApi(apiError(409), "estado", ERRORES_ETIQUETA.estado)).toBe("comun-error-estado");
+    expect(claveErrorApi(apiError(409), ERRORES_ETIQUETA.estado)).toBe("comun-error-estado");
+  });
+
+  it("only uses keys that exist in both languages", () => {
+    const claves = Object.values(ERRORES_ETIQUETA).flatMap((o) => Object.values(o.porStatus));
+    for (const mensajes of [es.dashboard, en.dashboard] as unknown as Record<string, string>[]) {
+      for (const clave of claves) expect(mensajes[clave], clave).toBeTruthy();
+    }
   });
 });
