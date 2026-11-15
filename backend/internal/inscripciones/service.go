@@ -145,10 +145,18 @@ func (s *Service) Inscribir(ctx context.Context, usuarioID, procesoID int64, onR
 	if err != nil {
 		return nil, err
 	}
+	proceso, err := s.repo.ProcesoResumen(ctx, procesoID)
+	if err != nil {
+		return nil, err
+	}
 	return &InscripcionDTO{
-		ID:        row.ID,
-		ProcesoID: row.ProcesoID,
-		Estado:    row.Estado,
+		ID:            row.ID,
+		ProcesoID:     row.ProcesoID,
+		ProcesoNombre: proceso.Nombre,
+		ProcesoTipo:   proceso.Tipo,
+		ProcesoAnio:   proceso.Anio,
+		Estado:        row.Estado,
+		Observacion:   row.Observacion,
 	}, nil
 }
 
