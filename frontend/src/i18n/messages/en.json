@@ -313,6 +313,7 @@
     "notif-subtitulo": "Notifications history",
     "notif-marcar-todas": "Mark all as read",
     "notif-sin-notificaciones": "No notifications",
+    "notif-historial-vacio-invitacion": "Your history is empty. You have a pending invitation in the bell.",
     "notif-no-leida": "Unread",
     "menu-admin-notificaciones": "Notifications",
     "menu-admin-ingresos": "Revenue",

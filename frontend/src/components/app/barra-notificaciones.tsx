@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { haceCuanto, tipoNotificacion } from "@/components/app/notificaciones-tipo";
+import { useRecordatorioOpinion } from "@/components/app/use-recordatorio-opinion";
 import { Skeleton } from "@/components/feedback/skeleton";
 import { Tooltip } from "@/components/feedback/tooltip";
 import { Tabs } from "@/components/navegacion/tabs";
@@ -14,11 +15,8 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { BOTON_SECUNDARIO } from "@/lib/estilos";
 import { PESO_ICONO_FUNCIONAL } from "@/lib/iconos";
 import { type Notificacion, notificacionesApi } from "@/lib/notifications/api";
-import { fetchMiTestimonio } from "@/lib/testimonios/api";
 import { cn } from "@/lib/utils";
 import { BellIcon, BellSlashIcon, ChecksIcon, GearSixIcon, XIcon } from "@phosphor-icons/react";
-
-const OPINION_REMINDER_KEY = "opinion_reminder_dismissed";
 
 type ItemNotif = Notificacion & { _virtual?: boolean };
 type Pestana = "all" | "sistema" | "user-tab";
@@ -41,7 +39,6 @@ export function BarraNotificaciones() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(false);
   const [cargadas, setCargadas] = useState(false);
-  const [mostrarOpinion, setMostrarOpinion] = useState(false);
   // Ids con un POST de «marcar como leída» en curso: evita el doble envío (clic en la fila y en la X).
   const marcando = useRef(new Set<number>());
 
@@ -71,20 +68,7 @@ export function BarraNotificaciones() {
     };
   }, [cargarNoLeidas]);
 
-  // Si el usuario aún no dejó su testimonio (y no descartó el aviso), se muestra un recordatorio.
-  useEffect(() => {
-    if (!token) return;
-    let descartado = false;
-    try {
-      descartado = localStorage.getItem(OPINION_REMINDER_KEY) === "true";
-    } catch {
-      /* almacenamiento bloqueado: se muestra el recordatorio */
-    }
-    if (descartado) return;
-    fetchMiTestimonio(token)
-      .then((mio) => setMostrarOpinion(mio === null))
-      .catch(() => {});
-  }, [token]);
+  const { pendiente: mostrarOpinion, descartar: descartarOpinion } = useRecordatorioOpinion(token);
 
   const cargarItems = useCallback(async () => {
     if (!token) return;
@@ -134,15 +118,6 @@ export function BarraNotificaciones() {
     } catch {
       /* ignorado, como en el original */
     }
-  };
-
-  const descartarOpinion = () => {
-    try {
-      localStorage.setItem(OPINION_REMINDER_KEY, "true");
-    } catch {
-      /* sin almacenamiento: solo se oculta en esta sesión */
-    }
-    setMostrarOpinion(false);
   };
 
   const opinion: ItemNotif | null = mostrarOpinion
