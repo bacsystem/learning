@@ -1,0 +1,1727 @@
+# Paquete questions (backend-dev). Rutas: backend/internal/questions/routes.go:34-51.
+# Contratos de apoyo: serums-ia-e1-taxonomia.md (T8), serums-ia-e3-02-ciclo-preguntas.md,
+# serums-ia-e3-07-revision-basica.md. Manda el código: el spec describe lo que responden los handlers.
+paths:
+  "/preguntas/stats":
+    get:
+      operationId: questions.GetStats
+      tags: [questions]
+      summary: "Estadísticas globales del banco"
+      description: "Solo `admin`. Totales de preguntas por dificultad, por tipo y por proceso."
+      x-rol: admin
+      responses:
+        "200":
+          description: "Totales del banco."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/EstadisticasPreguntas"
+              example:
+                total_preguntas: 40
+                por_dificultad:
+                  facil: 10
+                  medio: 20
+                  dificil: 10
+                por_tipo:
+                  unica: 30
+                  multiple: 10
+                por_proceso:
+                  - proceso: "Proceso Ejemplo 2026"
+                    total: 40
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/preguntas/import":
+    post:
+      operationId: questions.ImportPreguntas
+      tags: [questions]
+      summary: "Importar preguntas desde Excel o CSV"
+      description: |
+        Solo `admin`. Sube un `.xlsx` o un `.csv` (hasta 500 filas) y crea las filas válidas como preguntas manuales. Las filas con error no frenan al resto: se informan en `errors`. El `.xlsx` se reconoce por la extensión o el `Content-Type`.
+
+        Columnas, en orden: `enunciado`, `tipo`, `dificultad`, `grado_id`, `especialidad_id`, hasta 6 pares `respuesta`/`correcta`, `retroalimentacion` y `referencia`.
+
+        Límites: el handler lee hasta 5 MB (`400` si se pasa); el middleware global corta antes un cuerpo multipart de más de 20 MB con `413 archivo_demasiado_grande`.
+      x-rol: admin
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, proceso_id, asignatura_id]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Archivo `.xlsx` o `.csv`."
+                proceso_id:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                asignatura_id:
+                  type: integer
+                  format: int64
+                  minimum: 1
+      responses:
+        "200":
+          description: "Filas importadas y errores por fila."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/ResultadoImportacion"
+              example:
+                imported: 2
+                errors:
+                  - row: 4
+                    message: "Error de validación.: el enunciado está vacío"
+        "400":
+          description: "`proceso_id` o `asignatura_id` inválidos; falta `file`; archivo ilegible o con más de 500 filas; formulario o archivo de más de 5 MB; o la asignatura no está asignada al proceso."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "proceso_id inválido."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El proceso o la asignatura no existe."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/preguntas/preview":
+    post:
+      operationId: questions.PreviewPreguntas
+      tags: [questions]
+      summary: "Vista previa de una importación"
+      description: "Solo `admin`. Lee el archivo como `POST /preguntas/import`, pero no guarda nada: devuelve cada fila con su estado (`valido` o `error`)."
+      x-rol: admin
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Archivo `.xlsx` o `.csv`."
+      responses:
+        "200":
+          description: "Filas leídas y totales."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/VistaPreviaImportacion"
+              example:
+                rows:
+                  - row: 2
+                    enunciado: "¿Pregunta de ejemplo?"
+                    tipo: unica
+                    dificultad: medio
+                    grado_id: null
+                    especialidad_id: null
+                    num_respuestas: 4
+                    has_retro: true
+                    estado: valido
+                total_valido: 1
+                total_error: 0
+        "400":
+          description: "Falta `file`, archivo ilegible o con más de 500 filas, o formulario de más de 5 MB."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Archivo no encontrado en la solicitud."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/preguntas/generate-set":
+    post:
+      operationId: questions.GenerateSet
+      tags: [questions]
+      summary: "Generar un conjunto de preguntas"
+      description: "Solo `admin`. Elige al azar preguntas servibles (`aprobada` o `activo`) por asignatura, sin clave de respuestas. Lo usan prácticas y simulacros por dentro; este endpoint lo expone al admin."
+      x-rol: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/schemas/GenerarConjuntoRequest"
+            example:
+              proceso_id: 1
+              asignaturas:
+                - asignatura_id: 3
+                  numero_preguntas: 5
+      responses:
+        "200":
+          description: "Conjunto elegido."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/ConjuntoGenerado"
+              example:
+                preguntas:
+                  - id: 12
+                    enunciado: "¿Pregunta de ejemplo?"
+                    tipo: unica
+                    asignatura: "Asignatura Ejemplo"
+                    asignatura_id: 3
+                    respuestas:
+                      - id: 31
+                        texto: "Ciudad A"
+                        orden: 1
+                      - id: 32
+                        texto: "Ciudad B"
+                        orden: 2
+                    orden: 1
+                total: 1
+        "400":
+          description: "Cuerpo ilegible (`Cuerpo de solicitud inválido.`), campo que no cumple una regla (`Campos inválidos o faltantes: …`) o regla de negocio (`Error de validación.: …`: alternativas, proceso, grado, especialidad o etiquetas inexistentes)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Campos inválidos o faltantes: enunciado."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "No hay preguntas suficientes para algún pedido, o el total pasa de 200."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Preguntas insuficientes para generar el conjunto."
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/preguntas":
+    get:
+      operationId: questions.ListPreguntas
+      tags: [questions]
+      summary: "Listar preguntas"
+      description: "Solo `admin`. Listado paginado con filtros combinables. No trae `citas` ni `etiqueta_ids`; sí `citas_count`."
+      x-rol: admin
+      parameters:
+        - name: proceso_id
+          in: query
+          required: false
+          description: "Filtra por proceso. Un valor no numérico da `400`."
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: asignatura_id
+          in: query
+          required: false
+          description: "Filtra por asignatura."
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: grado_id
+          in: query
+          required: false
+          description: "Filtra por grado."
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: especialidad_id
+          in: query
+          required: false
+          description: "Filtra por especialidad."
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: dificultad
+          in: query
+          required: false
+          description: "Filtra por dificultad. No se valida: un valor desconocido no devuelve filas."
+          schema:
+            "$ref": "#/schemas/PreguntaDificultad"
+        - name: etiqueta_id
+          in: query
+          required: false
+          description: "Filtra por etiqueta."
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: tema_id
+          in: query
+          required: false
+          description: "Filtra por tema."
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: estado
+          in: query
+          required: false
+          description: "Filtra por estado (`eliminada` nunca se lista). Un valor desconocido da `400`."
+          schema:
+            type: string
+            enum: [borrador, en_revision, aprobada, rechazada, activo]
+        - name: origen
+          in: query
+          required: false
+          description: "Filtra por origen. Un valor desconocido da `400`."
+          schema:
+            "$ref": "#/schemas/PreguntaOrigen"
+        - name: search
+          in: query
+          required: false
+          description: "Texto a buscar en el enunciado."
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          description: "Página, base 1. **Tolerante**: un valor no numérico se ignora y se usa 1."
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          required: false
+          description: "Elementos por página. **Tolerante y sin recorte**: un valor no numérico, menor que 1 o mayor que 100 vuelve al defecto, 20."
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: "Página de preguntas."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/ListaPreguntas"
+              example:
+                data:
+                  - id: 12
+                    proceso_id: 1
+                    proceso: "Proceso Ejemplo 2026"
+                    asignatura_id: 3
+                    asignatura: "Asignatura Ejemplo"
+                    grado_id: null
+                    grado: null
+                    especialidad_id: null
+                    especialidad: null
+                    tema_id: 7
+                    tema: "Tema Ejemplo"
+                    enunciado: "¿Cuál es la capital del país del ejemplo?"
+                    tipo: unica
+                    dificultad: facil
+                    estado: borrador
+                    origen: manual
+                    motivo_rechazo: null
+                    citas_count: 0
+                    etiquetas: ["Etiqueta Ejemplo"]
+                    etiqueta_ids: [4]
+                    respuestas:
+                      - id: 31
+                        texto: "Ciudad A"
+                        es_correcta: true
+                        orden: 1
+                      - id: 32
+                        texto: "Ciudad B"
+                        es_correcta: false
+                        orden: 2
+                    retroalimentacion:
+                      explicacion: "Explicación de ejemplo para la pregunta."
+                      referencia: null
+                    estadisticas: null
+                    created_at: "2026-11-15T15:04:05Z"
+                total: 1
+                page: 1
+                per_page: 20
+        "400":
+          description: "Un filtro numérico no es un entero (`proceso_id inválido.`), o `estado` / `origen` no están permitidos."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "estado inválido."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    post:
+      operationId: questions.CreatePregunta
+      tags: [questions]
+      summary: "Crear una pregunta"
+      description: "Solo `admin`. Crea una pregunta manual en `borrador`. Reglas: `unica` con 1 correcta; `multiple` con al menos 2; de 2 a 6 alternativas."
+      x-rol: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/schemas/CrearPreguntaRequest"
+            example:
+              proceso_id: 1
+              asignatura_id: 3
+              tema_id: 7
+              enunciado: "¿Cuál es la capital del país del ejemplo?"
+              tipo: unica
+              dificultad: facil
+              etiqueta_ids: [4]
+              respuestas:
+                - texto: "Ciudad A"
+                  es_correcta: true
+                  orden: 1
+                - texto: "Ciudad B"
+                  es_correcta: false
+                  orden: 2
+              retroalimentacion:
+                explicacion: "Explicación de ejemplo para la pregunta."
+                referencia: null
+      responses:
+        "201":
+          description: "Pregunta creada."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/Pregunta"
+              example:
+                id: 12
+                proceso_id: 1
+                proceso: "Proceso Ejemplo 2026"
+                asignatura_id: 3
+                asignatura: "Asignatura Ejemplo"
+                grado_id: null
+                grado: null
+                especialidad_id: null
+                especialidad: null
+                tema_id: 7
+                tema: "Tema Ejemplo"
+                enunciado: "¿Cuál es la capital del país del ejemplo?"
+                tipo: unica
+                dificultad: facil
+                estado: borrador
+                origen: manual
+                motivo_rechazo: null
+                citas_count: 0
+                etiquetas: ["Etiqueta Ejemplo"]
+                etiqueta_ids: [4]
+                respuestas:
+                  - id: 31
+                    texto: "Ciudad A"
+                    es_correcta: true
+                    orden: 1
+                  - id: 32
+                    texto: "Ciudad B"
+                    es_correcta: false
+                    orden: 2
+                retroalimentacion:
+                  explicacion: "Explicación de ejemplo para la pregunta."
+                  referencia: null
+                estadisticas: null
+                created_at: "2026-11-15T15:04:05Z"
+        "400":
+          description: "Cuerpo ilegible (`Cuerpo de solicitud inválido.`), campo que no cumple una regla (`Campos inválidos o faltantes: …`) o regla de negocio (`Error de validación.: …`: alternativas, proceso, grado, especialidad o etiquetas inexistentes)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Campos inválidos o faltantes: enunciado."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "409":
+          description: "Ya existe un registro con esos datos."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe un registro con esos datos."
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "`tema_invalido`: el tema no existe, está archivado o es de otra asignatura."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: tema_invalido
+                message: "El tema no existe, está archivado o es de otra área."
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/preguntas/{id}":
+    get:
+      operationId: questions.GetPregunta
+      tags: [questions]
+      summary: "Obtener una pregunta"
+      description: "Solo `admin`. Vista completa con `citas`, clave de respuestas y estadísticas."
+      x-rol: admin
+      parameters:
+        - "$ref": "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "200":
+          description: "La pregunta."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/Pregunta"
+              example:
+                id: 12
+                proceso_id: 1
+                proceso: "Proceso Ejemplo 2026"
+                asignatura_id: 3
+                asignatura: "Asignatura Ejemplo"
+                grado_id: null
+                grado: null
+                especialidad_id: null
+                especialidad: null
+                tema_id: 7
+                tema: "Tema Ejemplo"
+                enunciado: "¿Cuál es la capital del país del ejemplo?"
+                tipo: unica
+                dificultad: facil
+                estado: borrador
+                origen: manual
+                motivo_rechazo: null
+                citas_count: 0
+                etiquetas: ["Etiqueta Ejemplo"]
+                etiqueta_ids: [4]
+                respuestas:
+                  - id: 31
+                    texto: "Ciudad A"
+                    es_correcta: true
+                    orden: 1
+                  - id: 32
+                    texto: "Ciudad B"
+                    es_correcta: false
+                    orden: 2
+                retroalimentacion:
+                  explicacion: "Explicación de ejemplo para la pregunta."
+                  referencia: null
+                estadisticas: null
+                created_at: "2026-11-15T15:04:05Z"
+                citas: []
+        "400":
+          description: "`{id}` no es un entero positivo."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID inválido"
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "La pregunta no existe o está eliminada."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    put:
+      operationId: questions.UpdatePregunta
+      tags: [questions]
+      summary: "Editar una pregunta"
+      description: |
+        Solo `admin`. Reemplaza el contenido. Reglas del ciclo de vida:
+
+        - Editar el enunciado, el tipo, las alternativas o la retroalimentación de una pregunta `aprobada` o `activo` la devuelve a `en_revision`.
+        - La clave de una pregunta de balotario oficial no se puede cambiar (`422 clave_oficial`).
+        - No se puede quitar una alternativa ni cambiar la clave si ya calificó intentos (`409`).
+      x-rol: admin
+      parameters:
+        - "$ref": "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/schemas/EditarPreguntaRequest"
+            example:
+              proceso_id: 1
+              asignatura_id: 3
+              tema_id: 7
+              enunciado: "¿Cuál es la capital del país del ejemplo?"
+              tipo: unica
+              dificultad: facil
+              etiqueta_ids: [4]
+              respuestas:
+                - texto: "Ciudad A"
+                  es_correcta: true
+                  orden: 1
+                - texto: "Ciudad B"
+                  es_correcta: false
+                  orden: 2
+              retroalimentacion:
+                explicacion: "Explicación de ejemplo para la pregunta."
+                referencia: null
+      responses:
+        "200":
+          description: "Pregunta actualizada."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/Pregunta"
+              example:
+                id: 12
+                proceso_id: 1
+                proceso: "Proceso Ejemplo 2026"
+                asignatura_id: 3
+                asignatura: "Asignatura Ejemplo"
+                grado_id: null
+                grado: null
+                especialidad_id: null
+                especialidad: null
+                tema_id: 7
+                tema: "Tema Ejemplo"
+                enunciado: "¿Cuál es la capital del país del ejemplo?"
+                tipo: unica
+                dificultad: facil
+                estado: borrador
+                origen: manual
+                motivo_rechazo: null
+                citas_count: 0
+                etiquetas: ["Etiqueta Ejemplo"]
+                etiqueta_ids: [4]
+                respuestas:
+                  - id: 31
+                    texto: "Ciudad A"
+                    es_correcta: true
+                    orden: 1
+                  - id: 32
+                    texto: "Ciudad B"
+                    es_correcta: false
+                    orden: 2
+                retroalimentacion:
+                  explicacion: "Explicación de ejemplo para la pregunta."
+                  referencia: null
+                estadisticas: null
+                created_at: "2026-11-15T15:04:05Z"
+        "400":
+          description: "`{id}` inválido, cuerpo ilegible, campo fuera de regla, `proceso_id` distinto del guardado o regla de negocio."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "proceso_id es inmutable"
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "La pregunta no existe o está eliminada."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "La alternativa o la clave ya tienen intentos calificados, o hay un duplicado."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe un registro con esos datos.: no se puede eliminar una alternativa que ya tiene intentos registrados"
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "Formato con código. `clave_oficial` (clave de un balotario oficial) o `tema_invalido`."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                claveOficial:
+                  value:
+                    error: clave_oficial
+                    message: "La clave de una pregunta de balotario oficial no se puede cambiar."
+                temaInvalido:
+                  value:
+                    error: tema_invalido
+                    message: "El tema no existe, está archivado o es de otra área."
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    delete:
+      operationId: questions.DeletePregunta
+      tags: [questions]
+      summary: "Eliminar una pregunta"
+      description: "Solo `admin`. Borrado lógico: la pregunta pasa a `eliminada` y deja de listarse. Solo se elimina desde `rechazada`, `aprobada` o `activo`."
+      x-rol: admin
+      parameters:
+        - "$ref": "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "204":
+          description: "Pregunta eliminada. Sin cuerpo."
+        "400":
+          description: "`{id}` no es un entero positivo."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID inválido"
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "La pregunta no existe o está eliminada."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "`estado_invalido`: la pregunta cambió o no se puede eliminar en su estado."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: estado_invalido
+                message: "La pregunta cambió o la operación no aplica a su estado; recárgala."
+                detalle:
+                  estado_actual: borrador
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/preguntas/{id}/estado":
+    patch:
+      operationId: questions.CambiarEstado
+      tags: [questions]
+      summary: "Cambiar el estado de una pregunta"
+      description: |
+        Solo `admin`. Aplica una transición del ciclo de vida y la audita.
+
+        - `borrador` o `en_revision` -> `aprobada` o `rechazada`; `rechazada` -> `borrador`; `aprobada` o `activo` -> `en_revision`.
+        - Aprobar exige al menos una cita a una fuente activa y `verificado: true`.
+        - Una pregunta que no es manual solo se aprueba desde `en_revision` (revalidación), con `nota`.
+        - Rechazar exige `motivo` (5 a 500).
+      x-rol: admin
+      parameters:
+        - "$ref": "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/schemas/CambiarEstadoRequest"
+            example:
+              estado: aprobada
+              verificado: true
+              nota: "Clave contrastada con la cita."
+      responses:
+        "200":
+          description: "Pregunta con su nuevo estado."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/Pregunta"
+              example:
+                id: 12
+                proceso_id: 1
+                proceso: "Proceso Ejemplo 2026"
+                asignatura_id: 3
+                asignatura: "Asignatura Ejemplo"
+                grado_id: null
+                grado: null
+                especialidad_id: null
+                especialidad: null
+                tema_id: 7
+                tema: "Tema Ejemplo"
+                enunciado: "¿Cuál es la capital del país del ejemplo?"
+                tipo: unica
+                dificultad: facil
+                estado: aprobada
+                origen: manual
+                motivo_rechazo: null
+                citas_count: 0
+                etiquetas: ["Etiqueta Ejemplo"]
+                etiqueta_ids: [4]
+                respuestas:
+                  - id: 31
+                    texto: "Ciudad A"
+                    es_correcta: true
+                    orden: 1
+                  - id: 32
+                    texto: "Ciudad B"
+                    es_correcta: false
+                    orden: 2
+                retroalimentacion:
+                  explicacion: "Explicación de ejemplo para la pregunta."
+                  referencia: null
+                estadisticas: null
+                created_at: "2026-11-15T15:04:05Z"
+                citas: []
+        "400":
+          description: "`parametro_invalido` (`{id}`) o `cuerpo_invalido` (JSON mal formado o campo desconocido)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: parametro_invalido
+                message: "Parámetro inválido."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "`no_encontrado`."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: no_encontrado
+                message: "Registro no encontrado."
+        "409":
+          description: "`estado_invalido` (la transición no aplica; `detalle.estado_actual`) o `revision_especializada` (la pregunta se revisa en su cola; `detalle.origen`)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: estado_invalido
+                message: "La pregunta cambió o la operación no aplica a su estado; recárgala."
+                detalle:
+                  estado_actual: rechazada
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "`validacion` (`detalle.campos`), `falta_cita`, `verificacion_requerida` o `nota_obligatoria` (`detalle.min`, `detalle.max`)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: verificacion_requerida
+                message: "Confirma que verificaste la pregunta y su clave contra la cita."
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/preguntas/{id}/citas":
+    put:
+      operationId: questions.ReemplazarCitas
+      tags: [questions]
+      summary: "Reemplazar las citas de una pregunta"
+      description: "Solo `admin`. Fija la lista completa de pasajes que cita la pregunta (hasta 20). Repetir la lista actual no cambia ni audita nada. Una pregunta `aprobada` debe conservar al menos una cita a una fuente activa."
+      x-rol: admin
+      parameters:
+        - "$ref": "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/schemas/ReemplazarCitasRequest"
+            example:
+              pasaje_ids: [101, 102]
+      responses:
+        "200":
+          description: "Pregunta con sus citas."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/Pregunta"
+              example:
+                id: 12
+                proceso_id: 1
+                proceso: "Proceso Ejemplo 2026"
+                asignatura_id: 3
+                asignatura: "Asignatura Ejemplo"
+                grado_id: null
+                grado: null
+                especialidad_id: null
+                especialidad: null
+                tema_id: 7
+                tema: "Tema Ejemplo"
+                enunciado: "¿Cuál es la capital del país del ejemplo?"
+                tipo: unica
+                dificultad: facil
+                estado: borrador
+                origen: manual
+                motivo_rechazo: null
+                citas_count: 0
+                etiquetas: ["Etiqueta Ejemplo"]
+                etiqueta_ids: [4]
+                respuestas:
+                  - id: 31
+                    texto: "Ciudad A"
+                    es_correcta: true
+                    orden: 1
+                  - id: 32
+                    texto: "Ciudad B"
+                    es_correcta: false
+                    orden: 2
+                retroalimentacion:
+                  explicacion: "Explicación de ejemplo para la pregunta."
+                  referencia: null
+                estadisticas: null
+                created_at: "2026-11-15T15:04:05Z"
+                citas: []
+        "400":
+          description: "`parametro_invalido` (`{id}`) o `cuerpo_invalido`."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: parametro_invalido
+                message: "Parámetro inválido."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "`no_encontrado`."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: no_encontrado
+                message: "Registro no encontrado."
+        "409":
+          description: "`estado_invalido` o `ultima_cita_activa` (una aprobada quedaría sin cita a una fuente activa)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: ultima_cita_activa
+                message: "Una pregunta aprobada debe conservar al menos una cita a una fuente activa."
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "`validacion` (`pasaje_ids` ausente, no positivo o repetido), `limite_citas` (`detalle.maximo`), `referencia_invalida` o `fuente_no_activa` (ambas con `detalle.pasaje_ids`)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: referencia_invalida
+                message: "Algún pasaje no existe."
+                detalle:
+                  pasaje_ids: [99]
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/etiquetas":
+    get:
+      operationId: questions.ListEtiquetas
+      tags: [questions]
+      summary: "Listar etiquetas"
+      description: "Solo `admin`. Devuelve un arreglo sin paginar, ordenado por nombre."
+      x-rol: admin
+      parameters:
+        - name: asignatura_id
+          in: query
+          required: false
+          description: "Filtra por asignatura. Un valor no numérico se ignora."
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: estado
+          in: query
+          required: false
+          description: "Filtra por estado. No se valida: un valor desconocido no devuelve filas."
+          schema:
+            type: string
+            enum: [activo, inactivo]
+      responses:
+        "200":
+          description: Etiquetas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/schemas/Etiqueta"
+              example:
+                - id: 4
+                  asignatura_id: 3
+                  asignatura: "Asignatura Ejemplo"
+                  nombre: "Etiqueta Ejemplo"
+                  estado: activo
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    post:
+      operationId: questions.CreateEtiqueta
+      tags: [questions]
+      summary: "Crear una etiqueta"
+      description: "Solo `admin`. El nombre es único por asignatura (sin distinguir mayúsculas ni espacios de los bordes)."
+      x-rol: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/schemas/CrearEtiquetaRequest"
+            example:
+              asignatura_id: 3
+              nombre: "Etiqueta Ejemplo"
+      responses:
+        "201":
+          description: "Etiqueta creada."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/Etiqueta"
+              example:
+                id: 4
+                asignatura_id: 3
+                asignatura: "Asignatura Ejemplo"
+                nombre: "Etiqueta Ejemplo"
+                estado: activo
+        "400":
+          description: "Cuerpo ilegible, campo fuera de regla, nombre en blanco o asignatura inexistente."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Campos inválidos o faltantes: nombre."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "409":
+          description: "Ya hay una etiqueta con ese nombre en la asignatura."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe un registro con esos datos.: ya existe una etiqueta con ese nombre para esta asignatura"
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/etiquetas/{id}":
+    put:
+      operationId: questions.UpdateEtiqueta
+      tags: [questions]
+      summary: "Editar una etiqueta"
+      description: "Solo `admin`. Cambia el nombre y, opcionalmente, el estado. Reenviar el mismo nombre no falla por duplicados ya existentes."
+      x-rol: admin
+      parameters:
+        - "$ref": "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/schemas/EditarEtiquetaRequest"
+            example:
+              nombre: "Etiqueta Ejemplo"
+              estado: inactivo
+      responses:
+        "200":
+          description: "Etiqueta actualizada."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/Etiqueta"
+              example:
+                id: 4
+                asignatura_id: 3
+                asignatura: "Asignatura Ejemplo"
+                nombre: "Etiqueta Ejemplo"
+                estado: activo
+        "400":
+          description: "`{id}` inválido, cuerpo ilegible o campo fuera de regla."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID inválido"
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "La etiqueta no existe."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "Ya hay una etiqueta con ese nombre en la asignatura."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe un registro con esos datos.: ya existe una etiqueta con ese nombre para esta asignatura"
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    delete:
+      operationId: questions.DeleteEtiqueta
+      tags: [questions]
+      summary: "Eliminar una etiqueta"
+      description: "Solo `admin`. Borrado físico."
+      x-rol: admin
+      parameters:
+        - "$ref": "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "204":
+          description: "Etiqueta eliminada. Sin cuerpo."
+        "400":
+          description: "`{id}` no es un entero positivo."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID inválido"
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "La etiqueta no existe."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+schemas:
+  PreguntaEstado:
+    type: string
+    enum: [borrador, en_revision, aprobada, rechazada, activo]
+    description: "Ciclo de vida de la pregunta. `activo` es el banco heredado, que se sirve igual que `aprobada`. `eliminada` nunca se devuelve."
+  PreguntaOrigen:
+    type: string
+    enum: [manual, balotario, ia]
+  PreguntaTipo:
+    type: string
+    enum: [unica, multiple]
+    description: "`unica`: exactamente 1 respuesta correcta. `multiple`: al menos 2."
+  PreguntaDificultad:
+    type: string
+    enum: [facil, medio, dificil]
+  RespuestaItem:
+    type: object
+    description: "Alternativa en un alta o una edición."
+    required: [texto, orden]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+        description: "Solo al editar: id de una alternativa existente, que se conserva (los intentos que la usan se preservan). Se omite en las nuevas."
+      texto:
+        type: string
+        minLength: 1
+        maxLength: 500
+      es_correcta:
+        type: boolean
+        default: false
+      orden:
+        type: integer
+        minimum: 1
+        description: "Posición 1…n sin repetir."
+  RetroalimentacionRequest:
+    type: object
+    description: "Retroalimentación opcional de la pregunta."
+    required: [explicacion]
+    properties:
+      explicacion:
+        type: string
+        minLength: 10
+        maxLength: 2000
+      referencia:
+        type: [string, "null"]
+  CrearPreguntaRequest:
+    type: object
+    required: [proceso_id, asignatura_id, enunciado, tipo, dificultad, respuestas]
+    properties:
+      proceso_id:
+        type: integer
+        format: int64
+        minimum: 1
+      asignatura_id:
+        type: integer
+        format: int64
+        minimum: 1
+      grado_id:
+        type: [integer, "null"]
+        format: int64
+        description: "Grado al que aplica; `null` = todos."
+      especialidad_id:
+        type: [integer, "null"]
+        format: int64
+        description: "Especialidad a la que aplica; `null` = todas."
+      enunciado:
+        type: string
+        minLength: 10
+        maxLength: 2000
+      tipo:
+        "$ref": "#/schemas/PreguntaTipo"
+      dificultad:
+        "$ref": "#/schemas/PreguntaDificultad"
+      etiqueta_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+          minimum: 1
+        description: "Etiquetas de la pregunta; deben ser de su asignatura."
+      respuestas:
+        type: array
+        items:
+          "$ref": "#/schemas/RespuestaItem"
+        minItems: 2
+        maxItems: 6
+        description: "De 2 a 6 alternativas. `unica`: 1 correcta; `multiple`: al menos 2."
+      retroalimentacion:
+        oneOf:
+          - "$ref": "#/schemas/RetroalimentacionRequest"
+          - type: "null"
+      tema_id:
+        type: [integer, "null"]
+        format: int64
+        description: "Tema principal, opcional; debe ser de la asignatura y no estar archivado."
+  EditarPreguntaRequest:
+    type: object
+    description: "Reemplazo de la pregunta. Editar el contenido de una pregunta `aprobada` o `activo` la devuelve a `en_revision`."
+    required: [asignatura_id, enunciado, tipo, dificultad, respuestas]
+    properties:
+      proceso_id:
+        type: [integer, "null"]
+        format: int64
+        description: "Inmutable: si se envía y difiere del guardado, `400`."
+      asignatura_id:
+        type: integer
+        format: int64
+        minimum: 1
+      grado_id:
+        type: [integer, "null"]
+        format: int64
+        description: "Grado al que aplica; `null` = todos."
+      especialidad_id:
+        type: [integer, "null"]
+        format: int64
+        description: "Especialidad a la que aplica; `null` = todas."
+      enunciado:
+        type: string
+        minLength: 10
+        maxLength: 2000
+      tipo:
+        "$ref": "#/schemas/PreguntaTipo"
+      dificultad:
+        "$ref": "#/schemas/PreguntaDificultad"
+      etiqueta_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+          minimum: 1
+        description: "Ausente o `null`: se conservan las etiquetas. `[]`: se quitan todas."
+      respuestas:
+        type: array
+        items:
+          "$ref": "#/schemas/RespuestaItem"
+        minItems: 2
+        maxItems: 6
+        description: "De 2 a 6 alternativas. `unica`: 1 correcta; `multiple`: al menos 2."
+      retroalimentacion:
+        oneOf:
+          - "$ref": "#/schemas/RetroalimentacionRequest"
+          - type: "null"
+      tema_id:
+        type: [integer, "null"]
+        format: int64
+        description: "Ausente: se conserva el tema. `null`: se quita. Número: se cambia."
+  Cita:
+    type: object
+    required: [pasaje_id, fuente_id, version, fuente_titulo, fuente_estado, seccion, linea_inicio, linea_fin, extracto, texto]
+    properties:
+      pasaje_id:
+        type: integer
+        format: int64
+        minimum: 1
+      fuente_id:
+        type: integer
+        format: int64
+        minimum: 1
+      version:
+        type: integer
+        minimum: 1
+      fuente_titulo:
+        type: string
+      fuente_estado:
+        type: string
+      seccion:
+        type: [string, "null"]
+      linea_inicio:
+        type: integer
+      linea_fin:
+        type: integer
+      extracto:
+        type: string
+      texto:
+        type: string
+        description: "Texto completo del pasaje citado, de la versión citada (inmutable)."
+  RespuestaAdmin:
+    type: object
+    description: "Alternativa en la vista de admin (incluye la clave)."
+    required: [id, texto, es_correcta, orden]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      texto:
+        type: string
+      es_correcta:
+        type: boolean
+      orden:
+        type: integer
+  RetroalimentacionResponse:
+    type: object
+    required: [explicacion, referencia]
+    properties:
+      explicacion:
+        type: string
+      referencia:
+        type: [string, "null"]
+  Estadistica:
+    type: object
+    required: [total_intentos, total_aciertos, indice_dificultad, indice_discriminacion]
+    properties:
+      total_intentos:
+        type: integer
+      total_aciertos:
+        type: integer
+      indice_dificultad:
+        type: number
+      indice_discriminacion:
+        type: number
+  Pregunta:
+    type: object
+    description: "Vista completa de una pregunta para el admin."
+    required: [id, proceso_id, proceso, asignatura_id, asignatura, grado_id, grado, especialidad_id, especialidad, tema_id, tema, enunciado, tipo, dificultad, estado, origen, motivo_rechazo, etiquetas, etiqueta_ids, respuestas, retroalimentacion, estadisticas, created_at]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      proceso_id:
+        type: integer
+        format: int64
+        minimum: 1
+      proceso:
+        type: string
+      asignatura_id:
+        type: integer
+        format: int64
+        minimum: 1
+      asignatura:
+        type: string
+      grado_id:
+        type: [integer, "null"]
+        format: int64
+      grado:
+        type: [string, "null"]
+      especialidad_id:
+        type: [integer, "null"]
+        format: int64
+      especialidad:
+        type: [string, "null"]
+      tema_id:
+        type: [integer, "null"]
+        format: int64
+      tema:
+        type: [string, "null"]
+      enunciado:
+        type: string
+      tipo:
+        "$ref": "#/schemas/PreguntaTipo"
+      dificultad:
+        "$ref": "#/schemas/PreguntaDificultad"
+      estado:
+        "$ref": "#/schemas/PreguntaEstado"
+      origen:
+        "$ref": "#/schemas/PreguntaOrigen"
+      motivo_rechazo:
+        type: [string, "null"]
+        description: "Solo mientras la pregunta está `rechazada`."
+      citas:
+        type: array
+        items:
+          "$ref": "#/schemas/Cita"
+        description: "Solo en las vistas de detalle (omitido en el listado)."
+      citas_count:
+        type: integer
+        minimum: 0
+        description: "Solo en el listado (omitido en el detalle)."
+      etiquetas:
+        type: array
+        items:
+          type: string
+      etiqueta_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+          minimum: 1
+        description: "Ids de `etiquetas`; vacío en el listado."
+      respuestas:
+        type: array
+        items:
+          "$ref": "#/schemas/RespuestaAdmin"
+      retroalimentacion:
+        oneOf:
+          - "$ref": "#/schemas/RetroalimentacionResponse"
+          - type: "null"
+      estadisticas:
+        oneOf:
+          - "$ref": "#/schemas/Estadistica"
+          - type: "null"
+      created_at:
+        type: string
+  ListaPreguntas:
+    allOf:
+      - "$ref": "../openapi.yaml#/components/schemas/PaginaMeta"
+      - type: object
+        required: [data]
+        properties:
+          data:
+            type: array
+            items:
+              "$ref": "#/schemas/Pregunta"
+  CambiarEstadoRequest:
+    type: object
+    required: [estado]
+    properties:
+      estado:
+        type: string
+        enum: [aprobada, rechazada, borrador, en_revision]
+        description: "Destino. `eliminada` va por `DELETE /preguntas/{id}`."
+      motivo:
+        type: [string, "null"]
+        description: "`rechazada`: obligatorio, de 5 a 500 caracteres. `en_revision`: opcional, hasta 500."
+      verificado:
+        type: [boolean, "null"]
+        description: "`aprobada`: debe ser `true`."
+      nota:
+        type: [string, "null"]
+        description: "`aprobada`: hasta 500 caracteres; de 10 a 500 y obligatoria al revalidar una pregunta que no es manual."
+  ReemplazarCitasRequest:
+    type: object
+    required: [pasaje_ids]
+    properties:
+      pasaje_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+          minimum: 1
+        maxItems: 20
+        description: "Lista completa de las citas (hasta 20, sin repetidos). `[]` quita todas. Obligatoria."
+  Etiqueta:
+    type: object
+    required: [id, asignatura_id, asignatura, nombre, estado]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      asignatura_id:
+        type: integer
+        format: int64
+        minimum: 1
+      asignatura:
+        type: string
+      nombre:
+        type: string
+      estado:
+        type: string
+        enum: [activo, inactivo]
+  CrearEtiquetaRequest:
+    type: object
+    required: [asignatura_id, nombre]
+    properties:
+      asignatura_id:
+        type: integer
+        format: int64
+        minimum: 1
+      nombre:
+        type: string
+        minLength: 1
+        maxLength: 100
+  EditarEtiquetaRequest:
+    type: object
+    required: [nombre]
+    properties:
+      nombre:
+        type: string
+        minLength: 1
+        maxLength: 100
+      estado:
+        type: string
+        enum: [activo, inactivo]
+        description: Opcional.
+  GenerarConjuntoRequest:
+    type: object
+    required: [proceso_id, asignaturas]
+    properties:
+      proceso_id:
+        type: integer
+        format: int64
+        minimum: 1
+      grado_id:
+        type: [integer, "null"]
+        format: int64
+      especialidad_id:
+        type: [integer, "null"]
+        format: int64
+      asignaturas:
+        type: array
+        items:
+          type: object
+          required: [asignatura_id, numero_preguntas]
+          properties:
+            asignatura_id:
+              type: integer
+              format: int64
+              minimum: 1
+            numero_preguntas:
+              type: integer
+              minimum: 1
+            dificultad:
+              type: string
+              enum: [facil, medio, dificil]
+              description: Opcional.
+        minItems: 1
+        description: "Sin asignaturas repetidas. El total de preguntas no puede pasar de 200."
+      excluir_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+          minimum: 1
+        description: "Preguntas que no deben salir."
+  PreguntaExamen:
+    type: object
+    description: "Pregunta de un conjunto de examen. Nunca incluye `es_correcta`."
+    required: [id, enunciado, tipo, asignatura, asignatura_id, respuestas, orden]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      enunciado:
+        type: string
+      tipo:
+        "$ref": "#/schemas/PreguntaTipo"
+      asignatura:
+        type: string
+      asignatura_id:
+        type: integer
+        format: int64
+        minimum: 1
+      respuestas:
+        type: array
+        items:
+          type: object
+          required: [id, texto, orden]
+          properties:
+            id:
+              type: integer
+              format: int64
+              minimum: 1
+            texto:
+              type: string
+            orden:
+              type: integer
+      orden:
+        type: integer
+  ConjuntoGenerado:
+    type: object
+    required: [preguntas, total]
+    properties:
+      preguntas:
+        type: array
+        items:
+          "$ref": "#/schemas/PreguntaExamen"
+      total:
+        type: integer
+  ResultadoImportacion:
+    type: object
+    description: "Resultado fila a fila: las filas válidas se crean y las demás se informan."
+    required: [imported, errors]
+    properties:
+      imported:
+        type: integer
+      errors:
+        type: array
+        items:
+          type: object
+          required: [row, message]
+          properties:
+            row:
+              type: integer
+            message:
+              type: string
+  VistaPreviaFila:
+    type: object
+    required: [row, enunciado, tipo, dificultad, grado_id, especialidad_id, num_respuestas, has_retro, estado]
+    properties:
+      row:
+        type: integer
+      enunciado:
+        type: string
+      tipo:
+        type: string
+      dificultad:
+        type: string
+      grado_id:
+        type: [integer, "null"]
+        format: int64
+      especialidad_id:
+        type: [integer, "null"]
+        format: int64
+      num_respuestas:
+        type: integer
+      has_retro:
+        type: boolean
+      estado:
+        type: string
+        enum: [valido, error]
+      error:
+        type: string
+        description: "Solo cuando `estado` es `error`."
+  VistaPreviaImportacion:
+    type: object
+    required: [rows, total_valido, total_error]
+    properties:
+      rows:
+        type: array
+        items:
+          "$ref": "#/schemas/VistaPreviaFila"
+      total_valido:
+        type: integer
+      total_error:
+        type: integer
+  EstadisticasPreguntas:
+    type: object
+    required: [total_preguntas, por_dificultad, por_tipo, por_proceso]
+    properties:
+      total_preguntas:
+        type: integer
+      por_dificultad:
+        type: object
+        required: [facil, medio, dificil]
+        properties:
+          facil:
+            type: integer
+          medio:
+            type: integer
+          dificil:
+            type: integer
+      por_tipo:
+        type: object
+        required: [unica, multiple]
+        properties:
+          unica:
+            type: integer
+          multiple:
+            type: integer
+      por_proceso:
+        type: array
+        items:
+          type: object
+          required: [proceso, total]
+          properties:
+            proceso:
+              type: string
+            total:
+              type: integer

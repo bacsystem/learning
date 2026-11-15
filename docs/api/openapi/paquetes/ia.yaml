@@ -1,0 +1,299 @@
+# Paquete ia (backend-dev). Rutas: backend/internal/ia/routes.go:18-21.
+# Contrato de apoyo: serums-ia-e6-02-control-costos.md §3. Todo el paquete responde con el formato de código.
+paths:
+  "/serums-ia/ia/consumo":
+    get:
+      operationId: ia.Consumo
+      tags: [ia]
+      summary: "Consumo de IA del usuario"
+      description: "Cualquier sesión (`usuario` o `admin`). Acciones que le quedan al usuario autenticado, contadas por día y por mes. El usuario sale de la sesión, nunca del request."
+      x-rol: autenticado
+      responses:
+        "200":
+          description: "Consumo actual."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/ConsumoIA"
+              example:
+                dia:
+                  usados: 1
+                  limite: 5
+                  disponibles: 4
+                  reinicia_at: "2026-11-16T05:00:00Z"
+                mes:
+                  usados: 8
+                  limite: 50
+                  disponibles: 42
+                  reinicia_at: "2026-12-01T05:00:00Z"
+                presupuesto_agotado: false
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/admin/ia/configuracion":
+    get:
+      operationId: ia.Configuracion
+      tags: [ia]
+      summary: "Configuración del control de costos"
+      description: "Solo `admin`. Límites por usuario y presupuesto mensual vigentes."
+      x-rol: admin
+      responses:
+        "200":
+          description: "Configuración."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/ConfiguracionIA"
+              example:
+                limite_usuario_dia: 5
+                limite_usuario_mes: 50
+                limite_admin_dia: 100
+                max_preguntas_solicitud: 10
+                lote_clasificacion: 20
+                presupuesto_mensual_usd: 50.0
+                updated_at: "2026-11-15T15:04:05Z"
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    put:
+      operationId: ia.Configurar
+      tags: [ia]
+      summary: "Reemplazar la configuración del control de costos"
+      description: "Solo `admin`. Reemplazo completo. Solo se audita lo que cambió; si el presupuesto cambia, se vuelve a evaluar la alerta del 80 %. Sin cambios responde la configuración actual sin auditar."
+      x-rol: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/schemas/ActualizarConfiguracionIA"
+            example:
+              limite_usuario_dia: 5
+              limite_usuario_mes: 50
+              limite_admin_dia: 100
+              max_preguntas_solicitud: 10
+              lote_clasificacion: 20
+              presupuesto_mensual_usd: 50.0
+      responses:
+        "200":
+          description: "Configuración guardada."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/ConfiguracionIA"
+              example:
+                limite_usuario_dia: 5
+                limite_usuario_mes: 50
+                limite_admin_dia: 100
+                max_preguntas_solicitud: 10
+                lote_clasificacion: 20
+                presupuesto_mensual_usd: 50.0
+                updated_at: "2026-11-15T15:04:05Z"
+        "400":
+          description: "`cuerpo_invalido`: JSON mal formado, campo desconocido o tipo equivocado."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: cuerpo_invalido
+                message: "Cuerpo de solicitud inválido."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "`validacion`: `detalle.campos` mapea cada campo a su regla (`requerido`, `min`, `max`, `dec2` o `dia_mayor_que_mes`)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: validacion
+                message: "Hay campos inválidos."
+                detalle:
+                  campos:
+                    limite_usuario_dia: dia_mayor_que_mes
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/admin/ia/gasto":
+    get:
+      operationId: ia.Gasto
+      tags: [ia]
+      summary: "Gasto de IA del mes"
+      description: "Solo `admin`. Monto gastado frente al presupuesto del mes en curso, con el detalle por operación."
+      x-rol: admin
+      responses:
+        "200":
+          description: "Gasto del mes."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/GastoIA"
+              example:
+                mes: "2026-11"
+                presupuesto_usd: 50.0
+                gastado_usd: 4.25
+                porcentaje: 8.5
+                alerta_80_at: null
+                agotado: false
+                reinicia_at: "2026-12-01T05:00:00Z"
+                por_operacion:
+                  - operacion: clasificacion
+                    invocaciones: 12
+                    desde_cache: 3
+                    costo_usd: 4.25
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+schemas:
+  CuotaIA:
+    type: object
+    description: "Consumo de una ventana."
+    required: [usados, limite, disponibles, reinicia_at]
+    properties:
+      usados:
+        type: integer
+        minimum: 0
+      limite:
+        type: integer
+        minimum: 0
+      disponibles:
+        type: integer
+        minimum: 0
+      reinicia_at:
+        type: string
+        format: date-time
+  ConsumoIA:
+    type: object
+    description: "Acciones de IA que le quedan al usuario autenticado."
+    required: [dia, mes, presupuesto_agotado]
+    properties:
+      dia:
+        oneOf:
+          - "$ref": "#/schemas/CuotaIA"
+          - type: "null"
+      mes:
+        oneOf:
+          - "$ref": "#/schemas/CuotaIA"
+          - type: "null"
+        description: "`null` para el admin, que no tiene límite mensual."
+      presupuesto_agotado:
+        type: boolean
+  ConfiguracionIA:
+    type: object
+    required: [limite_usuario_dia, limite_usuario_mes, limite_admin_dia, max_preguntas_solicitud, lote_clasificacion, presupuesto_mensual_usd, updated_at]
+    properties:
+      limite_usuario_dia:
+        type: integer
+        minimum: 0
+        maximum: 50
+      limite_usuario_mes:
+        type: integer
+        minimum: 0
+        maximum: 1000
+      limite_admin_dia:
+        type: integer
+        minimum: 1
+        maximum: 1000
+      max_preguntas_solicitud:
+        type: integer
+        minimum: 1
+        maximum: 50
+      lote_clasificacion:
+        type: integer
+        minimum: 1
+        maximum: 50
+      presupuesto_mensual_usd:
+        type: number
+        minimum: 1
+        maximum: 1000
+        description: "Hasta 2 decimales."
+      updated_at:
+        type: string
+        format: date-time
+  ActualizarConfiguracionIA:
+    type: object
+    description: "Reemplazo completo: todos los campos son obligatorios. Además, `limite_usuario_dia` no puede pasar de `limite_usuario_mes`."
+    required: [limite_usuario_dia, limite_usuario_mes, limite_admin_dia, max_preguntas_solicitud, lote_clasificacion, presupuesto_mensual_usd]
+    properties:
+      limite_usuario_dia:
+        type: integer
+        minimum: 0
+        maximum: 50
+      limite_usuario_mes:
+        type: integer
+        minimum: 0
+        maximum: 1000
+      limite_admin_dia:
+        type: integer
+        minimum: 1
+        maximum: 1000
+      max_preguntas_solicitud:
+        type: integer
+        minimum: 1
+        maximum: 50
+      lote_clasificacion:
+        type: integer
+        minimum: 1
+        maximum: 50
+      presupuesto_mensual_usd:
+        type: number
+        minimum: 1
+        maximum: 1000
+        description: "Hasta 2 decimales."
+  GastoIA:
+    type: object
+    description: "Gasto del mes. Ninguna cifra es por usuario."
+    required: [mes, presupuesto_usd, gastado_usd, porcentaje, alerta_80_at, agotado, reinicia_at, por_operacion]
+    properties:
+      mes:
+        type: string
+        pattern: "^[0-9]{4}-[0-9]{2}$"
+        description: "Mes en curso, hora de Lima."
+      presupuesto_usd:
+        type: number
+      gastado_usd:
+        type: number
+      porcentaje:
+        type: number
+        description: "Gastado sobre presupuesto, en %."
+      alerta_80_at:
+        type: [string, "null"]
+        format: date-time
+      agotado:
+        type: boolean
+      reinicia_at:
+        type: string
+        format: date-time
+      por_operacion:
+        type: array
+        items:
+          type: object
+          required: [operacion, invocaciones, desde_cache, costo_usd]
+          properties:
+            operacion:
+              type: string
+            invocaciones:
+              type: integer
+            desde_cache:
+              type: integer
+            costo_usd:
+              type: number

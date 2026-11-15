@@ -1,0 +1,1134 @@
+# Paquete fuentes (backend-dev). Rutas: backend/internal/fuentes/routes.go:13-46 (constantes).
+# Contratos de apoyo: serums-ia-e2-fuentes.md (S1-S7), serums-ia-e3-07-revision-basica.md §2 (GET /admin/pasajes).
+# Todo el paquete responde con el formato de código (`ErrorCodigo`), salvo los middlewares de sesión y rol.
+paths:
+  "/admin/fuentes":
+    post:
+      operationId: fuentes.Crear
+      tags: [fuentes]
+      summary: "Subir una fuente (S1)"
+      description: |
+        Solo `admin`. Sube el archivo y crea la fuente con su primera versión en estado `procesando`; el worker de ingesta la divide en pasajes y la deja `activa` o `fallida`. Ruta sin `{id}`: el middleware de cuerpo le da el techo de subida (20 MB) y el handler lee hasta 2 MiB más 64 KiB. El archivo se valida en orden: extensión `.md`, tipo, UTF-8 sin NUL y 20 000 líneas.
+
+        Límites: 100 fuentes por especialidad y 500 en total.
+      x-rol: admin
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              "$ref": "#/schemas/SubirFuenteRequest"
+      responses:
+        "202":
+          description: "Fuente aceptada; se procesa en segundo plano."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/FuenteDetalle"
+              example:
+                id: 5
+                titulo: "Balotario de ejemplo"
+                tipo: balotario
+                estado: procesando
+                aplica_a_todas: false
+                especialidades:
+                  - id: 2
+                    nombre: "Especialidad Ejemplo"
+                version_vigente: null
+                version_en_proceso:
+                  numero: 1
+                  estado: procesando
+                  motivo_fallo: null
+                created_at: "2026-11-15T15:04:05Z"
+                updated_at: "2026-11-15T15:04:05Z"
+                anio: 2026
+                proceso:
+                  id: 1
+                  nombre: "Proceso Ejemplo 2026"
+                motivo_retiro: null
+                oficial: null
+                contenidos_citantes: 0
+                versiones:
+                  - numero: 1
+                    estado: procesando
+                    motivo_fallo: null
+                    nombre_archivo: balotario-ejemplo.md
+                    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+                    tamano_bytes: 2048
+                    lineas: 80
+                    pasajes_count: 0
+                    oficial_verificada: false
+                    oficial_entidad: null
+                    created_at: "2026-11-15T15:04:05Z"
+                    procesada_at: null
+        "400":
+          description: "`cuerpo_invalido`: no es multipart o falta la parte `file`."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: cuerpo_invalido
+                message: "El formulario multipart con el archivo es obligatorio."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "409":
+          description: "`fuente_duplicada`: ya existe una fuente con este mismo archivo (cualquier versión). `detalle` trae `fuente_id`, `titulo`, `estado` y `version` de la existente."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: fuente_duplicada
+                message: "Ya existe una fuente con este mismo archivo."
+                detalle:
+                  fuente_id: 3
+                  titulo: "Fuente existente"
+                  estado: activa
+                  version: 1
+        "413":
+          description: "`archivo_demasiado_grande`: el archivo supera 2 MiB (o el cuerpo, el techo de la subida)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: archivo_demasiado_grande
+                message: "El archivo supera el máximo de 2 MiB."
+        "422":
+          description: "`archivo_invalido` (`detalle.motivo`: `extension`, `tipo`, `codificacion` o `lineas`), `validacion` (`detalle.campos`: campo -> `requerido`, `min`, `max`, `invalido` o `repetido`), `referencia_invalida` (proceso o especialidad inexistente o inactiva) o `limite_fuentes` (`detalle.limite`, y `especialidad_id` si es por profesión)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                archivo:
+                  value:
+                    error: archivo_invalido
+                    message: "El archivo no es un .md de texto UTF-8 válido."
+                    detalle:
+                      motivo: extension
+                validacion:
+                  value:
+                    error: validacion
+                    message: "Datos de la fuente inválidos."
+                    detalle:
+                      campos:
+                        titulo: min
+                limite:
+                  value:
+                    error: limite_fuentes
+                    message: "Se alcanzó el máximo de fuentes."
+                    detalle:
+                      limite: 500
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    get:
+      operationId: fuentes.Listar
+      tags: [fuentes]
+      summary: "Listar fuentes (S3)"
+      description: "Solo `admin`. Listado paginado. **Estricto**: un filtro o una paginación inválidos dan `400 parametro_invalido`."
+      x-rol: admin
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          description: "Filtra por estado."
+          schema:
+            "$ref": "#/schemas/FuenteEstado"
+        - name: tipo
+          in: query
+          required: false
+          description: "Filtra por tipo."
+          schema:
+            "$ref": "#/schemas/FuenteTipo"
+        - name: especialidad_id
+          in: query
+          required: false
+          description: "Filtra por especialidad."
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: oficial
+          in: query
+          required: false
+          description: "Filtra por la marca oficial de la versión vigente."
+          schema:
+            type: string
+            enum: ["true", "false"]
+        - name: q
+          in: query
+          required: false
+          description: "Búsqueda por título (hasta 100 caracteres)."
+          schema:
+            type: string
+            maxLength: 100
+        - name: page
+          in: query
+          required: false
+          description: "Página, base 1. **Estricto**: `400` si no es un entero positivo."
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000000
+            default: 1
+        - name: per_page
+          in: query
+          required: false
+          description: "Elementos por página, hasta 100. **Estricto** para valores no numéricos o ≤ 0; uno mayor que el máximo se recorta."
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: "Página de fuentes."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/ListaFuentes"
+              example:
+                data:
+                  - id: 5
+                    titulo: "Balotario de ejemplo"
+                    tipo: balotario
+                    estado: procesando
+                    aplica_a_todas: false
+                    especialidades:
+                      - id: 2
+                        nombre: "Especialidad Ejemplo"
+                    version_vigente: null
+                    version_en_proceso:
+                      numero: 1
+                      estado: procesando
+                      motivo_fallo: null
+                    created_at: "2026-11-15T15:04:05Z"
+                    updated_at: "2026-11-15T15:04:05Z"
+                total: 1
+                page: 1
+                per_page: 20
+        "400":
+          description: "`parametro_invalido`: `{id}` no es un entero positivo, o el cuerpo no cumple lo esperado."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: parametro_invalido
+                message: "Parámetro inválido."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "422":
+          description: "`validacion`: la búsqueda `q` pasa de 100 caracteres (`detalle.campos.q`: `max`)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: validacion
+                message: "Datos de la fuente inválidos."
+                detalle:
+                  campos:
+                    q: max
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/admin/fuentes/versiones":
+    post:
+      operationId: fuentes.NuevaVersion
+      tags: [fuentes]
+      summary: "Subir una versión nueva (S2)"
+      description: "Solo `admin`. Añade una versión a una fuente existente; queda `procesando` hasta que el worker la publique. Ruta sin `{id}`: el middleware de cuerpo le da el techo de subida (20 MB) y el handler lee hasta 2 MiB más 64 KiB. El archivo se valida en orden: extensión `.md`, tipo, UTF-8 sin NUL y 20 000 líneas. Una fuente admite hasta 20 versiones vivas: al llegar al tope se archiva la más antigua que se pueda."
+      x-rol: admin
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              "$ref": "#/schemas/NuevaVersionRequest"
+      responses:
+        "202":
+          description: "Versión aceptada; se procesa en segundo plano."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/FuenteDetalle"
+              example:
+                id: 5
+                titulo: "Balotario de ejemplo"
+                tipo: balotario
+                estado: procesando
+                aplica_a_todas: false
+                especialidades:
+                  - id: 2
+                    nombre: "Especialidad Ejemplo"
+                version_vigente: null
+                version_en_proceso:
+                  numero: 1
+                  estado: procesando
+                  motivo_fallo: null
+                created_at: "2026-11-15T15:04:05Z"
+                updated_at: "2026-11-15T15:04:05Z"
+                anio: 2026
+                proceso:
+                  id: 1
+                  nombre: "Proceso Ejemplo 2026"
+                motivo_retiro: null
+                oficial: null
+                contenidos_citantes: 0
+                versiones:
+                  - numero: 1
+                    estado: procesando
+                    motivo_fallo: null
+                    nombre_archivo: balotario-ejemplo.md
+                    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+                    tamano_bytes: 2048
+                    lineas: 80
+                    pasajes_count: 0
+                    oficial_verificada: false
+                    oficial_entidad: null
+                    created_at: "2026-11-15T15:04:05Z"
+                    procesada_at: null
+        "400":
+          description: "`cuerpo_invalido`: no es multipart, falta `file` o `fuente_id` no es numérico."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: cuerpo_invalido
+                message: "El formulario multipart es inválido."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "`no_encontrado`: la fuente no existe."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: no_encontrado
+                message: "Fuente no encontrada."
+        "409":
+          description: "`fuente_duplicada` (mismo archivo ya subido; `detalle` con la existente) o `estado_invalido` (la fuente no admite versiones nuevas en su estado)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                duplicada:
+                  value:
+                    error: fuente_duplicada
+                    message: "Ya existe una fuente con este mismo archivo."
+                    detalle:
+                      fuente_id: 3
+                      titulo: "Fuente existente"
+                      estado: activa
+                      version: 1
+                estado:
+                  value:
+                    error: estado_invalido
+                    message: "La fuente no admite esta operación en su estado actual."
+        "413":
+          description: "`archivo_demasiado_grande`: el archivo supera 2 MiB (o el cuerpo, el techo de la subida)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: archivo_demasiado_grande
+                message: "El archivo supera el máximo de 2 MiB."
+        "422":
+          description: "`archivo_invalido`, `validacion` (`fuente_id` ausente o ≤ 0) o `limite_versiones` (20 versiones y ninguna se puede archivar)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: limite_versiones
+                message: "La fuente ya tiene 20 versiones y ninguna se puede archivar."
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/admin/fuentes/{id}":
+    get:
+      operationId: fuentes.Obtener
+      tags: [fuentes]
+      summary: "Detalle de una fuente (S4)"
+      description: "Solo `admin`. Fuente con todas sus versiones."
+      x-rol: admin
+      parameters:
+        - "$ref": "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "200":
+          description: "La fuente."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/FuenteDetalle"
+              example:
+                id: 5
+                titulo: "Balotario de ejemplo"
+                tipo: balotario
+                estado: procesando
+                aplica_a_todas: false
+                especialidades:
+                  - id: 2
+                    nombre: "Especialidad Ejemplo"
+                version_vigente: null
+                version_en_proceso:
+                  numero: 1
+                  estado: procesando
+                  motivo_fallo: null
+                created_at: "2026-11-15T15:04:05Z"
+                updated_at: "2026-11-15T15:04:05Z"
+                anio: 2026
+                proceso:
+                  id: 1
+                  nombre: "Proceso Ejemplo 2026"
+                motivo_retiro: null
+                oficial: null
+                contenidos_citantes: 0
+                versiones:
+                  - numero: 1
+                    estado: procesando
+                    motivo_fallo: null
+                    nombre_archivo: balotario-ejemplo.md
+                    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+                    tamano_bytes: 2048
+                    lineas: 80
+                    pasajes_count: 0
+                    oficial_verificada: false
+                    oficial_entidad: null
+                    created_at: "2026-11-15T15:04:05Z"
+                    procesada_at: null
+        "400":
+          description: "`parametro_invalido`: `{id}` no es un entero positivo, o el cuerpo no cumple lo esperado."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: parametro_invalido
+                message: "Parámetro inválido."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "`no_encontrado`: la fuente no existe."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: no_encontrado
+                message: "Fuente no encontrada."
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    put:
+      operationId: fuentes.Editar
+      tags: [fuentes]
+      summary: "Editar título y especialidades (S7)"
+      description: "Solo `admin`. Reemplaza el título y la lista de especialidades. Una lista vacía significa «todas»."
+      x-rol: admin
+      parameters:
+        - "$ref": "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/schemas/EditarFuenteRequest"
+            example:
+              titulo: "Balotario de ejemplo"
+              especialidad_ids: [2]
+      responses:
+        "200":
+          description: "Fuente editada."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/FuenteDetalle"
+              example:
+                id: 5
+                titulo: "Balotario de ejemplo"
+                tipo: balotario
+                estado: procesando
+                aplica_a_todas: false
+                especialidades:
+                  - id: 2
+                    nombre: "Especialidad Ejemplo"
+                version_vigente: null
+                version_en_proceso:
+                  numero: 1
+                  estado: procesando
+                  motivo_fallo: null
+                created_at: "2026-11-15T15:04:05Z"
+                updated_at: "2026-11-15T15:04:05Z"
+                anio: 2026
+                proceso:
+                  id: 1
+                  nombre: "Proceso Ejemplo 2026"
+                motivo_retiro: null
+                oficial: null
+                contenidos_citantes: 0
+                versiones:
+                  - numero: 1
+                    estado: procesando
+                    motivo_fallo: null
+                    nombre_archivo: balotario-ejemplo.md
+                    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+                    tamano_bytes: 2048
+                    lineas: 80
+                    pasajes_count: 0
+                    oficial_verificada: false
+                    oficial_entidad: null
+                    created_at: "2026-11-15T15:04:05Z"
+                    procesada_at: null
+        "400":
+          description: "`parametro_invalido` (`{id}`) o `cuerpo_invalido` (JSON mal formado o campo desconocido)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: parametro_invalido
+                message: "Parámetro inválido."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "`no_encontrado`: la fuente no existe."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: no_encontrado
+                message: "Fuente no encontrada."
+        "409":
+          description: "`estado_invalido`: la fuente no se puede editar en su estado actual."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: estado_invalido
+                message: "La fuente no admite esta operación en su estado actual."
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "`validacion` (`detalle.campos`) o `referencia_invalida` (especialidad inexistente o inactiva)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: validacion
+                message: "Datos de la fuente inválidos."
+                detalle:
+                  campos:
+                    especialidad_ids: requerido
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/admin/fuentes/{id}/estado":
+    patch:
+      operationId: fuentes.CambiarEstado
+      tags: [fuentes]
+      summary: "Retirar, restaurar o reintentar una fuente (S5)"
+      description: |
+        Solo `admin`. Según el destino:
+
+        - `retirada`: retira una fuente `activa` sin versión en proceso; guarda el motivo y avisa a los suscriptores (las preguntas que la citan se marcan para revisión). La respuesta trae `contenidos_marcados`.
+        - `activa`: restaura una `retirada`, revalidando el límite de fuentes. No aprueba nada de nuevo.
+        - `procesando`: reintenta la última versión si falló.
+      x-rol: admin
+      parameters:
+        - "$ref": "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/schemas/CambioEstadoRequest"
+            example:
+              estado: retirada
+              motivo: "Reemplazada por una guía nueva."
+      responses:
+        "200":
+          description: "Fuente con su nuevo estado."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/FuenteDetalle"
+              example:
+                id: 5
+                titulo: "Balotario de ejemplo"
+                tipo: balotario
+                estado: retirada
+                aplica_a_todas: false
+                especialidades:
+                  - id: 2
+                    nombre: "Especialidad Ejemplo"
+                version_vigente: null
+                version_en_proceso:
+                  numero: 1
+                  estado: procesando
+                  motivo_fallo: null
+                created_at: "2026-11-15T15:04:05Z"
+                updated_at: "2026-11-15T15:04:05Z"
+                anio: 2026
+                proceso:
+                  id: 1
+                  nombre: "Proceso Ejemplo 2026"
+                motivo_retiro: "Reemplazada por una guía nueva."
+                oficial: null
+                contenidos_citantes: 0
+                versiones:
+                  - numero: 1
+                    estado: procesando
+                    motivo_fallo: null
+                    nombre_archivo: balotario-ejemplo.md
+                    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+                    tamano_bytes: 2048
+                    lineas: 80
+                    pasajes_count: 0
+                    oficial_verificada: false
+                    oficial_entidad: null
+                    created_at: "2026-11-15T15:04:05Z"
+                    procesada_at: null
+                contenidos_marcados: 0
+        "400":
+          description: "`parametro_invalido` (`{id}`) o `cuerpo_invalido`."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: parametro_invalido
+                message: "Parámetro inválido."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "`no_encontrado`: la fuente no existe."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: no_encontrado
+                message: "Fuente no encontrada."
+        "409":
+          description: "`estado_invalido`: la operación no aplica al estado actual."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: estado_invalido
+                message: "La fuente no admite esta operación en su estado actual."
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "`validacion` (`estado` o `motivo`) o `limite_fuentes` al restaurar o reintentar."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: validacion
+                message: "Datos de la fuente inválidos."
+                detalle:
+                  campos:
+                    motivo: min
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/admin/fuentes/{id}/oficial":
+    patch:
+      operationId: fuentes.Oficial
+      tags: [fuentes]
+      summary: "Marcar o desmarcar «oficial verificada» (S6)"
+      description: "Solo `admin`. Marca o desmarca la versión vigente como oficial verificada. Al marcar: `entidad_emisora` y `nota`. Al desmarcar: `motivo`."
+      x-rol: admin
+      parameters:
+        - "$ref": "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/schemas/OficialRequest"
+            example:
+              oficial_verificada: true
+              entidad_emisora: "Entidad de ejemplo"
+              nota: "Documento de ejemplo contrastado."
+      responses:
+        "200":
+          description: "Fuente con la marca actualizada."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/FuenteDetalle"
+              example:
+                id: 5
+                titulo: "Balotario de ejemplo"
+                tipo: balotario
+                estado: procesando
+                aplica_a_todas: false
+                especialidades:
+                  - id: 2
+                    nombre: "Especialidad Ejemplo"
+                version_vigente: null
+                version_en_proceso:
+                  numero: 1
+                  estado: procesando
+                  motivo_fallo: null
+                created_at: "2026-11-15T15:04:05Z"
+                updated_at: "2026-11-15T15:04:05Z"
+                anio: 2026
+                proceso:
+                  id: 1
+                  nombre: "Proceso Ejemplo 2026"
+                motivo_retiro: null
+                oficial: null
+                contenidos_citantes: 0
+                versiones:
+                  - numero: 1
+                    estado: procesando
+                    motivo_fallo: null
+                    nombre_archivo: balotario-ejemplo.md
+                    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+                    tamano_bytes: 2048
+                    lineas: 80
+                    pasajes_count: 0
+                    oficial_verificada: false
+                    oficial_entidad: null
+                    created_at: "2026-11-15T15:04:05Z"
+                    procesada_at: null
+        "400":
+          description: "`parametro_invalido` (`{id}`) o `cuerpo_invalido`."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: parametro_invalido
+                message: "Parámetro inválido."
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "`no_encontrado`: la fuente no existe."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: no_encontrado
+                message: "Fuente no encontrada."
+        "409":
+          description: "`estado_invalido`: la versión vigente ya está marcada (al marcar), no lo está (al desmarcar) o la fuente no tiene versión vigente."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: estado_invalido
+                message: "La fuente no admite esta operación en su estado actual."
+        "413":
+          "$ref": "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "`validacion` (`detalle.campos`)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: validacion
+                message: "Datos de la fuente inválidos."
+                detalle:
+                  campos:
+                    entidad_emisora: requerido
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  "/admin/pasajes":
+    get:
+      operationId: fuentes.BuscarPasajes
+      tags: [fuentes]
+      summary: "Buscar pasajes para citar"
+      description: "Solo `admin`. Busca texto en los pasajes de las fuentes activas (hasta 20 resultados, con extracto). La consulta nunca se registra en los logs."
+      x-rol: admin
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: "Texto a buscar."
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 300
+      responses:
+        "200":
+          description: "Pasajes encontrados."
+          content:
+            application/json:
+              schema:
+                "$ref": "#/schemas/ListaPasajes"
+              example:
+                data:
+                  - pasaje_id: 101
+                    fuente_id: 5
+                    fuente_titulo: "Balotario de ejemplo"
+                    version: 1
+                    seccion: "Sección 1"
+                    linea_inicio: 10
+                    linea_fin: 14
+                    extracto: "Texto de ejemplo del pasaje…"
+        "401":
+          "$ref": "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          "$ref": "../openapi.yaml#/components/responses/AccesoDenegado"
+        "422":
+          description: "`consulta_invalida`: `q` ausente o fuera de 3 a 300 caracteres (`detalle.min`, `detalle.max`)."
+          content:
+            application/json:
+              schema:
+                "$ref": "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: consulta_invalida
+                message: consulta_invalida
+                detalle:
+                  min: 3
+                  max: 300
+        "500":
+          "$ref": "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          "$ref": "../openapi.yaml#/components/responses/ServicioNoDisponible"
+schemas:
+  FuenteEstado:
+    type: string
+    enum: [procesando, activa, fallida, retirada]
+  FuenteTipo:
+    type: string
+    enum: [balotario, guia, norma, otro]
+  EspecialidadRef:
+    type: object
+    required: [id, nombre]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      nombre:
+        type: string
+  ProcesoRef:
+    type: object
+    required: [id, nombre]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      nombre:
+        type: string
+  VersionVigenteResumen:
+    type: object
+    required: [numero, oficial_verificada, pasajes_count]
+    properties:
+      numero:
+        type: integer
+        minimum: 1
+      oficial_verificada:
+        type: boolean
+      pasajes_count:
+        type: integer
+  VersionEnProceso:
+    type: object
+    description: "Última versión posterior a la vigente que aún no está lista."
+    required: [numero, estado, motivo_fallo]
+    properties:
+      numero:
+        type: integer
+        minimum: 1
+      estado:
+        type: string
+      motivo_fallo:
+        type: [string, "null"]
+  FuenteResumen:
+    type: object
+    required: [id, titulo, tipo, estado, aplica_a_todas, especialidades, version_vigente, version_en_proceso, created_at, updated_at]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      titulo:
+        type: string
+      tipo:
+        "$ref": "#/schemas/FuenteTipo"
+      estado:
+        "$ref": "#/schemas/FuenteEstado"
+      aplica_a_todas:
+        type: boolean
+        description: "`true` cuando la fuente no se limita a especialidades concretas."
+      especialidades:
+        type: array
+        items:
+          "$ref": "#/schemas/EspecialidadRef"
+      version_vigente:
+        oneOf:
+          - "$ref": "#/schemas/VersionVigenteResumen"
+          - type: "null"
+      version_en_proceso:
+        oneOf:
+          - "$ref": "#/schemas/VersionEnProceso"
+          - type: "null"
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+  VersionDetalle:
+    type: object
+    required: [numero, estado, motivo_fallo, nombre_archivo, sha256, tamano_bytes, lineas, pasajes_count, oficial_verificada, oficial_entidad, created_at, procesada_at]
+    properties:
+      numero:
+        type: integer
+        minimum: 1
+      estado:
+        type: string
+      motivo_fallo:
+        type: [string, "null"]
+      nombre_archivo:
+        type: string
+      sha256:
+        type: string
+        description: "Hash hexadecimal del contenido."
+      tamano_bytes:
+        type: integer
+      lineas:
+        type: integer
+      pasajes_count:
+        type: integer
+      oficial_verificada:
+        type: boolean
+      oficial_entidad:
+        type: [string, "null"]
+      created_at:
+        type: string
+        format: date-time
+      procesada_at:
+        type: [string, "null"]
+        format: date-time
+  MarcaOficial:
+    type: object
+    description: "Marca «oficial verificada» de la versión vigente."
+    required: [entidad_emisora, nota, marcado_at]
+    properties:
+      entidad_emisora:
+        type: string
+      nota:
+        type: string
+      marcado_at:
+        type: string
+        format: date-time
+  FuenteDetalle:
+    allOf:
+      - "$ref": "#/schemas/FuenteResumen"
+      - type: object
+        required: [anio, proceso, motivo_retiro, oficial, contenidos_citantes, versiones]
+        properties:
+          anio:
+            type: [integer, "null"]
+          proceso:
+            oneOf:
+              - "$ref": "#/schemas/ProcesoRef"
+              - type: "null"
+          motivo_retiro:
+            type: [string, "null"]
+          oficial:
+            oneOf:
+              - "$ref": "#/schemas/MarcaOficial"
+              - type: "null"
+          contenidos_citantes:
+            type: integer
+            minimum: 0
+            description: "Contenidos que citan la fuente."
+          versiones:
+            type: array
+            items:
+              "$ref": "#/schemas/VersionDetalle"
+          contenidos_marcados:
+            type: integer
+            minimum: 0
+            description: "Solo en la respuesta de un retiro (S5): contenidos que los suscriptores marcaron. Se envía aunque sea 0."
+    description: "Vista de admin de una fuente: su resumen más los campos de detalle."
+  ListaFuentes:
+    allOf:
+      - "$ref": "../openapi.yaml#/components/schemas/PaginaMeta"
+      - type: object
+        required: [data]
+        properties:
+          data:
+            type: array
+            items:
+              "$ref": "#/schemas/FuenteResumen"
+  PasajeBuscado:
+    type: object
+    required: [pasaje_id, fuente_id, fuente_titulo, version, seccion, linea_inicio, linea_fin, extracto]
+    properties:
+      pasaje_id:
+        type: integer
+        format: int64
+        minimum: 1
+      fuente_id:
+        type: integer
+        format: int64
+        minimum: 1
+      fuente_titulo:
+        type: string
+      version:
+        type: integer
+        minimum: 1
+      seccion:
+        type: [string, "null"]
+      linea_inicio:
+        type: integer
+      linea_fin:
+        type: integer
+      extracto:
+        type: string
+        description: "Extracto del pasaje, nunca el texto completo."
+  ListaPasajes:
+    type: object
+    description: "Hasta 20 pasajes de fuentes activas. Sin paginar."
+    required: [data]
+    properties:
+      data:
+        type: array
+        items:
+          "$ref": "#/schemas/PasajeBuscado"
+        maxItems: 20
+  SubirFuenteRequest:
+    type: object
+    required: [file, titulo, tipo]
+    properties:
+      file:
+        type: string
+        format: binary
+        description: "Archivo `.md` de texto UTF-8 de hasta 2 MiB y 20 000 líneas. `Content-Type` del archivo: `text/markdown` o `text/plain`."
+      titulo:
+        type: string
+        minLength: 3
+        maxLength: 150
+      tipo:
+        "$ref": "#/schemas/FuenteTipo"
+      anio:
+        type: integer
+        minimum: 1900
+        maximum: 2100
+        description: Opcional.
+      proceso_id:
+        type: integer
+        format: int64
+        minimum: 1
+        description: "Opcional; debe existir y estar activo."
+      especialidad_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+          minimum: 1
+        maxItems: 50
+        description: "Campo repetido. Sin repetidos. Vacío o ausente = aplica a todas las especialidades."
+  NuevaVersionRequest:
+    type: object
+    required: [file, fuente_id]
+    properties:
+      file:
+        type: string
+        format: binary
+        description: "Archivo `.md`, con las mismas reglas que al crear."
+      fuente_id:
+        type: integer
+        format: int64
+        minimum: 1
+        description: "Fuente a la que se añade la versión."
+  CambioEstadoRequest:
+    type: object
+    required: [estado]
+    properties:
+      estado:
+        type: string
+        enum: [retirada, activa, procesando]
+        description: "`retirada`: retirar (exige `motivo`). `activa`: restaurar una retirada. `procesando`: reintentar una versión fallida."
+      motivo:
+        type: [string, "null"]
+        minLength: 5
+        maxLength: 500
+        description: "Obligatorio al retirar; se ignora en los otros destinos."
+  OficialRequest:
+    type: object
+    description: "Los campos de la dirección contraria se ignoran."
+    required: [oficial_verificada]
+    properties:
+      oficial_verificada:
+        type: boolean
+        description: "`true` marca; `false` desmarca."
+      entidad_emisora:
+        type: [string, "null"]
+        minLength: 3
+        maxLength: 100
+        description: "Al marcar: obligatoria."
+      nota:
+        type: [string, "null"]
+        minLength: 10
+        maxLength: 500
+        description: "Al marcar: obligatoria."
+      motivo:
+        type: [string, "null"]
+        minLength: 5
+        maxLength: 500
+        description: "Al desmarcar: obligatorio."
+  EditarFuenteRequest:
+    type: object
+    required: [titulo, especialidad_ids]
+    properties:
+      titulo:
+        type: string
+        minLength: 3
+        maxLength: 150
+      especialidad_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+          minimum: 1
+        maxItems: 50
+        description: "Obligatoria. Sin repetidos. `[]` = aplica a todas las especialidades."
