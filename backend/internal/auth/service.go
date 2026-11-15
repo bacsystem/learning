@@ -328,7 +328,8 @@ func (s *Service) VerifyEmail(ctx context.Context, req VerifyEmailRequest, ip, u
 	if err != nil {
 		return err
 	}
-	res, err := s.repo.VerifyPendingRegistration(ctx, hashToken(req.Token), req.Username, string(hash))
+	idioma := locale.Normalize(req.Locale)
+	res, err := s.repo.VerifyPendingRegistration(ctx, hashToken(req.Token), req.Username, string(hash), idioma)
 	if err != nil {
 		return err
 	}
@@ -337,7 +338,7 @@ func (s *Service) VerifyEmail(ctx context.Context, req VerifyEmailRequest, ip, u
 	if profile, err := s.repo.GetPersonaProfile(ctx, res.PersonaID); err != nil {
 		log.Error().Err(err).Int64("usuario_id", res.UserID).Msg("verify_email: load profile failed")
 	} else if profile.Email != "" {
-		sub, bdy := emailRegistroPendiente(locale.Normalize(req.Locale), profile.Nombres, profile.ApellidoPaterno, req.Username)
+		sub, bdy := emailRegistroPendiente(idioma, profile.Nombres, profile.ApellidoPaterno, req.Username)
 		if err := s.repo.EnqueueEmail(ctx, profile.Email, sub, bdy); err != nil {
 			log.Error().Err(err).Int64("usuario_id", res.UserID).Msg("verify_email: enqueue email failed")
 		}
@@ -693,6 +694,18 @@ func (s *Service) ListUsuariosOnline(ctx context.Context) ([]UsuarioOnlineItem, 
 
 func (s *Service) ListSesionesUsuario(ctx context.Context, usuarioID int64) ([]SesionHistorialItem, error) {
 	return s.repo.ListSesionesUsuario(ctx, usuarioID)
+}
+
+// SetIdioma saves the language of usuario userID. Errors: ErrIdiomaInvalido
+// when idioma is not exactly a supported code.
+func (s *Service) SetIdioma(ctx context.Context, userID int64, idioma string) error {
+	if !locale.IsSupported(idioma) {
+		return ErrIdiomaInvalido
+	}
+	if err := s.repo.SetIdioma(ctx, userID, idioma); err != nil {
+		return fmt.Errorf("set idioma: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) SetTourCompletado(ctx context.Context, userID int64, completado bool) error {

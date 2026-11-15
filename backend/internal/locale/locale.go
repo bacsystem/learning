@@ -10,6 +10,11 @@ const (
 	EN = "en"
 )
 
+// IsSupported reports whether raw is exactly a supported language code. Unlike
+// Normalize it does not trim or fold case: it validates a value the client is
+// choosing, where a wrong one must be rejected rather than guessed.
+func IsSupported(raw string) bool { return raw == ES || raw == EN }
+
 // Normalize returns EN or ES. Surrounding spaces and case are ignored; an
 // empty, unknown or regional value ("en-US", "fr") resolves to ES, the default
 // language. It never fails, so an unrecognised locale cannot reject a request.
