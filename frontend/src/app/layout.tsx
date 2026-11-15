@@ -3,7 +3,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { DM_Sans, Figtree, Inter, JetBrains_Mono, Manrope, Plus_Jakarta_Sans } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
-import { getLocale, getMessages } from "next-intl/server";
+import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { Suspense } from "react";
 
 import Loading from "@/app/loading";
@@ -21,10 +21,11 @@ const figtree = Figtree({ variable: "--fuente-figtree", subsets: ["latin"], prel
 const mono = JetBrains_Mono({ variable: "--font-mono", weight: ["400", "500", "600"], subsets: ["latin"] });
 const fuentes = [sans, jakarta, manrope, dmSans, figtree, mono].map((f) => f.variable).join(" ");
 
-export const metadata: Metadata = {
-  title: "Capacitate",
-  description: "Practica y rinde simulacros para tus exámenes de selección, ascenso o habilitación profesional.",
-};
+// La descripción sigue el idioma de la cookie de locale (next-intl), igual que el resto de la interfaz.
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("dashboard");
+  return { title: "Capacitate", description: t("app-meta-descripcion") };
+}
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locale = await getLocale();
