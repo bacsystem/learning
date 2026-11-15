@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef } from "react";
 
 import { Campo } from "@/components/app/campo";
 import { Alerta } from "@/components/feedback/alerta";
@@ -17,6 +17,7 @@ import { excede, LIMITES } from "@/lib/admin/limites";
 import type { Especialidad, Grado, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
 import { ACCION_SECUNDARIA, BOTON_PRIMARIO, BOTON_SECUNDARIO, TARJETA } from "@/lib/estilos";
 import type { Etiqueta } from "@/lib/questions/api";
+import { claveErrorRespuesta, type ErroresPregunta } from "@/lib/questions/pregunta";
 import { cn } from "@/lib/utils";
 import {
   ArrowDownIcon,
@@ -77,7 +78,7 @@ function Seccion({
 
 /**
  * Formulario de una pregunta del banco (nueva y edición): clasificación, enunciado, etiquetas, alternativas con la(s)
- * correcta(s) y retroalimentación. El estado vive en la página; aquí solo se pinta y se valida lo mínimo antes de enviar.
+ * correcta(s) y retroalimentación. El estado y la validación viven en la página; aquí solo se pinta.
  */
 export function EditorPregunta({
   proceso,
@@ -112,6 +113,8 @@ export function EditorPregunta({
   onRetroReferencia,
   retroMinimo,
   error,
+  errores = {},
+  intentosEnvio = 0,
   enviando,
   textoEnviar,
   textoEnviando,
@@ -152,11 +155,15 @@ export function EditorPregunta({
   /** Exige entre 10 y 2000 caracteres en la explicación, como el backend (nueva pregunta y edición). */
   retroMinimo?: boolean;
   error: string | null;
+  /** Errores de validación por campo (ver `validarPregunta`); el formulario no usa la validación nativa del navegador. */
+  errores?: ErroresPregunta;
+  /** Cuenta los envíos: cada uno que deja errores lleva el foco al primer campo inválido. */
+  intentosEnvio?: number;
   enviando: boolean;
   textoEnviar: string;
   textoEnviando: string;
   onCancelar: () => void;
-  onEnviar: (e: FormEvent) => void;
+  onEnviar: (e: FormEvent<HTMLFormElement>) => void;
 }) {
   const t = useTranslations("dashboard");
   const opcionesDificultad: OpcionSelect[] = [
@@ -168,7 +175,6 @@ export function EditorPregunta({
     { value: "unica", label: t("admin-preguntas-tipo-unica") },
     { value: "multiple", label: t("admin-preguntas-tipo-multiple") },
   ];
-  const [intentado, setIntentado] = useState(false);
   // El error de guardado (p. ej. un 409) se pinta arriba del formulario y el botón está en una columna sticky: con un
   // enunciado largo quedaría fuera de la vista. Se lleva a la vista cada vez que aparece un error nuevo.
   const alertaRef = useRef<HTMLDivElement>(null);
@@ -177,25 +183,23 @@ export function EditorPregunta({
     const sinMovimiento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     alertaRef.current?.scrollIntoView({ behavior: sinMovimiento ? "auto" : "smooth", block: "start" });
   }, [error]);
+  const formRef = useRef<HTMLFormElement>(null);
+  // Con errores de validación tras un envío, el foco va al primer campo inválido.
+  useEffect(() => {
+    if (intentosEnvio === 0) return;
+    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+    // Solo reacciona a un envío nuevo, no a cada cambio de `errores`.
+  }, [intentosEnvio]);
   // En edición el proceso es fijo: cuenta como elegido.
   const procesoID = proceso.modo === "elegir" ? proceso.valor : 1;
-  const faltaProceso = intentado && !procesoID;
-  const faltaAsignatura = intentado && !asignaturaID;
   const correctas = respuestas.filter((r) => r.es_correcta).length;
-  // CreateRespuestaItem.texto: max=500 runas en el backend.
-  const respuestaLarga = respuestas.findIndex((r) => excede(r.texto, LIMITES.respuesta.texto));
-
-  function enviar(e: FormEvent) {
-    if (!procesoID || !asignaturaID || respuestaLarga >= 0) {
-      e.preventDefault();
-      setIntentado(true);
-      return;
-    }
-    onEnviar(e);
-  }
+  const errorRespuestas = respuestas.flatMap((_, idx) => {
+    const mensaje = errores[claveErrorRespuesta(idx)];
+    return mensaje ? [{ idx, mensaje }] : [];
+  });
 
   return (
-    <form onSubmit={enviar} className="flex flex-col gap-3">
+    <form ref={formRef} onSubmit={onEnviar} noValidate className="flex flex-col gap-3">
       {error ? (
         <div ref={alertaRef} className="scroll-mt-4">
           <Alerta tono="error">{error}</Alerta>
@@ -209,6 +213,7 @@ export function EditorPregunta({
             <Campo
               id="pregunta-enunciado"
               etiqueta={t("admin-preguntas-enunciado")}
+              error={errores.enunciado}
               ayuda={
                 <span className="tabular-nums">
                   {t("admin-preguntas-enunciado-ayuda", { n: enunciado.length, max: MAX_ENUNCIADO })}
@@ -219,8 +224,9 @@ export function EditorPregunta({
                 id="pregunta-enunciado"
                 required
                 rows={5}
-                minLength={10}
                 maxLength={MAX_ENUNCIADO}
+                invalido={Boolean(errores.enunciado)}
+                aria-describedby={errores.enunciado ? "pregunta-enunciado-error" : undefined}
                 value={enunciado}
                 onChange={(e) => onEnunciado(e.target.value)}
                 placeholder={t("admin-preguntas-enunciado-placeholder")}
@@ -312,7 +318,10 @@ export function EditorPregunta({
                       onChange={(e) => onTextoRespuesta(idx, e.target.value)}
                       required
                       maxLength={LIMITES.respuesta.texto}
-                      invalido={excede(resp.texto, LIMITES.respuesta.texto)}
+                      invalido={
+                        excede(resp.texto, LIMITES.respuesta.texto) || Boolean(errores[claveErrorRespuesta(idx)])
+                      }
+                      aria-describedby={errores[claveErrorRespuesta(idx)] ? `${id}-error` : undefined}
                       className="min-w-0 flex-1 basis-48"
                     />
                     <Casilla
@@ -367,12 +376,19 @@ export function EditorPregunta({
                 );
               })}
             </ol>
-            {respuestaLarga >= 0 ? (
+            {errorRespuestas.map(({ idx, mensaje }) => (
+              <p
+                key={idx}
+                id={`pregunta-respuesta-${idx}-error`}
+                role="alert"
+                className="text-control text-destructive"
+              >
+                {t("admin-preguntas-respuesta-error", { letra: LETRAS[idx] ?? idx + 1, mensaje })}
+              </p>
+            ))}
+            {errores.respuestas ? (
               <p role="alert" className="text-control text-destructive">
-                {t("admin-preguntas-respuesta-maximo", {
-                  letra: LETRAS[respuestaLarga] ?? respuestaLarga + 1,
-                  max: LIMITES.respuesta.texto,
-                })}
+                {errores.respuestas}
               </p>
             ) : null}
             {respuestas.length < MAX_RESPUESTAS ? (
@@ -390,12 +406,17 @@ export function EditorPregunta({
             titulo={t("admin-preguntas-retro-titulo")}
             subtitulo={t("admin-preguntas-retro-subtitulo")}
           >
-            <Campo id="pregunta-retro-explicacion" etiqueta={t("admin-preguntas-explicacion")}>
+            <Campo
+              id="pregunta-retro-explicacion"
+              etiqueta={t("admin-preguntas-explicacion")}
+              error={errores.retro_explicacion}
+            >
               <AreaTexto
                 id="pregunta-retro-explicacion"
                 rows={3}
-                minLength={retroMinimo ? 10 : undefined}
                 maxLength={retroMinimo ? 2000 : undefined}
+                invalido={Boolean(errores.retro_explicacion)}
+                aria-describedby={errores.retro_explicacion ? "pregunta-retro-explicacion-error" : undefined}
                 value={retroExplicacion}
                 onChange={(e) => onRetroExplicacion(e.target.value)}
               />
@@ -414,19 +435,15 @@ export function EditorPregunta({
         <div className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-18">
           <Seccion icon={SlidersHorizontalIcon} titulo={t("admin-preguntas-clasificacion")}>
             {proceso.modo === "elegir" ? (
-              <Campo
-                id="pregunta-proceso"
-                etiqueta={t("admin-preguntas-proceso")}
-                error={faltaProceso ? t("admin-preguntas-selecciona-proceso") : undefined}
-              >
+              <Campo id="pregunta-proceso" etiqueta={t("admin-preguntas-proceso")} error={errores.proceso_id}>
                 <SelectCampo
                   id="pregunta-proceso"
                   placeholder={t("admin-preguntas-seleccionar-proceso")}
                   valor={proceso.valor ? String(proceso.valor) : ""}
                   onCambio={(v) => proceso.onCambio(Number(v) || 0)}
                   opciones={proceso.opciones.map((p) => ({ value: String(p.id), label: p.nombre }))}
-                  invalido={faltaProceso}
-                  describidoPor={faltaProceso ? "pregunta-proceso-error" : undefined}
+                  invalido={Boolean(errores.proceso_id)}
+                  describidoPor={errores.proceso_id ? "pregunta-proceso-error" : undefined}
                   required
                 />
               </Campo>
@@ -440,11 +457,7 @@ export function EditorPregunta({
               </Campo>
             )}
 
-            <Campo
-              id="pregunta-asignatura"
-              etiqueta={t("admin-preguntas-asignatura")}
-              error={faltaAsignatura ? t("admin-preguntas-selecciona-asignatura") : undefined}
-            >
+            <Campo id="pregunta-asignatura" etiqueta={t("admin-preguntas-asignatura")} error={errores.asignatura_id}>
               <SelectCampo
                 id="pregunta-asignatura"
                 placeholder={t("admin-seleccionar-asignatura")}
@@ -452,8 +465,8 @@ export function EditorPregunta({
                 onCambio={(v) => onAsignatura(Number(v) || 0)}
                 opciones={asignaturas.map((a) => ({ value: String(a.asignatura_id), label: a.nombre }))}
                 disabled={!procesoID}
-                invalido={faltaAsignatura}
-                describidoPor={faltaAsignatura ? "pregunta-asignatura-error" : undefined}
+                invalido={Boolean(errores.asignatura_id)}
+                describidoPor={errores.asignatura_id ? "pregunta-asignatura-error" : undefined}
                 required
               />
             </Campo>

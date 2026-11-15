@@ -8,6 +8,7 @@ import {
   type TipoPregunta,
 } from "../../_componentes/editor-pregunta";
 import { PillEstadoPregunta } from "../../_componentes/estado-pregunta";
+import { useMensajesValidacionPregunta } from "../../_componentes/use-mensajes-validacion-pregunta";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -26,6 +27,7 @@ import {
   contenidoDePregunta,
   editarContenidoLaRetira,
 } from "@/lib/questions/estados";
+import { type ErroresPregunta, validarPregunta } from "@/lib/questions/pregunta";
 
 /** Renumbers orden after a move/removal; ids stay attached to their text. */
 const renumber = (rows: RespuestaRow[]) => rows.map((r, i) => ({ ...r, orden: i + 1 }));
@@ -88,6 +90,9 @@ export default function EditPreguntaPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmarRevision, setConfirmarRevision] = useState(false);
+  const mensajesValidacion = useMensajesValidacionPregunta();
+  const [errores, setErrores] = useState<ErroresPregunta>({});
+  const [intentosEnvio, setIntentosEnvio] = useState(0);
 
   useEffect(() => {
     if (!token || !preguntaID) return;
@@ -207,6 +212,14 @@ export default function EditPreguntaPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!pregunta) return;
+    const invalidos = validarPregunta(
+      { proceso_id: 1, asignatura_id: asignaturaID, enunciado, respuestas, retro_explicacion: retroExplicacion },
+      mensajesValidacion,
+      false,
+    );
+    setErrores(invalidos);
+    setIntentosEnvio((n) => n + 1);
+    if (Object.keys(invalidos).length > 0) return;
     const editado = {
       enunciado,
       tipo,
@@ -365,6 +378,8 @@ export default function EditPreguntaPage() {
         onRetroReferencia={setRetroReferencia}
         retroMinimo
         error={error}
+        errores={errores}
+        intentosEnvio={intentosEnvio}
         enviando={submitting}
         textoEnviar={t("admin-actualizar-pregunta")}
         textoEnviando={t("comun-guardando")}
