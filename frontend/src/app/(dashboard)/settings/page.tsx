@@ -18,6 +18,7 @@ import { Chip, PillEstado } from "@/components/patrones/pill-estado";
 import { Avatar } from "@/components/ui/avatar";
 import { type HealthStatus, systemApi, tourApi } from "@/lib/auth/auth-api";
 import { useAuth } from "@/lib/auth/auth-context";
+import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { formatearFechaHora } from "@/lib/formato";
 import { cargarTodo } from "@/lib/paginar-todo";
@@ -135,7 +136,7 @@ export default function Settings() {
       await tourApi.reset(token);
       updateUser({ tour_completado: false });
     } catch (e: unknown) {
-      toast.error((e as { message?: string }).message ?? t("perfil-tour-error"));
+      toast.error(t(claveErrorApi(e, { generico: "perfil-tour-error" })));
     } finally {
       setTourResetting(false);
     }

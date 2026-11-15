@@ -24,8 +24,10 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { adminGetUsuario, adminPatchUsuarioRol, type UsuarioDetalle } from "@/lib/admin/api";
+import { ERRORES_CORREO_USUARIO } from "@/lib/admin/errores-usuario";
 import { excede, LIMITES } from "@/lib/admin/limites";
 import { useAuth } from "@/lib/auth/auth-context";
+import { claveErrorApi } from "@/lib/errores-api";
 import {
   ACCION_SECUNDARIA,
   BOTON_DESTRUCTIVO,
@@ -114,8 +116,7 @@ export default function UsuarioDetallePage() {
       const data = await adminGetUsuario(token, Number(id));
       setUsuario(data);
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      setError(err.message || t("admin-usuarios-error-cargar-usuario"));
+      setError(t(claveErrorApi(e, { generico: "admin-usuarios-error-cargar-usuario" })));
     } finally {
       setLoading(false);
     }
@@ -134,9 +135,8 @@ export default function UsuarioDetallePage() {
       toast.ok(t("admin-usuarios-rol-actualizado"));
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
       // H21: the page Alerta is hidden behind the modal.
-      toast.error(err.message || t("admin-usuarios-error-rol"));
+      toast.error(t(claveErrorApi(e, { generico: "admin-usuarios-error-rol" })));
       setRolDialog((d) => ({ ...d, submitting: false }));
     }
   };
@@ -150,9 +150,8 @@ export default function UsuarioDetallePage() {
       toast.ok(t("admin-usuarios-correo-actualizado"));
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
       // H21: 409 (email in use) / 422 must be visible over the dialog.
-      toast.error(err.message || t("admin-usuarios-error-correo"));
+      toast.error(t(claveErrorApi(e, { ...ERRORES_CORREO_USUARIO, generico: "admin-usuarios-error-correo" })));
       setEmailDialog((d) => ({ ...d, submitting: false }));
     }
   };
@@ -166,8 +165,7 @@ export default function UsuarioDetallePage() {
       setDesactivarDialog({ open: false, observacion: "" });
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      toast.error(err.message || t("comun-error-estado"));
+      toast.error(t(claveErrorApi(e, { generico: "comun-error-estado" })));
     } finally {
       setEstadoSubmitting(false);
     }

@@ -17,6 +17,7 @@ import { useToast } from "@/components/feedback/toast";
 import { CabeceraPagina, EnlaceVolver } from "@/components/patrones/cabecera-pagina";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, Especialidad, Grado, Proceso, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
+import { claveErrorApi } from "@/lib/errores-api";
 import { CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { CreateRespuestaPayload, Etiqueta, questionsApi } from "@/lib/questions/api";
 import { armarRetroalimentacion, validarPregunta } from "@/lib/questions/pregunta";
@@ -99,8 +100,7 @@ export default function NuevaPreguntaPage() {
         setRedirigiendo(true);
         router.push("/admin/preguntas");
       } catch (e: unknown) {
-        const err = e as { message?: string };
-        setError(err.message ?? t("admin-error-crear-pregunta"));
+        setError(t(claveErrorApi(e, { generico: "admin-error-crear-pregunta" })));
       }
     },
   });

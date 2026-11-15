@@ -23,6 +23,8 @@ import { MenuAcciones } from "@/components/navegacion/menu-acciones";
 import { excede, LIMITES } from "@/lib/admin/limites";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, type Grado, type Institucion } from "@/lib/catalogs/api";
+import { ERRORES_GRADO } from "@/lib/catalogs/errores";
+import { claveErrorApi } from "@/lib/errores-api";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { CheckCircleIcon, EyeSlashIcon, MedalIcon, PencilSimpleIcon, PlusIcon } from "@phosphor-icons/react";
 
@@ -141,8 +143,7 @@ export default function GradosPage() {
       setDialog((d) => ({ ...d, open: false, submitting: false }));
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      setDialog((d) => ({ ...d, submitting: false, error: err.message ?? t("comun-error-guardar") }));
+      setDialog((d) => ({ ...d, submitting: false, error: t(claveErrorApi(e, ERRORES_GRADO.guardar)) }));
     }
   };
 
@@ -158,8 +159,7 @@ export default function GradosPage() {
       load();
       return null;
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      return err.message ?? t("comun-error-estado");
+      return t(claveErrorApi(e, ERRORES_GRADO.estado));
     }
   };
 

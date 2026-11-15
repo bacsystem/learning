@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { GrupoBotones } from "@/components/ui/grupo-botones";
 import { useAuth } from "@/lib/auth/auth-context";
+import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_DESTRUCTIVO, BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { InscripcionAdmin, inscripcionesApi } from "@/lib/inscripciones/api";
 import { CheckCircleIcon, XCircleIcon, XIcon } from "@phosphor-icons/react";
@@ -126,7 +127,7 @@ export default function Page() {
         return;
       }
       // El diálogo sigue abierto: el aviso va en un toast, no en la alerta de página que queda debajo del modal.
-      toast.error(err.message ?? t("admin-error-actualizar"));
+      toast.error(t(claveErrorApi(e, { generico: "admin-error-actualizar" })));
       setDialog((d) => ({ ...d, submitting: false }));
     }
   };

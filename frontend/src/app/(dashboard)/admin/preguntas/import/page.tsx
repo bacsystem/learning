@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, Proceso, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
+import { claveErrorApi } from "@/lib/errores-api";
 import {
   ACCION_SECUNDARIA,
   BOTON_PRIMARIO,
@@ -169,7 +170,7 @@ export default function ImportPreguntasPage() {
       setPreviewPage(0);
       setStep(1);
     } catch (e: unknown) {
-      setError((e as { message?: string }).message || t("admin-preguntas-import-error-procesar"));
+      setError(t(claveErrorApi(e, { generico: "admin-preguntas-import-error-procesar" })));
     } finally {
       setPreviewing(false);
     }
@@ -184,8 +185,8 @@ export default function ImportPreguntasPage() {
       setResult(res);
       setStep(2);
     } catch (e: unknown) {
-      // 400: the backend explains why (subject not in this process, foreign tags…).
-      setError((e as { message?: string }).message || t("admin-preguntas-import-error-importar"));
+      // 400 (subject not in this process, foreign tags…): the server's explanation is Spanish, so only the generic text shows.
+      setError(t(claveErrorApi(e, { generico: "admin-preguntas-import-error-importar" })));
     } finally {
       setImporting(false);
     }

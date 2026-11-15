@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { PersonaImportResult, PersonaPreviewResponse, PersonaPreviewRow, personasApi } from "@/lib/auth/auth-api";
 import { useAuth } from "@/lib/auth/auth-context";
+import { claveErrorApi } from "@/lib/errores-api";
 import {
   ACCION_PRINCIPAL,
   ACCION_SECUNDARIA,
@@ -167,7 +168,7 @@ export default function ImportPersonasPage() {
       setPreview(res);
       setStep(1);
     } catch (e: unknown) {
-      setError((e as { message?: string }).message || t("admin-preguntas-import-error-procesar"));
+      setError(t(claveErrorApi(e, { generico: "admin-preguntas-import-error-procesar" })));
     } finally {
       setPreviewing(false);
     }
@@ -182,7 +183,7 @@ export default function ImportPersonasPage() {
       setResult(res);
       setStep(2);
     } catch (e: unknown) {
-      setError((e as { message?: string }).message || t("admin-preguntas-import-error-importar"));
+      setError(t(claveErrorApi(e, { generico: "admin-preguntas-import-error-importar" })));
     } finally {
       setImporting(false);
     }

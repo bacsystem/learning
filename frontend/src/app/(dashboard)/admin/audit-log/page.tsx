@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { adminGetAuditLog, type AuditLogItem } from "@/lib/admin/api";
 import { useAuth } from "@/lib/auth/auth-context";
+import { claveErrorApi } from "@/lib/errores-api";
 import { ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { formatearFechaHora } from "@/lib/formato";
 import { cn } from "@/lib/utils";
@@ -77,8 +78,7 @@ export default function AuditLogPage() {
       setTotal(resp.total);
     } catch (e: unknown) {
       if (reqId !== loadReq.current) return;
-      const err = e as { message?: string };
-      setError(err.message ?? t("admin-audit-error-cargar"));
+      setError(t(claveErrorApi(e, { generico: "admin-audit-error-cargar" })));
     } finally {
       if (reqId === loadReq.current) setLoading(false);
     }

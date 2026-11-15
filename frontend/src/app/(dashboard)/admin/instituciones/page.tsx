@@ -21,6 +21,8 @@ import { MenuAcciones } from "@/components/navegacion/menu-acciones";
 import { ChipCodigo } from "@/components/patrones/pill-estado";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, type Institucion } from "@/lib/catalogs/api";
+import { ERRORES_INSTITUCION } from "@/lib/catalogs/errores";
+import { claveErrorApi } from "@/lib/errores-api";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { formatearFechaHora } from "@/lib/formato";
 import { BankIcon, CheckCircleIcon, EyeSlashIcon, PencilSimpleIcon, PlusIcon } from "@phosphor-icons/react";
@@ -111,8 +113,7 @@ export default function InstitucionesPage() {
       setDialog((d) => ({ ...d, open: false, submitting: false }));
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      setDialog((d) => ({ ...d, submitting: false, error: err.message ?? t("comun-error-guardar") }));
+      setDialog((d) => ({ ...d, submitting: false, error: t(claveErrorApi(e, ERRORES_INSTITUCION.guardar)) }));
     }
   };
 
@@ -128,8 +129,7 @@ export default function InstitucionesPage() {
       load();
       return null;
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      return err.message ?? t("comun-error-estado");
+      return t(claveErrorApi(e, ERRORES_INSTITUCION.estado));
     }
   };
 

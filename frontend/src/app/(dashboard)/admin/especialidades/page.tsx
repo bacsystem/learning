@@ -24,6 +24,8 @@ import { ChipCodigo } from "@/components/patrones/pill-estado";
 import { excede, LIMITES } from "@/lib/admin/limites";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, type Especialidad, type Institucion } from "@/lib/catalogs/api";
+import { ERRORES_ESPECIALIDAD } from "@/lib/catalogs/errores";
+import { claveErrorApi } from "@/lib/errores-api";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { CheckCircleIcon, EyeSlashIcon, GraduationCapIcon, PencilSimpleIcon, PlusIcon } from "@phosphor-icons/react";
 
@@ -130,8 +132,7 @@ export default function EspecialidadesPage() {
       setDialog((d) => ({ ...d, open: false, submitting: false }));
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      setDialog((d) => ({ ...d, submitting: false, error: err.message ?? t("comun-error-guardar") }));
+      setDialog((d) => ({ ...d, submitting: false, error: t(claveErrorApi(e, ERRORES_ESPECIALIDAD.guardar)) }));
     }
   };
 
@@ -147,8 +148,7 @@ export default function EspecialidadesPage() {
       load();
       return null;
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      return err.message ?? t("comun-error-estado");
+      return t(claveErrorApi(e, ERRORES_ESPECIALIDAD.estado));
     }
   };
 

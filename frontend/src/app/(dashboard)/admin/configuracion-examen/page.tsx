@@ -23,6 +23,7 @@ import { Chip } from "@/components/patrones/pill-estado";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, type Proceso, type ProcesoAsignaturaItem } from "@/lib/catalogs/api";
+import { claveErrorApi } from "@/lib/errores-api";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { type ConfiguracionExamen, simulacrosApi } from "@/lib/simulations/api";
 import { cn } from "@/lib/utils";
@@ -289,8 +290,11 @@ export default function ConfiguracionExamenPage() {
           });
         }
       } catch (e: unknown) {
-        const err = e as { message?: string };
-        setDialog((d) => ({ ...d, submitting: false, error: err.message ?? t("simulacros-config-error-crear") }));
+        setDialog((d) => ({
+          ...d,
+          submitting: false,
+          error: t(claveErrorApi(e, { generico: "simulacros-config-error-crear" })),
+        }));
         return;
       }
       loadData();
@@ -308,13 +312,12 @@ export default function ConfiguracionExamenPage() {
         ),
       );
     } catch (e: unknown) {
-      const err = e as { message?: string };
       setDialog((d) => ({
         ...d,
         submitting: false,
         soloAsignaturas: true,
         error: t("admin-config-examen-error-asignaturas-parcial", {
-          error: err.message ?? t("comun-error-guardar"),
+          error: t(claveErrorApi(e, { generico: "comun-error-guardar" })),
           accion: t("admin-config-examen-reintentar-asignaturas"),
         }),
       }));

@@ -19,6 +19,7 @@ import { DialogoConfirmacion } from "@/components/navegacion/dialogo-confirmacio
 import { CabeceraPagina, EnlaceVolver } from "@/components/patrones/cabecera-pagina";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, Especialidad, Grado, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
+import { claveErrorApi } from "@/lib/errores-api";
 import { CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { Etiqueta, Pregunta, questionsApi, UpdatePreguntaPayload } from "@/lib/questions/api";
 import {
@@ -280,14 +281,13 @@ export default function EditPreguntaPage() {
         setSubmitting(false);
         return;
       }
-      // The backend sends a specific message for every 409 (alternative with
-      // attempts, duplicated statement…) and 400 (invalid subject/tags). The
-      // key change on a question that already graded attempts (H133) gets its
-      // translated text.
+      // The server's message is never shown (it is Spanish, with internal field names). Only the key change on a question
+      // that already graded attempts (H133, a 409) is told apart, by its text, and gets its translation; the other
+      // errors use the generic one. It goes away when the backend gives that 409 a code (#269).
       setError(
         err.status === 409 && err.message?.includes("respuesta correcta")
           ? t("admin-preguntas-clave-con-intentos")
-          : err.message || t("admin-error-actualizar-pregunta"),
+          : t(claveErrorApi(e, { generico: "admin-error-actualizar-pregunta" })),
       );
       setSubmitting(false);
     }
