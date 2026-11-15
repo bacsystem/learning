@@ -39,6 +39,18 @@ type UserProfile struct {
 	Especialidad    string `json:"especialidad"`
 	Institucion     string `json:"institucion"`
 	TourCompletado  bool   `json:"tour_completado"`
+	Idioma          string `json:"idioma"`
+}
+
+// IdiomaRequest is the body of PUT /auth/idioma. The user is the session's:
+// there is no id in the route or the body.
+type IdiomaRequest struct {
+	Idioma string `json:"idioma"`
+}
+
+// IdiomaResponse echoes the stored language.
+type IdiomaResponse struct {
+	Idioma string `json:"idioma"`
 }
 
 type LoginResponse struct {

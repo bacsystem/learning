@@ -32,6 +32,7 @@ func Mount(mux *http.ServeMux, svc *Service, jwtSecret string, checkSession Sess
 	// Authenticated
 	mux.Handle("POST /auth/logout", auth(http.HandlerFunc(h.Logout)))
 	mux.Handle("GET /auth/me", auth(http.HandlerFunc(h.Me)))
+	mux.Handle("PUT /auth/idioma", auth(http.HandlerFunc(h.SetIdioma)))
 	mux.Handle("POST /auth/tour/completar", auth(http.HandlerFunc(h.CompleteTour)))
 	mux.Handle("DELETE /auth/tour/completar", auth(http.HandlerFunc(h.ResetTour)))
 

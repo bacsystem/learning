@@ -20,5 +20,6 @@ var (
 	ErrInvalidVerifyToken    = errors.New("El enlace de verificación es inválido o ha expirado.")
 	ErrEmailMismatch         = errors.New("El correo no coincide con el registrado para este DNI. Escribe el correo que tienes registrado o contacta al administrador.")
 	ErrCannotChangeOwnEstado = errors.New("No puedes desactivar ni rechazar tu propia cuenta.")
+	ErrIdiomaInvalido        = errors.New("Idioma no soportado.")
 	ErrLastAdmin             = errors.New("No se puede desactivar al último administrador activo.")
 )

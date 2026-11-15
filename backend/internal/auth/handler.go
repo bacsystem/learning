@@ -42,6 +42,9 @@ func newValidator() *validator.Validate {
 	return v
 }
 
+// codeIdiomaInvalido is the stable error code of PUT /auth/idioma (422).
+const codeIdiomaInvalido = "idioma_invalido"
+
 // maxJSONBody caps every JSON body decoded by this package, whatever the
 // global middleware allowed (its multipart ceiling is chosen from the
 // client-sent Content-Type and only meant for upload routes).
@@ -526,6 +529,29 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, http.StatusOK, map[string]string{"message": "Contraseña restablecida exitosamente."})
+}
+
+// SetIdioma stores the language of the session's user (PLT-11). It is a
+// preference of the caller, so it is neither audited nor addressed by id.
+func (h *Handler) SetIdioma(w http.ResponseWriter, r *http.Request) {
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		jsonError(w, http.StatusUnauthorized, "No autenticado.")
+		return
+	}
+	var req IdiomaRequest
+	if !httpx.DecodeJSONStrict(w, r, &req) {
+		return
+	}
+	if err := h.svc.SetIdioma(r.Context(), claims.UserID, req.Idioma); err != nil {
+		if errors.Is(err, ErrIdiomaInvalido) {
+			httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codeIdiomaInvalido, ErrIdiomaInvalido.Error(), nil)
+			return
+		}
+		httpx.InternalErrorCode(w, "auth.set_idioma", err)
+		return
+	}
+	jsonOK(w, http.StatusOK, IdiomaResponse{Idioma: req.Idioma})
 }
 
 func (h *Handler) CompleteTour(w http.ResponseWriter, r *http.Request) {

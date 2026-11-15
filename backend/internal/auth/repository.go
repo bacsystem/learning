@@ -219,6 +219,7 @@ type usuarioRow struct {
 	ActivatedAt    sql.NullTime  `db:"activated_at"`
 	ActivatedBy    sql.NullInt64 `db:"activated_by"`
 	TourCompletado bool          `db:"tour_completado"`
+	Idioma         string        `db:"idioma"`
 	CreatedAt      time.Time     `db:"created_at"`
 	UpdatedAt      time.Time     `db:"updated_at"`
 }
@@ -308,14 +309,14 @@ type VerifiedRegistration struct {
 //     belong to another persona (when it will be written) nor to another
 //     persona's account. If the persona has an e-mail on file it must still
 //     be the one the link was sent to.
-//  3. INSERT the usuario, write the persona e-mail if it had none, and mark
+//  3. INSERT the usuario (with its language, already normalized), write the persona e-mail if it had none, and mark
 //     the row consumed.
 //
 // Any error rolls everything back, so a failed attempt (e.g.
 // ErrUsernameTaken) leaves the token usable. Errors: ErrInvalidVerifyToken
 // (unknown/used/expired token, the persona already has a usuario or its
 // e-mail changed), ErrUsernameTaken, ErrEmailTaken.
-func (r *Repository) VerifyPendingRegistration(ctx context.Context, tokenHash, username, passwordHash string) (VerifiedRegistration, error) {
+func (r *Repository) VerifyPendingRegistration(ctx context.Context, tokenHash, username, passwordHash, idioma string) (VerifiedRegistration, error) {
 	var out VerifiedRegistration
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -374,8 +375,8 @@ func (r *Repository) VerifyPendingRegistration(ctx context.Context, tokenHash, u
 	}
 
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO usuarios (persona_id,username,password_hash) VALUES ($1,$2,$3) RETURNING id`,
-		out.PersonaID, username, passwordHash,
+		`INSERT INTO usuarios (persona_id,username,password_hash,idioma) VALUES ($1,$2,$3,$4) RETURNING id`,
+		out.PersonaID, username, passwordHash, idioma,
 	).Scan(&out.UserID)
 	switch {
 	case isUniqueViolation(err, "usuarios_persona_id_key"):
@@ -1388,7 +1389,7 @@ func (r *Repository) GetUserProfileByID(ctx context.Context, userID int64) (*Use
 		TourCompletado  bool   `db:"tour_completado"`
 	}
 	err := r.db.GetContext(ctx, &row, `
-		SELECT u.id, u.username, u.rol, u.estado, u.tour_completado,
+		SELECT u.id, u.username, u.rol, u.estado, u.tour_completado, u.idioma,
 		       p.nombres, p.apellido_paterno, p.apellido_materno,
 		       p.grado_id, g.nombre AS grado, g.nivel AS nivel,
 		       e.nombre AS especialidad, i.nombre AS institucion
@@ -1419,6 +1420,7 @@ func (r *Repository) GetUserProfileByID(ctx context.Context, userID int64) (*Use
 		Especialidad:    row.Especialidad,
 		Institucion:     row.Institucion,
 		TourCompletado:  row.TourCompletado,
+		Idioma:          row.usuarioRow.Idioma,
 	}, nil
 }
 
@@ -1440,6 +1442,13 @@ func (r *Repository) ResetTourByAdmin(ctx context.Context, userID int64, audit A
 func (r *Repository) SetTourCompletado(ctx context.Context, userID int64, completado bool) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE usuarios SET tour_completado=$1 WHERE id=$2`, completado, userID)
+	return err
+}
+
+// SetIdioma stores the language of usuario userID. The value must already be
+// validated; the table CHECK is only the last line of defence.
+func (r *Repository) SetIdioma(ctx context.Context, userID int64, idioma string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE usuarios SET idioma=$1 WHERE id=$2`, idioma, userID)
 	return err
 }
 
