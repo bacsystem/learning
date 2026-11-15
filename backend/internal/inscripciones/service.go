@@ -141,14 +141,24 @@ func (s *Service) Inscribir(ctx context.Context, usuarioID, procesoID int64, onR
 		return nil, err
 	}
 
+	// Read before creating: a failure after Create would answer 500 for an
+	// inscription that exists, and the retry would get ya_inscrito.
+	proceso, err := s.repo.ProcesoResumen(ctx, procesoID)
+	if err != nil {
+		return nil, err
+	}
 	row, err := s.repo.Create(ctx, usuarioID, procesoID, onReapply)
 	if err != nil {
 		return nil, err
 	}
 	return &InscripcionDTO{
-		ID:        row.ID,
-		ProcesoID: row.ProcesoID,
-		Estado:    row.Estado,
+		ID:            row.ID,
+		ProcesoID:     row.ProcesoID,
+		ProcesoNombre: proceso.Nombre,
+		ProcesoTipo:   proceso.Tipo,
+		ProcesoAnio:   proceso.Anio,
+		Estado:        row.Estado,
+		Observacion:   row.Observacion,
 	}, nil
 }
 

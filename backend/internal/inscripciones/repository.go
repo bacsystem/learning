@@ -88,6 +88,24 @@ func (r *Repository) ListProcesosActivos(ctx context.Context) ([]ProcesoRow, err
 	return rows, err
 }
 
+// ProcesoResumen is the part of a proceso shown with an inscripción.
+type ProcesoResumen struct {
+	Nombre string `db:"nombre"`
+	Tipo   string `db:"tipo"`
+	Anio   int    `db:"anio"`
+}
+
+// ProcesoResumen reads the name, type and year of a proceso; ErrProcesoNotFound
+// when it does not exist.
+func (r *Repository) ProcesoResumen(ctx context.Context, procesoID int64) (ProcesoResumen, error) {
+	var p ProcesoResumen
+	err := r.db.GetContext(ctx, &p, `SELECT nombre, tipo, anio FROM procesos WHERE id = $1`, procesoID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ProcesoResumen{}, ErrProcesoNotFound
+	}
+	return p, err
+}
+
 // ── Inscripciones ─────────────────────────────────────────────────────────────
 
 type InscripcionRow struct {
