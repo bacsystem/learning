@@ -1014,7 +1014,7 @@
     "admin-inscripciones-vacio": "There are no enrollments yet.",
     "admin-inscripciones-vacio-estado": "There are no enrollments with status “{estado}”.",
     "admin-inscripciones-filtrar-estado": "Filter by status",
-    "admin-inscripciones-aprobar-desc": "The user will be notified by email.",
+    "admin-inscripciones-aprobar-desc": "The user will be notified by email and in the app.",
     "admin-inscripciones-rechazar-desc": "State the reason so the user can correct it.",
     "admin-inscripciones-motivo-placeholder": "Explain the reason so the user can correct it...",
     "auth-volver-sign-in": "Back to sign in",
@@ -2079,6 +2079,10 @@
     "acceso-proceso-ya-inscrito": "You already have a pending or approved enrollment in this process. Check its status in Processes.",
     "acceso-proceso-sin-monto": "This process does not have its enrollment fee set yet. Try again later or contact the administrator.",
     "acceso-proceso-no-encontrado": "This process is no longer available. Refresh the list and try another process.",
+    "notif-plantilla-inscripcion-aprobada-titulo": "Enrollment approved",
+    "notif-plantilla-inscripcion-aprobada-cuerpo": "Your enrollment in the process {proceso} ({institucion}) was approved. You can now practice from Processes.",
+    "notif-plantilla-inscripcion-rechazada-titulo": "Enrollment rejected",
+    "notif-plantilla-inscripcion-rechazada-cuerpo": "Your enrollment in the process {proceso} ({institucion}) was rejected. Reason: {motivo}",
     "barra-superior-abrir-menu": "Open menu",
     "barra-superior-ubicacion": "Location"
   }

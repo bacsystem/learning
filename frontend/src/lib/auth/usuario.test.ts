@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
-
 import { usuarioConsultable } from "./usuario";
+import { describe, expect, it } from "vitest";
 
 describe("usuarioConsultable", () => {
   it("acepta un usuario alfanumérico de 4 o más caracteres", () => {

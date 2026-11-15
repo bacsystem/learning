@@ -32,6 +32,9 @@ export interface Notificacion {
   creado_por?: number;
   created_at: string;
   leida: boolean;
+  /** Plantilla de las notificaciones personales (p. ej. `inscripcion_rechazada`); `null` en las de difusión. */
+  clave?: string | null;
+  parametros?: Record<string, unknown> | null;
 }
 
 export interface CreateNotificacionPayload {
