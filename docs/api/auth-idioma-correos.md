@@ -15,7 +15,7 @@ Estado: borrador para revisión (2026-11-15). Origen: decisión D4 del po (`docs
   | `emailPasswordRestablecida` | `:209` | `:682` (reset) |
   | `emailRegistroPendiente` | `:135` | `:339` (verify-email) |
 - No hay ninguna columna ni tabla de idioma o preferencias en `backend/migrations/` (búsqueda de `idioma|locale|preferenc`: sin resultados).
-- `decodeJSON` del paquete auth **no** usa `DisallowUnknownFields` (`backend/internal/auth/handler.go:54-70`): un cliente viejo y un backend nuevo, o al revés, siguen funcionando con el campo nuevo.
+- Hoy, `decodeJSON` del paquete auth **no** usa `DisallowUnknownFields` (`backend/internal/auth/handler.go:54-70`). **Eso va a cambiar con el #236:** pasará a `httpx.DecodeJSONStrict` (`backend/internal/httpx/httpx.go:44-46`), que rechaza los campos desconocidos con 400. Desde entonces, un frontend que envíe `locale` a un backend sin ese campo recibe 400. Por eso la compatibilidad depende del **orden de merge** de §4.
 
 ## 2. Decisión: campo opcional `locale` en el body
 
@@ -74,6 +74,11 @@ Mismo campo, misma regla: `{ "token": "…", "username": "…", "password": "…
 
 - **Implementación (backend-dev):** una función única `Normalize(string) string` con las constantes `ES` y `EN` en un paquete pequeño, `backend/internal/locale`. Así E8-02 la reutiliza desde notificaciones y el worker sin depender de `auth`. Se añade `Locale string \`json:"locale"\`` (sin tag `validate`) a `RegisterRequest`, `VerifyEmailRequest`, `ForgotPasswordRequest` y `ResetPasswordRequest`. El valor normalizado llega a `Service.Register`, `Service.VerifyEmail`, `Service.ForgotPassword` y `Service.ResetPassword`: un parámetro más, o el propio DTO en `VerifyEmail` (`service.go:325`). Las cuatro plantillas reciben el locale y eligen el texto.
 - **Frontend (frontend-dev):** `register`, `verifyEmail`, `forgotPassword` y `resetPassword` (`auth-api.ts:81-124`) envían `locale` con el valor activo de next-intl (`useLocale()`), que ya es `es` o `en`. Si falta, se omite el campo.
+- **Orden de merge (obligatorio, H1 del review del #254):**
+  1. Primero se mergea el PR de backend, con `Locale` en los 4 DTOs. Un backend con el campo acepta a los clientes que no lo envían.
+  2. Después, el PR de frontend que envía `locale`.
+
+  El orden vale tanto si el #236 (`DecodeJSONStrict` en auth) se mergea antes como después. Si se mergea antes, invertir el orden da 400 en los cuatro endpoints, también en recuperación y registro. Si se mergea después, el #236 debe partir de un `develop` que ya tenga `Locale` en esos DTOs.
 - **Logs y auditoría:** sin cambios. El `locale` no es dato personal, pero no aporta y no se añade.
 
 ## 5. Compatibilidad con SIA-E8-02 (idioma preferido)
