@@ -14,7 +14,7 @@ func TestEmailTemplates_EscapeUserData(t *testing.T) {
 		"rechazado": func() (string, string) { return emailRechazado("es", evil, evil) },
 		"inactivo":  func() (string, string) { return emailInactivo("es", evil, evil) },
 		"registroPendiente": func() (string, string) {
-			return emailRegistroPendiente("es", evil, evil, evil)
+			return emailRegistroPendiente("es", "c@x.test", evil, evil, evil)
 		},
 		"verificarRegistro": func() (string, string) {
 			return emailVerificarRegistro("es", evil, evil, "https://app.test/auth/verify-email?token=abc")

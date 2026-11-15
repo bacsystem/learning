@@ -93,7 +93,7 @@ func run() int {
 	if frontendBase == "" {
 		frontendBase = "http://localhost:3000"
 	}
-	svc := auth.NewService(repo, cfg.JWTSecret, frontendBase)
+	svc := auth.NewService(repo, cfg.JWTSecret, frontendBase, auth.WithContactEmail(cfg.ContactEmail))
 
 	audLog := audit.New(database)
 

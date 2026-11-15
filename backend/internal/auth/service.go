@@ -44,6 +44,8 @@ type Service struct {
 	login           loginStore
 	jwtSecret       string
 	frontendBaseURL string
+	// contactEmail is the support address printed in the e-mails; empty omits it.
+	contactEmail string
 	// registerIssues caps accepted registrations per persona (dni_hmac), in
 	// the shared Postgres counter table; see registerIssuesPerPersona.
 	registerIssues *internalmw.DBLimiter
@@ -51,11 +53,23 @@ type Service struct {
 	relojLimites func() time.Time
 }
 
-func NewService(repo *Repository, jwtSecret string, frontendBaseURL string) *Service {
-	return &Service{
+func NewService(repo *Repository, jwtSecret string, frontendBaseURL string, opts ...Option) *Service {
+	s := &Service{
 		repo: repo, login: repo, jwtSecret: jwtSecret, frontendBaseURL: frontendBaseURL,
 		registerIssues: internalmw.NewDBLimiter(repo.db.DB, registerIssuesPrefix, registerIssuesPerPersona, registerIssueWindow),
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// Option customizes a Service at construction.
+type Option func(*Service)
+
+// WithContactEmail sets the support address the e-mails tell users to write to.
+func WithContactEmail(email string) Option {
+	return func(s *Service) { s.contactEmail = email }
 }
 
 // fijarRelojLimites makes every DBLimiter of this service, and of the handlers
@@ -338,7 +352,7 @@ func (s *Service) VerifyEmail(ctx context.Context, req VerifyEmailRequest, ip, u
 	if profile, err := s.repo.GetPersonaProfile(ctx, res.PersonaID); err != nil {
 		log.Error().Err(err).Int64("usuario_id", res.UserID).Msg("verify_email: load profile failed")
 	} else if profile.Email != "" {
-		sub, bdy := emailRegistroPendiente(idioma, profile.Nombres, profile.ApellidoPaterno, req.Username)
+		sub, bdy := emailRegistroPendiente(idioma, s.contactEmail, profile.Nombres, profile.ApellidoPaterno, req.Username)
 		if err := s.repo.EnqueueEmail(ctx, profile.Email, sub, bdy); err != nil {
 			log.Error().Err(err).Int64("usuario_id", res.UserID).Msg("verify_email: enqueue email failed")
 		}

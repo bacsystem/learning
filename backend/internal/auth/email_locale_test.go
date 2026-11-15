@@ -283,7 +283,7 @@ func TestEmailTemplates_LanguagesDoNotLeak(t *testing.T) {
 			return rendered{sub, body, textsOf(verificarRegistroCopy(loc))}
 		},
 		"registration pending": func(loc string) rendered {
-			sub, body := emailRegistroPendiente(loc, "Ana", "Perez", "ana")
+			sub, body := emailRegistroPendiente(loc, "c@x.test", "Ana", "Perez", "ana")
 			return rendered{sub, body, textsOf(registroPendienteCopy(loc))}
 		},
 	}
