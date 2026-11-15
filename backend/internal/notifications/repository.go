@@ -39,6 +39,7 @@ func (r *Repository) ListAll(ctx context.Context) ([]Notificacion, error) {
 		SELECT id, titulo, cuerpo, tipo, destinatario, creado_por, created_at,
 		       false AS leida
 		FROM notificaciones
+		WHERE usuario_id IS NULL
 		ORDER BY created_at DESC, id DESC
 		LIMIT 200`)
 	if rows == nil {
@@ -47,9 +48,10 @@ func (r *Repository) ListAll(ctx context.Context) ([]Notificacion, error) {
 	return rows, err
 }
 
-// Delete removes a notification. Returns ErrNotFound for an unknown id.
+// Delete removes a broadcast notification. A personal one is not the admin's to
+// delete, so it answers ErrNotFound like an unknown id.
 func (r *Repository) Delete(ctx context.Context, id int64) error {
-	res, err := r.db.ExecContext(ctx, `DELETE FROM notificaciones WHERE id = $1`, id)
+	res, err := r.db.ExecContext(ctx, `DELETE FROM notificaciones WHERE id = $1 AND usuario_id IS NULL`, id)
 	if err != nil {
 		return err
 	}
@@ -63,18 +65,21 @@ func (r *Repository) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-// ListForUser returns notifications visible to a given user (by rol), newest first,
+// ListForUser returns notifications visible to a given user (broadcast, by rol,
+// or personal), newest first,
 // with the leida flag for that specific user.
 func (r *Repository) ListForUser(ctx context.Context, userID int64, rol string) ([]Notificacion, error) {
 	var rows []Notificacion
 	err := r.db.SelectContext(ctx, &rows, `
 		SELECT n.id, n.titulo, n.cuerpo, n.tipo, n.destinatario, n.creado_por, n.created_at,
+		       n.clave, n.parametros,
 		       (nl.usuario_id IS NOT NULL) AS leida
 		FROM notificaciones n
 		LEFT JOIN notificacion_leidas nl
 		       ON nl.notificacion_id = n.id AND nl.usuario_id = $1
 		WHERE n.destinatario = 'todos'
 		   OR n.destinatario = $2
+		   OR n.usuario_id = $1
 		ORDER BY n.created_at DESC, n.id DESC
 		LIMIT 100`,
 		userID, "rol:"+rol,
@@ -91,7 +96,7 @@ func (r *Repository) UnreadCount(ctx context.Context, userID int64, rol string) 
 	err := r.db.QueryRowContext(ctx, `
 		SELECT COUNT(*)
 		FROM notificaciones n
-		WHERE (n.destinatario = 'todos' OR n.destinatario = $2)
+		WHERE (n.destinatario = 'todos' OR n.destinatario = $2 OR n.usuario_id = $1)
 		  AND NOT EXISTS (
 		      SELECT 1 FROM notificacion_leidas nl
 		      WHERE nl.notificacion_id = n.id AND nl.usuario_id = $1
@@ -102,14 +107,14 @@ func (r *Repository) UnreadCount(ctx context.Context, userID int64, rol string) 
 }
 
 // MarkRead marks a single notification as read for a user (idempotent).
-// Only notifications visible to the user (todos or their role) can be marked;
+// Only notifications visible to the user (todos, their role or personal) can be marked;
 // otherwise — or if the id does not exist — it returns ErrNotFound.
 func (r *Repository) MarkRead(ctx context.Context, notifID, userID int64, rol string) error {
 	var visible bool
 	err := r.db.QueryRowContext(ctx, `
 		WITH n AS (
 			SELECT id FROM notificaciones
-			WHERE id = $1 AND (destinatario = 'todos' OR destinatario = $3)
+			WHERE id = $1 AND (destinatario = 'todos' OR destinatario = $3 OR usuario_id = $2)
 		), ins AS (
 			INSERT INTO notificacion_leidas (notificacion_id, usuario_id)
 			SELECT id, $2 FROM n
@@ -138,7 +143,7 @@ func (r *Repository) MarkAllRead(ctx context.Context, userID int64, rol string) 
 		INSERT INTO notificacion_leidas (notificacion_id, usuario_id)
 		SELECT n.id, $1
 		FROM notificaciones n
-		WHERE (n.destinatario = 'todos' OR n.destinatario = $2)
+		WHERE (n.destinatario = 'todos' OR n.destinatario = $2 OR n.usuario_id = $1)
 		  AND NOT EXISTS (
 		      SELECT 1 FROM notificacion_leidas nl
 		      WHERE nl.notificacion_id = n.id AND nl.usuario_id = $1

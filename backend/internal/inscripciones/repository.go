@@ -244,14 +244,30 @@ func (r *Repository) ListByEstado(ctx context.Context, estado string, page, perP
 	return r.decryptDetails(rows), nil
 }
 
+// execer is the transaction the notice is written in.
+type execer = sqlx.ExecerContext
+
+// AvisoFunc writes the notice of a decision inside its transaction; its error
+// rolls the decision back.
+type AvisoFunc func(ctx context.Context, tx execer, d datosAviso) error
+
+// TransicionError is ErrTransicionInvalida with the state the inscription is in.
+type TransicionError struct{ Actual string }
+
+func (e *TransicionError) Error() string {
+	return fmt.Sprintf("%s Estado actual: %s.", ErrTransicionInvalida.Error(), e.Actual)
+}
+
+func (e *TransicionError) Unwrap() error { return ErrTransicionInvalida }
+
 // UpdateEstado decides a pendiente inscription. The origin state is part of
 // the WHERE clause, so concurrent reviewers cannot overwrite each other and a
 // decided inscription is never changed again (it would retroactively change
 // revenue and simulacro access). It returns ErrInscripcionNotFound when the id
 // does not exist and ErrTransicionInvalida when it is no longer pendiente.
-// auditFn writes the audit row in the same transaction; its error rolls the
-// decision back.
-func (r *Repository) UpdateEstado(ctx context.Context, id int64, estado, observacion string, adminID int64, auditFn audit.TxFunc) error {
+// auditFn writes the audit row and avisoFn the notice, both in the same
+// transaction; their errors roll the decision back. avisoFn may be nil.
+func (r *Repository) UpdateEstado(ctx context.Context, id int64, estado, observacion string, adminID int64, auditFn audit.TxFunc, avisoFn AvisoFunc) error {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
@@ -273,6 +289,15 @@ func (r *Repository) UpdateEstado(ctx context.Context, id int64, estado, observa
 		if err := audit.RunTx(ctx, tx, auditFn); err != nil {
 			return err
 		}
+		if avisoFn != nil {
+			d, err := r.datosAviso(ctx, tx, id, estado, observacion)
+			if err != nil {
+				return err
+			}
+			if err := avisoFn(ctx, tx, d); err != nil {
+				return err
+			}
+		}
 		return tx.Commit()
 	}
 	var actual string
@@ -283,7 +308,45 @@ func (r *Repository) UpdateEstado(ctx context.Context, id int64, estado, observa
 	if err != nil {
 		return err
 	}
-	return fmt.Errorf("%w Estado actual: %s.", ErrTransicionInvalida, actual)
+	return &TransicionError{Actual: actual}
+}
+
+// datosAviso reads what the notice of a decision needs: the postulante's
+// language and address, and the proceso and its institución.
+func (r *Repository) datosAviso(ctx context.Context, tx *sqlx.Tx, id int64, estado, motivo string) (datosAviso, error) {
+	d := datosAviso{InscripcionID: id, Estado: estado, Motivo: motivo}
+	var email, nombres string
+	err := tx.QueryRowContext(ctx, `
+		SELECT i.usuario_id, u.idioma, pe.email, pe.nombres, pr.nombre, ins.nombre
+		FROM inscripciones i
+		JOIN usuarios       u   ON u.id   = i.usuario_id
+		JOIN personas       pe  ON pe.id  = u.persona_id
+		JOIN procesos       pr  ON pr.id  = i.proceso_id
+		JOIN instituciones  ins ON ins.id = pr.institucion_id
+		WHERE i.id = $1`, id).
+		Scan(&d.UsuarioID, &d.Idioma, &email, &nombres, &d.Proceso, &d.Institucion)
+	if err != nil {
+		return datosAviso{}, fmt.Errorf("datos del aviso: %w", err)
+	}
+	d.Email = r.decrypt(email, "email")
+	d.Nombres = r.decrypt(nombres, "nombres")
+	return d, nil
+}
+
+// insertNotificacion creates the personal notification of a decision.
+func (r *Repository) insertNotificacion(ctx context.Context, tx execer, adminID, usuarioID int64, a aviso, parametros []byte) error {
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO notificaciones (titulo, cuerpo, tipo, destinatario, usuario_id, clave, parametros, creado_por)
+		VALUES ($1, $2, 'sistema', 'usuario', $3, $4, $5, $6)`,
+		a.Titulo, a.Cuerpo, usuarioID, a.Clave, parametros, adminID)
+	return err
+}
+
+// encolarCorreo queues an e-mail; the worker sends it and retries on failure.
+func (r *Repository) encolarCorreo(ctx context.Context, tx execer, to, subject, bodyHTML string) error {
+	_, err := tx.ExecContext(ctx,
+		`INSERT INTO email_queue (to_address, subject, body_html) VALUES ($1, $2, $3)`, to, subject, bodyHTML)
+	return err
 }
 
 func (r *Repository) decryptDetails(rows []InscripcionDetail) []InscripcionDetail {

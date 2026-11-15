@@ -3,84 +3,10 @@ package auth
 import (
 	"fmt"
 	"html"
-	"time"
 
+	"github.com/cbaciliod/learning/internal/correo"
 	"github.com/cbaciliod/learning/internal/locale"
 )
-
-// emailBrand signs the header and footer of every e-mail.
-const emailBrand = "Capacitate"
-
-const emailLayout = `<!DOCTYPE html>
-<html lang="%s">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>%s</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 16px;">
-    <tr><td align="center">
-      <table width="100%%" cellpadding="0" cellspacing="0" style="max-width:560px;">
-
-        <!-- Header -->
-        <tr><td style="background-color:#4a5e3a;border-radius:12px 12px 0 0;padding:32px 40px;text-align:center;">
-          <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">%s</p>
-        </td></tr>
-
-        <!-- Body -->
-        <tr><td style="background-color:#ffffff;padding:40px 40px 32px;">%s</td></tr>
-
-        <!-- Footer -->
-        <tr><td style="background-color:#f9f9f9;border:1px solid #e4e4e7;border-top:none;border-radius:0 0 12px 12px;padding:20px 40px;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#71717a;">%s</p>
-          <p style="margin:8px 0 0;font-size:12px;color:#a1a1aa;">© %d %s</p>
-        </td></tr>
-
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`
-
-// layoutAutoNotice is the "do not reply" line of the footer.
-func layoutAutoNotice(loc string) string {
-	if loc == locale.EN {
-		return "This message was sent automatically — please do not reply to this e-mail."
-	}
-	return "Este mensaje fue enviado automáticamente — por favor no respondas a este correo."
-}
-
-func wrap(loc, subject, content string) string {
-	return fmt.Sprintf(emailLayout, loc, subject, emailBrand, content, layoutAutoNotice(loc), time.Now().Year(), emailBrand)
-}
-
-// btnPrimary renders a call-to-action button. label is a trusted literal;
-// url is escaped (it goes into an attribute and the visible text).
-func btnPrimary(loc, label, url string) string {
-	return fmt.Sprintf(`
-    <table width="100%%" cellpadding="0" cellspacing="0" style="margin:28px 0 20px;">
-      <tr><td align="center">
-        <a href="%s" style="display:inline-block;background-color:#4a5e3a;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 36px;border-radius:8px;">%s</a>
-      </td></tr>
-    </table>
-    <p style="margin:0;font-size:12px;color:#a1a1aa;text-align:center;">%s<br><span style="color:#4a5e3a;">%s</span></p>`,
-		html.EscapeString(url), label, buttonFallback(loc), html.EscapeString(url))
-}
-
-func buttonFallback(loc string) string {
-	if loc == locale.EN {
-		return "If the button does not work, copy this link:"
-	}
-	return "Si el botón no funciona, copia este enlace:"
-}
-
-func infoBox(color, borderColor, text string) string {
-	return fmt.Sprintf(`
-    <table width="100%%" cellpadding="0" cellspacing="0" style="background:%s;border-left:4px solid %s;border-radius:0 8px 8px 0;margin:20px 0;">
-      <tr><td style="padding:16px 20px;font-size:14px;color:#3f3f46;">%s</td></tr>
-    </table>`, color, borderColor, text)
-}
 
 // Every value that comes from the database (names, username) is passed
 // through html.EscapeString before it reaches the HTML (H130).
@@ -103,8 +29,8 @@ func emailActivado(nombres, apellido, username, loginURL string) (subject, body 
       </td></tr>
     </table>
     %s`,
-		html.EscapeString(nombres+" "+apellido), html.EscapeString(username), btnPrimary(locale.ES, "Iniciar sesión", loginURL))
-	body = wrap(locale.ES, subject, content)
+		html.EscapeString(nombres+" "+apellido), html.EscapeString(username), correo.BtnPrimary(locale.ES, "Iniciar sesión", loginURL))
+	body = correo.Wrap(locale.ES, subject, content)
 	return
 }
 
@@ -124,8 +50,8 @@ func emailRechazado(nombres, apellido string) (subject, body string) {
       o presentar una nueva solicitud.
     </p>`,
 		html.EscapeString(nombres+" "+apellido),
-		infoBox("#fef2f2", "#dc2626", "Si crees que esto es un error, comunícate con el área de administración de tu institución."))
-	body = wrap(locale.ES, subject, content)
+		correo.InfoBox("#fef2f2", "#dc2626", "Si crees que esto es un error, comunícate con el área de administración de tu institución."))
+	body = correo.Wrap(locale.ES, subject, content)
 	return
 }
 
@@ -145,8 +71,8 @@ func emailInactivo(nombres, apellido string) (subject, body string) {
       Contacta con el área de administración para solicitar la reactivación.
     </p>`,
 		html.EscapeString(nombres+" "+apellido),
-		infoBox("#fffbeb", "#d97706", "Si consideras que esta acción fue un error, comunícate con el área de administración de tu institución."))
-	body = wrap(locale.ES, subject, content)
+		correo.InfoBox("#fffbeb", "#d97706", "Si consideras que esta acción fue un error, comunícate con el área de administración de tu institución."))
+	body = correo.Wrap(locale.ES, subject, content)
 	return
 }
 
@@ -170,8 +96,8 @@ func emailRegistroPendiente(loc, nombres, apellido, username string) (subject, b
 
     <p style="margin:20px 0 0;font-size:13px;color:#71717a;">%s</p>`,
 		fmt.Sprintf(c.greeting, html.EscapeString(nombres+" "+apellido)), c.intro, c.usernameLabel,
-		html.EscapeString(username), infoBox("#f0f9ff", "#0ea5e9", c.notice), c.footer)
-	body = wrap(loc, subject, content)
+		html.EscapeString(username), correo.InfoBox("#f0f9ff", "#0ea5e9", c.notice), c.footer)
+	body = correo.Wrap(loc, subject, content)
 	return
 }
 
@@ -210,8 +136,8 @@ func emailVerificarRegistro(loc, nombres, apellido, verifyURL string) (subject, 
     %s
     <p style="margin:20px 0 0;font-size:13px;color:#71717a;">%s</p>`,
 		fmt.Sprintf(c.greeting, html.EscapeString(nombres+" "+apellido)), c.intro,
-		btnPrimary(loc, c.button, verifyURL), infoBox("#fffbeb", "#d97706", c.notice), c.footer)
-	body = wrap(loc, subject, content)
+		correo.BtnPrimary(loc, c.button, verifyURL), correo.InfoBox("#fffbeb", "#d97706", c.notice), c.footer)
+	body = correo.Wrap(loc, subject, content)
 	return
 }
 
@@ -249,8 +175,8 @@ func emailOlvidePassword(loc, resetURL string) (subject, body string) {
     %s
     %s
     <p style="margin:20px 0 0;font-size:13px;color:#71717a;">%s</p>`,
-		c.title, c.intro, btnPrimary(loc, c.button, resetURL), infoBox("#fffbeb", "#d97706", c.notice), c.footer)
-	body = wrap(loc, subject, content)
+		c.title, c.intro, correo.BtnPrimary(loc, c.button, resetURL), correo.InfoBox("#fffbeb", "#d97706", c.notice), c.footer)
+	body = correo.Wrap(loc, subject, content)
 	return
 }
 
@@ -288,8 +214,8 @@ func emailPasswordRestablecida(loc, loginURL string) (subject, body string) {
     %s
     %s
     <p style="margin:20px 0 0;font-size:13px;color:#71717a;">%s</p>`,
-		c.title, c.intro, btnPrimary(loc, c.button, loginURL), infoBox("#fef2f2", "#dc2626", c.notice), c.footer)
-	body = wrap(loc, subject, content)
+		c.title, c.intro, correo.BtnPrimary(loc, c.button, loginURL), correo.InfoBox("#fef2f2", "#dc2626", c.notice), c.footer)
+	body = correo.Wrap(loc, subject, content)
 	return
 }
 
@@ -329,7 +255,7 @@ func emailCorreoCambiado() (subject, body string) {
       correo ya no son válidos. Por seguridad se cerraron tus sesiones abiertas.
     </p>
     %s`,
-		infoBox("#fef2f2", "#dc2626", "🔒 Si no solicitaste este cambio, contacta al administrador de inmediato."))
-	body = wrap(locale.ES, subject, content)
+		correo.InfoBox("#fef2f2", "#dc2626", "🔒 Si no solicitaste este cambio, contacta al administrador de inmediato."))
+	body = correo.Wrap(locale.ES, subject, content)
 	return
 }

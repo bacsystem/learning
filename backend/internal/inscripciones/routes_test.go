@@ -13,7 +13,7 @@ import (
 func TestRoutes_AdminOnly(t *testing.T) {
 	db := dbtest.Open(t)
 	mux := http.NewServeMux()
-	Mount(mux, NewService(NewRepository(db, dbtest.GCM(t), nil)), audit.New(db), dbtest.JWTSecret, dbtest.SessionChecker(t, db))
+	Mount(mux, NewService(NewRepository(db, dbtest.GCM(t), nil), testBase), audit.New(db), dbtest.JWTSecret, dbtest.SessionChecker(t, db))
 	dbtest.AssertAdminOnly(t, db, mux, []dbtest.Route{
 		"GET /admin/inscripciones",
 		"PATCH /admin/inscripciones/999999999/estado",
