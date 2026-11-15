@@ -1,0 +1,841 @@
+# Paquete backend/internal/practices (backend-dev). Rutas: practices/routes.go:27-40.
+# Escrito leyendo el código (handler.go, dto.go, validation.go, service.go, repository.go).
+# Contrato de diseño: plataforma-multi-institucion.md §2.4 (los 403 de POST /practicas).
+#
+# Formatos de error de este paquete:
+#   - ErrorTexto: casi todos (`jsonError`, handler.go:33-37).
+#   - ErrorCodigo: los 403 de acceso al proceso, `tiempo_agotado` sin `resultado_id`
+#     y `pregunta_validada` (handler.go:60-103).
+#   - ErrorTiempoAgotado: `409 tiempo_agotado` con `resultado_id` en la raíz.
+#   - `practica_en_curso` es un caso aparte: `{error, practica_id}` sin `message`.
+# Todas las rutas son `autenticado` y filtran por `usuario_id`: la práctica de otra
+# persona responde igual que una inexistente (404, H137).
+x-comunes:
+  autenticado: &autenticado
+    '401':
+      $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+    '503':
+      $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+  contenidoTexto: &contenidoTexto
+    application/json:
+      schema:
+        $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+
+paths:
+  /practicas:
+    post:
+      operationId: practices.CreatePractica
+      tags: [practices]
+      summary: Crear una práctica
+      description: |
+        Rol: `autenticado`. Genera el set de preguntas del proceso y crea la
+        práctica `en_curso`. Reglas (`validation.go`, `service.go`):
+
+        - El proceso debe ser de la institución y del nivel de la persona
+          (leídos de la base) y la persona debe tener una inscripción
+          `aprobado` (PLT-06, contrato `plataforma-multi-institucion.md` §2.4).
+        - Solo puede haber una práctica `en_curso` por usuario (índice único,
+          migración 049). Si la que existe ya venció, se finaliza y se crea la nueva.
+        - Hasta 200 preguntas en total (`MaxPreguntasPractica`); cada asignatura
+          puede aparecer una sola vez.
+      x-rol: autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/CrearPracticaRequest'
+            example:
+              proceso_id: 1
+              asignaturas:
+                - asignatura_id: 1
+                  numero_preguntas: 10
+              tiempo_limite_seg: 1800
+              modo_calificacion: al_final
+      responses:
+        <<: *autenticado
+        '201':
+          description: Práctica creada. Las preguntas no revelan la clave.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/PracticaEnCurso'
+        '400':
+          description: |
+            Cuerpo ilegible (`Payload inválido.`) o datos inválidos
+            (`Error de validación.: <detalle>`: `proceso_id`, `asignaturas`,
+            `numero_preguntas`, `modo_calificacion`, `tiempo_limite_seg` menor que 60).
+          content: *contenidoTexto
+        '403':
+          description: |
+            Formato `ErrorCodigo`. Códigos: `institucion_no_permitida` (el proceso
+            es de otra institución, aunque exista una inscripción cruzada aprobada),
+            `nivel_no_permitido` (nivel incompatible) e `inscripcion_requerida`
+            (sin inscripción aprobada). Ese es el orden de comprobación.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              examples:
+                institucion:
+                  value:
+                    error: institucion_no_permitida
+                    message: Este proceso pertenece a otra institución.
+                nivel:
+                  value:
+                    error: nivel_no_permitido
+                    message: No tienes acceso a este proceso.
+                inscripcion:
+                  value:
+                    error: inscripcion_requerida
+                    message: Debes tener una inscripción aprobada para crear una práctica.
+        '404':
+          description: |
+            El proceso no existe (el texto es `Práctica no encontrada.`, el mismo
+            de las demás rutas).
+          content: *contenidoTexto
+        '409':
+          description: |
+            Ya hay una práctica en curso. Formato propio, sin `message`:
+            `{"error": "practica_en_curso", "practica_id": n}`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/ErrorPracticaEnCurso'
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: |
+            `ErrorTexto`. Más de 200 preguntas en total
+            (`Se excedió el máximo permitido.: …`) o el banco no alcanza
+            (`Preguntas insuficientes para generar la práctica.`).
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+    get:
+      operationId: practices.ListHistorial
+      tags: [practices]
+      summary: Historial de prácticas
+      description: |
+        Rol: `autenticado`. Prácticas propias terminadas (`completada` o
+        `abandonada`), de la más reciente a la más antigua. Las `en_curso` y
+        las eliminadas no aparecen.
+
+        Paginación **tolerante** (`handler.go:287-288`): un `page` o `per_page`
+        inválido o fuera de rango cae al defecto (`page` 1, `per_page` 20). A
+        diferencia del parámetro común, un `per_page` mayor que 100 **no** se
+        recorta: vuelve a 20.
+      x-rol: autenticado
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: 'Página, base 1. Inválido o menor que 1: 1.'
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          required: false
+          description: 'Elementos por página, de 1 a 100. Inválido o fuera de rango: 20.'
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: estado
+          in: query
+          required: false
+          description: |
+            Filtra por estado. Cualquier otro valor da una lista vacía; no se
+            valida.
+          schema:
+            type: string
+            examples: [completada, abandonada]
+      responses:
+        <<: *autenticado
+        '200':
+          description: Una página del historial.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '../openapi.yaml#/components/schemas/PaginaMeta'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/schemas/HistorialPracticaItem'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /practicas/batch:
+    delete:
+      operationId: practices.BatchDeletePracticas
+      tags: [practices]
+      summary: Eliminar varias prácticas
+      description: |
+        Rol: `autenticado`. Borrado lógico (estado `eliminada`). Los ids repetidos
+        se colapsan y se aceptan como máximo 100 distintos. Si alguno no es de la
+        persona, no se elimina ninguno.
+      x-rol: autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/BorrarPracticasRequest'
+            example:
+              ids: [1, 2, 3]
+      responses:
+        <<: *autenticado
+        '204':
+          description: Prácticas eliminadas. Sin cuerpo.
+        '400':
+          description: 'Cuerpo ilegible (`Payload inválido.`) o algún id menor o igual que 0 (`Error de validación.: id inválido`).'
+          content: *contenidoTexto
+        '403':
+          description: Algún id es de otra persona (`Acceso denegado.`).
+          content: *contenidoTexto
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: 'Más de 100 ids distintos (`Se excedió el máximo permitido.: …`).'
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /practicas/{id}:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+    get:
+      operationId: practices.GetPractica
+      tags: [practices]
+      summary: Ver una práctica
+      description: |
+        Rol: `autenticado`. Devuelve la práctica con sus preguntas (sin la
+        clave, salvo las ya comprobadas en modo `inmediato`). Si estaba
+        `en_curso` y su tiempo venció, se finaliza en este momento y responde
+        `409 tiempo_agotado` con el `resultado_id`.
+      x-rol: autenticado
+      responses:
+        <<: *autenticado
+        '200':
+          description: La práctica.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/PracticaEnCurso'
+        '400':
+          description: '`ID inválido`.'
+          content: *contenidoTexto
+        '404':
+          description: La práctica no existe o no es de la persona (`Práctica no encontrada.`).
+          content: *contenidoTexto
+        '409':
+          description: |
+            `tiempo_agotado` con `resultado_id` en la raíz (`ErrorTiempoAgotado`):
+            la práctica venció y se finalizó al consultarla; el cliente debe ir
+            a su resultado.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTiempoAgotado'
+              example:
+                error: tiempo_agotado
+                message: El tiempo de la práctica se agotó.
+                resultado_id: 1
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+    delete:
+      operationId: practices.DeletePractica
+      tags: [practices]
+      summary: Eliminar una práctica
+      description: 'Rol: `autenticado`. Borrado lógico de una práctica propia.'
+      x-rol: autenticado
+      responses:
+        <<: *autenticado
+        '204':
+          description: Práctica eliminada. Sin cuerpo.
+        '400':
+          description: '`ID inválido`.'
+          content: *contenidoTexto
+        '404':
+          description: No existe, ya estaba eliminada o no es de la persona.
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /practicas/{id}/responder:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+    post:
+      operationId: practices.ToggleRespuesta
+      tags: [practices]
+      summary: Marcar o desmarcar una respuesta
+      description: |
+        Rol: `autenticado`. En preguntas `unica` reemplaza la selección; en
+        `multiple` alterna la alternativa. Devuelve la selección vigente de la
+        pregunta, sin decir si es correcta. La práctica debe estar `en_curso` y
+        dentro del tiempo (con 5 s de gracia). En modo `inmediato`, una pregunta
+        ya comprobada queda bloqueada.
+      x-rol: autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/ResponderRequest'
+            example:
+              pregunta_id: 10
+              respuesta_id: 41
+      responses:
+        <<: *autenticado
+        '200':
+          description: Selección vigente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Seleccion'
+              example:
+                respuesta_ids: [41]
+        '400':
+          description: |
+            `ID inválido`; cuerpo sin `pregunta_id` o `respuesta_id` positivos;
+            la respuesta no pertenece a la pregunta; o la práctica no está
+            `en_curso` (`La práctica no está en el estado requerido.`).
+          content: *contenidoTexto
+        '404':
+          description: La práctica no existe, no es de la persona, o la pregunta no es de la práctica.
+          content: *contenidoTexto
+        '409':
+          description: |
+            Formato `ErrorCodigo`. Códigos: `tiempo_agotado` (venció el tiempo;
+            esta ruta **no** incluye `resultado_id`) y `pregunta_validada` (la
+            pregunta ya se comprobó en modo `inmediato`).
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              examples:
+                tiempo:
+                  value:
+                    error: tiempo_agotado
+                    message: El tiempo de la práctica se agotó.
+                validada:
+                  value:
+                    error: pregunta_validada
+                    message: La pregunta ya fue comprobada; su respuesta no puede cambiarse.
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /practicas/{id}/validar/{preguntaId}:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+      - name: preguntaId
+        in: path
+        required: true
+        description: Id de la pregunta dentro de la práctica. Entero > 0; si no, `400`.
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+        example: 10
+    post:
+      operationId: practices.ValidarPregunta
+      tags: [practices]
+      summary: Comprobar una pregunta (modo inmediato)
+      description: |
+        Rol: `autenticado`. Solo en prácticas `inmediato` y `en_curso`. Califica
+        la selección guardada de la pregunta y revela la clave y la explicación;
+        desde entonces la selección queda bloqueada.
+      x-rol: autenticado
+      responses:
+        <<: *autenticado
+        '200':
+          description: Resultado de la comprobación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/ValidarPreguntaResponse'
+        '400':
+          description: |
+            `ID inválido`; la práctica no es `inmediato` ni está `en_curso`; o la
+            pregunta no tiene selección (`Error de validación.: selecciona al menos
+            una respuesta antes de comprobar`).
+          content: *contenidoTexto
+        '404':
+          description: La práctica no existe, no es de la persona, o la pregunta no es de la práctica.
+          content: *contenidoTexto
+        '409':
+          description: |
+            Formato `ErrorCodigo`: `tiempo_agotado` (sin `resultado_id`).
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              example:
+                error: tiempo_agotado
+                message: El tiempo de la práctica se agotó.
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /practicas/{id}/finalizar:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+    post:
+      operationId: practices.FinalizarPractica
+      tags: [practices]
+      summary: Finalizar o abandonar una práctica
+      description: |
+        Rol: `autenticado`. Califica la práctica y registra las estadísticas de
+        las preguntas una sola vez. El cuerpo es opcional (un cuerpo ilegible se
+        trata como vacío). Con `abandonar: true` la práctica queda `abandonada`
+        y la respuesta solo trae `id`, `estado` y `proceso`; el resto de los
+        campos vale su cero.
+      x-rol: autenticado
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/FinalizarRequest'
+            example:
+              abandonar: false
+      responses:
+        <<: *autenticado
+        '200':
+          description: Resultado de la práctica.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/PracticaResultado'
+        '400':
+          description: '`ID inválido`, o la práctica ya no está `en_curso`.'
+          content: *contenidoTexto
+        '404':
+          description: No existe o no es de la persona.
+          content: *contenidoTexto
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /practicas/{id}/resultado:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+    get:
+      operationId: practices.GetResultado
+      tags: [practices]
+      summary: Resultado de una práctica
+      description: 'Rol: `autenticado`. Solo de prácticas `completada`.'
+      x-rol: autenticado
+      responses:
+        <<: *autenticado
+        '200':
+          description: Resultado y desglose por asignatura.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/PracticaResultado'
+        '400':
+          description: '`ID inválido`, o la práctica no está `completada`.'
+          content: *contenidoTexto
+        '404':
+          description: No existe o no es de la persona.
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /practicas/{id}/revision:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+    get:
+      operationId: practices.GetRevision
+      tags: [practices]
+      summary: Revisión de una práctica
+      description: |
+        Rol: `autenticado`. Solo de prácticas `completada`. Incluye la clave de
+        cada pregunta, la explicación y la referencia.
+      x-rol: autenticado
+      responses:
+        <<: *autenticado
+        '200':
+          description: Revisión pregunta por pregunta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/RevisionPractica'
+        '400':
+          description: '`ID inválido`, o la práctica no está `completada`.'
+          content: *contenidoTexto
+        '404':
+          description: No existe o no es de la persona.
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+schemas:
+  ErrorPracticaEnCurso:
+    type: object
+    description: |
+      `409` de `POST /practicas`: ya hay una práctica en curso (handler.go:64-70).
+      No lleva `message`.
+    required: [error, practica_id]
+    properties:
+      error:
+        type: string
+        const: practica_en_curso
+      practica_id:
+        type: integer
+        format: int64
+        description: Id de la práctica que sigue en curso. Puede ser 0 si ya no se pudo leer.
+        example: 1
+
+  CrearPracticaRequest:
+    type: object
+    required: [proceso_id, asignaturas, modo_calificacion]
+    properties:
+      proceso_id:
+        type: integer
+        format: int64
+        minimum: 1
+      asignaturas:
+        type: array
+        minItems: 1
+        description: Asignaturas distintas; la suma de `numero_preguntas` no puede pasar de 200.
+        items:
+          $ref: '#/schemas/PracticaAsignaturaItem'
+      tiempo_limite_seg:
+        type: [integer, 'null']
+        minimum: 60
+        description: 'Tiempo límite en segundos. Ausente o `null`: sin límite.'
+      modo_calificacion:
+        type: string
+        enum: [inmediato, al_final]
+        description: '`inmediato` permite comprobar cada pregunta; `al_final` califica al terminar.'
+
+  PracticaAsignaturaItem:
+    type: object
+    required: [asignatura_id, numero_preguntas]
+    properties:
+      asignatura_id:
+        type: integer
+        format: int64
+        minimum: 1
+      numero_preguntas:
+        type: integer
+        minimum: 1
+
+  BorrarPracticasRequest:
+    type: object
+    required: [ids]
+    properties:
+      ids:
+        type: array
+        maxItems: 100
+        description: Ids positivos; los repetidos se colapsan. Máximo 100 distintos.
+        items:
+          type: integer
+          format: int64
+          minimum: 1
+
+  ResponderRequest:
+    type: object
+    required: [pregunta_id, respuesta_id]
+    properties:
+      pregunta_id:
+        type: integer
+        format: int64
+        minimum: 1
+      respuesta_id:
+        type: integer
+        format: int64
+        minimum: 1
+
+  FinalizarRequest:
+    type: object
+    properties:
+      abandonar:
+        type: boolean
+        default: false
+        description: '`true` abandona la práctica sin calificarla.'
+
+  Seleccion:
+    type: object
+    required: [respuesta_ids]
+    properties:
+      respuesta_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+
+  RespuestaPracticaItem:
+    type: object
+    description: Alternativa durante la práctica. Nunca trae `es_correcta`.
+    required: [id, texto, letra, orden]
+    properties:
+      id:
+        type: integer
+        format: int64
+      texto:
+        type: string
+      letra:
+        type: string
+        example: a
+      orden:
+        type: integer
+
+  PreguntaPracticaItem:
+    type: object
+    required: [id, orden, enunciado, tipo, asignatura, respuestas, estado, respuesta_ids, validada]
+    properties:
+      id:
+        type: integer
+        format: int64
+      orden:
+        type: integer
+      enunciado:
+        type: string
+      tipo:
+        type: string
+        enum: [unica, multiple]
+      asignatura:
+        type: string
+      respuestas:
+        type: array
+        items:
+          $ref: '#/schemas/RespuestaPracticaItem'
+      estado:
+        type: string
+        enum: [sin_responder, respondida, correcta, incorrecta]
+        description: '`correcta` e `incorrecta` solo tras comprobar la pregunta en modo `inmediato`.'
+      respuesta_ids:
+        type: array
+        description: Selección vigente.
+        items:
+          type: integer
+          format: int64
+      validada:
+        type: boolean
+        description: '`true` si la pregunta se comprobó (modo `inmediato`); su selección queda bloqueada.'
+      respuesta_correcta_ids:
+        type: array
+        description: Solo si `validada` (omitido si no).
+        items:
+          type: integer
+          format: int64
+      explicacion:
+        type: string
+        description: Solo si `validada` y hay explicación (omitido si no).
+
+  PracticaEnCurso:
+    type: object
+    required: [id, proceso, modo_calificacion, tiempo_limite_seg, fecha_inicio, tiempo_restante_seg, total_preguntas, preguntas]
+    properties:
+      id:
+        type: integer
+        format: int64
+      proceso:
+        type: string
+        example: Proceso de ejemplo 2026
+      modo_calificacion:
+        type: string
+        enum: [inmediato, al_final]
+      tiempo_limite_seg:
+        type: [integer, 'null']
+      fecha_inicio:
+        type: string
+        format: date-time
+      tiempo_restante_seg:
+        type: [integer, 'null']
+        description: Segundos que quedan según el reloj de la base. `null` si no hay límite.
+      total_preguntas:
+        type: integer
+      preguntas:
+        type: array
+        items:
+          $ref: '#/schemas/PreguntaPracticaItem'
+
+  ValidarPreguntaResponse:
+    type: object
+    required: [es_correcta, respuesta_correcta_ids, explicacion]
+    properties:
+      es_correcta:
+        type: boolean
+      respuesta_correcta_id:
+        type: integer
+        format: int64
+        description: Solo en preguntas `unica` (campo heredado); omitido en `multiple`.
+      respuesta_correcta_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+      explicacion:
+        type: string
+
+  ResultadoAsignaturaItem:
+    type: object
+    required: [asignatura, total_preguntas, correctas, incorrectas, sin_responder, porcentaje]
+    properties:
+      asignatura:
+        type: string
+      total_preguntas:
+        type: integer
+      correctas:
+        type: integer
+      incorrectas:
+        type: integer
+      sin_responder:
+        type: integer
+      porcentaje:
+        type: number
+        description: 0 a 100.
+
+  PracticaResultado:
+    type: object
+    description: |
+      Resultado de una práctica. Al abandonar solo vienen `id`, `estado` y
+      `proceso`; los demás campos valen su cero (`""`, 0, `null`, `[]`).
+    required:
+      - id
+      - estado
+      - proceso
+      - total_preguntas
+      - correctas
+      - incorrectas
+      - sin_responder
+      - porcentaje
+      - tiempo_usado_seg
+      - tiempo_limite_seg
+      - fecha_inicio
+      - fecha_fin
+      - por_asignatura
+    properties:
+      id:
+        type: integer
+        format: int64
+      estado:
+        type: string
+        enum: [completada, abandonada]
+      proceso:
+        type: string
+      total_preguntas:
+        type: integer
+      correctas:
+        type: integer
+      incorrectas:
+        type: integer
+      sin_responder:
+        type: integer
+      porcentaje:
+        type: number
+      tiempo_usado_seg:
+        type: integer
+      tiempo_limite_seg:
+        type: [integer, 'null']
+      fecha_inicio:
+        type: string
+        description: RFC 3339; vacío al abandonar.
+      fecha_fin:
+        type: string
+        description: RFC 3339; vacío si la práctica no tiene fin.
+      por_asignatura:
+        type: [array, 'null']
+        items:
+          $ref: '#/schemas/ResultadoAsignaturaItem'
+
+  RespuestaRevisionItem:
+    type: object
+    required: [id, texto, letra, es_correcta]
+    properties:
+      id:
+        type: integer
+        format: int64
+      texto:
+        type: string
+      letra:
+        type: string
+      es_correcta:
+        type: boolean
+
+  RevisionPreguntaItem:
+    type: object
+    required: [orden, enunciado, asignatura, respuesta_usuario_ids, respuesta_correcta_ids, es_correcta, respuestas, explicacion, referencia]
+    properties:
+      orden:
+        type: integer
+      enunciado:
+        type: string
+      asignatura:
+        type: string
+      respuesta_usuario_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+      respuesta_correcta_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+      es_correcta:
+        type: [boolean, 'null']
+        description: '`null` si la pregunta quedó sin responder.'
+      respuestas:
+        type: array
+        items:
+          $ref: '#/schemas/RespuestaRevisionItem'
+      explicacion:
+        type: string
+      referencia:
+        type: string
+
+  RevisionPractica:
+    type: object
+    required: [id, preguntas]
+    properties:
+      id:
+        type: integer
+        format: int64
+      preguntas:
+        type: array
+        items:
+          $ref: '#/schemas/RevisionPreguntaItem'
+
+  HistorialPracticaItem:
+    type: object
+    required: [id, numero, asignaturas, total_preguntas, correctas, porcentaje, tiempo_usado_seg, fecha, estado]
+    properties:
+      id:
+        type: integer
+        format: int64
+      numero:
+        type: integer
+        description: Posición en el listado (empieza en `(page-1)*per_page + 1`).
+      asignaturas:
+        type: string
+        description: Nombres de las asignaturas en orden alfabético, separados por «, ».
+        example: Salud pública, Epidemiología
+      total_preguntas:
+        type: integer
+      correctas:
+        type: integer
+      porcentaje:
+        type: number
+      tiempo_usado_seg:
+        type: integer
+      fecha:
+        type: string
+        format: date-time
+        description: Inicio de la práctica.
+      estado:
+        type: string
+        enum: [completada, abandonada]

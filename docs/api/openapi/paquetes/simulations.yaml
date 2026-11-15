@@ -1,0 +1,1098 @@
+# Paquete backend/internal/simulations (backend-dev). Rutas: simulations/routes.go:27-41.
+# Escrito leyendo el código (handler.go, dto.go, validation.go, service.go, repository.go).
+# Contrato de diseño: plataforma-multi-institucion.md §2.4 (los 403 de POST /simulacros).
+#
+# Formatos de error de este paquete:
+#   - ErrorTexto: casi todos (`jsonError`, handler.go:33-37).
+#   - ErrorCodigo: los 403 de acceso al proceso y `tiempo_agotado` sin `resultado_id`.
+#   - ErrorTiempoAgotado: `409 tiempo_agotado` con `resultado_id` en la raíz.
+#   - `simulacro_en_curso` es un caso aparte: `{error, simulacro_id}` sin `message`.
+# Las rutas del postulante filtran por `usuario_id`: el simulacro de otra persona
+# responde igual que uno inexistente (404). La configuración (alta, edición y
+# listado) es solo de admin.
+x-comunes:
+  autenticado: &autenticado
+    '401':
+      $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+    '503':
+      $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+  admin: &admin
+    '401':
+      $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+    '403':
+      $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+    '503':
+      $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+  contenidoTexto: &contenidoTexto
+    application/json:
+      schema:
+        $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+
+paths:
+  /simulacros:
+    post:
+      operationId: simulations.CreateSimulacro
+      tags: [simulations]
+      summary: Crear un simulacro
+      description: |
+        Rol: `autenticado`. Crea un simulacro `en_curso` con la configuración
+        activa del proceso y las asignaturas que corresponden a la especialidad
+        de la persona. Reglas (`service.go`):
+
+        - El proceso debe ser de la institución y del nivel de la persona
+          (leídos de la base) y la persona debe tener una inscripción
+          `aprobado` (PLT-06, contrato `plataforma-multi-institucion.md` §2.4).
+        - Solo puede haber un simulacro `en_curso` por usuario (índice único,
+          migración 049).
+        - El proceso necesita una configuración activa con al menos una
+          asignatura con preguntas.
+      x-rol: autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/CrearSimulacroRequest'
+            example:
+              proceso_id: 1
+      responses:
+        <<: *autenticado
+        '201':
+          description: Simulacro creado. Las preguntas no revelan la clave.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/SimulacroEnCurso'
+        '400':
+          description: |
+            Cuerpo ilegible (`Payload inválido.`) o el proceso no tiene
+            configuración de examen activa (`No hay configuración de examen
+            activa para este proceso.`).
+          content: *contenidoTexto
+        '403':
+          description: |
+            Formato `ErrorCodigo`. Códigos: `institucion_no_permitida` (el proceso
+            es de otra institución, aunque exista una inscripción cruzada aprobada),
+            `nivel_no_permitido` (nivel incompatible) e `inscripcion_requerida`
+            (sin inscripción aprobada). Ese es el orden de comprobación.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              examples:
+                institucion:
+                  value:
+                    error: institucion_no_permitida
+                    message: Este proceso pertenece a otra institución.
+                nivel:
+                  value:
+                    error: nivel_no_permitido
+                    message: No tienes acceso a este proceso.
+                inscripcion:
+                  value:
+                    error: inscripcion_requerida
+                    message: Debes tener una inscripción aprobada para crear un simulacro.
+        '404':
+          description: El proceso no existe (el texto es `Simulacro no encontrado.`, el mismo de las demás rutas).
+          content: *contenidoTexto
+        '409':
+          description: |
+            Ya hay un simulacro en curso. Formato propio, sin `message`:
+            `{"error": "simulacro_en_curso", "simulacro_id": n}`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/ErrorSimulacroEnCurso'
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: |
+            `ErrorTexto`. `proceso_id` inválido (`Datos inválidos.: proceso_id es
+            requerido`) o el banco no alcanza (`Preguntas insuficientes para
+            generar el simulacro.`).
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /simulacros/historial:
+    get:
+      operationId: simulations.GetHistorial
+      tags: [simulations]
+      summary: Historial de simulacros
+      description: |
+        Rol: `autenticado`. Simulacros propios `completado`, del más reciente al
+        más antiguo.
+
+        Paginación **tolerante** (`handler.go:274-275`): un `page` o `per_page`
+        inválido o fuera de rango cae al defecto (`page` 1, `per_page` 20). A
+        diferencia del parámetro común, un `per_page` mayor que 100 **no** se
+        recorta: vuelve a 20. Los filtros inválidos se ignoran.
+      x-rol: autenticado
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: 'Página, base 1. Inválido o menor que 1: 1.'
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          required: false
+          description: 'Elementos por página, de 1 a 100. Inválido o fuera de rango: 20.'
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: proceso_id
+          in: query
+          required: false
+          description: Filtra por proceso. Un valor no numérico o menor o igual que 0 se ignora.
+          schema:
+            type: integer
+            format: int64
+        - name: aprobado
+          in: query
+          required: false
+          description: |
+            Filtra por aprobado. `true` filtra los aprobados; cualquier otro
+            valor no vacío filtra los no aprobados.
+          schema:
+            type: string
+            examples: ['true', 'false']
+      responses:
+        <<: *autenticado
+        '200':
+          description: Una página del historial.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '../openapi.yaml#/components/schemas/PaginaMeta'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/schemas/HistorialSimulacroItem'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /simulacros/en-curso:
+    get:
+      operationId: simulations.GetEnCurso
+      tags: [simulations]
+      summary: Simulacro en curso
+      description: |
+        Rol: `autenticado`. Dice si la persona tiene un simulacro `en_curso`. Si
+        el que tenía venció, se finaliza aquí y se responde `en_curso: false`.
+      x-rol: autenticado
+      responses:
+        <<: *autenticado
+        '200':
+          description: Estado del simulacro en curso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/EnCurso'
+              examples:
+                conSimulacro:
+                  value:
+                    en_curso: true
+                    simulacro_id: 1
+                sinSimulacro:
+                  value:
+                    en_curso: false
+                    simulacro_id: null
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /simulacros/configuracion:
+    get:
+      operationId: simulations.GetConfiguracion
+      tags: [simulations]
+      summary: Configuración de un proceso para el postulante
+      description: |
+        Rol: `autenticado`. Configuración activa del proceso, con las asignaturas
+        que corresponden al grado y la especialidad de la sesión (tomados de los
+        claims del token) y cuántas preguntas hay disponibles. No comprueba la
+        institución del proceso: es una lectura de configuración sin datos
+        personales (fuera de PLT-06, issue #276).
+      x-rol: autenticado
+      parameters:
+        - name: proceso_id
+          in: query
+          required: true
+          description: Id del proceso. Entero > 0; si no, `400`.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        <<: *autenticado
+        '200':
+          description: La configuración, o `null` si el proceso no tiene una activa.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [configuracion]
+                properties:
+                  configuracion:
+                    oneOf:
+                      - $ref: '#/schemas/Configuracion'
+                      - type: 'null'
+        '400':
+          description: '`proceso_id requerido`.'
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+    post:
+      operationId: simulations.CreateConfiguracion
+      tags: [simulations]
+      summary: Crear la configuración de examen de un proceso
+      description: |
+        Rol: `admin`. Crea una configuración `activo`. `nota_minima` y
+        `nota_maxima` ausentes toman 55 y 100 (un 0 explícito se respeta).
+        La escala es de 0 a 100 y `nota_minima` no puede pasar de `nota_maxima`.
+      x-rol: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/CrearConfiguracionRequest'
+            example:
+              proceso_id: 1
+              tiempo_total_seg: 3600
+              total_preguntas: 50
+              nota_minima: 55
+              nota_maxima: 100
+              descripcion: Simulacro de ejemplo
+      responses:
+        <<: *admin
+        '201':
+          description: Configuración creada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Configuracion'
+        '400':
+          description: |
+            Cuerpo ilegible (`JSON inválido`) o faltan `proceso_id`,
+            `tiempo_total_seg` (mínimo 60) o `total_preguntas` (mínimo 1).
+          content: *contenidoTexto
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: |
+            `ErrorTexto`. Notas fuera de rango (`Datos inválidos.: nota_maxima debe
+            estar entre 0 y 100`, `nota_minima debe estar entre 0 y nota_maxima`).
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /simulacros/configuraciones:
+    get:
+      operationId: simulations.ListConfiguraciones
+      tags: [simulations]
+      summary: Listar las configuraciones activas
+      description: 'Rol: `admin`. Todas las configuraciones activas, sin paginar.'
+      x-rol: admin
+      responses:
+        <<: *admin
+        '200':
+          description: Configuraciones activas.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/schemas/Configuracion'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /simulacros/configuracion/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Id de la configuración. Entero > 0; si no, `400`.
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+        example: 1
+    patch:
+      operationId: simulations.UpdateConfiguracion
+      tags: [simulations]
+      summary: Editar una configuración de examen
+      description: |
+        Rol: `admin`. Actualiza solo los campos presentes; el resultado completo
+        se valida con las mismas reglas del alta, más `estado` (`activo` o
+        `inactivo`).
+      x-rol: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/EditarConfiguracionRequest'
+            example:
+              total_preguntas: 40
+              estado: activo
+      responses:
+        <<: *admin
+        '200':
+          description: Configuración actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Configuracion'
+        '400':
+          description: '`id inválido` o cuerpo ilegible (`JSON inválido`).'
+          content: *contenidoTexto
+        '404':
+          description: La configuración no existe (`Simulacro no encontrado.`, el mismo texto de las demás rutas).
+          content: *contenidoTexto
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: '`ErrorTexto`. Algún valor fuera de rango (`Datos inválidos.: …`).'
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /simulacros/{id}:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+    get:
+      operationId: simulations.GetSimulacro
+      tags: [simulations]
+      summary: Ver un simulacro en curso
+      description: |
+        Rol: `autenticado`. Devuelve el simulacro `en_curso` con sus preguntas
+        (sin la clave). Si su tiempo venció, se finaliza en este momento y
+        responde `409 tiempo_agotado` con el `resultado_id`. Un simulacro ya
+        terminado responde 400: se consulta con `/resultado`.
+      x-rol: autenticado
+      responses:
+        <<: *autenticado
+        '200':
+          description: El simulacro.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/SimulacroEnCurso'
+        '400':
+          description: '`ID inválido`, o el simulacro ya no está `en_curso`.'
+          content: *contenidoTexto
+        '404':
+          description: No existe o no es de la persona (`Simulacro no encontrado.`).
+          content: *contenidoTexto
+        '409':
+          description: |
+            `tiempo_agotado` con `resultado_id` en la raíz (`ErrorTiempoAgotado`):
+            el simulacro venció y se finalizó al consultarlo; el cliente debe ir
+            a su resultado.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTiempoAgotado'
+              example:
+                error: tiempo_agotado
+                message: El tiempo del simulacro se agotó.
+                resultado_id: 1
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /simulacros/{id}/responder:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+    post:
+      operationId: simulations.ResponderPregunta
+      tags: [simulations]
+      summary: Marcar o desmarcar una respuesta
+      description: |
+        Rol: `autenticado`. En preguntas `unica` reemplaza la selección; en
+        `multiple` alterna la alternativa. Devuelve la selección vigente, sin
+        decir si es correcta. El simulacro debe estar `en_curso` y dentro del
+        tiempo (con 5 s de gracia).
+      x-rol: autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/ResponderRequest'
+            example:
+              pregunta_id: 10
+              respuesta_id: 41
+      responses:
+        <<: *autenticado
+        '200':
+          description: Selección vigente de la pregunta.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, respuesta_ids]
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  respuesta_ids:
+                    type: array
+                    items:
+                      type: integer
+                      format: int64
+              example:
+                ok: true
+                respuesta_ids: [41]
+        '400':
+          description: |
+            `ID inválido`; cuerpo sin `pregunta_id` o `respuesta_id` positivos; o
+            el simulacro ya no está `en_curso`.
+          content: *contenidoTexto
+        '404':
+          description: El simulacro no existe, no es de la persona, o la pregunta no es del simulacro.
+          content: *contenidoTexto
+        '409':
+          description: |
+            Formato `ErrorCodigo`: `tiempo_agotado` (venció el tiempo; esta ruta
+            **no** incluye `resultado_id`).
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              example:
+                error: tiempo_agotado
+                message: El tiempo del simulacro se agotó.
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: |
+            `ErrorTexto`. La respuesta no pertenece a la pregunta
+            (`Datos inválidos.: la respuesta no pertenece a la pregunta`).
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /simulacros/{id}/preguntas/{preguntaId}/respuestas:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+      - name: preguntaId
+        in: path
+        required: true
+        description: Id de la pregunta dentro del simulacro. Entero > 0; si no, `400`.
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+        example: 10
+    put:
+      operationId: simulations.SetRespuestas
+      tags: [simulations]
+      summary: Reemplazar la selección de una pregunta
+      description: |
+        Rol: `autenticado`. Reemplaza la selección completa de la pregunta
+        (idempotente). Una lista vacía la borra. Las preguntas `unica` admiten
+        a lo sumo un id; los ids repetidos se colapsan. Mismas reglas de estado y
+        tiempo que `/responder`.
+      x-rol: autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/SetRespuestasRequest'
+            example:
+              respuesta_ids: [41, 42]
+      responses:
+        <<: *autenticado
+        '200':
+          description: Selección vigente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Seleccion'
+        '400':
+          description: |
+            `ID inválido`; cuerpo sin `respuesta_ids` (`respuesta_ids es
+            requerido.`; `null` cuenta como ausente); o el simulacro ya no está
+            `en_curso`.
+          content: *contenidoTexto
+        '404':
+          description: El simulacro no existe, no es de la persona, o la pregunta no es del simulacro.
+          content: *contenidoTexto
+        '409':
+          description: |
+            Formato `ErrorCodigo`: `tiempo_agotado` (venció el tiempo; esta ruta
+            **no** incluye `resultado_id`).
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              example:
+                error: tiempo_agotado
+                message: El tiempo del simulacro se agotó.
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: |
+            `ErrorTexto`. Más de un id en una pregunta `unica`, o algún id no
+            pertenece a la pregunta (`Datos inválidos.: …`).
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /simulacros/{id}/finalizar:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+    post:
+      operationId: simulations.FinalizarSimulacro
+      tags: [simulations]
+      summary: Finalizar un simulacro
+      description: |
+        Rol: `autenticado`. Califica el simulacro (puntaje ponderado por peso y
+        coeficiente, nota centesimal, aprobado) y registra las estadísticas de
+        las preguntas una sola vez. No lleva cuerpo.
+      x-rol: autenticado
+      responses:
+        <<: *autenticado
+        '200':
+          description: Resultado del simulacro.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/SimulacroResultado'
+        '400':
+          description: '`ID inválido`, o el simulacro ya no está `en_curso`.'
+          content: *contenidoTexto
+        '404':
+          description: No existe o no es de la persona.
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /simulacros/{id}/resultado:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+    get:
+      operationId: simulations.GetResultado
+      tags: [simulations]
+      summary: Resultado de un simulacro
+      description: 'Rol: `autenticado`. Solo de simulacros `completado`.'
+      x-rol: autenticado
+      responses:
+        <<: *autenticado
+        '200':
+          description: Resultado, desglose por asignatura y posición estimada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/SimulacroResultado'
+        '400':
+          description: '`ID inválido`, o el simulacro no está `completado`.'
+          content: *contenidoTexto
+        '404':
+          description: No existe o no es de la persona.
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /simulacros/{id}/revision:
+    parameters:
+      - $ref: '../openapi.yaml#/components/parameters/Id'
+    get:
+      operationId: simulations.GetRevision
+      tags: [simulations]
+      summary: Revisión de un simulacro
+      description: |
+        Rol: `autenticado`. Solo de simulacros `completado`. Incluye la clave de
+        cada pregunta, la explicación y la referencia.
+      x-rol: autenticado
+      responses:
+        <<: *autenticado
+        '200':
+          description: Revisión pregunta por pregunta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/RevisionSimulacro'
+        '400':
+          description: '`ID inválido`, o el simulacro no está `completado`.'
+          content: *contenidoTexto
+        '404':
+          description: No existe o no es de la persona.
+          content: *contenidoTexto
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+schemas:
+  ErrorSimulacroEnCurso:
+    type: object
+    description: |
+      `409` de `POST /simulacros`: ya hay un simulacro en curso (handler.go:58-63).
+      No lleva `message`.
+    required: [error, simulacro_id]
+    properties:
+      error:
+        type: string
+        const: simulacro_en_curso
+      simulacro_id:
+        type: integer
+        format: int64
+        description: Id del simulacro que sigue en curso. Puede ser 0 si ya no se pudo leer.
+        example: 1
+
+  CrearSimulacroRequest:
+    type: object
+    required: [proceso_id]
+    properties:
+      proceso_id:
+        type: integer
+        format: int64
+        minimum: 1
+
+  ResponderRequest:
+    type: object
+    required: [pregunta_id, respuesta_id]
+    properties:
+      pregunta_id:
+        type: integer
+        format: int64
+        minimum: 1
+      respuesta_id:
+        type: integer
+        format: int64
+        minimum: 1
+
+  SetRespuestasRequest:
+    type: object
+    required: [respuesta_ids]
+    properties:
+      respuesta_ids:
+        type: array
+        description: Selección completa. `[]` la borra; `null` o ausente da `400`.
+        items:
+          type: integer
+          format: int64
+
+  Seleccion:
+    type: object
+    required: [respuesta_ids]
+    properties:
+      respuesta_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+
+  EnCurso:
+    type: object
+    required: [en_curso, simulacro_id]
+    properties:
+      en_curso:
+        type: boolean
+      simulacro_id:
+        type: [integer, 'null']
+        format: int64
+
+  RespuestaSimulacroItem:
+    type: object
+    description: Alternativa durante el simulacro. Nunca trae `es_correcta`.
+    required: [id, texto, letra, orden]
+    properties:
+      id:
+        type: integer
+        format: int64
+      texto:
+        type: string
+      letra:
+        type: string
+        example: a
+      orden:
+        type: integer
+
+  PreguntaSimulacroItem:
+    type: object
+    required: [id, orden, enunciado, tipo, asignatura, respuestas, estado, respuesta_id, respuesta_ids, marcada]
+    properties:
+      id:
+        type: integer
+        format: int64
+      orden:
+        type: integer
+      enunciado:
+        type: string
+      tipo:
+        type: string
+        enum: [unica, multiple]
+      asignatura:
+        type: string
+      respuestas:
+        type: array
+        items:
+          $ref: '#/schemas/RespuestaSimulacroItem'
+      estado:
+        type: string
+        enum: [sin_responder, respondida]
+      respuesta_id:
+        type: [integer, 'null']
+        format: int64
+        description: Primera alternativa elegida (campo heredado para preguntas `unica`).
+      respuesta_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+      marcada:
+        type: boolean
+
+  SimulacroEnCurso:
+    type: object
+    required: [id, proceso, tiempo_limite_seg, fecha_inicio, tiempo_restante_seg, total_preguntas, preguntas]
+    properties:
+      id:
+        type: integer
+        format: int64
+      proceso:
+        type: string
+        example: Proceso de ejemplo 2026
+      tiempo_limite_seg:
+        type: integer
+      fecha_inicio:
+        type: string
+        format: date-time
+      tiempo_restante_seg:
+        type: integer
+      total_preguntas:
+        type: integer
+      preguntas:
+        type: array
+        items:
+          $ref: '#/schemas/PreguntaSimulacroItem'
+
+  ResultadoAsignaturaSimulacro:
+    type: object
+    required: [asignatura, total_preguntas, correctas, incorrectas, sin_responder, puntaje, porcentaje, peso]
+    properties:
+      asignatura:
+        type: string
+      total_preguntas:
+        type: integer
+      correctas:
+        type: integer
+      incorrectas:
+        type: integer
+      sin_responder:
+        type: integer
+      puntaje:
+        type: number
+      porcentaje:
+        type: number
+        description: Correctas sobre el total de la asignatura, 0 a 100.
+      peso:
+        type: number
+        description: Peso porcentual de la asignatura en el proceso.
+
+  PosicionEstimada:
+    type: object
+    required: [posicion, total_usuarios]
+    properties:
+      posicion:
+        type: integer
+        minimum: 1
+      total_usuarios:
+        type: integer
+        minimum: 1
+
+  SimulacroResultado:
+    type: object
+    required:
+      - id
+      - proceso
+      - total_preguntas
+      - correctas
+      - incorrectas
+      - sin_responder
+      - puntaje_total
+      - puntaje_maximo
+      - porcentaje
+      - nota_centesimal
+      - aprobado
+      - tiempo_usado_seg
+      - tiempo_limite_seg
+      - fecha_inicio
+      - fecha_fin
+      - por_asignatura
+    properties:
+      id:
+        type: integer
+        format: int64
+      proceso:
+        type: string
+      total_preguntas:
+        type: integer
+      correctas:
+        type: integer
+      incorrectas:
+        type: integer
+      sin_responder:
+        type: integer
+      puntaje_total:
+        type: number
+      puntaje_maximo:
+        type: number
+      porcentaje:
+        type: number
+        description: '`puntaje_total / puntaje_maximo * 100`.'
+      nota_centesimal:
+        type: number
+        description: Nota en la escala de 0 a 100.
+      aprobado:
+        type: boolean
+      tiempo_usado_seg:
+        type: integer
+      tiempo_limite_seg:
+        type: integer
+      fecha_inicio:
+        type: string
+        format: date-time
+      fecha_fin:
+        type: string
+        description: RFC 3339; vacío si el simulacro no tiene fin.
+      por_asignatura:
+        type: [array, 'null']
+        items:
+          $ref: '#/schemas/ResultadoAsignaturaSimulacro'
+      posicion:
+        $ref: '#/schemas/PosicionEstimada'
+        description: Posición estimada entre los usuarios. Omitido si no se pudo calcular.
+
+  RespuestaRevisionSimItem:
+    type: object
+    required: [id, texto, letra, es_correcta]
+    properties:
+      id:
+        type: integer
+        format: int64
+      texto:
+        type: string
+      letra:
+        type: string
+      es_correcta:
+        type: boolean
+
+  RevisionPreguntaSimulacro:
+    type: object
+    required:
+      - pregunta_id
+      - tipo
+      - respuesta_usuario_ids
+      - respuesta_correcta_ids
+      - orden
+      - enunciado
+      - asignatura
+      - respuesta_usuario_id
+      - respuesta_correcta_id
+      - es_correcta
+      - respuestas
+    properties:
+      pregunta_id:
+        type: integer
+        format: int64
+      tipo:
+        type: string
+        enum: [unica, multiple]
+      respuesta_usuario_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+      respuesta_correcta_ids:
+        type: array
+        items:
+          type: integer
+          format: int64
+      orden:
+        type: integer
+      enunciado:
+        type: string
+      asignatura:
+        type: string
+      respuesta_usuario_id:
+        type: [integer, 'null']
+        format: int64
+        description: Primer id elegido (campo heredado para preguntas `unica`).
+      respuesta_correcta_id:
+        type: integer
+        format: int64
+        description: Primer id correcto (campo heredado para preguntas `unica`).
+      es_correcta:
+        type: [boolean, 'null']
+        description: '`null` si la pregunta quedó sin responder.'
+      respuestas:
+        type: array
+        items:
+          $ref: '#/schemas/RespuestaRevisionSimItem'
+      explicacion:
+        type: string
+        description: Omitido si no hay explicación.
+      referencia:
+        type: string
+        description: Omitido si no hay referencia.
+
+  RevisionSimulacro:
+    type: object
+    required: [id, preguntas]
+    properties:
+      id:
+        type: integer
+        format: int64
+      preguntas:
+        type: array
+        items:
+          $ref: '#/schemas/RevisionPreguntaSimulacro'
+
+  HistorialSimulacroItem:
+    type: object
+    required: [id, numero, proceso, fecha, puntaje_total, puntaje_maximo, porcentaje, nota_centesimal, aprobado, tiempo_usado_seg, estado]
+    properties:
+      id:
+        type: integer
+        format: int64
+      numero:
+        type: integer
+        description: Posición en el listado.
+      proceso:
+        type: string
+      fecha:
+        type: string
+        format: date-time
+        description: Inicio del simulacro.
+      puntaje_total:
+        type: number
+      puntaje_maximo:
+        type: number
+      porcentaje:
+        type: number
+      nota_centesimal:
+        type: number
+      aprobado:
+        type: boolean
+      tiempo_usado_seg:
+        type: integer
+      estado:
+        type: string
+        const: completado
+
+  AsignaturaConfigItem:
+    type: object
+    required: [asignatura_id, nombre, numero_preguntas, peso_porcentual, preguntas_disponibles]
+    properties:
+      asignatura_id:
+        type: integer
+        format: int64
+      nombre:
+        type: string
+      numero_preguntas:
+        type: integer
+      peso_porcentual:
+        type: number
+      preguntas_disponibles:
+        type: integer
+        description: Preguntas servibles para la especialidad de la sesión.
+
+  Configuracion:
+    type: object
+    required: [id, proceso_id, proceso, tiempo_total_seg, total_preguntas, nota_minima, nota_maxima, estado, asignaturas]
+    properties:
+      id:
+        type: integer
+        format: int64
+      proceso_id:
+        type: integer
+        format: int64
+      proceso:
+        type: string
+      tiempo_total_seg:
+        type: integer
+        minimum: 60
+      total_preguntas:
+        type: integer
+        minimum: 1
+      nota_minima:
+        type: number
+      nota_maxima:
+        type: number
+      descripcion:
+        type: string
+        description: Omitido si está vacía.
+      estado:
+        type: string
+        enum: [activo, inactivo]
+      asignaturas:
+        type: [array, 'null']
+        description: |
+          Solo la llena `GET /simulacros/configuracion`. En el alta, la edición y
+          el listado de admin vale `null`.
+        items:
+          $ref: '#/schemas/AsignaturaConfigItem'
+
+  CrearConfiguracionRequest:
+    type: object
+    required: [proceso_id, tiempo_total_seg, total_preguntas]
+    properties:
+      proceso_id:
+        type: integer
+        format: int64
+        minimum: 1
+      tiempo_total_seg:
+        type: integer
+        minimum: 60
+      total_preguntas:
+        type: integer
+        minimum: 1
+      nota_minima:
+        type: [number, 'null']
+        minimum: 0
+        description: 'Ausente o `null`: 55.'
+      nota_maxima:
+        type: [number, 'null']
+        exclusiveMinimum: 0
+        maximum: 100
+        description: 'Ausente o `null`: 100.'
+      descripcion:
+        type: string
+
+  EditarConfiguracionRequest:
+    type: object
+    description: Solo los campos presentes cambian.
+    properties:
+      tiempo_total_seg:
+        type: [integer, 'null']
+        minimum: 60
+      total_preguntas:
+        type: [integer, 'null']
+        minimum: 1
+      nota_minima:
+        type: [number, 'null']
+        minimum: 0
+      nota_maxima:
+        type: [number, 'null']
+        exclusiveMinimum: 0
+        maximum: 100
+      descripcion:
+        type: [string, 'null']
+      estado:
+        type: [string, 'null']
+        enum: [activo, inactivo, null]

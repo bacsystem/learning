@@ -219,8 +219,48 @@ paths:
     $ref: './paquetes/ia.yaml#/paths/~1admin~1ia~1gasto'
 
   # ── practices ── (backend-dev)
+  /practicas:
+    $ref: './paquetes/practices.yaml#/paths/~1practicas'
+  /practicas/batch:
+    $ref: './paquetes/practices.yaml#/paths/~1practicas~1batch'
+  /practicas/{id}:
+    $ref: './paquetes/practices.yaml#/paths/~1practicas~1{id}'
+  /practicas/{id}/responder:
+    $ref: './paquetes/practices.yaml#/paths/~1practicas~1{id}~1responder'
+  /practicas/{id}/validar/{preguntaId}:
+    $ref: './paquetes/practices.yaml#/paths/~1practicas~1{id}~1validar~1{preguntaId}'
+  /practicas/{id}/finalizar:
+    $ref: './paquetes/practices.yaml#/paths/~1practicas~1{id}~1finalizar'
+  /practicas/{id}/resultado:
+    $ref: './paquetes/practices.yaml#/paths/~1practicas~1{id}~1resultado'
+  /practicas/{id}/revision:
+    $ref: './paquetes/practices.yaml#/paths/~1practicas~1{id}~1revision'
 
   # ── simulations ── (backend-dev)
+  /simulacros:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros'
+  /simulacros/historial:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros~1historial'
+  /simulacros/en-curso:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros~1en-curso'
+  /simulacros/configuracion:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros~1configuracion'
+  /simulacros/configuraciones:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros~1configuraciones'
+  /simulacros/configuracion/{id}:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros~1configuracion~1{id}'
+  /simulacros/{id}:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros~1{id}'
+  /simulacros/{id}/responder:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros~1{id}~1responder'
+  /simulacros/{id}/preguntas/{preguntaId}/respuestas:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros~1{id}~1preguntas~1{preguntaId}~1respuestas'
+  /simulacros/{id}/finalizar:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros~1{id}~1finalizar'
+  /simulacros/{id}/resultado:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros~1{id}~1resultado'
+  /simulacros/{id}/revision:
+    $ref: './paquetes/simulations.yaml#/paths/~1simulacros~1{id}~1revision'
 
   # ── auth ── (backend-dev-2)
   /auth/check-dni:
