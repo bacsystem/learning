@@ -921,6 +921,7 @@
     "admin-dashboard-actividad-vacio": "Sin actividad en los últimos 7 días",
     "admin-dashboard-actividad-desc": "{practicas} prácticas y {simulacros} simulacros en los últimos 7 días",
     "admin-dashboard-top-asignaturas": "Top Asignaturas",
+    "admin-dashboard-top-preguntas": "Preguntas",
     "admin-dashboard-sin-datos": "Sin datos",
     "admin-dashboard-online-titulo": "Usuarios en línea",
     "admin-dashboard-online-subtitulo": "Activos en los últimos 5 min · actualiza cada 30s",
