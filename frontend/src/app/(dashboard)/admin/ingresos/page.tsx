@@ -28,6 +28,7 @@ import {
   type IngresosData,
 } from "@/lib/admin/api";
 import { useAuth } from "@/lib/auth/auth-context";
+import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { formatearFecha, formatearMonto } from "@/lib/formato";
 import { cn } from "@/lib/utils";
@@ -76,8 +77,7 @@ export default function IngresosPage() {
       const resp = await adminGetIngresos(token);
       setData(resp);
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      setError(err.message ?? t("admin-ingresos-error-cargar"));
+      setError(t(claveErrorApi(e, { generico: "admin-ingresos-error-cargar" })));
     } finally {
       setLoading(false);
     }
@@ -123,8 +123,11 @@ export default function IngresosPage() {
       toast.ok(t("admin-ingresos-tarifa-actualizada", { anio: updated.anio }));
     } catch (e: unknown) {
       // El error va dentro del diálogo: la alerta de página queda tapada por el modal.
-      const err = e as { message?: string };
-      setEditDialog((d) => ({ ...d, submitting: false, error: err.message ?? t("admin-ingresos-error-tarifa") }));
+      setEditDialog((d) => ({
+        ...d,
+        submitting: false,
+        error: t(claveErrorApi(e, { generico: "admin-ingresos-error-tarifa" })),
+      }));
     }
   };
 

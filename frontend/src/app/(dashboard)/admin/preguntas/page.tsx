@@ -21,6 +21,7 @@ import { Menu, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuTrigger } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Asignatura, catalogsApi, Especialidad, Grado, Proceso } from "@/lib/catalogs/api";
+import { claveErrorApi } from "@/lib/errores-api";
 import {
   ACCION_PRINCIPAL,
   ACCION_SECUNDARIA,
@@ -224,9 +225,8 @@ export default function PreguntasPage() {
       setConfirmDelete({ open: false, row: null, submitting: false });
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
       const clave = claveErrorEliminacion(e);
-      toast.error(clave ? t(clave) : (err.message ?? t("comun-error-eliminar")));
+      toast.error(clave ? t(clave) : t(claveErrorApi(e, { generico: "comun-error-eliminar" })));
       if (apiErrorCode(e) === "estado_invalido") {
         // El estado cambió mientras tanto: se cierra el diálogo y se muestra el actual.
         setConfirmDelete({ open: false, row: null, submitting: false });

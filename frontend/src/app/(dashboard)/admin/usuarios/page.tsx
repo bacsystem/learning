@@ -22,6 +22,7 @@ import { Dialog, DialogTitle } from "@/components/ui/dialog";
 import { GrupoBotones } from "@/components/ui/grupo-botones";
 import { excede, LIMITES } from "@/lib/admin/limites";
 import { useAuth } from "@/lib/auth/auth-context";
+import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_DESTRUCTIVO, BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { formatearFecha, formatearFechaHora } from "@/lib/formato";
 import { inscripcionesApi, SesionHistorialItem, UsuarioPendiente } from "@/lib/inscripciones/api";
@@ -183,9 +184,8 @@ export default function Page() {
       closeDialog();
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
       // H21: the page Alerta is hidden behind the modal; a toast is visible over it.
-      toast.error(err.message || t("admin-error-actualizar"));
+      toast.error(t(claveErrorApi(e, { generico: "admin-error-actualizar" })));
       setDialog((d) => ({ ...d, submitting: false }));
     }
   };
@@ -205,8 +205,7 @@ export default function Page() {
         await inscripcionesApi.resetTourUsuario(token, usuario.id);
         toast.ok(t("admin-usuarios-recorrido-habilitado"), `@${usuario.username}`);
       } catch (e: unknown) {
-        const err = e as { message?: string };
-        toast.error(err.message || t("admin-usuarios-error-recorrido"));
+        toast.error(t(claveErrorApi(e, { generico: "admin-usuarios-error-recorrido" })));
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -222,9 +221,8 @@ export default function Page() {
       closeEmailDialog();
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
       // H21: 409 (email in use) / 422 must be visible over the dialog.
-      toast.error(err.message || t("admin-error-actualizar-correo"));
+      toast.error(t(claveErrorApi(e, { generico: "admin-error-actualizar-correo" })));
       setEmailDialog((d) => ({ ...d, submitting: false }));
     }
   };

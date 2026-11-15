@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { excede, LIMITES } from "@/lib/admin/limites";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Asignatura, catalogsApi, Grado, Institucion, Proceso, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
+import { claveErrorApi } from "@/lib/errores-api";
 import {
   ACCION_PRINCIPAL,
   ACCION_SECUNDARIA,
@@ -236,8 +237,7 @@ export default function ProcesosPage() {
       closeDialog();
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      toast.error(err.message ?? t("comun-error-guardar"));
+      toast.error(t(claveErrorApi(e, { generico: "comun-error-guardar" })));
       setDialog((d) => ({ ...d, submitting: false }));
     }
   };
@@ -255,8 +255,7 @@ export default function ProcesosPage() {
       closeConfirm();
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      toast.error(err.message ?? t("comun-error-estado"));
+      toast.error(t(claveErrorApi(e, { generico: "comun-error-estado" })));
       setConfirmDialog((d) => ({ ...d, submitting: false }));
     }
   };
@@ -317,8 +316,7 @@ export default function ProcesosPage() {
     try {
       await catalogsApi.asignarAsignatura(token, procesoId, asigDialog.addForm);
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      toast.error(err.message ?? t("admin-error-asignar-asignatura"));
+      toast.error(t(claveErrorApi(e, { generico: "admin-error-asignar-asignatura" })));
       setAsigDialog((d) => ({ ...d, addSubmitting: false }));
       return;
     }
@@ -335,8 +333,7 @@ export default function ProcesosPage() {
     try {
       await catalogsApi.deleteProcesoAsignatura(token, procesoId, quitarDialog.item.asignatura_id);
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      toast.error(err.message ?? t("admin-error-eliminar-asignatura"));
+      toast.error(t(claveErrorApi(e, { generico: "admin-error-eliminar-asignatura" })));
       setQuitarDialog((d) => ({ ...d, submitting: false }));
       return;
     }

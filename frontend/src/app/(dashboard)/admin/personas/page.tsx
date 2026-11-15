@@ -21,6 +21,7 @@ import { GrupoBotones } from "@/components/ui/grupo-botones";
 import { adminPersonasApi, PersonaListItem, UpdatePersonaRequest } from "@/lib/auth/auth-api";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, Especialidad, Grado } from "@/lib/catalogs/api";
+import { claveErrorApi } from "@/lib/errores-api";
 import { ACCION_PRINCIPAL, BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { PencilSimpleIcon, UploadSimpleIcon, UserCircleIcon, WarningCircleIcon, XIcon } from "@phosphor-icons/react";
 
@@ -132,7 +133,7 @@ export default function PersonasPage() {
       toast.ok(t("admin-personas-actualizada"), updated.nombre_completo);
       closeEdit();
     } catch (e: unknown) {
-      setSaveError((e as { message?: string }).message || t("comun-error-guardar"));
+      setSaveError(t(claveErrorApi(e, { generico: "comun-error-guardar" })));
     } finally {
       setSaving(false);
     }

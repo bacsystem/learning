@@ -14,6 +14,7 @@ import { Chip, PillEstado } from "@/components/patrones/pill-estado";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth/auth-context";
+import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { Inscripcion, inscripcionesApi, Proceso } from "@/lib/inscripciones/api";
 import { cn } from "@/lib/utils";
@@ -128,8 +129,7 @@ export default function Page() {
       setConfirm(null);
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      setError(err.message ?? t("procesos-error-inscribir"));
+      setError(t(claveErrorApi(e, { generico: "procesos-error-inscribir" })));
       setConfirm(null);
     } finally {
       setSubmitting(false);

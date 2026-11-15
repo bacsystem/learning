@@ -16,6 +16,7 @@ import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { Chip } from "@/components/patrones/pill-estado";
 import { Dialog } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth/auth-context";
+import { claveErrorApi } from "@/lib/errores-api";
 import {
   ACCION_SECUNDARIA,
   BOTON_DESTRUCTIVO,
@@ -156,8 +157,7 @@ export default function AdminNotificacionesPage() {
       setForm(DEFAULT_FORM);
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      toast.error(err.message ?? t("comun-error-guardar"));
+      toast.error(t(claveErrorApi(e, { generico: "comun-error-guardar" })));
     } finally {
       setSubmitting(false);
     }
@@ -175,8 +175,7 @@ export default function AdminNotificacionesPage() {
       closeConfirm();
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      toast.error(err.message ?? t("comun-error-eliminar"));
+      toast.error(t(claveErrorApi(e, { generico: "comun-error-eliminar" })));
       setConfirmDialog((d) => ({ ...d, submitting: false }));
     }
   };
