@@ -3,7 +3,18 @@ package auth
 import (
 	"fmt"
 	"html"
+	"time"
 )
+
+// emailBrand signs the header and footer of every e-mail.
+const emailBrand = "Capacitate"
+
+// emailInstitution is the institution line removed from the e-mails until the
+// product owner confirms whether the client requires it. Restore it as a
+// secondary line in emailLayout (header and footer) if so.
+//
+//nolint:unused // kept on purpose, see above.
+const emailInstitution = "Ejército del Perú"
 
 const emailLayout = `<!DOCTYPE html>
 <html lang="es">
@@ -19,8 +30,7 @@ const emailLayout = `<!DOCTYPE html>
 
         <!-- Header -->
         <tr><td style="background-color:#4a5e3a;border-radius:12px 12px 0 0;padding:32px 40px;text-align:center;">
-          <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">Sistema de Capacitación</p>
-          <p style="margin:6px 0 0;font-size:13px;color:#c8d8b8;">Ejército del Perú</p>
+          <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">%s</p>
         </td></tr>
 
         <!-- Body -->
@@ -29,7 +39,7 @@ const emailLayout = `<!DOCTYPE html>
         <!-- Footer -->
         <tr><td style="background-color:#f9f9f9;border:1px solid #e4e4e7;border-top:none;border-radius:0 0 12px 12px;padding:20px 40px;text-align:center;">
           <p style="margin:0;font-size:12px;color:#71717a;">Este mensaje fue enviado automáticamente — por favor no respondas a este correo.</p>
-          <p style="margin:8px 0 0;font-size:12px;color:#a1a1aa;">© 2025 Sistema de Capacitación · Ejército del Perú</p>
+          <p style="margin:8px 0 0;font-size:12px;color:#a1a1aa;">© %d %s</p>
         </td></tr>
 
       </table>
@@ -39,7 +49,7 @@ const emailLayout = `<!DOCTYPE html>
 </html>`
 
 func wrap(subject, content string) string {
-	return fmt.Sprintf(emailLayout, subject, content)
+	return fmt.Sprintf(emailLayout, subject, emailBrand, content, time.Now().Year(), emailBrand)
 }
 
 // btnPrimary renders a call-to-action button. label is a trusted literal;

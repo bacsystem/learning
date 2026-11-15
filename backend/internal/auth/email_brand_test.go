@@ -1,0 +1,38 @@
+package auth
+
+import (
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestEmailTemplates_Brand(t *testing.T) {
+	templates := map[string]func() (string, string){
+		"recovery":      func() (string, string) { return emailOlvidePassword("https://x/reset") },
+		"reset done":    func() (string, string) { return emailPasswordRestablecida("https://x/login") },
+		"verify":        func() (string, string) { return emailVerificarRegistro("Ana", "Perez", "https://x/v") },
+		"registration":  func() (string, string) { return emailRegistroPendiente("Ana", "Perez", "ana") },
+		"activated":     func() (string, string) { return emailActivado("Ana", "Perez", "ana", "https://x/login") },
+		"rejected":      func() (string, string) { return emailRechazado("Ana", "Perez") },
+		"inactive":      func() (string, string) { return emailInactivo("Ana", "Perez") },
+		"email changed": func() (string, string) { return emailCorreoCambiado() },
+	}
+	footer := fmt.Sprintf("© %d %s", time.Now().Year(), emailBrand)
+	for name, render := range templates {
+		t.Run(name, func(t *testing.T) {
+			_, body := render()
+			if !strings.Contains(body, ">"+emailBrand+"</p>") {
+				t.Error("header does not carry the brand")
+			}
+			if !strings.Contains(body, footer) {
+				t.Errorf("footer %q missing", footer)
+			}
+			for _, gone := range []string{"Sistema de Capacitación", emailInstitution} {
+				if strings.Contains(body, gone) {
+					t.Errorf("body still contains %q", gone)
+				}
+			}
+		})
+	}
+}
