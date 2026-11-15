@@ -5,8 +5,9 @@ package auth
 // RegisterRequest only identifies the persona: credentials are chosen when the
 // e-mailed link is opened (VerifyEmailRequest).
 type RegisterRequest struct {
-	DNI   string `json:"dni"   validate:"required,len=8,numeric"`
-	Email string `json:"email" validate:"required,email,max=254"`
+	DNI    string `json:"dni"   validate:"required,len=8,numeric"`
+	Email  string `json:"email" validate:"required,email,max=254"`
+	Locale string `json:"locale"` // optional: language of the e-mail, see locale.Normalize
 }
 
 type VerifyEmailRequest struct {
@@ -14,6 +15,7 @@ type VerifyEmailRequest struct {
 	Username        string `json:"username"         validate:"required,min=4,max=30,alphanum"`
 	Password        string `json:"password"         validate:"required,min=8,maxbytes=72"` // bcrypt limit is 72 BYTES
 	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
+	Locale          string `json:"locale"` // optional: language of the e-mail, see locale.Normalize
 }
 
 // ── Login ───────────────────────────────────────────────────────────────────
@@ -48,13 +50,15 @@ type LoginResponse struct {
 // ── Password Recovery ───────────────────────────────────────────────────────
 
 type ForgotPasswordRequest struct {
-	Email string `json:"email" validate:"required,email"`
+	Email  string `json:"email" validate:"required,email"`
+	Locale string `json:"locale"` // optional: language of the e-mail, see locale.Normalize
 }
 
 type ResetPasswordRequest struct {
 	Token           string `json:"token"            validate:"required"`
 	Password        string `json:"password"         validate:"required,min=8,maxbytes=72"` // bcrypt limit is 72 BYTES
 	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
+	Locale          string `json:"locale"` // optional: language of the e-mail, see locale.Normalize
 }
 
 // ── Admin: Estado ───────────────────────────────────────────────────────────

@@ -502,7 +502,7 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = h.svc.ForgotPassword(r.Context(), req.Email, clientIP(r))
+	_ = h.svc.ForgotPassword(r.Context(), req.Email, req.Locale, clientIP(r))
 	jsonOK(w, http.StatusOK, map[string]string{"message": "Si el email está registrado, recibirás un enlace para restablecer tu contraseña."})
 }
 
@@ -516,7 +516,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.ResetPassword(r.Context(), req.Token, req.Password, clientIP(r)); err != nil {
+	if err := h.svc.ResetPassword(r.Context(), req.Token, req.Password, req.Locale, clientIP(r)); err != nil {
 		if errors.Is(err, ErrInvalidToken) {
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return

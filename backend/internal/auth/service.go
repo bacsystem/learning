@@ -13,6 +13,7 @@ import (
 	"time"
 
 	jwtpkg "github.com/cbaciliod/learning/internal/jwt"
+	"github.com/cbaciliod/learning/internal/locale"
 	internalmw "github.com/cbaciliod/learning/internal/middleware"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -254,7 +255,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest, ip, ua stri
 		return err
 	}
 	link := fmt.Sprintf("%s/auth/verify-email?token=%s", s.frontendBaseURL, token)
-	sub, bdy := emailVerificarRegistro(profile.Nombres, profile.ApellidoPaterno, link)
+	sub, bdy := emailVerificarRegistro(locale.Normalize(req.Locale), profile.Nombres, profile.ApellidoPaterno, link)
 	if err := s.repo.SavePendingRegistration(ctx, PendingRegistration{
 		PersonaID: persona.ID,
 		Email:     sendTo,
@@ -336,7 +337,7 @@ func (s *Service) VerifyEmail(ctx context.Context, req VerifyEmailRequest, ip, u
 	if profile, err := s.repo.GetPersonaProfile(ctx, res.PersonaID); err != nil {
 		log.Error().Err(err).Int64("usuario_id", res.UserID).Msg("verify_email: load profile failed")
 	} else if profile.Email != "" {
-		sub, bdy := emailRegistroPendiente(profile.Nombres, profile.ApellidoPaterno, req.Username)
+		sub, bdy := emailRegistroPendiente(locale.Normalize(req.Locale), profile.Nombres, profile.ApellidoPaterno, req.Username)
 		if err := s.repo.EnqueueEmail(ctx, profile.Email, sub, bdy); err != nil {
 			log.Error().Err(err).Int64("usuario_id", res.UserID).Msg("verify_email: enqueue email failed")
 		}
@@ -614,7 +615,7 @@ func (s *Service) AdminUpdatePersona(ctx context.Context, personaID int64, req U
 // ACTIVE usuario. It always returns nil (anti-enumeration). If several active
 // usuarios share the e-mail nothing is sent: picking one would be arbitrary
 // and could hand one person's account to another.
-func (s *Service) ForgotPassword(ctx context.Context, email, ip string) error {
+func (s *Service) ForgotPassword(ctx context.Context, email, lang, ip string) error {
 	email = NormalizeEmail(email)
 	ids, err := s.repo.FindActiveUserIDsByEmail(ctx, email)
 	if err != nil {
@@ -643,7 +644,7 @@ func (s *Service) ForgotPassword(ctx context.Context, email, ip string) error {
 	}
 
 	resetLink := fmt.Sprintf("%s/auth/password-new?token=%s", s.frontendBaseURL, token)
-	sub, bdy := emailOlvidePassword(resetLink)
+	sub, bdy := emailOlvidePassword(locale.Normalize(lang), resetLink)
 	if err := s.repo.EnqueueEmail(ctx, email, sub, bdy); err != nil {
 		log.Error().Err(err).Int64("usuario_id", userID).Msg("forgot_password: enqueue email failed")
 	}
@@ -654,7 +655,7 @@ func (s *Service) ForgotPassword(ctx context.Context, email, ip string) error {
 
 // ResetPassword consumes a recovery token (single use, atomically) and sets
 // the new password, revoking all sessions of the usuario.
-func (s *Service) ResetPassword(ctx context.Context, token, newPassword, ip string) error {
+func (s *Service) ResetPassword(ctx context.Context, token, newPassword, lang, ip string) error {
 	tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(token)))
 
 	// Cheap pre-check so invalid tokens don't cost a bcrypt hash. It is NOT
@@ -679,7 +680,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword, ip stri
 	}
 
 	// Notify user: password changed
-	sub, bdy := emailPasswordRestablecida(s.frontendBaseURL + "/auth/sign-in")
+	sub, bdy := emailPasswordRestablecida(locale.Normalize(lang), s.frontendBaseURL+"/auth/sign-in")
 	s.notifyUsuario(ctx, userID, "reset_password", sub, bdy)
 
 	s.repo.WriteAudit(ctx, AuditEntry{UsuarioID: &userID, Accion: "reset_password", Entidad: "usuarios", EntidadID: &userID, IP: ip})

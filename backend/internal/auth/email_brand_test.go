@@ -9,10 +9,10 @@ import (
 
 func TestEmailTemplates_Brand(t *testing.T) {
 	templates := map[string]func() (string, string){
-		"recovery":      func() (string, string) { return emailOlvidePassword("https://x/reset") },
-		"reset done":    func() (string, string) { return emailPasswordRestablecida("https://x/login") },
-		"verify":        func() (string, string) { return emailVerificarRegistro("Ana", "Perez", "https://x/v") },
-		"registration":  func() (string, string) { return emailRegistroPendiente("Ana", "Perez", "ana") },
+		"recovery":      func() (string, string) { return emailOlvidePassword("es", "https://x/reset") },
+		"reset done":    func() (string, string) { return emailPasswordRestablecida("es", "https://x/login") },
+		"verify":        func() (string, string) { return emailVerificarRegistro("es", "Ana", "Perez", "https://x/v") },
+		"registration":  func() (string, string) { return emailRegistroPendiente("es", "Ana", "Perez", "ana") },
 		"activated":     func() (string, string) { return emailActivado("Ana", "Perez", "ana", "https://x/login") },
 		"rejected":      func() (string, string) { return emailRechazado("Ana", "Perez") },
 		"inactive":      func() (string, string) { return emailInactivo("Ana", "Perez") },
