@@ -174,6 +174,7 @@ export default function AuditLogPage() {
         />
         <div className="min-w-56 flex-1">
           <Buscador
+            etiquetaLimpiar={t("tabla-limpiar-busqueda")}
             etiqueta={t("admin-audit-buscar-etiqueta")}
             placeholder={t("admin-audit-buscar")}
             valor={q}

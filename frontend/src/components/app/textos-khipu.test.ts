@@ -52,6 +52,7 @@ describe("textos-khipu", () => {
     const { t } = traductor();
     expect(textosTablaListado(t)).toMatchObject({
       buscar: "tabla-buscar",
+      limpiar: "tabla-limpiar-busqueda",
       columnas: "tabla-columnas",
       columnasVisibles: "tabla-columnas-visibles",
       exportar: "tabla-exportar",

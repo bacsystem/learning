@@ -57,6 +57,8 @@ function normalizar(s: string): string {
 /** Textos de la barra del listado, para traducirlos (por defecto en castellano). */
 export type TextosTablaListado = {
   buscar: string;
+  /** Nombre accesible del botón de limpiar la búsqueda. */
+  limpiar: string;
   columnas: string;
   columnasVisibles: string;
   exportar: string;
@@ -66,6 +68,7 @@ export type TextosTablaListado = {
 
 const TEXTOS_ES: TextosTablaListado = {
   buscar: "Buscar…",
+  limpiar: "Limpiar búsqueda",
   columnas: "Columnas",
   columnasVisibles: "Columnas visibles",
   exportar: "Exportar",
@@ -148,7 +151,13 @@ export function TablaListado<T>({
         <div className="flex flex-wrap items-center gap-2" data-sin-imprimir>
           {buscar ? (
             <div className="min-w-56 flex-1">
-              <Buscador etiqueta={textoBusqueda} placeholder={textoBusqueda} valor={busqueda} onCambio={setBusqueda} />
+              <Buscador
+                etiqueta={textoBusqueda}
+                placeholder={textoBusqueda}
+                etiquetaLimpiar={textos.limpiar}
+                valor={busqueda}
+                onCambio={setBusqueda}
+              />
             </div>
           ) : (
             <div className="flex-1" />

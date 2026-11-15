@@ -439,6 +439,7 @@
     "admin-config-recursos-error-guardar": "Error al guardar los accesos directos. Revise título y URL de cada fila.",
     "admin-config-recursos-guardar": "Guardar accesos directos",
     "tabla-buscar": "Buscar…",
+    "tabla-limpiar-busqueda": "Limpiar búsqueda",
     "tabla-columnas": "Columnas",
     "tabla-columnas-visibles": "Columnas visibles",
     "tabla-exportar": "Exportar",

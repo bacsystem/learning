@@ -38,6 +38,7 @@ export function textosTablaListado(t: Traductor): TextosTablaListado & TextosTab
   return {
     ...textosTablaDatos(t),
     buscar: t("tabla-buscar"),
+    limpiar: t("tabla-limpiar-busqueda"),
     columnas: t("tabla-columnas"),
     columnasVisibles: t("tabla-columnas-visibles"),
     exportar: t("tabla-exportar"),
