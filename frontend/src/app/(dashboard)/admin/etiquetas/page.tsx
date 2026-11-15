@@ -3,31 +3,27 @@
 import {
   CeldaNombre,
   DialogoConfirmarAccion,
-  DialogoFormulario,
   etiquetaEstado,
   PillEstadoCatalogo,
   type TabEstado,
   TabsEstado,
 } from "../_catalogos/componentes";
+import { FormularioEtiqueta } from "./formulario-etiqueta";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Campo } from "@/components/app/campo";
 import { type ColumnaListado, TablaListado } from "@/components/app/tabla-listado";
 import { Alerta } from "@/components/feedback/alerta";
 import { useToast } from "@/components/feedback/toast";
-import { Entrada } from "@/components/formularios/campo";
 import { SelectCampo } from "@/components/formularios/select-campo";
 import { MenuAcciones } from "@/components/navegacion/menu-acciones";
 import { useAuth } from "@/lib/auth/auth-context";
 import { type Asignatura, catalogsApi } from "@/lib/catalogs/api";
+import { claveErrorApi } from "@/lib/errores-api";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { type Etiqueta, questionsApi } from "@/lib/questions/api";
-import { CheckCircleIcon, EyeSlashIcon, PencilSimpleIcon, PlusIcon, TagIcon, TrashIcon } from "@phosphor-icons/react";
-
-type DialogMode = "create" | "edit";
-
-const DEFAULT_FORM = { asignatura_id: 0, nombre: "" };
+import { ERRORES_ETIQUETA, type ValoresEtiqueta } from "@/lib/questions/etiquetas";
+import { CheckCircleIcon, EyeSlashIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 
 export default function EtiquetasPage() {
   const { token } = useAuth();
@@ -41,14 +37,8 @@ export default function EtiquetasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [dialog, setDialog] = useState<{
-    open: boolean;
-    mode: DialogMode;
-    row: Etiqueta | null;
-    form: typeof DEFAULT_FORM;
-    submitting: boolean;
-    error: string | null;
-  }>({ open: false, mode: "create", row: null, form: DEFAULT_FORM, submitting: false, error: null });
+  /** `row` es `null` al crear; `null` en el estado, el diálogo cerrado. */
+  const [dialog, setDialog] = useState<{ row: Etiqueta | null } | null>(null);
 
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; row: Etiqueta | null }>({
     open: false,
@@ -99,44 +89,22 @@ export default function EtiquetasPage() {
     [asignaturas],
   );
 
-  const openCreate = () =>
-    setDialog({ open: true, mode: "create", row: null, form: DEFAULT_FORM, submitting: false, error: null });
+  const openCreate = () => setDialog({ row: null });
+  const openEdit = useCallback((row: Etiqueta) => setDialog({ row }), []);
+  const closeDialog = () => setDialog(null);
 
-  const openEdit = useCallback(
-    (row: Etiqueta) =>
-      setDialog({
-        open: true,
-        mode: "edit",
-        row,
-        form: { asignatura_id: row.asignatura_id, nombre: row.nombre },
-        submitting: false,
-        error: null,
-      }),
-    [],
-  );
-
-  const closeDialog = () => setDialog((d) => ({ ...d, open: false }));
-
-  const submitDialog = async () => {
-    if (!token) return;
-    setDialog((d) => ({ ...d, submitting: true, error: null }));
-    try {
-      if (dialog.mode === "create") {
-        await questionsApi.createEtiqueta(token, {
-          asignatura_id: dialog.form.asignatura_id,
-          nombre: dialog.form.nombre,
-        });
-        toast.ok(t("admin-etiquetas-creada"));
-      } else if (dialog.row) {
-        await questionsApi.updateEtiqueta(token, dialog.row.id, { nombre: dialog.form.nombre });
-        toast.ok(t("admin-etiquetas-actualizada"));
-      }
-      setDialog((d) => ({ ...d, open: false, submitting: false }));
-      load();
-    } catch (e: unknown) {
-      const err = e as { message?: string };
-      setDialog((d) => ({ ...d, submitting: false, error: err.message ?? t("comun-error-guardar") }));
+  // Rechaza si la API falla: el formulario lo traduce y lo muestra sin cerrarse.
+  const submitDialog = async (valores: ValoresEtiqueta) => {
+    if (!token || !dialog) return;
+    if (dialog.row) {
+      await questionsApi.updateEtiqueta(token, dialog.row.id, { nombre: valores.nombre });
+      toast.ok(t("admin-etiquetas-actualizada"));
+    } else {
+      await questionsApi.createEtiqueta(token, valores);
+      toast.ok(t("admin-etiquetas-creada"));
     }
+    setDialog(null);
+    load();
   };
 
   const openEstado = useCallback((row: Etiqueta) => setEstadoDialog({ open: true, row }), []);
@@ -153,8 +121,7 @@ export default function EtiquetasPage() {
       load();
       return null;
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      return err.message ?? t("comun-error-estado");
+      return t(claveErrorApi(e, ERRORES_ETIQUETA.estado));
     }
   };
 
@@ -169,8 +136,7 @@ export default function EtiquetasPage() {
       load();
       return null;
     } catch (e: unknown) {
-      const err = e as { message?: string };
-      return err.message ?? t("comun-error-eliminar");
+      return t(claveErrorApi(e, ERRORES_ETIQUETA.eliminar));
     }
   };
 
@@ -278,42 +244,14 @@ export default function EtiquetasPage() {
         }
       />
 
-      <DialogoFormulario
-        open={dialog.open}
-        onCerrar={closeDialog}
-        icon={TagIcon}
-        titulo={dialog.mode === "create" ? t("admin-nueva-etiqueta") : t("admin-editar-etiqueta")}
-        descripcion={dialog.mode === "edit" && dialog.row ? dialog.row.asignatura : undefined}
-        error={dialog.error}
-        pendiente={dialog.submitting}
-        textoGuardar={t("comun-guardar")}
-        textoGuardando={t("comun-guardando")}
-        textoCancelar={t("comun-cancelar")}
-        onGuardar={submitDialog}
-        ancho="sm:max-w-md"
-      >
-        {dialog.mode === "create" ? (
-          <Campo id="etiqueta-asignatura" etiqueta={t("admin-catalogos-col-asignatura")} className="md:col-span-2">
-            <SelectCampo
-              id="etiqueta-asignatura"
-              required
-              placeholder={t("admin-seleccionar-asignatura")}
-              opciones={opcionesAsignatura}
-              valor={dialog.form.asignatura_id ? String(dialog.form.asignatura_id) : ""}
-              onCambio={(v) => setDialog((d) => ({ ...d, form: { ...d.form, asignatura_id: Number(v) || 0 } }))}
-            />
-          </Campo>
-        ) : null}
-        <Campo id="etiqueta-nombre" etiqueta={t("admin-catalogos-col-nombre")} className="md:col-span-2">
-          <Entrada
-            id="etiqueta-nombre"
-            required
-            maxLength={100}
-            value={dialog.form.nombre}
-            onChange={(e) => setDialog((d) => ({ ...d, form: { ...d.form, nombre: e.target.value } }))}
-          />
-        </Campo>
-      </DialogoFormulario>
+      {dialog ? (
+        <FormularioEtiqueta
+          etiqueta={dialog.row}
+          opcionesAsignatura={opcionesAsignatura}
+          onCerrar={closeDialog}
+          onGuardar={submitDialog}
+        />
+      ) : null}
 
       <DialogoConfirmarAccion
         open={confirmDialog.open}
