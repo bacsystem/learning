@@ -2,6 +2,8 @@
 
 Estado: borrador para revisión (2026-11-15). Origen: decisión D4 del po (`docs/qa/decisiones-247.md`, worktree de qa): los correos de auth que la persona dispara desde la UI salen en el idioma que usaba al pedirlos; si no se conoce, en español. La ampliación a reset-password y verify-email también la decidió el po el 2026-11-15, sin persistir el idioma.
 
+> **Enmienda (2026-11-15, PLT-11/PLT-13):** el idioma pasa a guardarse en `usuarios.idioma`, en [plataforma-avisos-idioma.md](plataforma-avisos-idioma.md) §1. Los cuatro endpoints de §3 **no cambian**: su `locale` decide solo el correo del request. La única novedad es que `POST /auth/verify-email` también usa su `locale` para fijar el idioma del usuario que crea. Quedan reemplazados el «Fuera de alcance» de §3 (los correos que dispara el admin pasan a usar el idioma guardado, PLT-13) y la regla de precedencia de §5 (ahora vigente, en `plataforma-avisos-idioma.md` §1.4). En §6, la fila «Admin activa a un usuario → español» queda reemplazada: el correo sale en el idioma guardado del usuario (PLT-13).
+
 ## 1. Situación actual (código)
 
 - El frontend guarda el locale en la cookie `${NEXT_PUBLIC_STORAGE_PREFIX}-locale` (CLAUDE.md, i18n) y **no** se lo envía al backend: `forgotPassword` manda solo `{ email }` (`frontend/src/lib/auth/auth-api.ts:113-118`) y `register`, `{ dni, email }` (`auth-api.ts:81-88`).
