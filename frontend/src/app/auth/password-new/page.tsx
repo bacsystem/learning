@@ -12,6 +12,7 @@ import { Campo } from "@/components/app/campo";
 import { Alerta } from "@/components/feedback/alerta";
 import { Contrasena } from "@/components/formularios/contrasena";
 import { BotonAsync } from "@/components/patrones/boton-async";
+import { comoLocale } from "@/constants";
 import { authApi } from "@/lib/auth/auth-api";
 import { claveErrorAuth } from "@/lib/auth/errores-auth";
 import { ACCION_SECUNDARIA, BOTON_PRIMARIO } from "@/lib/estilos";
@@ -21,7 +22,7 @@ import { ArrowLeftIcon, LockKeyIcon } from "@phosphor-icons/react";
 export default function Page() {
   const router = useRouter();
   const t = useTranslations("dashboard");
-  const locale = useLocale();
+  const locale = comoLocale(useLocale());
   const etiquetasContrasena = useEtiquetasContrasena();
   const searchParams = useSearchParams();
   // Read once: the token is then removed from the URL (and the history entry).

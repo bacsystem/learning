@@ -1,3 +1,4 @@
+import type { LocaleOption } from "@/constants";
 import { API_BASE } from "@/lib/http/api-base";
 import { apiErrorFrom } from "@/lib/http/api-error";
 import { avisarSiSesionExpirada } from "@/lib/http/sesion";
@@ -78,7 +79,7 @@ export const authApi = {
     });
   },
 
-  register(payload: { dni: string; email: string; locale?: string }): Promise<{ message: string }> {
+  register(payload: { dni: string; email: string; locale?: LocaleOption }): Promise<{ message: string }> {
     // 202 with one generic message whether or not the data matched: the
     // account is only created when the e-mailed link is opened (verifyEmail).
     return request("/auth/register", {
@@ -96,7 +97,7 @@ export const authApi = {
     username: string;
     password: string;
     confirm_password: string;
-    locale?: string;
+    locale?: LocaleOption;
   }): Promise<{ message: string }> {
     return request("/auth/verify-email", {
       method: "POST",
@@ -111,7 +112,7 @@ export const authApi = {
     });
   },
 
-  forgotPassword(email: string, locale?: string): Promise<{ message: string }> {
+  forgotPassword(email: string, locale?: LocaleOption): Promise<{ message: string }> {
     return request("/auth/forgot-password", {
       method: "POST",
       body: JSON.stringify({ email, locale }),
@@ -122,7 +123,7 @@ export const authApi = {
     token: string,
     password: string,
     confirm_password: string,
-    locale?: string,
+    locale?: LocaleOption,
   ): Promise<{ message: string }> {
     return request("/auth/reset-password", {
       method: "POST",

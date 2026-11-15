@@ -13,6 +13,7 @@ import { Spinner } from "@/components/feedback/spinner";
 import { Entrada } from "@/components/formularios/campo";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { Chip } from "@/components/patrones/pill-estado";
+import { comoLocale } from "@/constants";
 import { authApi, type CheckDNIResult } from "@/lib/auth/auth-api";
 import { claveErrorAuth } from "@/lib/auth/errores-auth";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO } from "@/lib/estilos";
@@ -46,7 +47,7 @@ function Verificando() {
 
 export default function Page() {
   const t = useTranslations("dashboard");
-  const locale = useLocale();
+  const locale = comoLocale(useLocale());
   const dniRef = useRef<HTMLInputElement>(null);
   // Step 2 only confirms the e-mail: username and password are chosen on the
   // page the e-mailed link opens (/auth/verify-email).

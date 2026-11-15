@@ -10,6 +10,7 @@ import { Campo } from "@/components/app/campo";
 import { Alerta } from "@/components/feedback/alerta";
 import { Entrada } from "@/components/formularios/campo";
 import { BotonAsync } from "@/components/patrones/boton-async";
+import { comoLocale } from "@/constants";
 import { authApi } from "@/lib/auth/auth-api";
 import { claveErrorAuth } from "@/lib/auth/errores-auth";
 import { BOTON_PRIMARIO } from "@/lib/estilos";
@@ -20,7 +21,7 @@ export default function Page() {
   const [sent, setSent] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const t = useTranslations("dashboard");
-  const locale = useLocale();
+  const locale = comoLocale(useLocale());
   const validationSchema = useMemo(
     () => yup.object({ email: yup.string().required(t("auth-campo-requerido")).email(t("auth-correo-invalido")) }),
     [t],

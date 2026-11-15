@@ -15,6 +15,7 @@ import { Spinner } from "@/components/feedback/spinner";
 import { Entrada } from "@/components/formularios/campo";
 import { Contrasena } from "@/components/formularios/contrasena";
 import { BotonAsync } from "@/components/patrones/boton-async";
+import { comoLocale } from "@/constants";
 import { authApi } from "@/lib/auth/auth-api";
 import { claveErrorAuth } from "@/lib/auth/errores-auth";
 import { ACCION_SECUNDARIA, BOTON_PRIMARIO } from "@/lib/estilos";
@@ -43,7 +44,7 @@ function EstadoDisponibilidad({ estado }: { estado: UsernameStatus }) {
 
 export default function Page() {
   const t = useTranslations("dashboard");
-  const locale = useLocale();
+  const locale = comoLocale(useLocale());
   const etiquetasContrasena = useEtiquetasContrasena();
   const searchParams = useSearchParams();
   // Read once: the token is then removed from the URL (and the history entry).
