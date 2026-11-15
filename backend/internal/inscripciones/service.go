@@ -141,11 +141,13 @@ func (s *Service) Inscribir(ctx context.Context, usuarioID, procesoID int64, onR
 		return nil, err
 	}
 
-	row, err := s.repo.Create(ctx, usuarioID, procesoID, onReapply)
+	// Read before creating: a failure after Create would answer 500 for an
+	// inscription that exists, and the retry would get ya_inscrito.
+	proceso, err := s.repo.ProcesoResumen(ctx, procesoID)
 	if err != nil {
 		return nil, err
 	}
-	proceso, err := s.repo.ProcesoResumen(ctx, procesoID)
+	row, err := s.repo.Create(ctx, usuarioID, procesoID, onReapply)
 	if err != nil {
 		return nil, err
 	}
