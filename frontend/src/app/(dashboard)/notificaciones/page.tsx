@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
 import { haceCuanto, tipoNotificacion } from "@/components/app/notificaciones-tipo";
+import { claveDetalleHistorialVacio } from "@/components/app/notificaciones-vacio";
 import { useRecordatorioOpinion } from "@/components/app/use-recordatorio-opinion";
 import { Alerta } from "@/components/feedback/alerta";
 import { EstadoVacio } from "@/components/feedback/estado-vacio";
@@ -26,7 +27,10 @@ export default function NotificacionesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // El badge de la campana cuenta la invitación a opinar aunque el historial esté vacío: se explica para no contradecirlo.
-  const { pendiente: invitacionPendiente } = useRecordatorioOpinion(token);
+  const recordatorio = useRecordatorioOpinion(token);
+  const detalleVacio = claveDetalleHistorialVacio(recordatorio);
+  // Con el historial vacío se espera a saber si hay invitación pendiente: así el vacío no parpadea ni se contradice.
+  const esperando = loading || (!error && items.length === 0 && !recordatorio.resuelto);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -75,7 +79,7 @@ export default function NotificacionesPage() {
           icon={BellIcon}
           titulo={t("notif-subtitulo")}
           subtitulo={
-            loading || error || (items.length === 0 && invitacionPendiente)
+            esperando || error || (items.length === 0 && detalleVacio)
               ? undefined
               : t("notif-en-total", { n: items.length })
           }
@@ -93,7 +97,7 @@ export default function NotificacionesPage() {
         />
 
         <div className="px-2 pt-1 pb-2">
-          {loading ? (
+          {esperando ? (
             <div className="flex flex-col gap-1" aria-busy="true">
               {[0, 1, 2, 3, 4].map((i) => (
                 <div key={i} className="flex items-start gap-3 px-3 py-3">
@@ -121,7 +125,7 @@ export default function NotificacionesPage() {
             </Alerta>
           ) : items.length === 0 ? (
             <EstadoVacio icon={BellIcon} titulo={t("notif-sin-notificaciones")} className="m-2 border-0 bg-transparent">
-              {invitacionPendiente ? t("notif-historial-vacio-invitacion") : null}
+              {detalleVacio ? t(detalleVacio) : null}
             </EstadoVacio>
           ) : (
             <ul className="divide-border/60 flex flex-col divide-y">
