@@ -6,7 +6,7 @@
 #   bash setup-team.sh          # escribe .claude/agents/*, .claude/settings.json (si no existe) y CLAUDE.md
 #   bash setup-team.sh --check  # solo compara: falla si este script y .claude/ no coinciden
 #
-# Fuente de verdad: este script. Si cambias un agente o .claude/settings.json, actualiza también
+# Fuente de verdad: este script. Si cambias un agente, un hook o .claude/settings.json, actualiza también
 # este archivo en el mismo PR y verifica con --check.
 set -euo pipefail
 
@@ -278,7 +278,7 @@ emit .claude/agents/qa.md <<'AGENT_EOF'
 ---
 name: qa
 description: QA. Valida cada entrega contra los criterios de aceptación del PO, ejecuta las verificaciones, recorre las pantallas en el navegador y reporta defectos.
-tools: Read, Grep, Glob, Bash, Write, Edit, SendMessage, TaskCreate, TaskGet, TaskList, TaskUpdate, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__tabs_close_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__find, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__browser_batch, mcp__claude-in-chrome__resize_window, mcp__claude-in-chrome__read_console_messages, mcp__claude-in-chrome__read_network_requests, mcp__claude-in-chrome__gif_creator
+tools: Read, Grep, Glob, Bash, Write, Edit, SendMessage, TaskCreate, TaskGet, TaskList, TaskUpdate, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__tabs_close_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__find, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__file_upload, mcp__claude-in-chrome__browser_batch, mcp__claude-in-chrome__read_console_messages, mcp__claude-in-chrome__read_network_requests, mcp__claude-in-chrome__gif_creator
 model: sonnet
 ---
 Eres el responsable de calidad de Capacitate.
@@ -287,7 +287,9 @@ Responsabilidades:
 - Por cada historia, verificar que se cumplan sus criterios de aceptación.
 - Ejecutar `make test`, `make lint`, `make build` y, en frontend/, `npx tsc --noEmit` y `npm run lint`.
 - Revisar que las claves i18n existan en es.json y en.json, y que no haya colores o tipografías fijas.
-- Recorrer en el navegador (Claude in Chrome) cada pantalla de la historia contra la app local (`make dev`): flujo feliz, errores, roles, idiomas es/en y ancho de móvil; revisar la consola y las peticiones de red. Trabajar siempre en una pestaña nueva y no pulsar acciones que abran diálogos nativos del navegador (alert/confirm).
+- Recorrer en el navegador (Claude in Chrome) cada pantalla de la historia contra la app local (`make dev` o la preproducción de `make local/up`): flujo feliz, errores, roles, idiomas es/en; revisar la consola y las peticiones de red. Trabajar siempre en una pestaña nueva y no pulsar acciones que abran diálogos nativos del navegador (alert/confirm).
+- Subir archivos en el navegador (`file_upload`) solo con archivos sintéticos que crees tú en tu scratchpad. Nunca subas nada de `assets/` ni archivos `.env`.
+- Móvil: el navegador no permite cambiar el ancho efectivo de la página, así que la vista móvil se valida revisando en el código las clases responsive y los breakpoints de cada pantalla. Repórtalo como «revisado en código»; el usuario hace una pasada manual con DevTools antes de cada release.
 - Escribir tests faltantes en backend (Go) y, si el tech-lead lo aprueba, proponer una base de tests para el frontend (hoy no existe).
 - Reportar defectos al dev dueño del archivo con pasos para reproducir, resultado esperado y obtenido.
 - Dar el visto bueno final al tech-lead y al PO cuando todo pase.
@@ -355,6 +357,52 @@ Comunicación activa (obligatorio para todo el equipo):
 - Mensajes cortos y concretos: qué hiciste, qué necesitas, de quién y enlace o ruta si aplica.
 AGENT_EOF
 
+# ---------------------------------------------------------------- hooks
+# Guardia de file_upload (Claude in Chrome): solo se suben archivos del scratchpad de la
+# sesión (/tmp/claude-*), nunca assets/ ni .env*. Es la barrera real; la regla del qa es texto.
+emit .claude/hooks/guard-file-upload.py <<'HOOK_EOF'
+"""PreToolUse de mcp__claude-in-chrome__file_upload: bloquea (exit 2) rutas no permitidas."""
+import json
+import os
+import sys
+
+PERMITIDAS = ("/private/tmp/claude-", "/tmp/claude-")
+
+
+def motivo_rechazo(ruta):
+    real = os.path.realpath(ruta)
+    partes = real.split(os.sep)
+    if "assets" in partes:
+        return "está dentro de assets/"
+    if any(p.startswith(".env") for p in partes):
+        return "es un archivo .env"
+    if not real.startswith(PERMITIDAS):
+        return "no está en el scratchpad de la sesión (/tmp/claude-*)"
+    return None
+
+
+def main():
+    try:
+        datos = json.load(sys.stdin)
+        rutas = datos.get("tool_input", {}).get("paths") or []
+    except (ValueError, AttributeError):
+        print("guard-file-upload: entrada ilegible; subida bloqueada", file=sys.stderr)
+        return 2
+    if not isinstance(rutas, list) or not rutas:
+        print("guard-file-upload: sin rutas; subida bloqueada", file=sys.stderr)
+        return 2
+    for ruta in rutas:
+        motivo = motivo_rechazo(str(ruta))
+        if motivo:
+            print(f"guard-file-upload: {ruta} {motivo}; subida bloqueada", file=sys.stderr)
+            return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+HOOK_EOF
+
 if [ "$MODE" = "--check" ] || [ ! -f .claude/settings.json ]; then
 emit .claude/settings.json <<'SETTINGS_EOF'
 {
@@ -386,6 +434,19 @@ emit .claude/settings.json <<'SETTINGS_EOF'
       "Read(./assets/**)",
       "Bash(cat *.env*)",
       "Bash(grep * *.env*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__claude-in-chrome__file_upload",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-file-upload.py\" || exit 2"
+          }
+        ]
+      }
     ]
   }
 }
