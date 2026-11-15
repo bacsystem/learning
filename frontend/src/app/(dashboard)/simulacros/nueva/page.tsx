@@ -16,9 +16,11 @@ import { Chip } from "@/components/patrones/pill-estado";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth/auth-context";
+import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA, ROTULO, TARJETA } from "@/lib/estilos";
 import { type IconoComponente, PESO_ICONO } from "@/lib/iconos";
 import { inscripcionesApi, type Proceso } from "@/lib/inscripciones/api";
+import { ERROR_CREAR_SIMULACRO } from "@/lib/inscripciones/errores";
 import { type ConfiguracionExamen, simulacrosApi } from "@/lib/simulations/api";
 import { cn } from "@/lib/utils";
 import {
@@ -144,19 +146,13 @@ export default function NuevoSimulacroPage() {
         proceso_id: procesoSeleccionado.id,
       });
       router.push(`/simulacros/${simulacro.id}`);
-    } catch (e: any) {
-      if (e.status === 409 && e.simulacro_id) {
-        setConflictDialog({ open: true, simulacroId: e.simulacro_id });
-      } else if (e.status === 403) {
-        setError(t("simulacros-error-sin-acceso"));
-      } else if (e.status === 422) {
-        setError(t("simulacros-error-preguntas"));
-      } else if (e.status === 400) {
-        // H33: always the translated key (the server message is Spanish-only).
-        // 400 is ErrNoConfig (no active configuración) or a bad payload.
-        setError(t("simulacros-error-configuracion"));
+    } catch (e: unknown) {
+      const conflicto = e as { status?: number; simulacro_id?: number };
+      if (conflicto.status === 409 && conflicto.simulacro_id) {
+        setConflictDialog({ open: true, simulacroId: conflicto.simulacro_id });
       } else {
-        setError(t("simulacros-error-crear"));
+        // H33: always a translated key (the server message is Spanish-only).
+        setError(t(claveErrorApi(e, ERROR_CREAR_SIMULACRO)));
       }
     } finally {
       setLoading(false);
