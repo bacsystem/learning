@@ -308,7 +308,9 @@ export default function AdminDashboardPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className={cn(CABECERA_TABLA, "pl-4")}>{t("admin-catalogos-col-asignatura")}</TableHead>
-                    <TableHead className={cn(CABECERA_TABLA, "pr-4 text-right")}>{t("menu-practicas")}</TableHead>
+                    <TableHead className={cn(CABECERA_TABLA, "pr-4 text-right")}>
+                      {t("admin-dashboard-top-preguntas")}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="text-control">

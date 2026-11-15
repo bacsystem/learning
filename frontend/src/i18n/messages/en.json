@@ -922,6 +922,7 @@
     "admin-dashboard-actividad-vacio": "No activity in the last 7 days",
     "admin-dashboard-actividad-desc": "{practicas} practice sessions and {simulacros} mock exams in the last 7 days",
     "admin-dashboard-top-asignaturas": "Top Subjects",
+    "admin-dashboard-top-preguntas": "Questions",
     "admin-dashboard-sin-datos": "No data",
     "admin-dashboard-online-titulo": "Users online",
     "admin-dashboard-online-subtitulo": "Active in the last 5 min · refreshes every 30s",
