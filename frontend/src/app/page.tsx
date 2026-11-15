@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
@@ -118,20 +117,6 @@ function CabeceraLanding({
       <h2 className="text-titulo-pagina text-foreground text-balance">{titulo}</h2>
       <p className="text-cuerpo text-muted-foreground leading-relaxed">{children}</p>
     </header>
-  );
-}
-
-/** Escudo de la institución como marca de agua en la esquina de una tarjeta. */
-function MarcaAgua() {
-  return (
-    <Image
-      src="/images/ep/army.png"
-      alt=""
-      aria-hidden="true"
-      width={44}
-      height={44}
-      className="pointer-events-none absolute top-3 right-3 size-11 opacity-15 mix-blend-multiply select-none dark:opacity-10 dark:mix-blend-normal"
-    />
   );
 }
 
@@ -301,7 +286,6 @@ export default function Home() {
                       key={p.id}
                       className={cn(TARJETA_ELEVABLE, "relative flex flex-col gap-3 overflow-hidden p-5")}
                     >
-                      <MarcaAgua />
                       <tono.icono className={cn("size-6", tono.texto)} />
                       <div className="flex flex-1 flex-col gap-1.5">
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -341,7 +325,6 @@ export default function Home() {
                     key={testimonio.id}
                     className={cn(TARJETA_ELEVABLE, "relative flex flex-col gap-4 overflow-hidden p-5")}
                   >
-                    <MarcaAgua />
                     <div
                       className="flex gap-0.5"
                       role="img"
@@ -477,6 +460,10 @@ export default function Home() {
               </ul>
             </div>
           </div>
+
+          <p className="text-etiqueta text-texto-terciario border-border/60 max-w-3xl border-t py-4 leading-relaxed">
+            {t("landing-pie-aviso")}
+          </p>
 
           {/* Bottom bar */}
           <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-t py-5">
