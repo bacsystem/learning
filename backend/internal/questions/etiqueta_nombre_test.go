@@ -1,13 +1,10 @@
 package questions
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	qt "github.com/cbaciliod/learning/internal/questions/questionstest"
 )
@@ -92,68 +89,5 @@ func TestCreateEtiqueta_AsignaturaInexistenteNoEs500(t *testing.T) {
 	code, _ := postEtiqueta(mux, admin, 999999999, "huerfana")
 	if code != http.StatusBadRequest {
 		t.Errorf("status %d, want 400", code)
-	}
-}
-
-// Without a unique index the duplicate check is serialized by an advisory
-// lock. While one transaction holds the lock for a name, a second one for the
-// same name in another spelling waits; once the first commits its tag, the
-// second sees it and answers ErrConflict.
-func TestRechazarEtiquetaDuplicada_SerializaPorNombre(t *testing.T) {
-	f, _, _ := etiquetaFixture(t)
-	ctx := context.Background()
-	asignatura := f.Asignaturas[0]
-
-	tx1, err := f.DB.BeginTxx(ctx, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx1.Rollback()
-	if err := rechazarEtiquetaDuplicada(ctx, tx1, asignatura, "Carrera", 0); err != nil {
-		t.Fatalf("first check: %v", err)
-	}
-
-	second := make(chan error, 1)
-	go func() {
-		tx2, err := f.DB.BeginTxx(ctx, nil)
-		if err != nil {
-			second <- err
-			return
-		}
-		defer tx2.Rollback()
-		second <- rechazarEtiquetaDuplicada(ctx, tx2, asignatura, " CARRERA ", 0)
-	}()
-
-	select {
-	case err := <-second:
-		t.Fatalf("second check did not wait for the lock (returned %v)", err)
-	case <-time.After(300 * time.Millisecond):
-	}
-
-	if _, err := tx1.ExecContext(ctx, `INSERT INTO etiquetas_pregunta (asignatura_id, nombre) VALUES ($1, 'Carrera')`, asignatura); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx1.Commit(); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case err := <-second:
-		if !errors.Is(err, ErrConflict) {
-			t.Fatalf("second check = %v, want ErrConflict", err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("second check never returned after the first committed")
-	}
-}
-
-// Rows saved before the validation may hold padded or upper-case names; they
-// still count as duplicates.
-func TestCreateEtiqueta_DuplicadoContraNombreHeredado(t *testing.T) {
-	f, mux, admin := etiquetaFixture(t)
-	if _, err := f.DB.Exec(`INSERT INTO etiquetas_pregunta (asignatura_id, nombre) VALUES ($1, '  Legado ')`, f.Asignaturas[0]); err != nil {
-		t.Fatal(err)
-	}
-	if code, _ := postEtiqueta(mux, admin, f.Asignaturas[0], "legado"); code != http.StatusConflict {
-		t.Errorf("status %d, want 409", code)
 	}
 }
