@@ -21,7 +21,9 @@ import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useAuth } from "@/lib/auth/auth-context";
 import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_DESTRUCTIVO, BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA } from "@/lib/estilos";
+import { apiErrorCode } from "@/lib/http/api-error";
 import { InscripcionAdmin, inscripcionesApi } from "@/lib/inscripciones/api";
+import { ERROR_ESTADO_INSCRIPCION, TRANSICION_INVALIDA } from "@/lib/inscripciones/errores-admin";
 import { CheckCircleIcon, XCircleIcon, XIcon } from "@phosphor-icons/react";
 
 const TABS = ["todos", "pendiente", "aprobado", "rechazado"] as const;
@@ -114,13 +116,13 @@ export default function Page() {
       closeDialog();
       load();
     } catch (e: unknown) {
-      const err = e as { message?: string; status?: number };
-      if (err.status === 409 || err.status === 404) {
+      const yaDecidida = apiErrorCode(e) === TRANSICION_INVALIDA;
+      if (yaDecidida || (e as { status?: number }).status === 404) {
         // Someone else decided (409) or removed (404) it meanwhile: say so and
         // reload so the row shows its real state instead of stale actions.
         closeDialog();
         setNotice(
-          t(err.status === 409 ? "admin-inscripciones-ya-revisada" : "admin-inscripciones-no-encontrada", {
+          t(yaDecidida ? "admin-inscripciones-ya-revisada" : "admin-inscripciones-no-encontrada", {
             nombre: dialog.ins.nombre_completo,
           }),
         );
@@ -128,7 +130,7 @@ export default function Page() {
         return;
       }
       // El diálogo sigue abierto: el aviso va en un toast, no en la alerta de página que queda debajo del modal.
-      toast.error(t(claveErrorApi(e, { generico: "admin-error-actualizar" })));
+      toast.error(t(claveErrorApi(e, ERROR_ESTADO_INSCRIPCION)));
       setDialog((d) => ({ ...d, submitting: false }));
     }
   };

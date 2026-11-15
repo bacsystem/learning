@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { destinoNotificacion, textoNotificacion } from "@/components/app/notificaciones-plantilla";
 import { haceCuanto, tipoNotificacion } from "@/components/app/notificaciones-tipo";
 import { useRecordatorioOpinion } from "@/components/app/use-recordatorio-opinion";
 import { Skeleton } from "@/components/feedback/skeleton";
@@ -31,6 +33,7 @@ const FILTROS: Record<Pestana, (n: ItemNotif) => boolean> = {
 export function BarraNotificaciones() {
   const t = useTranslations("dashboard");
   const { token } = useAuth();
+  const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [silenciado, setSilenciado] = useState(false);
   const [pestana, setPestana] = useState<Pestana>("all");
@@ -107,6 +110,15 @@ export function BarraNotificaciones() {
     } finally {
       marcando.current.delete(id);
     }
+  };
+
+  // Una notificación con plantilla lleva además a su pantalla (p. ej. /procesos) y cierra la campana.
+  const abrirNotificacion = (n: ItemNotif) => {
+    if (!n.leida) marcarLeida(n.id);
+    const destino = destinoNotificacion(n);
+    if (!destino) return;
+    setAbierto(false);
+    router.push(destino);
   };
 
   const marcarTodas = async () => {
@@ -224,6 +236,7 @@ export function BarraNotificaciones() {
               cargando={cargando && !cargadas}
               error={error && !cargadas}
               onReintentar={cargarItems}
+              onAbrir={abrirNotificacion}
               onMarcarLeida={marcarLeida}
               onDescartarOpinion={descartarOpinion}
               textoVacio={t("notif-sin-notificaciones")}
@@ -248,6 +261,7 @@ function ListaNotificaciones({
   cargando,
   error,
   onReintentar,
+  onAbrir,
   onMarcarLeida,
   onDescartarOpinion,
   textoVacio,
@@ -257,6 +271,7 @@ function ListaNotificaciones({
   cargando: boolean;
   error: boolean;
   onReintentar: () => void;
+  onAbrir: (n: ItemNotif) => void;
   onMarcarLeida: (id: number) => void;
   onDescartarOpinion: () => void;
   textoVacio: string;
@@ -305,6 +320,7 @@ function ListaNotificaciones({
       {items.map((n) => {
         const tipo = tipoNotificacion(n.tipo);
         const Icono = tipo.icono;
+        const texto = textoNotificacion(n, t);
         const etiquetaAccion = n._virtual ? t("notif-descartar") : t("notif-marcar-leida");
         return (
           <li key={n.id} className="group relative">
@@ -316,7 +332,7 @@ function ListaNotificaciones({
                   window.location.href = "/settings#opinion";
                   return;
                 }
-                if (!n.leida) onMarcarLeida(n.id);
+                onAbrir(n);
               }}
               className={cn(
                 "ease-salida hover:bg-secondary focus-visible:ring-ring/50 flex w-full items-start gap-3 rounded-lg px-2.5 py-2.5 pr-10 text-left transition-colors duration-(--duracion-rapida) outline-none focus-visible:ring-2",
@@ -328,9 +344,9 @@ function ListaNotificaciones({
                 <span
                   className={cn("text-control text-foreground leading-snug", n.leida ? "font-medium" : "font-semibold")}
                 >
-                  {n.titulo}
+                  {texto.titulo}
                 </span>
-                <span className="text-cuerpo text-muted-foreground line-clamp-2 leading-snug">{n.cuerpo}</span>
+                <span className="text-cuerpo text-muted-foreground line-clamp-2 leading-snug">{texto.cuerpo}</span>
                 <span className="text-etiqueta text-texto-terciario">
                   {t(tipo.etiqueta)} · {n._virtual ? t("notif-hace-ahora") : haceCuanto(n.created_at, t)}
                 </span>

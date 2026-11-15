@@ -1014,7 +1014,7 @@
     "admin-inscripciones-vacio": "Todavía no hay inscripciones.",
     "admin-inscripciones-vacio-estado": "No hay inscripciones en estado «{estado}».",
     "admin-inscripciones-filtrar-estado": "Filtrar por estado",
-    "admin-inscripciones-aprobar-desc": "Se notificará al usuario por correo electrónico.",
+    "admin-inscripciones-aprobar-desc": "Se avisará al usuario por correo electrónico y en la app.",
     "admin-inscripciones-rechazar-desc": "Indica el motivo para que el usuario pueda corregirlo.",
     "admin-inscripciones-motivo-placeholder": "Explica el motivo para que el usuario pueda corregirlo...",
     "auth-volver-sign-in": "Volver al inicio de sesión",
@@ -2078,6 +2078,10 @@
     "acceso-proceso-ya-inscrito": "Ya tienes una inscripción pendiente o aprobada en este proceso. Revisa su estado en Procesos.",
     "acceso-proceso-sin-monto": "Este proceso aún no tiene el monto de inscripción configurado. Inténtalo más tarde o contacta al administrador.",
     "acceso-proceso-no-encontrado": "Este proceso ya no está disponible. Actualiza la lista e inténtalo con otro proceso.",
+    "notif-plantilla-inscripcion-aprobada-titulo": "Inscripción aprobada",
+    "notif-plantilla-inscripcion-aprobada-cuerpo": "Tu inscripción al proceso {proceso} ({institucion}) fue aprobada. Ya puedes practicar desde Procesos.",
+    "notif-plantilla-inscripcion-rechazada-titulo": "Inscripción rechazada",
+    "notif-plantilla-inscripcion-rechazada-cuerpo": "Tu inscripción al proceso {proceso} ({institucion}) fue rechazada. Motivo: {motivo}",
     "barra-superior-abrir-menu": "Abrir menú",
     "barra-superior-ubicacion": "Ubicación"
   }

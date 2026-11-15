@@ -129,7 +129,10 @@ export default function Page() {
     setSubmitting(true);
     try {
       await inscripcionesApi.inscribir(token, confirm.id);
-      toast.ok(t("procesos-inscripcion-enviada"), t("procesos-inscripcion-enviada-detalle", { proceso: confirm.nombre }));
+      toast.ok(
+        t("procesos-inscripcion-enviada"),
+        t("procesos-inscripcion-enviada-detalle", { proceso: confirm.nombre }),
+      );
       setConfirm(null);
       load();
     } catch (e: unknown) {
