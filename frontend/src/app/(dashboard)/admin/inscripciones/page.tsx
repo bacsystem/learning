@@ -361,7 +361,11 @@ export default function Page() {
             ) : null}
 
             {dialog.accion === "rechazado" ? (
-              <Campo id="ins-observacion" etiqueta={t("admin-usuarios-motivo-rechazo")}>
+              <Campo
+                id="ins-observacion"
+                etiqueta={t("admin-usuarios-motivo-rechazo")}
+                ayuda={dialog.observacion.trim() ? undefined : t("admin-inscripciones-motivo-requerido")}
+              >
                 <AreaTexto
                   id="ins-observacion"
                   rows={3}
