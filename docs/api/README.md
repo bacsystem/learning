@@ -13,12 +13,32 @@ Convenciones transversales para todos los endpoints del módulo «Aprendizaje as
 | [serums-ia-e6-02-control-costos.md](serums-ia-e6-02-control-costos.md) | E6-02 (MVP); extiende E6-01 | borrador para revisión (2026-11-12); ADR [0009](../adr/0009-control-costos-ia-reserva-sincrona.md) |
 | [auth-idioma-correos.md](auth-idioma-correos.md) | #247 D4: `locale` opcional (`es`/`en`, fallback `es`) en `POST /auth/register`, `/auth/verify-email`, `/auth/forgot-password` y `/auth/reset-password` (fuera del módulo SERUMS IA) | borrador para revisión (2026-11-15); enmendado por PLT-11 |
 | [plataforma-multi-institucion.md](plataforma-multi-institucion.md) | PLT-06 (vigente): elegibilidad por institución. Diferidas: PLT-07, PLT-08, PLT-10 y PLT-14 (catálogos, grado exigido, filtros del admin y landing) (fuera del módulo) | borrador para revisión (2026-11-15); ADR [0010](../adr/0010-multi-institucion-elegibilidad-y-catalogos.md) |
-| [openapi-plan.md](openapi-plan.md) | Spec OpenAPI 3.1 de toda la API (153 operaciones): convenciones, reparto por paquete entre backend-dev y backend-dev-2, orden de PR y cobertura de los `.md` | aprobado (2026-11-15); ADR [0012](../adr/0012-documentacion-openapi-spec-first.md) aceptada |
+| [openapi-plan.md](openapi-plan.md) | Spec OpenAPI 3.1 de toda la API (153 operaciones): convenciones, reparto por paquete entre backend-dev y backend-dev-2, orden de PR y cobertura de los `.md` | completado (2026-11-15): los 16 paquetes están documentados y el test `apispec` corre en modo estricto (#311); ADR [0012](../adr/0012-documentacion-openapi-spec-first.md) aceptada |
 | [plataforma-avisos-idioma.md](plataforma-avisos-idioma.md) | PLT-11, PLT-12 y PLT-13: `usuarios.idioma`, `PUT /auth/idioma`, aviso de decisión de inscripción (correo y notificación personal) y correos de cuenta en el idioma guardado (fuera del módulo) | borrador para revisión (2026-11-15); ADR [0011](../adr/0011-idioma-guardado-y-avisos-personales.md) |
 
 ADRs: [0008](../adr/0008-balotario-parser-bajo-demanda-y-cita-por-rango.md) parser del balotario bajo demanda y cita por rango de líneas (enmienda la 0003), [0009](../adr/0009-control-costos-ia-reserva-sincrona.md) control de costos de IA con reserva síncrona; [0001](../adr/0001-unicidad-proceso-asignaturas-por-especialidad.md) unicidad de `proceso_asignaturas`, [0002](../adr/0002-secreto-hmac-contadores-antifraude.md) secreto HMAC antifraude, [0003](../adr/0003-puerto-source-repository-y-adaptador-postgres.md) `SourceRepository`, [0004](../adr/0004-alojamiento-base-de-datos-produccion.md) despliegue en Railway y base de producción (aceptado con condiciones), [0005](../adr/0005-estado-operativo-panel-salud.md) estado operativo del panel de salud, [0006](../adr/0006-puerto-servicio-ia.md) puerto del servicio de IA, [0007](../adr/0007-busqueda-pasajes-admin-fuera-del-puerto.md) búsqueda de pasajes para el admin. Contrato de la épica de plataforma PLT-E1: [plataforma-salud.md](plataforma-salud.md). PLT-E2 y PLT-E3: ADR [0010](../adr/0010-multi-institucion-elegibilidad-y-catalogos.md) (multi-institución y catálogos por institución) y [0011](../adr/0011-idioma-guardado-y-avisos-personales.md) (idioma guardado y avisos personales).
 
 Un cambio a un contrato ya publicado se avisa directamente a backend-dev, frontend-dev y al tech-lead.
+
+## Spec OpenAPI: fuente de verdad de la forma
+
+Decisión 4 del [ADR 0012](../adr/0012-documentacion-openapi-spec-first.md).
+
+- **Qué documenta cada sitio:**
+  - **[`openapi/`](openapi/openapi.yaml)** (OpenAPI 3.1) es la **fuente de verdad de la forma** de cada endpoint: ruta, método, rol (`x-rol`), parámetros, request, response y códigos de error. Tiene un archivo por paquete Go en `openapi/paquetes/`.
+  - **Los `.md` de esta carpeta** son el contrato de **diseño**: reglas, orden de validación, modelo de datos, migraciones, auditoría y trazabilidad. Si un `.md` y el spec no coinciden en la forma, manda el spec y se avisa al architect para que corrija el `.md`.
+- **Contrato nuevo:**
+  - el architect escribe el `.md` y el delta del spec en el mismo PR, con `x-estado: planificado` en las operaciones que aún no existen;
+  - el backend que lo implementa quita la marca y ajusta el spec a lo implementado.
+- **Cambio de forma** (ruta, rol, DTO, status o código de error): actualiza el spec **en el mismo PR**. El tech-lead lo exige en `/pr-review` a todo PR que toque un `routes.go`, un `handler.go` o un `dto.go`.
+- **Guardias:**
+  - **Test de Go:** `backend/internal/apispec` (corre en `make test`) compara el spec con las rutas registradas y con el rol de su cadena de middlewares. Falla si sobra o falta una operación, o si el `x-rol` no coincide.
+  - **Lint:** `redocly lint`, dentro de `make lint`, con la versión fijada en `REDOCLY_VERSION` del Makefile.
+- **Página de documentación (Redoc):** se regenera con `make docs/api`, que escribe `docs/api/openapi/dist/index.html`.
+  - Ese HTML no se versiona.
+  - Se abre en el navegador y necesita red, porque carga Redoc desde una CDN ([openapi-plan.md](openapi-plan.md) §5).
+  - No se sirve desde el backend ni se publica (decisión 6 del ADR 0012).
+- **Ejemplos del spec:** siempre sintéticos (`@example.com`, DNI `00000000`, «Persona Ejemplo»). Nunca datos de `assets/`, de la base ni de logs.
 
 ---
 

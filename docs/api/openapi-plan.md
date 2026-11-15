@@ -1,7 +1,12 @@
 # Plan de trabajo: spec OpenAPI de la API
 
 - **Decisión:** [ADR 0012](../adr/0012-documentacion-openapi-spec-first.md). Spec primero, OpenAPI 3.1, un archivo por paquete Go y un test de rutas en `backend/internal/apispec`.
-- **Estado:** aprobado (2026-11-15). El usuario aprobó `@redocly/cli` (fijada en 2.72.1, invocada con `npx`). El tech-lead aprobó el paso de `go.yaml.in/yaml/v3` a dependencia directa y autorizó a backend-dev y backend-dev-2 a escribir en `docs/api/openapi/paquetes/`, cada uno solo en sus paquetes.
+- **Estado:** completado (2026-11-15).
+  - Los 16 paquetes están documentados en `docs/api/openapi/`.
+  - El test `backend/internal/apispec` corre en modo estricto (#311, paso 3a): falla con cualquier ruta sin documentar.
+  - La fuente de verdad quedó fijada en el README de `docs/api/` (paso 3b).
+  - Desde aquí, el plan es histórico. Las reglas vigentes están en el ADR 0012 y en el README.
+- **Aprobaciones (2026-11-15):** el usuario aprobó `@redocly/cli` (fijada en 2.72.1, invocada con `npx`). El tech-lead aprobó el paso de `go.yaml.in/yaml/v3` a dependencia directa y autorizó a backend-dev y backend-dev-2 a escribir en `docs/api/openapi/paquetes/`, cada uno solo en sus paquetes.
 - **Sin migraciones ni cambios de comportamiento.** Ningún PR de este plan toca `handler.go`, `service.go`, `repository.go` ni `dto.go`.
 
 ## 1. Inventario: 153 operaciones (152 rutas en 15 paquetes, más `GET /health`)
@@ -175,7 +180,12 @@ En `plataforma-multi-institucion.md`, dos partes están diferidas y **no entran 
 2. **`.gitignore`:** añadir `docs/api/openapi/dist/`.
 3. **CI:** añadir el mismo `redocly lint` a un workflow que tenga Node (`frontend.yml`, o un job nuevo). El test `apispec` ya corre dentro de `go test ./...` (`backend.yml:76-77`) y no necesita ningún cambio, porque el checkout trae todo el repo.
 4. **Visor:**
-   - comprobar si el HTML de `build-docs` carga scripts desde una CDN y anotarlo aquí;
+   - **Comprobado por devops (con `@redocly/cli` 2.72.1): sí carga un script de una CDN.**
+     - El HTML de `build-docs` carga `https://cdn.redocly.com/redoc/v3.0.1/bundles/redoc.standalone.js` con `modulepreload`, integridad `sha384` (SRI) y `crossorigin="anonymous"`.
+     - No usa Google Fonts.
+     - **Para abrirlo hace falta red.** Sin conexión, la página no se muestra.
+     - Según el ADR 0012, decisión 6, se acepta porque es solo para uso local. El SRI impide que se ejecute un script modificado en la CDN. Si se quisiera usar sin red o publicarlo en preprod, se decide en otro ADR (por ejemplo, servir `redoc.standalone.js` desde el repo).
+     - Si cambia la versión de Redocly, cambian la URL y el hash: hay que volver a comprobarlos.
    - no se sirve desde el backend ni se despliega (ADR 0012, decisión 6).
 5. Docker no cambia.
 
