@@ -92,6 +92,9 @@ export function reiniciarRecordatorio(): void {
 /**
  * Invitación a dejar una opinión. Es un aviso efímero del cliente, no una notificación del servidor: no aparece en el
  * historial, solo en la campana. `resuelto` indica que ya se sabe si está pendiente.
+ *
+ * El snapshot del servidor es el almacén vivo (no un valor vacío): el hook solo se usa dentro del layout privado, que espera
+ * a `hidratado` antes de pintar, así que no hay desajuste de hidratación.
  */
 export function useRecordatorioOpinion(token: string | null | undefined) {
   const actual = useSyncExternalStore(suscribirRecordatorio, almacenRecordatorio, almacenRecordatorio);

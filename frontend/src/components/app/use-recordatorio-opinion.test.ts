@@ -6,7 +6,10 @@ import {
   recordatorioPara,
   reiniciarRecordatorio,
   suscribirRecordatorio,
+  useRecordatorioOpinion,
 } from "./use-recordatorio-opinion";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fetchMiTestimonio } from "@/lib/testimonios/api";
@@ -108,5 +111,22 @@ describe("el estado es de una sola sesión", () => {
     await esperar();
     expect(almacenRecordatorio().token).toBe("B");
     expect(recordatorioPara("B")).toEqual({ resuelto: true, pendiente: false });
+  });
+});
+
+describe("useRecordatorioOpinion (render)", () => {
+  function Sonda({ token }: { token: string | null }) {
+    const { resuelto, pendiente } = useRecordatorioOpinion(token);
+    return createElement("p", null, `resuelto:${resuelto} pendiente:${pendiente}`);
+  }
+  const ver = (token: string | null) => renderToString(createElement(Sonda, { token }));
+
+  it("shows the invitation to its own session and never to another one", async () => {
+    vi.mocked(fetchMiTestimonio).mockResolvedValue(null);
+    cargarRecordatorio("A");
+    await esperar();
+    expect(ver("A")).toContain("resuelto:true pendiente:true");
+    expect(ver("B")).toContain("resuelto:false pendiente:false");
+    expect(ver(null)).toContain("resuelto:false pendiente:false");
   });
 });
