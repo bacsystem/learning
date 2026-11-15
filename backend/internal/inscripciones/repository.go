@@ -11,6 +11,7 @@ import (
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/db/pgerr"
 	"github.com/cbaciliod/learning/internal/db/pii"
+	"github.com/cbaciliod/learning/internal/examen"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -41,6 +42,37 @@ type ProcesoRow struct {
 	Descripcion *string `db:"descripcion"`
 	Anio        int     `db:"anio"`
 	Estado      string  `db:"estado"`
+}
+
+// ListProcesosElegibles returns the active procesos of the institución of the
+// user's persona whose nivel is empty or equals their grado's nivel. Both are
+// read from the database, never from the token.
+func (r *Repository) ListProcesosElegibles(ctx context.Context, usuarioID int64) ([]ProcesoRow, error) {
+	rows := []ProcesoRow{}
+	err := r.db.SelectContext(ctx, &rows, `
+		SELECT p.id, p.nombre, p.tipo, p.grado_id, p.descripcion, p.anio, p.estado,
+		       COALESCE(g.nombre, '') AS grado_nombre,
+		       COALESCE(p.nivel, '') AS nivel
+		FROM procesos p
+		LEFT JOIN grados g ON g.id = p.grado_id
+		JOIN usuarios u ON u.id = $1
+		JOIN personas pe ON pe.id = u.persona_id
+		JOIN grados gu ON gu.id = pe.grado_id
+		WHERE p.estado = 'activo'
+		  AND p.institucion_id = pe.institucion_id
+		  AND (COALESCE(p.nivel, '') = '' OR p.nivel = gu.nivel)
+		ORDER BY p.anio DESC, p.nombre, p.id`, usuarioID)
+	return rows, err
+}
+
+// AccesoProceso reads the user's access to the proceso; ErrProcesoNotFound
+// when it does not exist.
+func (r *Repository) AccesoProceso(ctx context.Context, usuarioID, procesoID int64) (examen.Acceso, error) {
+	acceso, err := examen.AccesoProceso(ctx, r.db, usuarioID, procesoID)
+	if errors.Is(err, examen.ErrProcesoNoEncontrado) {
+		return examen.Acceso{}, ErrProcesoNotFound
+	}
+	return acceso, err
 }
 
 func (r *Repository) ListProcesosActivos(ctx context.Context) ([]ProcesoRow, error) {

@@ -66,19 +66,20 @@ func NewService(repo *Repository, qSvc QuestionsService) *Service {
 // ── CreatePractica ────────────────────────────────────────────────────────────
 
 // CreatePractica validates, checks access and conflicts, generates questions,
-// and creates a practice. Same access rule as simulacros (H12): the proceso's
-// nivel must match the user's and the user needs an approved inscripción.
-func (s *Service) CreatePractica(ctx context.Context, req CreatePracticaRequest, usuarioID int64, userNivel string, gradoID, especialidadID int64) (PracticaEnCursoResponse, error) {
+// and creates a practice. Same access rule as simulacros (H12, PLT-06): the
+// proceso must be of the user's institución and nivel (read from the database)
+// and the user needs an approved inscripción.
+func (s *Service) CreatePractica(ctx context.Context, req CreatePracticaRequest, usuarioID, gradoID, especialidadID int64) (PracticaEnCursoResponse, error) {
 	if err := ValidateCreate(req); err != nil {
 		return PracticaEnCursoResponse{}, err
 	}
 
-	procesoNivel, err := s.repo.GetProcesoNivel(ctx, req.ProcesoID)
+	acceso, err := s.repo.AccesoProceso(ctx, usuarioID, req.ProcesoID)
 	if err != nil {
 		return PracticaEnCursoResponse{}, err
 	}
-	if procesoNivel != "" && procesoNivel != userNivel {
-		return PracticaEnCursoResponse{}, ErrNivelNoPermitido
+	if err := acceso.Permitido(); err != nil {
+		return PracticaEnCursoResponse{}, err
 	}
 	hasIns, err := s.repo.HasInscripcionAprobada(ctx, usuarioID, req.ProcesoID)
 	if err != nil {

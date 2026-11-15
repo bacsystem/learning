@@ -569,7 +569,10 @@ func (s *sembrador) hash(rol string) ([]byte, error) {
 }
 
 // inscripcion signs the user up through the inscripciones service (proceso
-// active, nivel, payment config) and approves it when the dataset says so.
+// active, institución, nivel, payment config) and approves it when the dataset
+// says so. The service refuses a proceso of another institución (PLT-06), so
+// the cross-institution case of the dataset, which stands for an inscripción
+// that existed before that rule, is inserted directly.
 func (s *sembrador) inscripcion(ctx context.Context, usuarioID, procesoID int64, estado string, adminID int64) error {
 	var actual struct {
 		ID     int64  `db:"id"`
@@ -578,11 +581,11 @@ func (s *sembrador) inscripcion(ctx context.Context, usuarioID, procesoID int64,
 	err := s.db.GetContext(ctx, &actual, `SELECT id, estado FROM inscripciones WHERE usuario_id = $1 AND proceso_id = $2`, usuarioID, procesoID)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		r, err := s.ins.Inscribir(ctx, usuarioID, procesoID, nivelDemo, nil)
+		id, err := s.nueva(ctx, usuarioID, procesoID)
 		if err != nil {
 			return err
 		}
-		actual.ID, actual.Estado = r.ID, r.Estado
+		actual.ID, actual.Estado = id, "pendiente"
 		s.creado["inscripciones"]++
 	case err != nil:
 		return err
@@ -591,4 +594,28 @@ func (s *sembrador) inscripcion(ctx context.Context, usuarioID, procesoID int64,
 		return nil
 	}
 	return s.ins.UpdateEstado(ctx, actual.ID, estado, "", adminID, nil)
+}
+
+// nueva creates a pendiente inscripción and returns its id.
+func (s *sembrador) nueva(ctx context.Context, usuarioID, procesoID int64) (int64, error) {
+	var otraInstitucion bool
+	err := s.db.GetContext(ctx, &otraInstitucion, `
+		SELECT p.institucion_id <> pe.institucion_id
+		FROM procesos p, usuarios u JOIN personas pe ON pe.id = u.persona_id
+		WHERE p.id = $1 AND u.id = $2`, procesoID, usuarioID)
+	if err != nil {
+		return 0, err
+	}
+	if !otraInstitucion {
+		r, err := s.ins.Inscribir(ctx, usuarioID, procesoID, nil)
+		if err != nil {
+			return 0, err
+		}
+		return r.ID, nil
+	}
+	var id int64
+	err = s.db.GetContext(ctx, &id,
+		`INSERT INTO inscripciones (usuario_id, proceso_id, monto) VALUES ($1, $2, $3) RETURNING id`,
+		usuarioID, procesoID, montoInscripcion)
+	return id, err
 }
