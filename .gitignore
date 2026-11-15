@@ -57,3 +57,6 @@ yarn-error.log*
 # archivo versionado vive en una carpeta assets; si el frontend necesitara una,
 # que use otro nombre o una excepción explícita con !.
 assets/
+
+# Salida de `make docs/api` (Redoc estático del spec OpenAPI).
+docs/api/openapi/dist/

@@ -58,6 +58,12 @@ jobs:
       - name: i18n keys in sync
         run: node scripts/check-i18n.mjs
 
+      # ADR 0012: lint del spec OpenAPI (igual que `make lint`; versión = REDOCLY_VERSION del Makefile).
+      # Los avisos no fallan; los errores sí.
+      - name: OpenAPI lint
+        working-directory: .
+        run: npx --yes @redocly/cli@2.72.1 lint docs/api/openapi/openapi.yaml --config docs/api/openapi/redocly.yaml
+
       - name: Build
         run: npm run build
         env:

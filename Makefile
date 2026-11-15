@@ -9,6 +9,11 @@
 GOOSE_VERSION         := v3.21.1
 GOVULNCHECK_VERSION   := v1.9.0
 GOLANGCI_LINT_VERSION := v2.15.0
+# Lint y visor del spec OpenAPI (ADR 0012, decisión 5). Sin versiones de menos de dos semanas.
+# Cambiarla a la vez aquí, en el workflow frontend.yml y en docs/api/openapi/redocly.yaml.
+REDOCLY_VERSION := 2.72.1
+OPENAPI_SPEC := docs/api/openapi/openapi.yaml
+OPENAPI_CFG := docs/api/openapi/redocly.yaml
 GOOSE := go run github.com/pressly/goose/v3/cmd/goose@$(GOOSE_VERSION)
 
 # Base de desarrollo de backend/.env (migrate/* y fix-encrypt-personas).
@@ -56,7 +61,7 @@ C_ENC_KEY  := $(call root_env,ENCRYPTION_KEY)
 C_AF_KEY   := $(call root_env,ANTIFRAUD_HMAC_KEY)
 s          ?=
 
-.PHONY: help dev dev/backend dev/frontend test lint fmt build \
+.PHONY: help dev dev/backend dev/frontend test lint fmt build docs/api \
         migrate/up migrate/down migrate/status migrate/create fix-encrypt-personas \
         docker/build docker/build/backend docker/build/frontend docker/verify \
         docker/push docker/release docker/build/backup docker/push/backup backup/test \
@@ -92,13 +97,14 @@ test: check/test-db ## Tests como el CI (exige TEST_DATABASE_URL a una base *_te
 	cd backend && TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -race -count=1 ./...
 	cd frontend && npm test
 
-lint: ## Lint como el CI: go vet, golangci-lint, tsc, eslint, i18n, npm audit (no reescribe)
+lint: ## Lint como el CI: go vet, golangci-lint, tsc, eslint, i18n, npm audit, redocly (no reescribe)
 	cd backend && go vet ./...
 	cd backend && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --timeout=5m ./...
 	cd frontend && npx tsc --noEmit
 	cd frontend && npm run lint
 	cd frontend && node scripts/check-i18n.mjs
 	cd frontend && npm audit --omit=dev --audit-level=high
+	npx --yes @redocly/cli@$(REDOCLY_VERSION) lint $(OPENAPI_SPEC) --config $(OPENAPI_CFG)
 
 fmt: ## Formatea: go fmt y eslint --fix
 	cd backend && go fmt ./...
@@ -109,6 +115,9 @@ fmt: ## Formatea: go fmt y eslint --fix
 # entorno o, como frontend.yml, http://localhost:8080. Por eso la variable de make
 # del mismo nombre (arriba, con la URL de producción) NO debe exportarse: si se
 # exporta, este build incrusta la URL de producción sin avisar.
+docs/api: ## HTML estático de Redoc del spec OpenAPI en docs/api/openapi/dist/index.html (no se versiona)
+	npx --yes @redocly/cli@$(REDOCLY_VERSION) build-docs $(OPENAPI_SPEC) --config $(OPENAPI_CFG) --output docs/api/openapi/dist/index.html
+
 build: ## Build como el CI: go build ./... + bin/server y next build
 	cd backend && go build ./...
 	cd backend && CGO_ENABLED=0 go build -o bin/server ./cmd/server
