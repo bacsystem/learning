@@ -127,8 +127,74 @@ paths:
   # ── simulations ── (backend-dev)
 
   # ── auth ── (backend-dev-2)
+  /auth/check-dni:
+    $ref: './paquetes/auth.yaml#/paths/~1auth~1check-dni'
+  /auth/check-username:
+    $ref: './paquetes/auth.yaml#/paths/~1auth~1check-username'
+  /auth/register:
+    $ref: './paquetes/auth.yaml#/paths/~1auth~1register'
+  /auth/verify-email:
+    $ref: './paquetes/auth.yaml#/paths/~1auth~1verify-email'
+  /auth/login:
+    $ref: './paquetes/auth.yaml#/paths/~1auth~1login'
+  /auth/forgot-password:
+    $ref: './paquetes/auth.yaml#/paths/~1auth~1forgot-password'
+  /auth/reset-password:
+    $ref: './paquetes/auth.yaml#/paths/~1auth~1reset-password'
+  /auth/logout:
+    $ref: './paquetes/auth.yaml#/paths/~1auth~1logout'
+  /auth/me:
+    $ref: './paquetes/auth.yaml#/paths/~1auth~1me'
+  /auth/idioma:
+    $ref: './paquetes/auth.yaml#/paths/~1auth~1idioma'
+  /auth/tour/completar:
+    $ref: './paquetes/auth.yaml#/paths/~1auth~1tour~1completar'
+  /admin/personas:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1personas'
+  /admin/personas/{id}:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1personas~1{id}'
+  /admin/usuarios:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1usuarios'
+  /admin/usuarios/online:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1usuarios~1online'
+  /admin/usuarios/{id}/sesiones:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1usuarios~1{id}~1sesiones'
+  /admin/usuarios/{id}/estado:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1usuarios~1{id}~1estado'
+  /admin/usuarios/{id}/email:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1usuarios~1{id}~1email'
+  /admin/usuarios/{id}/tour:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1usuarios~1{id}~1tour'
+  /admin/registro-limites:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1registro-limites'
+  /admin/personas/batch:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1personas~1batch'
+  /admin/personas/preview:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1personas~1preview'
+  /admin/personas/import:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1personas~1import'
+  /admin/config/sesiones:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1config~1sesiones'
+  /admin/config/recursos:
+    $ref: './paquetes/auth.yaml#/paths/~1admin~1config~1recursos'
 
   # ── admin ── (backend-dev-2)
+  /admin/dashboard:
+    $ref: './paquetes/admin.yaml#/paths/~1admin~1dashboard'
+  /admin/dashboard/actividad:
+    $ref: './paquetes/admin.yaml#/paths/~1admin~1dashboard~1actividad'
+  /admin/usuarios/{id}:
+    $ref: './paquetes/admin.yaml#/paths/~1admin~1usuarios~1{id}'
+  /admin/usuarios/{id}/rol:
+    $ref: './paquetes/admin.yaml#/paths/~1admin~1usuarios~1{id}~1rol'
+  /admin/audit-log:
+    $ref: './paquetes/admin.yaml#/paths/~1admin~1audit-log'
+  /admin/ingresos:
+    $ref: './paquetes/admin.yaml#/paths/~1admin~1ingresos'
+  /admin/ingresos/config:
+    $ref: './paquetes/admin.yaml#/paths/~1admin~1ingresos~1config'
+  /admin/ingresos/config/{anio}:
+    $ref: './paquetes/admin.yaml#/paths/~1admin~1ingresos~1config~1{anio}'
 
   # ── inscripciones ── (backend-dev-2)
   /stats/publico:
