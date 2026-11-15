@@ -155,6 +155,7 @@ En Railway se cargan como **variables de servicio**. Los secretos van
 | backend | `JWT_SECRET`, `ENCRYPTION_KEY`, `ANTIFRAUD_HMAC_KEY` (y `ANTIFRAUD_HMAC_KEY_PREVIOUS` solo en una rotación) | Sellados. Se generan con `openssl rand -hex 32` y nunca se pegan en mensajes ni en el PR. **El usuario** guarda una copia de `ENCRYPTION_KEY` fuera de Railway antes de sellarla |
 | backend | `ENV` | `production` |
 | backend | `CORS_ORIGINS`, `FRONTEND_BASE_URL` | El dominio público del frontend |
+| backend | `CONTACT_EMAIL` | Opcional; el correo de contacto de la empresa. Mismo valor que `NEXT_PUBLIC_CONTACT_EMAIL` del frontend. Vacío = `contact@bacsystemsolutions.com` |
 | backend | `TRUSTED_PROXIES` | El rango del proxy de Railway, sin confirmar: la documentación consultada no lo publica. Mientras no se confirme, el rate limit y la auditoría ven la IP del proxy. **Pendiente**, ver H-3 |
 | backend | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM` | Los del proveedor de correo |
 | backend | `SMTP_PASSWORD` | Sellado |

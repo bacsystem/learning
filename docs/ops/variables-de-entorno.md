@@ -51,6 +51,7 @@ trabajo (viper). En la imagen no hay `.env`: `backend/.dockerignore` lo excluye.
 | `CORS_ORIGINS` | Orígenes permitidos, separados por comas | vacío. En entornos locales, vacío equivale a `http://localhost:3000` / vacío | No | En entorno no local, vacío no arranca: `CORS_ORIGINS is required unless ENV is development or test` |
 | `TRUSTED_PROXIES` | CIDR o IP de los proxies de confianza, para tomar la IP del cliente (auth, auditoría, rate limit) | vacío (no confía en ningún proxy) / vacío | No | Las entradas inválidas **se ignoran sin avisar** (H-3). Detrás de un balanceador, si no se configura, todas las peticiones parecen venir de la IP del balanceador y el rate limit se vuelve global |
 | `FRONTEND_BASE_URL` | Base de los enlaces en los correos (verificación, recuperación) | vacío; en entornos locales usa `http://localhost:3000` / vacío | No | En entorno no local, vacío no arranca. Si es inválida: `FRONTEND_BASE_URL must be a valid URL` |
+| `CONTACT_EMAIL` | Correo de contacto que el backend da en el correo «solicitud de cuenta recibida». **Debe llevar el mismo valor que `NEXT_PUBLIC_CONTACT_EMAIL` del frontend** | `contact@bacsystemsolutions.com` / vacío (toma el del código) / Railway: el de la empresa | No | Vacío o en blanco usa el valor por defecto. Si es inválida (no es una dirección simple: nombre visible, varias direcciones o texto), el backend no arranca y el error nombra `CONTACT_EMAIL` |
 | `SMTP_HOST` | Servidor SMTP del worker de correo | vacío / vacío | No | En entorno no local, vacío no arranca: `SMTP_HOST is required…` |
 | `SMTP_PORT` | Puerto SMTP | `0` / `587` | No | En entorno no local, 0, negativo o no numérico no arranca: `SMTP_PORT must be a positive port…` |
 | `SMTP_USER` | Usuario SMTP | vacío / vacío | No | Opcional (SMTP sin autenticación) |
@@ -130,7 +131,7 @@ falta una imagen de frontend por entorno.
 |---|---|---|---|---|
 | `NEXT_PUBLIC_API_URL` | URL base de la API | `http://localhost:8080` si no está definida (`??`) / `http://localhost:8080` / `https://api-capacitate.bacsystemsolutions.com` / sin valor | No (es pública) | **Arreglado en este PR:** el Dockerfile falla si llega vacía. Antes, `ARG` sin valor → `ENV` vacío, y `??` no cubre la cadena vacía, así que el bundle llamaba a rutas relativas sin avisar. Fuera de Docker (`npm run build` sin la variable) se incrusta `http://localhost:8080` (H-4) |
 | `NEXT_PUBLIC_STORAGE_PREFIX` | Prefijo de la cookie de idioma (`<prefijo>-locale`) | `capacitate` / vacío / vacío / vacío | No | Usa `capacitate` |
-| `NEXT_PUBLIC_CONTACT_EMAIL` | Correo de contacto público | `contact@bacsystemsolutions.com` / vacío / vacío / vacío | No | Usa el de la empresa |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | Correo de contacto público (debe coincidir con `CONTACT_EMAIL` del backend) | `contact@bacsystemsolutions.com` / vacío / vacío / vacío | No | Usa el de la empresa |
 | `NODE_ENV`, `PORT`, `HOSTNAME` | Runtime del servidor standalone | `production`, `3000`, `0.0.0.0` (Dockerfile) | No | — |
 | `NEXT_TELEMETRY_DISABLED` | Desactiva la telemetría de Next | `1` (Dockerfile y CI) | No | — |
 
