@@ -664,7 +664,7 @@ func (r *Repository) ListEtiquetas(ctx context.Context, asignaturaID int64, esta
 // CreateEtiqueta inserts a new tag and returns it.
 func (r *Repository) CreateEtiqueta(ctx context.Context, req CreateEtiquetaRequest) (EtiquetaResponse, error) {
 	var id int64
-	err := enTransaccion(ctx, r.db, func(tx *sqlx.Tx) error {
+	err := r.enTx(ctx, func(tx *sqlx.Tx) error {
 		if err := rechazarEtiquetaDuplicada(ctx, tx, req.AsignaturaID, req.Nombre, 0); err != nil {
 			return err
 		}
@@ -690,19 +690,10 @@ func (r *Repository) CreateEtiqueta(ctx context.Context, req CreateEtiquetaReque
 	return EtiquetaResponse{}, ErrNotFound
 }
 
-// enTransaccion runs fn in a transaction: commit when it returns nil, rollback
-// otherwise.
-func enTransaccion(ctx context.Context, db *sqlx.DB, fn func(tx *sqlx.Tx) error) error {
-	tx, err := db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := fn(tx); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
+// recorteNombre are the characters trimmed from a tag name: what
+// strings.TrimSpace removes for ASCII plus the no-break space. SQL btrim only
+// trims plain spaces by default, so the set is passed explicitly.
+const recorteNombre = " \t\n\r\v\f\u00a0"
 
 // rechazarEtiquetaDuplicada returns ErrConflict when the asignatura already has
 // a tag with the same name ignoring case and surrounding spaces (excluding the
@@ -712,20 +703,20 @@ func enTransaccion(ctx context.Context, db *sqlx.DB, fn func(tx *sqlx.Tx) error)
 // requests cannot both pass the check.
 func rechazarEtiquetaDuplicada(ctx context.Context, tx *sqlx.Tx, asignaturaID int64, nombre string, exceptoID int64) error {
 	if _, err := tx.ExecContext(ctx,
-		`SELECT pg_advisory_xact_lock(hashtextextended($1::text || ':' || lower(btrim($2)), 0))`,
-		asignaturaID, nombre); err != nil {
+		`SELECT pg_advisory_xact_lock(hashtextextended($1::text || ':' || lower(btrim($2, $3)), 0))`,
+		asignaturaID, nombre, recorteNombre); err != nil {
 		return err
 	}
 	var existe bool
 	if err := tx.QueryRowContext(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM etiquetas_pregunta
-			WHERE asignatura_id = $1 AND lower(btrim(nombre)) = lower(btrim($2)) AND id <> $3)`,
-		asignaturaID, nombre, exceptoID).Scan(&existe); err != nil {
+			WHERE asignatura_id = $1 AND lower(btrim(nombre, $3)) = lower(btrim($2, $3)) AND id <> $4)`,
+		asignaturaID, nombre, recorteNombre, exceptoID).Scan(&existe); err != nil {
 		return err
 	}
 	if existe {
-		return ErrConflict
+		return fmt.Errorf("%w: %s", ErrConflict, msgEtiquetaDuplicada)
 	}
 	return nil
 }
@@ -752,15 +743,20 @@ func (r *Repository) UpdateEtiqueta(ctx context.Context, id int64, req UpdateEti
 	}
 
 	args = append(args, id)
-	err := enTransaccion(ctx, r.db, func(tx *sqlx.Tx) error {
+	err := r.enTx(ctx, func(tx *sqlx.Tx) error {
 		var asignaturaID int64
-		if err := tx.QueryRowContext(ctx, `SELECT asignatura_id FROM etiquetas_pregunta WHERE id = $1`, id).Scan(&asignaturaID); err != nil {
+		var mismoNombre bool
+		if err := tx.QueryRowContext(ctx, `
+			SELECT asignatura_id, lower(btrim(nombre, $2)) = lower(btrim($3, $2))
+			FROM etiquetas_pregunta WHERE id = $1`, id, recorteNombre, req.Nombre).Scan(&asignaturaID, &mismoNombre); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrNotFound
 			}
 			return err
 		}
-		if req.Nombre != "" {
+		// A request that keeps the name (the form always resends it) must not
+		// fail because of duplicates that already exist.
+		if req.Nombre != "" && !mismoNombre {
 			if err := rechazarEtiquetaDuplicada(ctx, tx, asignaturaID, req.Nombre, id); err != nil {
 				return err
 			}

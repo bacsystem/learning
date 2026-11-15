@@ -154,7 +154,7 @@ func (s *Service) CreateEtiqueta(ctx context.Context, req CreateEtiquetaRequest)
 			return EtiquetaResponse{}, fmt.Errorf("%w: la asignatura no existe", ErrValidation)
 		}
 		if isUniqueViolation(err) {
-			return EtiquetaResponse{}, fmt.Errorf("%w: ya existe una etiqueta con ese nombre para esta asignatura", ErrConflict)
+			return EtiquetaResponse{}, fmt.Errorf("%w: %s", ErrConflict, msgEtiquetaDuplicada)
 		}
 		return EtiquetaResponse{}, err
 	}
@@ -171,7 +171,7 @@ func (s *Service) UpdateEtiqueta(ctx context.Context, id int64, req UpdateEtique
 	result, err := s.repo.UpdateEtiqueta(ctx, id, req)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return EtiquetaResponse{}, fmt.Errorf("%w: ya existe una etiqueta con ese nombre para esta asignatura", ErrConflict)
+			return EtiquetaResponse{}, fmt.Errorf("%w: %s", ErrConflict, msgEtiquetaDuplicada)
 		}
 		return EtiquetaResponse{}, err
 	}

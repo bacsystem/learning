@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -155,5 +157,107 @@ func TestCreateEtiqueta_DuplicadoContraNombreHeredado(t *testing.T) {
 	}
 	if code, _ := postEtiqueta(mux, admin, f.Asignaturas[0], "legado"); code != http.StatusConflict {
 		t.Errorf("status %d, want 409", code)
+	}
+}
+
+// The legacy name may carry a tab or a no-break space: SQL btrim alone would
+// not trim them, so the comparison passes the same set Go trims.
+func TestCreateEtiqueta_DuplicadoContraNombreConTabulador(t *testing.T) {
+	f, mux, admin := etiquetaFixture(t)
+	for _, legado := range []string{"Legado\t", "\u00a0Legado\u00a0"} {
+		if _, err := f.DB.Exec(`INSERT INTO etiquetas_pregunta (asignatura_id, nombre) VALUES ($1, $2)`, f.Asignaturas[0], legado); err != nil {
+			t.Fatal(err)
+		}
+		if code, _ := postEtiqueta(mux, admin, f.Asignaturas[0], "legado"); code != http.StatusConflict {
+			t.Errorf("legacy %q: status %d, want 409", legado, code)
+		}
+		if _, err := f.DB.Exec(`DELETE FROM etiquetas_pregunta WHERE asignatura_id=$1`, f.Asignaturas[0]); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestCreateEtiqueta_MensajeDeDuplicadoEsElPropio(t *testing.T) {
+	f, mux, admin := etiquetaFixture(t)
+	postEtiqueta(mux, admin, f.Asignaturas[0], "zz")
+	w := qt.Do(mux, "POST", "/etiquetas", admin, fmt.Sprintf(`{"asignatura_id":%d,"nombre":"ZZ"}`, f.Asignaturas[0]))
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), msgEtiquetaDuplicada) {
+		t.Errorf("status %d body %s, want 409 with %q", w.Code, w.Body, msgEtiquetaDuplicada)
+	}
+}
+
+// The edit form always resends the name. Existing duplicates (saved before the
+// check) must not block changing the estado of either of them.
+func TestUpdateEtiqueta_SinCambiarNombreNoChocaConDuplicadosExistentes(t *testing.T) {
+	f, mux, admin := etiquetaFixture(t)
+	var ids []int64
+	for _, nombre := range []string{"zz", "ZZ"} {
+		var id int64
+		if err := f.DB.QueryRow(`INSERT INTO etiquetas_pregunta (asignatura_id, nombre) VALUES ($1, $2) RETURNING id`,
+			f.Asignaturas[0], nombre).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	for i, nombre := range []string{"zz", "ZZ"} {
+		w := qt.Do(mux, "PUT", fmt.Sprintf("/etiquetas/%d", ids[i]), admin, fmt.Sprintf(`{"nombre":%q,"estado":"inactivo"}`, nombre))
+		if w.Code != http.StatusOK {
+			t.Errorf("tag %q: status %d body %s, want 200", nombre, w.Code, w.Body)
+		}
+	}
+}
+
+func TestUpdateEtiqueta_NombreEnBlancoConEstadoNoCambiaNada(t *testing.T) {
+	f, mux, admin := etiquetaFixture(t)
+	_, et := postEtiqueta(mux, admin, f.Asignaturas[0], "intacta")
+	w := qt.Do(mux, "PUT", fmt.Sprintf("/etiquetas/%d", et.ID), admin, `{"nombre":"   ","estado":"inactivo"}`)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status %d, want 400", w.Code)
+	}
+	var estado string
+	if err := f.DB.QueryRow(`SELECT estado FROM etiquetas_pregunta WHERE id=$1`, et.ID).Scan(&estado); err != nil {
+		t.Fatal(err)
+	}
+	if estado != "activo" {
+		t.Errorf("estado = %q, the rejected request must not change it", estado)
+	}
+}
+
+// Concurrent creates through the repository (spellings of one name) leave
+// exactly one tag. The race window is tiny, so this is a smoke test; the
+// lock itself is proven by TestRechazarEtiquetaDuplicada_SerializaPorNombre.
+func TestRepositoryCreateEtiqueta_ConcurrenteCreaUna(t *testing.T) {
+	f, _, _ := etiquetaFixture(t)
+	repo := NewRepository(f.DB)
+	base := []string{"carrera", "CARRERA", " Carrera ", "caRRera", "carrera\t", "CarRera", "  carrera", "CARRERA  "}
+	var variantes []string
+	for range 4 {
+		variantes = append(variantes, base...)
+	}
+	errs := make([]error, len(variantes))
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i, nombre := range variantes {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			nombre, _ := normalizarNombreEtiqueta(nombre)
+			_, errs[i] = repo.CreateEtiqueta(context.Background(), CreateEtiquetaRequest{AsignaturaID: f.Asignaturas[0], Nombre: nombre})
+		}()
+	}
+	close(start)
+	wg.Wait()
+	created := 0
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			created++
+		case !errors.Is(err, ErrConflict):
+			t.Errorf("unexpected error: %v", err)
+		}
+	}
+	if created != 1 {
+		t.Fatalf("created %d tags, want 1", created)
 	}
 }
