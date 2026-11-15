@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode"
 
 	qt "github.com/cbaciliod/learning/internal/questions/questionstest"
 )
@@ -224,8 +225,11 @@ func TestUpdateEtiqueta_NombreEnBlancoConEstadoNoCambiaNada(t *testing.T) {
 }
 
 // Concurrent creates through the repository (spellings of one name) leave
-// exactly one tag. The race window is tiny, so this is a smoke test; the
-// lock itself is proven by TestRechazarEtiquetaDuplicada_SerializaPorNombre.
+// exactly one tag. The race window is microseconds, so this test cannot fail
+// reliably without the lock: it only guards against regressions that make
+// concurrent creates error out. The locks themselves are proven by the
+// deterministic tests TestRechazarEtiquetaDuplicada_SerializaPorNombre and
+// TestUpdateEtiqueta_EsperaALaFilaBloqueada.
 func TestRepositoryCreateEtiqueta_ConcurrenteCreaUna(t *testing.T) {
 	f, _, _ := etiquetaFixture(t)
 	repo := NewRepository(f.DB)
@@ -259,5 +263,87 @@ func TestRepositoryCreateEtiqueta_ConcurrenteCreaUna(t *testing.T) {
 	}
 	if created != 1 {
 		t.Fatalf("created %d tags, want 1", created)
+	}
+}
+
+// recorteNombre must trim exactly what strings.TrimSpace trims, or a name
+// stored trimmed by Go would not match a legacy row trimmed by SQL.
+func TestRecorteNombre_EsElConjuntoDeUnicodeIsSpace(t *testing.T) {
+	for r := rune(0); r <= unicode.MaxRune; r++ {
+		if unicode.IsSpace(r) != strings.ContainsRune(recorteNombre, r) {
+			t.Fatalf("U+%04X: IsSpace=%v but in recorteNombre=%v", r, unicode.IsSpace(r), strings.ContainsRune(recorteNombre, r))
+		}
+	}
+}
+
+// Legacy rows "zz " and "ZZ" are duplicates; resending the stored name (the
+// form does) must still work.
+func TestUpdateEtiqueta_ReenviarNombreHeredadoConEspacioFinal(t *testing.T) {
+	f, mux, admin := etiquetaFixture(t)
+	var id int64
+	if err := f.DB.QueryRow(`INSERT INTO etiquetas_pregunta (asignatura_id, nombre) VALUES ($1, 'zz ') RETURNING id`, f.Asignaturas[0]).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.DB.Exec(`INSERT INTO etiquetas_pregunta (asignatura_id, nombre) VALUES ($1, 'ZZ')`, f.Asignaturas[0]); err != nil {
+		t.Fatal(err)
+	}
+	w := qt.Do(mux, "PUT", fmt.Sprintf("/etiquetas/%d", id), admin, `{"nombre":"zz ","estado":"inactivo"}`)
+	if w.Code != http.StatusOK {
+		t.Errorf("status %d body %s, want 200", w.Code, w.Body)
+	}
+}
+
+// UpdateEtiqueta reads the row FOR UPDATE before the duplicate check, so while
+// another transaction holds the row it waits at the read: it has not taken the
+// advisory lock yet. Without FOR UPDATE it would pass the check holding that
+// lock and only then block on its UPDATE (the final UPDATE waits for the row
+// either way, which is why the lock is what this test inspects).
+func TestUpdateEtiqueta_EsperaALaFilaBloqueada(t *testing.T) {
+	f, mux, admin := etiquetaFixture(t)
+	_, et := postEtiqueta(mux, admin, f.Asignaturas[0], "foo")
+	ctx := context.Background()
+
+	tx, err := f.DB.BeginTxx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `SELECT id FROM etiquetas_pregunta WHERE id = $1 FOR UPDATE`, et.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := NewRepository(f.DB).UpdateEtiqueta(ctx, et.ID, UpdateEtiquetaRequest{Nombre: "bar"})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		t.Fatalf("UpdateEtiqueta did not wait for the locked row (returned %v)", err)
+	case <-time.After(300 * time.Millisecond):
+	}
+	probe, err := f.DB.BeginTxx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var libre bool
+	if err := probe.QueryRowContext(ctx, `
+		SELECT pg_try_advisory_xact_lock(hashtextextended($1::text || ':' || 'bar', 0))`, f.Asignaturas[0]).Scan(&libre); err != nil {
+		t.Fatal(err)
+	}
+	_ = probe.Rollback()
+	if !libre {
+		t.Fatal("UpdateEtiqueta took the name lock before reading the row FOR UPDATE")
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("UpdateEtiqueta after release: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("UpdateEtiqueta never returned after the row was released")
 	}
 }

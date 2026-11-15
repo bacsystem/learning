@@ -690,10 +690,11 @@ func (r *Repository) CreateEtiqueta(ctx context.Context, req CreateEtiquetaReque
 	return EtiquetaResponse{}, ErrNotFound
 }
 
-// recorteNombre are the characters trimmed from a tag name: what
-// strings.TrimSpace removes for ASCII plus the no-break space. SQL btrim only
-// trims plain spaces by default, so the set is passed explicitly.
-const recorteNombre = " \t\n\r\v\f\u00a0"
+// recorteNombre are the characters trimmed from a tag name: exactly the
+// unicode.IsSpace set that strings.TrimSpace removes in the service. SQL btrim
+// only trims plain spaces by default, so the set is passed explicitly (a test
+// keeps it equal to unicode.IsSpace).
+const recorteNombre = " \t\n\v\f\r\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
 
 // rechazarEtiquetaDuplicada returns ErrConflict when the asignatura already has
 // a tag with the same name ignoring case and surrounding spaces (excluding the
@@ -748,12 +749,13 @@ func (r *Repository) UpdateEtiqueta(ctx context.Context, id int64, req UpdateEti
 		var mismoNombre bool
 		if err := tx.QueryRowContext(ctx, `
 			SELECT asignatura_id, lower(btrim(nombre, $2)) = lower(btrim($3, $2))
-			FROM etiquetas_pregunta WHERE id = $1`, id, recorteNombre, req.Nombre).Scan(&asignaturaID, &mismoNombre); err != nil {
+			FROM etiquetas_pregunta WHERE id = $1 FOR UPDATE`, id, recorteNombre, req.Nombre).Scan(&asignaturaID, &mismoNombre); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrNotFound
 			}
 			return err
 		}
+		// FOR UPDATE above keeps the row (and so its name) fixed until commit.
 		// A request that keeps the name (the form always resends it) must not
 		// fail because of duplicates that already exist.
 		if req.Nombre != "" && !mismoNombre {
