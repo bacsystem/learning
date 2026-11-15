@@ -317,7 +317,7 @@ export default function ProcesosPage() {
     try {
       await catalogsApi.asignarAsignatura(token, procesoId, asigDialog.addForm);
     } catch (e: unknown) {
-      toast.error(t(claveErrorApi(e, { generico: "admin-error-asignar-asignatura" })));
+      toast.error(t(claveErrorApi(e, ERRORES_PROCESO.asignar)));
       setAsigDialog((d) => ({ ...d, addSubmitting: false }));
       return;
     }
@@ -334,7 +334,7 @@ export default function ProcesosPage() {
     try {
       await catalogsApi.deleteProcesoAsignatura(token, procesoId, quitarDialog.item.asignatura_id);
     } catch (e: unknown) {
-      toast.error(t(claveErrorApi(e, { generico: "admin-error-eliminar-asignatura" })));
+      toast.error(t(claveErrorApi(e, ERRORES_PROCESO.quitar)));
       setQuitarDialog((d) => ({ ...d, submitting: false }));
       return;
     }

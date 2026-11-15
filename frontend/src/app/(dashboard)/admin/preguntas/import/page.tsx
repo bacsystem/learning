@@ -185,7 +185,7 @@ export default function ImportPreguntasPage() {
       setResult(res);
       setStep(2);
     } catch (e: unknown) {
-      // 400: the backend explains why (subject not in this process, foreign tags…).
+      // 400 (subject not in this process, foreign tags…): the server's explanation is Spanish, so only the generic text shows.
       setError(t(claveErrorApi(e, { generico: "admin-preguntas-import-error-importar" })));
     } finally {
       setImporting(false);

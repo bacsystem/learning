@@ -1,6 +1,5 @@
 import {
   ERRORES_ASIGNATURA,
-  ERRORES_CORREO_USUARIO,
   ERRORES_ESPECIALIDAD,
   ERRORES_GRADO,
   ERRORES_INSTITUCION,
@@ -27,15 +26,23 @@ describe("errores de los catálogos", () => {
     expect(claveErrorApi(legado(409), ERRORES_ESPECIALIDAD.estado)).toBe("admin-error-especialidad-con-usuarios");
   });
 
+  it("translates the process errors: weights, already assigned and active process", () => {
+    const codigo = (code: string, status: number) => Object.assign(new Error("x"), { status, code });
+    expect(claveErrorApi(legado(400), ERRORES_PROCESO.estado)).toBe("admin-error-proceso-pesos-no-suman");
+    expect(claveErrorApi(codigo("peso_duplicado", 409), ERRORES_PROCESO.asignar)).toBe(
+      "admin-error-asignatura-ya-asignada",
+    );
+    expect(claveErrorApi(legado(409), ERRORES_PROCESO.asignar)).toBe("admin-error-proceso-activo-pesos");
+    expect(claveErrorApi(legado(409), ERRORES_PROCESO.quitar)).toBe("admin-error-proceso-activo-pesos");
+    expect(claveErrorApi(legado(500), ERRORES_PROCESO.asignar)).toBe("admin-error-asignar-asignatura");
+    expect(claveErrorApi(legado(500), ERRORES_PROCESO.quitar)).toBe("admin-error-eliminar-asignatura");
+    // Un código sin traducción no cae en el mensaje del status 409.
+    expect(claveErrorApi(codigo("otro", 409), ERRORES_PROCESO.quitar)).toBe("admin-error-eliminar-asignatura");
+  });
+
   it("falls back to the generic text for anything else", () => {
     expect(claveErrorApi(legado(500), ERRORES_GRADO.guardar)).toBe("comun-error-guardar");
     expect(claveErrorApi(legado(409), ERRORES_INSTITUCION.estado)).toBe("comun-error-estado");
-  });
-
-  it("translates the e-mail change: 409 in use, 422 invalid", () => {
-    expect(claveErrorApi(legado(409), ERRORES_CORREO_USUARIO)).toBe("admin-error-correo-en-uso");
-    expect(claveErrorApi(legado(422), ERRORES_CORREO_USUARIO)).toBe("admin-error-correo-invalido");
-    expect(claveErrorApi(legado(500), ERRORES_CORREO_USUARIO)).toBe("admin-error-actualizar-correo");
   });
 
   it("only uses keys that exist in both languages", () => {
@@ -45,7 +52,6 @@ describe("errores de los catálogos", () => {
       ...Object.values(ERRORES_ESPECIALIDAD),
       ...Object.values(ERRORES_ASIGNATURA),
       ...Object.values(ERRORES_PROCESO),
-      ERRORES_CORREO_USUARIO,
     );
   });
 });

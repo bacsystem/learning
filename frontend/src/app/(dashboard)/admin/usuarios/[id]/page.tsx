@@ -24,9 +24,9 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { adminGetUsuario, adminPatchUsuarioRol, type UsuarioDetalle } from "@/lib/admin/api";
+import { ERRORES_CORREO_USUARIO } from "@/lib/admin/errores-usuario";
 import { excede, LIMITES } from "@/lib/admin/limites";
 import { useAuth } from "@/lib/auth/auth-context";
-import { ERRORES_CORREO_USUARIO } from "@/lib/catalogs/errores";
 import { claveErrorApi } from "@/lib/errores-api";
 import {
   ACCION_SECUNDARIA,
