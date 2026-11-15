@@ -28,6 +28,10 @@ const codigoTemaInvalido = "tema_invalido"
 // constraintTema is the composite FK (tema_id, asignatura_id) of migration 059.
 const constraintTema = "fk_preguntas_tema"
 
+// msgEtiquetaDuplicada is the 409 message for a tag name already used in the
+// asignatura, whichever check detects it.
+const msgEtiquetaDuplicada = "ya existe una etiqueta con ese nombre para esta asignatura"
+
 const msgAlternativaConIntentos = "no se puede eliminar una alternativa que ya tiene intentos registrados"
 
 // msgClaveConIntentos is the 409 message when an edit changes the key of a
@@ -63,8 +67,9 @@ func isTemaFKViolation(err error) bool {
 
 // isForeignKeyViolation returns true for a 23503 that is neither the
 // alternative RESTRICT above nor the tema FK: a grado_id or especialidad_id
-// that does not exist. Etiquetas are checked before the insert
-// (validarClasificacion), so they never get here.
+// that does not exist, or the asignatura_id of a new etiqueta. The etiquetas
+// of a pregunta are checked before its insert (validarClasificacion), so they
+// never get here.
 func isForeignKeyViolation(err error) bool {
 	var pqErr *pq.Error
 	return errors.As(err, &pqErr) && pqErr.Code == "23503" && !isAlternativaConIntentos(err) && !isTemaFKViolation(err)

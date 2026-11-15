@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Service implements the business logic for the questions module.
@@ -130,12 +131,30 @@ func (s *Service) ListEtiquetas(ctx context.Context, asignaturaID int64, estado 
 	return s.repo.ListEtiquetas(ctx, asignaturaID, estado)
 }
 
+// normalizarNombreEtiqueta trims the name stored for a tag; a name that is
+// blank after trimming is rejected.
+func normalizarNombreEtiqueta(nombre string) (string, error) {
+	nombre = strings.TrimSpace(nombre)
+	if nombre == "" {
+		return "", fmt.Errorf("%w: el nombre de la etiqueta no puede estar vacío", ErrValidation)
+	}
+	return nombre, nil
+}
+
 // CreateEtiqueta creates a new tag.
 func (s *Service) CreateEtiqueta(ctx context.Context, req CreateEtiquetaRequest) (EtiquetaResponse, error) {
+	nombre, err := normalizarNombreEtiqueta(req.Nombre)
+	if err != nil {
+		return EtiquetaResponse{}, err
+	}
+	req.Nombre = nombre
 	result, err := s.repo.CreateEtiqueta(ctx, req)
 	if err != nil {
+		if isForeignKeyViolation(err) {
+			return EtiquetaResponse{}, fmt.Errorf("%w: la asignatura no existe", ErrValidation)
+		}
 		if isUniqueViolation(err) {
-			return EtiquetaResponse{}, fmt.Errorf("%w: ya existe una etiqueta con ese nombre para esta asignatura", ErrConflict)
+			return EtiquetaResponse{}, fmt.Errorf("%w: %s", ErrConflict, msgEtiquetaDuplicada)
 		}
 		return EtiquetaResponse{}, err
 	}
@@ -144,10 +163,15 @@ func (s *Service) CreateEtiqueta(ctx context.Context, req CreateEtiquetaRequest)
 
 // UpdateEtiqueta updates a tag.
 func (s *Service) UpdateEtiqueta(ctx context.Context, id int64, req UpdateEtiquetaRequest) (EtiquetaResponse, error) {
+	nombre, err := normalizarNombreEtiqueta(req.Nombre)
+	if err != nil {
+		return EtiquetaResponse{}, err
+	}
+	req.Nombre = nombre
 	result, err := s.repo.UpdateEtiqueta(ctx, id, req)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return EtiquetaResponse{}, fmt.Errorf("%w: ya existe una etiqueta con ese nombre para esta asignatura", ErrConflict)
+			return EtiquetaResponse{}, fmt.Errorf("%w: %s", ErrConflict, msgEtiquetaDuplicada)
 		}
 		return EtiquetaResponse{}, err
 	}

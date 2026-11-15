@@ -664,12 +664,17 @@ func (r *Repository) ListEtiquetas(ctx context.Context, asignaturaID int64, esta
 // CreateEtiqueta inserts a new tag and returns it.
 func (r *Repository) CreateEtiqueta(ctx context.Context, req CreateEtiquetaRequest) (EtiquetaResponse, error) {
 	var id int64
-	err := r.db.QueryRowContext(ctx, `
-		INSERT INTO etiquetas_pregunta (asignatura_id, nombre)
-		VALUES ($1, $2)
-		RETURNING id`,
-		req.AsignaturaID, req.Nombre,
-	).Scan(&id)
+	err := r.enTx(ctx, func(tx *sqlx.Tx) error {
+		if err := rechazarEtiquetaDuplicada(ctx, tx, req.AsignaturaID, req.Nombre, 0); err != nil {
+			return err
+		}
+		return tx.QueryRowContext(ctx, `
+			INSERT INTO etiquetas_pregunta (asignatura_id, nombre)
+			VALUES ($1, $2)
+			RETURNING id`,
+			req.AsignaturaID, req.Nombre,
+		).Scan(&id)
+	})
 	if err != nil {
 		return EtiquetaResponse{}, err
 	}
@@ -683,6 +688,38 @@ func (r *Repository) CreateEtiqueta(ctx context.Context, req CreateEtiquetaReque
 		}
 	}
 	return EtiquetaResponse{}, ErrNotFound
+}
+
+// recorteNombre are the characters trimmed from a tag name: exactly the
+// unicode.IsSpace set that strings.TrimSpace removes in the service. SQL btrim
+// only trims plain spaces by default, so the set is passed explicitly (a test
+// keeps it equal to unicode.IsSpace).
+const recorteNombre = " \t\n\v\f\r\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
+
+// rechazarEtiquetaDuplicada returns ErrConflict when the asignatura already has
+// a tag with the same name ignoring case and surrounding spaces (excluding the
+// tag exceptoID, 0 for none). The table only has UNIQUE(asignatura_id, nombre),
+// which is case-sensitive, so the check and the write are serialized per
+// (asignatura, name) with a transaction-scoped advisory lock: two concurrent
+// requests cannot both pass the check.
+func rechazarEtiquetaDuplicada(ctx context.Context, tx *sqlx.Tx, asignaturaID int64, nombre string, exceptoID int64) error {
+	if _, err := tx.ExecContext(ctx,
+		`SELECT pg_advisory_xact_lock(hashtextextended($1::text || ':' || lower(btrim($2, $3)), 0))`,
+		asignaturaID, nombre, recorteNombre); err != nil {
+		return err
+	}
+	var existe bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM etiquetas_pregunta
+			WHERE asignatura_id = $1 AND lower(btrim(nombre, $3)) = lower(btrim($2, $3)) AND id <> $4)`,
+		asignaturaID, nombre, recorteNombre, exceptoID).Scan(&existe); err != nil {
+		return err
+	}
+	if existe {
+		return fmt.Errorf("%w: %s", ErrConflict, msgEtiquetaDuplicada)
+	}
+	return nil
 }
 
 // UpdateEtiqueta updates a tag's nombre and/or estado.
@@ -707,16 +744,32 @@ func (r *Repository) UpdateEtiqueta(ctx context.Context, id int64, req UpdateEti
 	}
 
 	args = append(args, id)
-	res, err := r.db.ExecContext(ctx,
-		fmt.Sprintf("UPDATE etiquetas_pregunta SET %s WHERE id = $%d", strings.Join(sets, ", "), i),
-		args...,
-	)
+	err := r.enTx(ctx, func(tx *sqlx.Tx) error {
+		var asignaturaID int64
+		var mismoNombre bool
+		if err := tx.QueryRowContext(ctx, `
+			SELECT asignatura_id, lower(btrim(nombre, $2)) = lower(btrim($3, $2))
+			FROM etiquetas_pregunta WHERE id = $1 FOR UPDATE`, id, recorteNombre, req.Nombre).Scan(&asignaturaID, &mismoNombre); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+		// FOR UPDATE above keeps the row (and so its name) fixed until commit.
+		// A request that keeps the name (the form always resends it) must not
+		// fail because of duplicates that already exist.
+		if req.Nombre != "" && !mismoNombre {
+			if err := rechazarEtiquetaDuplicada(ctx, tx, asignaturaID, req.Nombre, id); err != nil {
+				return err
+			}
+		}
+		_, err := tx.ExecContext(ctx,
+			fmt.Sprintf("UPDATE etiquetas_pregunta SET %s WHERE id = $%d", strings.Join(sets, ", "), i),
+			args...)
+		return err
+	})
 	if err != nil {
 		return EtiquetaResponse{}, err
-	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return EtiquetaResponse{}, ErrNotFound
 	}
 
 	// Fetch updated
