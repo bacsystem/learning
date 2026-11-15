@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/cbaciliod/learning/internal/locale"
 )
 
 // Marker texts that differ between the Spanish and English templates.
@@ -76,8 +79,7 @@ func TestForgotPassword_EmailLanguage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newFixture(t)
-			uid, _ := f.activeUser("fp", "usuario")
-			_ = uid
+			f.activeUser("fp", "usuario")
 			email := f.email("fp")
 			rr := f.postJSON("/auth/forgot-password", fmt.Sprintf(`{"email":%q%s}`, email, tt.localeJSON))
 			if rr.Code != http.StatusOK {
@@ -211,17 +213,72 @@ func TestAdminEmails_StaySpanishWithBrand(t *testing.T) {
 	}
 }
 
-// Every template has an English and a Spanish text for each field.
-func TestEmailTemplates_EnglishHasNoSpanishLeftovers(t *testing.T) {
-	_, a := emailOlvidePassword("en", "https://x/r")
-	_, b := emailPasswordRestablecida("en", "https://x/l")
-	_, c := emailVerificarRegistro("en", "Ana", "Perez", "https://x/v")
-	_, d := emailRegistroPendiente("en", "Ana", "Perez", "ana")
-	for _, body := range []string{a, b, c, d} {
-		for _, es := range []string{"Si el botón", "automáticamente", "Hola,", "contraseña"} {
-			if strings.Contains(body, es) {
-				t.Errorf("English e-mail contains Spanish text %q", es)
+// Every user-facing text of a template exists in both languages: the body in
+// one language contains none of the texts of the other, and the subjects
+// differ. It walks the copy structs, so a new field is covered automatically.
+func TestEmailTemplates_LanguagesDoNotLeak(t *testing.T) {
+	type rendered struct {
+		subject, body string
+		texts         []string
+	}
+	templates := map[string]func(loc string) rendered{
+		"recovery": func(loc string) rendered {
+			sub, body := emailOlvidePassword(loc, "https://x/r")
+			return rendered{sub, body, textsOf(olvidePasswordCopy(loc))}
+		},
+		"reset done": func(loc string) rendered {
+			sub, body := emailPasswordRestablecida(loc, "https://x/l")
+			return rendered{sub, body, textsOf(passwordRestablecidaCopy(loc))}
+		},
+		"verify": func(loc string) rendered {
+			sub, body := emailVerificarRegistro(loc, "Ana", "Perez", "https://x/v")
+			return rendered{sub, body, textsOf(verificarRegistroCopy(loc))}
+		},
+		"registration pending": func(loc string) rendered {
+			sub, body := emailRegistroPendiente(loc, "Ana", "Perez", "ana")
+			return rendered{sub, body, textsOf(registroPendienteCopy(loc))}
+		},
+	}
+	shared := map[string][]string{
+		locale.ES: {buttonFallback(locale.ES), layoutAutoNotice(locale.ES)},
+		locale.EN: {buttonFallback(locale.EN), layoutAutoNotice(locale.EN)},
+	}
+	for name, render := range templates {
+		t.Run(name, func(t *testing.T) {
+			es, en := render(locale.ES), render(locale.EN)
+			if es.subject == en.subject {
+				t.Errorf("subject is the same in both languages: %q", es.subject)
 			}
+			for _, c := range []struct {
+				body, other string
+				foreign     []string
+			}{
+				{en.body, "es", append(es.texts, shared[locale.ES]...)},
+				{es.body, "en", append(en.texts, shared[locale.EN]...)},
+			} {
+				for _, text := range c.foreign {
+					if strings.Contains(c.body, text) {
+						t.Errorf("body contains the %s text %q", c.other, text)
+					}
+				}
+			}
+		})
+	}
+}
+
+// textsOf returns the fixed fragments of every string field of a copy struct
+// (the part before a %s verb for greetings), skipping the e-mail subject.
+func textsOf(texts any) []string {
+	v := reflect.ValueOf(texts)
+	var out []string
+	for i := 0; i < v.NumField(); i++ {
+		if v.Type().Field(i).Name == "subject" {
+			continue
+		}
+		text, _, _ := strings.Cut(v.Field(i).String(), "%s")
+		if text != "" {
+			out = append(out, text)
 		}
 	}
+	return out
 }
