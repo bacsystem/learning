@@ -8,8 +8,24 @@ import (
 	"testing"
 )
 
-// fuenteConRutas wraps registration statements in a compilable-looking file.
+// middlewares declares the names routes.go files use, each bound to the
+// constructor it really is.
+const middlewares = `
+	authn := auth.RequireAuth(s, c)
+	requireAuth := auth.RequireAuth(s, c)
+	auth := RequireAuth(s, c)
+	admin := auth.RequireAdmin
+	requireAdmin := auth.RequireAdmin
+`
+
+// fuenteConRutas wraps registration statements in a compilable-looking file,
+// after the standard middleware declarations.
 func fuenteConRutas(consts, cuerpo string) string {
+	return fuenteSinMiddlewares(consts, middlewares+cuerpo)
+}
+
+// fuenteSinMiddlewares is fuenteConRutas without the standard declarations.
+func fuenteSinMiddlewares(consts, cuerpo string) string {
 	return "package x\n" + consts + "\nfunc Mount() {\n" + cuerpo + "\n}\n"
 }
 
@@ -86,6 +102,44 @@ func TestEscanearFuente_FormaDesconocidaFalla(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), "x/routes.go:") {
 				t.Errorf("el error no lleva archivo:línea: %q", err)
+			}
+		})
+	}
+}
+
+// The role is what a name is assigned to, not the name: `admin := auth.RequireAuth`
+// is an authenticated route.
+func TestEscanearFuente_RolPorAsignacion(t *testing.T) {
+	tests := []struct {
+		name    string
+		consts  string
+		cuerpo  string
+		want    rol
+		wantErr string
+	}{
+		{"admin que apunta a RequireAuth", "", "admin := auth.RequireAuth(s, c)\nmux.Handle(\"GET /a\", admin(http.HandlerFunc(h.A)))", rolAutenticado, ""},
+		{"authn que apunta a RequireAdmin", "", "authn := auth.RequireAdmin\nmux.Handle(\"GET /a\", authn(http.HandlerFunc(h.A)))", rolAdmin, ""},
+		{"nombre libre que apunta a RequireAdmin", "", "guardia := auth.RequireAdmin\nmux.Handle(\"GET /a\", guardia(h.A))", rolAdmin, ""},
+		{"RequireAuth sin calificar", "", "a := RequireAuth(s, c)\nmux.Handle(\"GET /a\", a(h.A))", rolAutenticado, ""},
+		{"var local", "", "var admin = auth.RequireAdmin\nmux.Handle(\"GET /a\", admin(h.A))", rolAdmin, ""},
+		{"var de paquete", "var admin = auth.RequireAdmin", "mux.Handle(\"GET /a\", admin(h.A))", rolAdmin, ""},
+		{"asignación local gana a la de paquete", "var guardia = auth.RequireAdmin", "guardia := auth.RequireAuth(s, c)\nmux.Handle(\"GET /a\", guardia(h.A))", rolAutenticado, ""},
+		{"sin asignación conocida", "", "mux.Handle(\"GET /a\", admin(h.A))", "", `llamada a "admin" desconocida`},
+		{"asignada a otra cosa", "", "admin := otraCosa(s)\nmux.Handle(\"GET /a\", admin(h.A))", "", `"admin" se asigna a una expresión que no es`},
+		{"asignada a una función literal", "", "admin := func(h http.Handler) http.Handler { return h }\nmux.Handle(\"GET /a\", admin(h.A))", "", `"admin" se asigna a una expresión que no es`},
+		{"asignada dos veces", "", "admin := auth.RequireAdmin\nadmin = auth.RequireAuth(s, c)\nmux.Handle(\"GET /a\", admin(h.A))", "", `se asigna 2 veces`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rutas, err := escanearFuente("x/routes.go", fuenteSinMiddlewares(tt.consts, tt.cuerpo))
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) || !strings.Contains(err.Error(), "x/routes.go:") {
+					t.Fatalf("got %v; se esperaba un error con %q y archivo:línea", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil || len(rutas) != 1 || rutas[0].Rol != tt.want {
+				t.Fatalf("got %v, %v; want %s", rutas, err, tt.want)
 			}
 		})
 	}
