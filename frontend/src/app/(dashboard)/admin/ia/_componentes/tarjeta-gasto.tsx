@@ -9,6 +9,7 @@ import { CONTENEDOR_TABLA, FilaVacia } from "@/components/patrones/pie-tabla";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { CABECERA_TABLA, TARJETA } from "@/lib/estilos";
+import { formatearMonto } from "@/lib/formato";
 import type { GastoIa } from "@/lib/serums-ia/ia/api";
 import { type EstadoGasto, estadoGasto, porcentajeBarra } from "@/lib/serums-ia/ia/reglas";
 import { cn } from "@/lib/utils";
@@ -22,8 +23,6 @@ export function TarjetaGasto({ gasto }: { gasto: GastoIa }) {
   const t = useTranslations("dashboard");
   const { fechaHora: fecha } = useFormatoFecha();
   const formato = useFormatter();
-  // Con el formato del idioma activo, como el resto de las cifras de esta pantalla.
-  const dolares = (v: number) => formato.number(v, { style: "currency", currency: "USD" });
   const estado = estadoGasto(gasto);
   // El mes llega como `AAAA-MM`; se ancla a mediodía de Lima para que la zona no lo corra de mes.
   const mes = formato.dateTime(new Date(`${gasto.mes}-01T12:00:00-05:00`), {
@@ -54,7 +53,7 @@ export function TarjetaGasto({ gasto }: { gasto: GastoIa }) {
           icono={WalletIcon}
           ayuda={t("serumsIa.ia.gasto.reinicia", { fecha: fecha(gasto.reinicia_at) })}
         >
-          {dolares(gasto.presupuesto_usd)}
+          {formatearMonto("USD", gasto.presupuesto_usd)}
         </Metrica>
         <Metrica
           etiqueta={t("serumsIa.ia.gasto.gastado")}
@@ -62,7 +61,7 @@ export function TarjetaGasto({ gasto }: { gasto: GastoIa }) {
           tono={estado === "normal" ? "neutro" : TONO_ALERTA[estado]}
           ayuda={t("serumsIa.ia.gasto.porcentaje", { porcentaje })}
         >
-          {dolares(gasto.gastado_usd)}
+          {formatearMonto("USD", gasto.gastado_usd)}
         </Metrica>
       </FilaMetricas>
 
@@ -102,7 +101,7 @@ export function TarjetaGasto({ gasto }: { gasto: GastoIa }) {
                     {formato.number(o.desde_cache)}
                   </TableCell>
                   <TableCell className="px-3 py-2 pr-4 text-right font-mono tabular-nums">
-                    {dolares(o.costo_usd)}
+                    {formatearMonto("USD", o.costo_usd)}
                   </TableCell>
                 </TableRow>
               ))}

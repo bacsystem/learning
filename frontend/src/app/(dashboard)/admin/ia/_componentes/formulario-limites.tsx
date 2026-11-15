@@ -18,6 +18,7 @@ import {
   type CampoConfiguracion,
   CAMPOS_CONFIGURACION,
   camposRechazados,
+  errorVisible,
   esquemaConfiguracion,
   RANGOS,
 } from "@/lib/serums-ia/ia/reglas";
@@ -75,7 +76,7 @@ export function FormularioLimites({
 
   // El error aparece al salir del campo o en cuanto el valor cambia: «Guardar» se deshabilita con él y debe decir por qué.
   const errorDe = (campo: CampoConfiguracion) => {
-    const visible = formik.touched[campo] || formik.values[campo] !== formik.initialValues[campo];
+    const visible = errorVisible(formik.touched[campo], formik.values[campo], formik.initialValues[campo]);
     const e = visible ? formik.errors[campo] : undefined;
     return typeof e === "string" ? e : undefined;
   };
