@@ -1067,7 +1067,7 @@
     "verify-email-invalido-detalle": "This confirmation link is invalid, has already been used or has expired (it is valid for 24 hours). If you signed up more than once, only the latest link you received works.",
     "verify-email-usuario-en-uso": "Already taken",
     "verify-email-titulo": "Complete your registration",
-    "verify-email-descripcion": "Your email is confirmed. Choose the username and password you will use to access the platform.",
+    "verify-email-descripcion": "Choose the username and password you will use to access the platform. We will confirm your email when you finish.",
     "verify-email-usuario": "Username",
     "verify-email-usuario-placeholder": "user123",
     "verify-email-repite-contrasena": "Repeat your password",
