@@ -283,7 +283,7 @@ export default function EditPreguntaPage() {
       }
       // The server's message is never shown (it is Spanish, with internal field names). Only the key change on a question
       // that already graded attempts (H133, a 409) is told apart, by its text, and gets its translation; the other
-      // errors use the generic one.
+      // errors use the generic one. It goes away when the backend gives that 409 a code (#269).
       setError(
         err.status === 409 && err.message?.includes("respuesta correcta")
           ? t("admin-preguntas-clave-con-intentos")

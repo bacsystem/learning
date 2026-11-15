@@ -14,7 +14,10 @@ function archivos(dir: string): string[] {
   });
 }
 
-/** Un `message` solo puede usarse para decidir un caso: se quita `.message?.includes(...)` y no debe quedar otro `.message`. */
+/**
+ * Un `message` solo puede usarse para decidir un caso: se quita `.message?.includes(...)` y no debe quedar otro `.message`.
+ * Límite conocido: busca el texto `.message`, así que no detecta la desestructuración (`const { message } = e`).
+ */
 const sinComparaciones = (linea: string) => linea.replace(/\.message\?\.includes\([^)]*\)/g, "");
 
 /** El informe de filas inválidas de una importación no es un `ApiError`: son filas del resultado del servidor. */
