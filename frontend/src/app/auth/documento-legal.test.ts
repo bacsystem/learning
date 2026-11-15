@@ -32,6 +32,7 @@ describe("DocumentoLegal", () => {
     const html = pagina("es", es);
     expect(html).not.toContain("disponible solo en español");
     expect(html).not.toContain("Spanish only");
+    expect(html.indexOf("INTRO-EN-ESPAÑOL")).toBeLessThan(html.indexOf("</header>"));
     expect(html.indexOf("INTRO-EN-ESPAÑOL")).toBeLessThan(html.indexOf("CUERPO"));
     expect(html.match(/INTRO-EN-ESPAÑOL/g)).toHaveLength(1);
   });
