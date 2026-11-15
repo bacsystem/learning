@@ -13,67 +13,119 @@ import (
 
 // ── Cuenta activada ──────────────────────────────────────────────────────────
 
-func emailActivado(nombres, apellido, username, loginURL string) (subject, body string) {
-	subject = "Tu cuenta ha sido activada"
+func emailActivado(loc, nombres, apellido, username, loginURL string) (subject, body string) {
+	c := activadoCopy(loc)
+	subject = c.subject
 	content := fmt.Sprintf(`
-    <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#18181b;">¡Bienvenido, %s!</h1>
-    <p style="margin:0 0 20px;font-size:15px;color:#52525b;">
-      Tu cuenta ha sido <strong style="color:#4a5e3a;">activada exitosamente</strong>.
-      Ya puedes acceder a la plataforma y comenzar tus capacitaciones.
-    </p>
+    <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#18181b;">%s</h1>
+    <p style="margin:0 0 20px;font-size:15px;color:#52525b;">%s</p>
 
     <table width="100%%" cellpadding="0" cellspacing="0" style="background:#f0f4ec;border-radius:8px;margin-bottom:8px;">
       <tr><td style="padding:20px 24px;">
-        <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#71717a;text-transform:uppercase;letter-spacing:0.5px;">Usuario asignado</p>
+        <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#71717a;text-transform:uppercase;letter-spacing:0.5px;">%s</p>
         <p style="margin:0;font-size:20px;font-weight:700;color:#4a5e3a;">@%s</p>
       </td></tr>
     </table>
     %s`,
-		html.EscapeString(nombres+" "+apellido), html.EscapeString(username), correo.BtnPrimary(locale.ES, "Iniciar sesión", loginURL))
-	body = correo.Wrap(locale.ES, subject, content)
+		fmt.Sprintf(c.greeting, html.EscapeString(nombres+" "+apellido)), c.intro, c.usernameLabel,
+		html.EscapeString(username), correo.BtnPrimary(loc, c.button, loginURL))
+	body = correo.Wrap(loc, subject, content)
 	return
+}
+
+type activadoTexts struct{ subject, greeting, intro, usernameLabel, button string }
+
+func activadoCopy(loc string) activadoTexts {
+	if loc == locale.EN {
+		return activadoTexts{
+			subject:       "Your account has been activated",
+			greeting:      "Welcome, %s!",
+			intro:         `Your account has been <strong style="color:#4a5e3a;">activated successfully</strong>. You can now access the platform and start your training.`,
+			usernameLabel: "Assigned username",
+			button:        "Sign in",
+		}
+	}
+	return activadoTexts{
+		subject:       "Tu cuenta ha sido activada",
+		greeting:      "¡Bienvenido, %s!",
+		intro:         `Tu cuenta ha sido <strong style="color:#4a5e3a;">activada exitosamente</strong>. Ya puedes acceder a la plataforma y comenzar tus capacitaciones.`,
+		usernameLabel: "Usuario asignado",
+		button:        "Iniciar sesión",
+	}
 }
 
 // ── Cuenta rechazada ─────────────────────────────────────────────────────────
 
-func emailRechazado(nombres, apellido string) (subject, body string) {
-	subject = "Actualización sobre tu solicitud de cuenta"
+func emailRechazado(loc, nombres, apellido string) (subject, body string) {
+	c := rechazadoCopy(loc)
+	subject = c.subject
 	content := fmt.Sprintf(`
-    <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#18181b;">Hola, %s</h1>
-    <p style="margin:0 0 4px;font-size:15px;color:#52525b;">
-      Hemos revisado tu solicitud de acceso y lamentablemente
-      <strong style="color:#dc2626;">no pudo ser aprobada</strong> en este momento.
-    </p>
+    <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#18181b;">%s</h1>
+    <p style="margin:0 0 4px;font-size:15px;color:#52525b;">%s</p>
     %s
-    <p style="margin:16px 0 0;font-size:14px;color:#71717a;">
-      Puedes contactar al personal administrativo de tu institución para obtener más información
-      o presentar una nueva solicitud.
-    </p>`,
-		html.EscapeString(nombres+" "+apellido),
-		correo.InfoBox("#fef2f2", "#dc2626", "Si crees que esto es un error, comunícate con el área de administración de tu institución."))
-	body = correo.Wrap(locale.ES, subject, content)
+    <p style="margin:16px 0 0;font-size:14px;color:#71717a;">%s</p>`,
+		fmt.Sprintf(c.greeting, html.EscapeString(nombres+" "+apellido)), c.intro,
+		correo.InfoBox("#fef2f2", "#dc2626", c.notice), c.footer)
+	body = correo.Wrap(loc, subject, content)
 	return
+}
+
+type rechazadoTexts struct{ subject, greeting, intro, notice, footer string }
+
+func rechazadoCopy(loc string) rechazadoTexts {
+	if loc == locale.EN {
+		return rechazadoTexts{
+			subject:  "Update on your account request",
+			greeting: "Hello, %s",
+			intro:    `We have reviewed your access request and unfortunately it <strong style="color:#dc2626;">could not be approved</strong> at this time.`,
+			notice:   "If you think this is a mistake, contact the administration area of your institution.",
+			footer:   "You can contact the administrative staff of your institution for more information or submit a new request.",
+		}
+	}
+	return rechazadoTexts{
+		subject:  "Actualización sobre tu solicitud de cuenta",
+		greeting: "Hola, %s",
+		intro:    `Hemos revisado tu solicitud de acceso y lamentablemente <strong style="color:#dc2626;">no pudo ser aprobada</strong> en este momento.`,
+		notice:   "Si crees que esto es un error, comunícate con el área de administración de tu institución.",
+		footer:   "Puedes contactar al personal administrativo de tu institución para obtener más información o presentar una nueva solicitud.",
+	}
 }
 
 // ── Cuenta desactivada ───────────────────────────────────────────────────────
 
-func emailInactivo(nombres, apellido string) (subject, body string) {
-	subject = "Tu cuenta ha sido desactivada"
+func emailInactivo(loc, nombres, apellido string) (subject, body string) {
+	c := inactivoCopy(loc)
+	subject = c.subject
 	content := fmt.Sprintf(`
-    <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#18181b;">Hola, %s</h1>
-    <p style="margin:0 0 4px;font-size:15px;color:#52525b;">
-      Tu cuenta ha sido <strong style="color:#d97706;">desactivada temporalmente</strong>
-      por el administrador del sistema.
-    </p>
+    <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#18181b;">%s</h1>
+    <p style="margin:0 0 4px;font-size:15px;color:#52525b;">%s</p>
     %s
-    <p style="margin:16px 0 0;font-size:14px;color:#71717a;">
-      Durante este período no podrás acceder a los recursos de capacitación.
-      Contacta con el área de administración para solicitar la reactivación.
-    </p>`,
-		html.EscapeString(nombres+" "+apellido),
-		correo.InfoBox("#fffbeb", "#d97706", "Si consideras que esta acción fue un error, comunícate con el área de administración de tu institución."))
-	body = correo.Wrap(locale.ES, subject, content)
+    <p style="margin:16px 0 0;font-size:14px;color:#71717a;">%s</p>`,
+		fmt.Sprintf(c.greeting, html.EscapeString(nombres+" "+apellido)), c.intro,
+		correo.InfoBox("#fffbeb", "#d97706", c.notice), c.footer)
+	body = correo.Wrap(loc, subject, content)
 	return
+}
+
+type inactivoTexts struct{ subject, greeting, intro, notice, footer string }
+
+func inactivoCopy(loc string) inactivoTexts {
+	if loc == locale.EN {
+		return inactivoTexts{
+			subject:  "Your account has been deactivated",
+			greeting: "Hello, %s",
+			intro:    `Your account has been <strong style="color:#d97706;">temporarily deactivated</strong> by the system administrator.`,
+			notice:   "If you think this action was a mistake, contact the administration area of your institution.",
+			footer:   "During this period you will not be able to access the training resources. Contact the administration area to request reactivation.",
+		}
+	}
+	return inactivoTexts{
+		subject:  "Tu cuenta ha sido desactivada",
+		greeting: "Hola, %s",
+		intro:    `Tu cuenta ha sido <strong style="color:#d97706;">desactivada temporalmente</strong> por el administrador del sistema.`,
+		notice:   "Si consideras que esta acción fue un error, comunícate con el área de administración de tu institución.",
+		footer:   "Durante este período no podrás acceder a los recursos de capacitación. Contacta con el área de administración para solicitar la reactivación.",
+	}
 }
 
 // ── Registro pendiente (al usuario) ─────────────────────────────────────────
