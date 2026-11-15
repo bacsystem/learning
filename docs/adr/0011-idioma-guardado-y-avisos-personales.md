@@ -96,6 +96,10 @@
   - La decisión del admin hace dos INSERT más dentro de su transacción. El costo es despreciable.
   - El frontend mantiene una tabla de `clave` → texto y ruta. Una clave desconocida se muestra con `titulo` y `cuerpo`.
   - `email_queue.body_html` guarda el nombre y el motivo, como ya guarda los correos de cuenta. No hay ningún dato personal nuevo en logs.
+- **La 069 no es compatible hacia atrás:** el binario anterior hace `SELECT * FROM usuarios` (`auth/repository.go:438,447`), y sqlx falla con la columna nueva (#285). Por eso:
+  - el rollback del código exige revertir antes la base;
+  - PLT-11 pasa esas consultas a una lista explícita de columnas;
+  - el orden de despliegue está en el contrato §4.
 - **Down de la 069:** pierde las preferencias de idioma.
 - **Down de la 070:** borra las notificaciones personales antes de quitar las columnas, porque sin `usuario_id` quedarían huérfanas e invisibles para todos.
 - **Fuera:**

@@ -197,6 +197,16 @@ El asunto se recorta a 255 caracteres (`email_queue.subject VARCHAR(255)`).
 
 - **Numeración confirmada por el tech-lead (2026-11-15, después del recorte de alcance).** El merge es estricto, en orden numérico (goose sin allow-missing): 069 → 070. No se intercambian números.
 - **Orden de los PR:** PLT-11 (069) → PLT-12 (070) → PLT-13. PLT-13 se rebasea sobre PLT-12, porque PLT-12 mueve el layout de correo a `internal/correo` (§2.4).
-- **Compatibilidad:** un binario viejo funciona con el esquema nuevo de las dos.
-  - 069: columna con default.
-  - 070: el binario viejo no ve las notificaciones personales, porque no son `todos` ni `rol:*`.
+- **Compatibilidad hacia atrás** (binario viejo con el esquema nuevo):
+  - **069 NO es compatible** (hallazgo del review del #285, reproducido por el tech-lead).
+    - El código de `develop` lee `SELECT * FROM usuarios` hacia `usuarioRow` (`auth/repository.go:438,447`).
+    - Con la columna `idioma`, sqlx falla con `missing destination name idioma`, y se cae el login y todo lo que use `FindByID` o `FindByUsername`.
+    - **Consecuencias:**
+      - **Rollback:** volver al binario anterior exige **revertir antes la base** (`goose down` de la 069, que pierde las preferencias de idioma). No basta con cambiar el código.
+      - **Ventana de despliegue:** si el binario viejo sigue sirviendo después de `migrate`, el login falla hasta que arranca el nuevo. Para que ese hueco no exista, el cambio de esas dos consultas a una lista explícita de columnas debe llegar a producción **antes** que la 069, en su propio release o en uno anterior. Si van en el mismo release, se acepta el corte breve y se anota en el PR.
+    - **Corrección en PLT-11:** `FindByID` y `FindByUsername` pasan a listar sus columnas explícitamente, con `idioma` incluido.
+  - **070 sí es compatible.**
+    - Los lectores de `notificaciones` listan columnas explícitas (`notifications/repository.go:26-31,38-43,70-79`). No hay `SELECT *` ni `RETURNING *` sobre esa tabla en el código que no es de test.
+    - El binario viejo no ve las notificaciones personales, porque no son `todos` ni `rol:*`.
+  - **Revisión del repo (2026-11-15):** los únicos `SELECT *` del backend fuera de los tests son esos dos de `usuarios`.
+- **Regla (README §11):** no se usa `SELECT *` ni `RETURNING *` sobre tablas que pueden crecer. Toda consulta que escanea a un struct lista sus columnas.
