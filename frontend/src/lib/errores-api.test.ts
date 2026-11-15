@@ -42,8 +42,8 @@ describe("claveErrorApi", () => {
   it("clavesDeOpciones lists the codes, the statuses and the generic key", () => {
     expect(clavesDeOpciones({ accion: "guardar", ...mapas })).toEqual([
       "k-codigo",
-      "k-status",
       "k-404",
+      "k-status",
       "comun-error-guardar",
     ]);
     expect(clavesDeOpciones({ generico: "propia" })).toEqual(["propia"]);
