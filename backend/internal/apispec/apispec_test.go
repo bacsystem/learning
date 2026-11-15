@@ -6,29 +6,6 @@ import (
 	"testing"
 )
 
-// paquetesDocumentados lists the Go packages whose routes must all be in the
-// spec (pending mode, ADR 0012 decision 3). It only grows: each domain PR adds
-// its packages, one per line, and the final PR removes the variable so that
-// any route missing from the spec fails.
-var paquetesDocumentados = []string{
-	"server",
-	"inscripciones",
-	"testimonios",
-	"notifications",
-	"salud",
-	"auth",
-	"admin",
-	"catalogs",
-	"temas",
-	"perfiles",
-	"questions",
-	"fuentes",
-	"balotario",
-	"ia",
-	"practices",
-	"simulations",
-}
-
 // TestRutasCoincidenConElSpec compares the routes registered in the code (and
 // the role their middleware chain enforces) with docs/api/openapi.
 func TestRutasCoincidenConElSpec(t *testing.T) {
@@ -41,11 +18,7 @@ func TestRutasCoincidenConElSpec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("no se pudo leer el spec: %v", err)
 	}
-	errores, avisos := comparar(codigo, spec, paquetesDocumentados)
-	for _, a := range avisos {
-		t.Log(a)
-	}
-	for _, e := range errores {
+	for _, e := range comparar(codigo, spec) {
 		t.Error(e)
 	}
 }

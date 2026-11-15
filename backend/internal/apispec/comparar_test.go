@@ -6,16 +6,13 @@ import (
 	"sort"
 )
 
-// comparar checks the spec against the routes of the code. errores always fail
-// the test; avisos are routes of packages that are not documented yet.
-//
-// paquetesDocumentados lists the packages whose routes must all be in the spec.
-func comparar(codigo map[string][]rutaCodigo, spec infoSpec, documentados []string) (errores, avisos []string) {
-	for _, p := range documentados {
-		if _, ok := codigo[p]; !ok {
-			errores = append(errores, fmt.Sprintf("paquetesDocumentados: %q no es un paquete con rutas", p))
-		}
-	}
+// comparar checks the spec against the routes of the code and returns every
+// mismatch (strict mode, ADR 0012 decision 3): a route of the code missing
+// from the spec, an operation of the spec missing from the code without
+// x-estado: planificado, a different x-rol, and the shape rules of each
+// operation.
+func comparar(codigo map[string][]rutaCodigo, spec infoSpec) []string {
+	var errores []string
 	enCodigo := map[string]rutaCodigo{}
 	paqueteDe := map[string]string{}
 	for paquete, rutas := range codigo {
@@ -32,17 +29,14 @@ func comparar(codigo map[string][]rutaCodigo, spec infoSpec, documentados []stri
 		if _, ok := spec.Ops[clave]; ok {
 			continue
 		}
-		msg := fmt.Sprintf("%s (%s) no está en el spec", clave, enCodigo[clave].Pos)
-		if slices.Contains(documentados, paqueteDe[clave]) {
-			errores = append(errores, fmt.Sprintf("%s; el paquete %q ya está en paquetesDocumentados", msg, paqueteDe[clave]))
-		} else {
-			avisos = append(avisos, fmt.Sprintf("%s [paquete %s sin documentar]", msg, paqueteDe[clave]))
-		}
+		errores = append(errores, fmt.Sprintf(
+			"%s (%s) no está en el spec: documéntala en docs/api/openapi/paquetes/%s.yaml y referénciala desde openapi.yaml",
+			clave, enCodigo[clave].Pos, paqueteDe[clave]))
 	}
 	for _, h := range spec.Huerfanas {
 		errores = append(errores, fmt.Sprintf("%s no está referenciada desde openapi.yaml", h))
 	}
-	return errores, avisos
+	return errores
 }
 
 func compararOperacion(op opSpec, enCodigo map[string]rutaCodigo) []string {
