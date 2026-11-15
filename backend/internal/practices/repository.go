@@ -190,13 +190,13 @@ func (r *Repository) GetPracticaEnCurso(ctx context.Context, usuarioID int64) (*
 
 // ── Access checks (same rule as simulacros) ──────────────────────────────────
 
-// GetProcesoNivel returns the nivel assigned to the proceso.
-func (r *Repository) GetProcesoNivel(ctx context.Context, procesoID int64) (string, error) {
-	nivel, err := examen.ProcesoNivel(ctx, r.db, procesoID)
+// AccesoProceso reads the user's access to the proceso from the database.
+func (r *Repository) AccesoProceso(ctx context.Context, usuarioID, procesoID int64) (examen.Acceso, error) {
+	acceso, err := examen.AccesoProceso(ctx, r.db, usuarioID, procesoID)
 	if errors.Is(err, examen.ErrProcesoNoEncontrado) {
-		return "", ErrNotFound
+		return examen.Acceso{}, ErrNotFound
 	}
-	return nivel, err
+	return acceso, err
 }
 
 // HasInscripcionAprobada returns true if the user has an approved inscripción for the proceso.

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cbaciliod/learning/internal/audit"
+	"github.com/cbaciliod/learning/internal/examen"
 )
 
 var (
@@ -13,7 +14,9 @@ var (
 	ErrYaInscrito          = errors.New("Ya estás inscrito en este proceso.")
 	ErrInscripcionNotFound = errors.New("Inscripción no encontrada.")
 	ErrEstadoInvalido      = errors.New("Estado inválido. Valores permitidos: aprobado, rechazado.")
-	ErrNivelNoPermitido    = errors.New("No tienes acceso a este proceso.")
+	// Access errors of the proceso (403), decided by examen.AccesoProceso.
+	ErrNivelNoPermitido       = examen.ErrNivelNoPermitido
+	ErrInstitucionNoPermitida = examen.ErrInstitucionNoPermitida
 	// ErrTransicionInvalida: only pendiente → aprobado|rechazado is allowed;
 	// a decided inscription is final.
 	ErrTransicionInvalida = errors.New("La inscripción ya fue revisada; solo se pueden aprobar o rechazar inscripciones pendientes.")
@@ -68,6 +71,10 @@ func (s *Service) ListTodosProcesosActivos(ctx context.Context) ([]ProcesoDTO, e
 	if err != nil {
 		return nil, err
 	}
+	return toProcesoDTOs(rows), nil
+}
+
+func toProcesoDTOs(rows []ProcesoRow) []ProcesoDTO {
 	out := make([]ProcesoDTO, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, ProcesoDTO{
@@ -80,30 +87,17 @@ func (s *Service) ListTodosProcesosActivos(ctx context.Context) ([]ProcesoDTO, e
 			Anio:        r.Anio,
 		})
 	}
-	return out, nil
+	return out
 }
 
-func (s *Service) ListProcesosActivos(ctx context.Context, userNivel string) ([]ProcesoDTO, error) {
-	rows, err := s.repo.ListProcesosActivos(ctx)
+// ListProcesosActivos lists the active procesos the user may join: those of
+// the institución of their persona that fit their grado's nivel (PLT-06).
+func (s *Service) ListProcesosActivos(ctx context.Context, usuarioID int64) ([]ProcesoDTO, error) {
+	rows, err := s.repo.ListProcesosElegibles(ctx, usuarioID)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]ProcesoDTO, 0, len(rows))
-	for _, r := range rows {
-		if r.Nivel != "" && r.Nivel != userNivel {
-			continue
-		}
-		out = append(out, ProcesoDTO{
-			ID:          r.ID,
-			Nombre:      r.Nombre,
-			Tipo:        r.Tipo,
-			GradoNombre: r.GradoNombre,
-			Nivel:       r.Nivel,
-			Descripcion: r.Descripcion,
-			Anio:        r.Anio,
-		})
-	}
-	return out, nil
+	return toProcesoDTOs(rows), nil
 }
 
 // ── Inscripciones de usuario ──────────────────────────────────────────────────
@@ -119,25 +113,19 @@ type InscripcionDTO struct {
 }
 
 // Inscribir creates the user's inscription, or re-applies a rejected one
-// (onReapply audits it); pendiente/aprobado → ErrYaInscrito.
-func (s *Service) Inscribir(ctx context.Context, usuarioID, procesoID int64, userNivel string, onReapply ReapplyAuditFunc) (*InscripcionDTO, error) {
-	// Check proceso exists, is active, and matches user's nivel
-	procesos, err := s.repo.ListProcesosActivos(ctx)
+// (onReapply audits it); pendiente/aprobado → ErrYaInscrito. The proceso must
+// exist, be active and fit the user's institución and nivel, checked in that
+// order (PLT-06).
+func (s *Service) Inscribir(ctx context.Context, usuarioID, procesoID int64, onReapply ReapplyAuditFunc) (*InscripcionDTO, error) {
+	acceso, err := s.repo.AccesoProceso(ctx, usuarioID, procesoID)
 	if err != nil {
 		return nil, err
 	}
-	found := false
-	for _, p := range procesos {
-		if p.ID == procesoID {
-			if p.Nivel != "" && p.Nivel != userNivel {
-				return nil, ErrNivelNoPermitido
-			}
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !acceso.Activo {
 		return nil, ErrProcesoNotFound
+	}
+	if err := acceso.Permitido(); err != nil {
+		return nil, err
 	}
 
 	row, err := s.repo.Create(ctx, usuarioID, procesoID, onReapply)

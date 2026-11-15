@@ -20,8 +20,21 @@ type Querier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
-// ErrProcesoNoEncontrado is returned by ProcesoNivel for an unknown proceso.
+// ErrProcesoNoEncontrado is returned by AccesoProceso for an unknown proceso.
 var ErrProcesoNoEncontrado = errors.New("proceso no encontrado")
+
+// Errors of Acceso.Permitido; the handlers answer them with 403 and the codes
+// below.
+var (
+	ErrInstitucionNoPermitida = errors.New("Este proceso pertenece a otra institución.")
+	ErrNivelNoPermitido       = errors.New("No tienes acceso a este proceso.")
+)
+
+// Error codes of the 403 (API contract, plataforma-multi-institucion §2).
+const (
+	CodigoInstitucionNoPermitida = "institucion_no_permitida"
+	CodigoNivelNoPermitido       = "nivel_no_permitido"
+)
 
 // Alternativa is one alternative of a question.
 type Alternativa struct {
@@ -126,16 +139,47 @@ func IsUniqueViolation(err error, constraint string) bool {
 	return errors.As(err, &pqErr) && pqErr.Code == "23505" && pqErr.Constraint == constraint
 }
 
-// ProcesoNivel returns the nivel assigned to the proceso ("" when none), or
-// ErrProcesoNoEncontrado.
-func ProcesoNivel(ctx context.Context, q Querier, procesoID int64) (string, error) {
-	var nivel string
-	err := q.QueryRowContext(ctx,
-		`SELECT COALESCE(nivel, '') FROM procesos WHERE id = $1`, procesoID).Scan(&nivel)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", ErrProcesoNoEncontrado
+// Acceso is what the user's own institución and nivel (read from the database)
+// allow on a proceso.
+type Acceso struct {
+	Activo           bool
+	MismaInstitucion bool
+	NivelOK          bool
+}
+
+// Permitido applies the fixed order of PLT-06: another institución first, then
+// the nivel. Whether the proceso is active is up to the caller (only the
+// inscripción requires it).
+func (a Acceso) Permitido() error {
+	switch {
+	case !a.MismaInstitucion:
+		return ErrInstitucionNoPermitida
+	case !a.NivelOK:
+		return ErrNivelNoPermitido
 	}
-	return nivel, err
+	return nil
+}
+
+// AccesoProceso reads in one query whether the proceso is active and whether
+// the institución and the nivel of the user's persona fit it. An empty nivel
+// on the proceso means every nivel. Never use the token for this: it can be
+// stale. It returns ErrProcesoNoEncontrado when the proceso does not exist.
+func AccesoProceso(ctx context.Context, q Querier, usuarioID, procesoID int64) (Acceso, error) {
+	var a Acceso
+	err := q.QueryRowContext(ctx, `
+		SELECT p.estado = 'activo',
+		       p.institucion_id = pe.institucion_id,
+		       (COALESCE(p.nivel, '') = '' OR p.nivel = g.nivel)
+		FROM procesos p
+		CROSS JOIN usuarios u
+		JOIN personas pe ON pe.id = u.persona_id
+		JOIN grados   g  ON g.id  = pe.grado_id
+		WHERE p.id = $2 AND u.id = $1`,
+		usuarioID, procesoID).Scan(&a.Activo, &a.MismaInstitucion, &a.NivelOK)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Acceso{}, ErrProcesoNoEncontrado
+	}
+	return a, err
 }
 
 // InscripcionAprobada reports whether the user has an approved inscripción

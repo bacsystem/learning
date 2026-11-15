@@ -3,6 +3,8 @@ package practices
 import (
 	"errors"
 	"fmt"
+
+	"github.com/cbaciliod/learning/internal/examen"
 )
 
 // ErrNotFound is returned when a practice is not found.
@@ -21,8 +23,14 @@ var ErrValidation = errors.New("Error de validación.")
 // ErrInsufficientQuestions is returned when the question bank can't satisfy the request.
 var ErrInsufficientQuestions = errors.New("Preguntas insuficientes para generar la práctica.")
 
-// ErrNivelNoPermitido is returned when the user's nivel doesn't match the proceso (403).
-var ErrNivelNoPermitido = errors.New("No tienes acceso a este proceso.")
+// Access errors of the proceso (403): the user's nivel or institución do not fit.
+var (
+	ErrNivelNoPermitido       = examen.ErrNivelNoPermitido
+	ErrInstitucionNoPermitida = examen.ErrInstitucionNoPermitida
+)
+
+// codigoInscripcionRequerida is the error code of ErrInscripcionRequired.
+const codigoInscripcionRequerida = "inscripcion_requerida"
 
 // ErrInscripcionRequired is returned when the user doesn't have an approved inscripción (403).
 var ErrInscripcionRequired = errors.New("Debes tener una inscripción aprobada para crear una práctica.")

@@ -7,6 +7,8 @@ import (
 	"strconv"
 
 	"github.com/cbaciliod/learning/internal/auth"
+	"github.com/cbaciliod/learning/internal/examen"
+	"github.com/cbaciliod/learning/internal/httpx"
 	"github.com/rs/zerolog/log"
 )
 
@@ -72,10 +74,12 @@ func mapErr(w http.ResponseWriter, err error) {
 		jsonError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, ErrForbidden):
 		jsonError(w, http.StatusForbidden, err.Error())
+	case errors.Is(err, ErrInstitucionNoPermitida):
+		httpx.JSONErrorCode(w, http.StatusForbidden, examen.CodigoInstitucionNoPermitida, err.Error(), nil)
 	case errors.Is(err, ErrNivelNoPermitido):
-		jsonError(w, http.StatusForbidden, err.Error())
+		httpx.JSONErrorCode(w, http.StatusForbidden, examen.CodigoNivelNoPermitido, err.Error(), nil)
 	case errors.Is(err, ErrInscripcionRequired):
-		jsonError(w, http.StatusForbidden, err.Error())
+		httpx.JSONErrorCode(w, http.StatusForbidden, codigoInscripcionRequerida, err.Error(), nil)
 	case errors.Is(err, ErrSimulacroEstado):
 		jsonError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, ErrNoConfig):
@@ -108,7 +112,7 @@ func (h *Handler) CreateSimulacro(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := h.svc.CreateSimulacro(r.Context(), req, claims.UserID, claims.Nivel, claims.GradoID, claims.EspecialidadID)
+	resp, err := h.svc.CreateSimulacro(r.Context(), req, claims.UserID, claims.GradoID, claims.EspecialidadID)
 	if err != nil {
 		mapErr(w, err)
 		return

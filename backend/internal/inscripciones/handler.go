@@ -8,12 +8,20 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cbaciliod/learning/internal/examen"
 	"github.com/cbaciliod/learning/internal/httpx"
 
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/auth"
 	jwtpkg "github.com/cbaciliod/learning/internal/jwt"
 	"github.com/jmoiron/sqlx"
+)
+
+// Error codes of POST /inscripciones that no other package shares.
+const (
+	codigoNoEncontrado        = "no_encontrado"
+	codigoYaInscrito          = "ya_inscrito"
+	codigoSinMontoConfigurado = "sin_monto_configurado"
 )
 
 type Handler struct {
@@ -95,7 +103,7 @@ func (h *Handler) ListProcesos(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusUnauthorized, "No autenticado.")
 		return
 	}
-	list, err := h.svc.ListProcesosActivos(r.Context(), claims.Nivel)
+	list, err := h.svc.ListProcesosActivos(r.Context(), claims.UserID)
 	if err != nil {
 		internalError(w, "list_procesos", err, "Error al obtener procesos.")
 		return
@@ -115,8 +123,8 @@ func (h *Handler) Inscribir(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ProcesoID int64 `json:"proceso_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ProcesoID == 0 {
-		jsonError(w, http.StatusBadRequest, "proceso_id es requerido.")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ProcesoID <= 0 {
+		httpx.JSONErrorCode(w, http.StatusBadRequest, httpx.CodeInvalidBody, "proceso_id es requerido.", nil)
 		return
 	}
 	onReapply := func(ctx context.Context, tx sqlx.ExecerContext, id int64) error {
@@ -124,21 +132,37 @@ func (h *Handler) Inscribir(w http.ResponseWriter, r *http.Request) {
 			map[string]any{"proceso_id": req.ProcesoID, "estado_anterior": "rechazado"},
 			audit.ClientIP(r), r.UserAgent())
 	}
-	ins, err := h.svc.Inscribir(r.Context(), claims.UserID, req.ProcesoID, claims.Nivel, onReapply)
+	ins, err := h.svc.Inscribir(r.Context(), claims.UserID, req.ProcesoID, onReapply)
 	if err != nil {
-		switch {
-		case errors.Is(err, ErrProcesoNotFound):
-			jsonError(w, http.StatusNotFound, err.Error())
-		case errors.Is(err, ErrYaInscrito), errors.Is(err, ErrSinConfigPago):
-			jsonError(w, http.StatusConflict, err.Error())
-		case errors.Is(err, ErrNivelNoPermitido):
-			jsonError(w, http.StatusForbidden, err.Error())
-		default:
-			internalError(w, "inscribir", err, "Error al procesar la inscripción.")
-		}
+		inscribirError(w, err)
 		return
 	}
 	jsonOK(w, http.StatusCreated, ins)
+}
+
+// inscribirError answers the errors of POST /inscripciones with the coded
+// format of the API contract (plataforma-multi-institucion §2.3).
+func inscribirError(w http.ResponseWriter, err error) {
+	var (
+		status int
+		code   string
+	)
+	switch {
+	case errors.Is(err, ErrProcesoNotFound):
+		status, code = http.StatusNotFound, codigoNoEncontrado
+	case errors.Is(err, ErrInstitucionNoPermitida):
+		status, code = http.StatusForbidden, examen.CodigoInstitucionNoPermitida
+	case errors.Is(err, ErrNivelNoPermitido):
+		status, code = http.StatusForbidden, examen.CodigoNivelNoPermitido
+	case errors.Is(err, ErrYaInscrito):
+		status, code = http.StatusConflict, codigoYaInscrito
+	case errors.Is(err, ErrSinConfigPago):
+		status, code = http.StatusConflict, codigoSinMontoConfigurado
+	default:
+		httpx.InternalErrorCode(w, "inscripciones.inscribir", err)
+		return
+	}
+	httpx.JSONErrorCode(w, status, code, err.Error(), nil)
 }
 
 // GET /inscripciones/me

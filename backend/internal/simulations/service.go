@@ -65,18 +65,18 @@ func NewService(repo *Repository, qSvc QuestionsService) *Service {
 // ── CreateSimulacro ───────────────────────────────────────────────────────────
 
 // CreateSimulacro validates, checks for conflicts, loads config, generates questions, and creates a simulacro.
-func (s *Service) CreateSimulacro(ctx context.Context, req CreateSimulacroRequest, usuarioID int64, userNivel string, gradoID, especialidadID int64) (SimulacroEnCursoResponse, error) {
+func (s *Service) CreateSimulacro(ctx context.Context, req CreateSimulacroRequest, usuarioID, gradoID, especialidadID int64) (SimulacroEnCursoResponse, error) {
 	if err := ValidateCreate(req); err != nil {
 		return SimulacroEnCursoResponse{}, err
 	}
 
-	// Validate user's nivel matches the proceso's nivel
-	procesoNivel, err := s.repo.GetProcesoNivel(ctx, req.ProcesoID)
+	// The proceso must be of the user's institución and nivel (PLT-06)
+	acceso, err := s.repo.AccesoProceso(ctx, usuarioID, req.ProcesoID)
 	if err != nil {
 		return SimulacroEnCursoResponse{}, err
 	}
-	if procesoNivel != "" && procesoNivel != userNivel {
-		return SimulacroEnCursoResponse{}, ErrNivelNoPermitido
+	if err := acceso.Permitido(); err != nil {
+		return SimulacroEnCursoResponse{}, err
 	}
 
 	// Validate user has an approved inscripcion for this proceso
