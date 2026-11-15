@@ -4,6 +4,8 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
 import { haceCuanto, tipoNotificacion } from "@/components/app/notificaciones-tipo";
+import { claveDetalleHistorialVacio } from "@/components/app/notificaciones-vacio";
+import { useRecordatorioOpinion } from "@/components/app/use-recordatorio-opinion";
 import { Alerta } from "@/components/feedback/alerta";
 import { EstadoVacio } from "@/components/feedback/estado-vacio";
 import { Skeleton } from "@/components/feedback/skeleton";
@@ -24,6 +26,11 @@ export default function NotificacionesPage() {
   const [items, setItems] = useState<Notificacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // El badge de la campana cuenta la invitación a opinar aunque el historial esté vacío: se explica para no contradecirlo.
+  const recordatorio = useRecordatorioOpinion(token);
+  const detalleVacio = claveDetalleHistorialVacio(recordatorio);
+  // Con el historial vacío se espera a saber si hay invitación pendiente: así el vacío no parpadea ni se contradice.
+  const esperando = loading || (!error && items.length === 0 && !recordatorio.resuelto);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -71,7 +78,11 @@ export default function NotificacionesPage() {
         <CabeceraSeccion
           icon={BellIcon}
           titulo={t("notif-subtitulo")}
-          subtitulo={loading || error ? undefined : t("notif-en-total", { n: items.length })}
+          subtitulo={
+            esperando || error || (items.length === 0 && detalleVacio)
+              ? undefined
+              : t("notif-en-total", { n: items.length })
+          }
           derecha={
             <div className="flex items-center gap-2">
               {unreadCount > 0 ? <Chip>{t("notif-sin-leer", { n: unreadCount })}</Chip> : null}
@@ -86,7 +97,7 @@ export default function NotificacionesPage() {
         />
 
         <div className="px-2 pt-1 pb-2">
-          {loading ? (
+          {esperando ? (
             <div className="flex flex-col gap-1" aria-busy="true">
               {[0, 1, 2, 3, 4].map((i) => (
                 <div key={i} className="flex items-start gap-3 px-3 py-3">
@@ -113,11 +124,9 @@ export default function NotificacionesPage() {
               {error}
             </Alerta>
           ) : items.length === 0 ? (
-            <EstadoVacio
-              icon={BellIcon}
-              titulo={t("notif-sin-notificaciones")}
-              className="m-2 border-0 bg-transparent"
-            />
+            <EstadoVacio icon={BellIcon} titulo={t("notif-sin-notificaciones")} className="m-2 border-0 bg-transparent">
+              {detalleVacio ? t(detalleVacio) : null}
+            </EstadoVacio>
           ) : (
             <ul className="divide-border/60 flex flex-col divide-y">
               {items.map((n) => {

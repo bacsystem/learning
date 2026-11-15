@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { Campo } from "@/components/app/campo";
+import { marcarOpinionEnviada } from "@/components/app/use-recordatorio-opinion";
 import { Alerta } from "@/components/feedback/alerta";
 import { EstadoVacio } from "@/components/feedback/estado-vacio";
 import { Skeleton } from "@/components/feedback/skeleton";
@@ -177,6 +178,8 @@ export default function Settings() {
     try {
       await submitTestimonio(token, { contenido: submitText.trim(), calificacion: submitCal });
       setSubmitSuccess(true);
+      // La invitación a opinar de la campana y de /notificaciones se resuelve sola.
+      marcarOpinionEnviada();
       fetchMiTestimonio(token)
         .then((t) => {
           if (t) setMiTestimonio(t);

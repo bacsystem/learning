@@ -314,6 +314,7 @@
     "notif-subtitulo": "Historial de notificaciones",
     "notif-marcar-todas": "Marcar todas como leídas",
     "notif-sin-notificaciones": "Sin notificaciones",
+    "notif-historial-vacio-invitacion": "Tu historial está vacío. Tienes una invitación pendiente en la campana.",
     "notif-no-leida": "No leída",
     "menu-admin-notificaciones": "Notificaciones",
     "menu-admin-ingresos": "Ingresos",
