@@ -13,9 +13,8 @@ const emailBrand = "Capacitate"
 
 // emailInstitution is the institution line removed from the e-mails until the
 // product owner confirms whether the client requires it. Restore it as a
-// secondary line in emailLayout (header and footer) if so.
-//
-//nolint:unused // kept on purpose, see above.
+// secondary line in emailLayout (header and footer) if so. Only
+// TestEmailTemplates_Brand uses it today, to assert it stays out of the e-mails.
 const emailInstitution = "Ejército del Perú"
 
 const emailLayout = `<!DOCTYPE html>
