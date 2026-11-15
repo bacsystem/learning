@@ -443,7 +443,7 @@ emit .claude/settings.json <<'SETTINGS_EOF'
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-file-upload.py\""
+            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-file-upload.py\" || exit 2"
           }
         ]
       }
