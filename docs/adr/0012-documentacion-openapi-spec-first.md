@@ -152,7 +152,9 @@
      - **Implementación:** el backend que implementa quita la marca y ajusta el spec a lo que implementó.
      - **Revisión:** el tech-lead revisa los dos en `/pr-review`.
    - **Si el código contradice al `.md`** mientras se escribe el spec, el spec documenta el código y el dev avisa al architect con `archivo:línea`. El architect decide si es un bug (se abre un issue, siguiendo la regla de «bugs al final») o si hay que corregir el `.md`. El spec no se escribe con el comportamiento deseado.
-5. **Lint:** `@redocly/cli` con la versión fijada y un `redocly.yaml` en `docs/api/openapi/`.
+5. **Lint:** `@redocly/cli` **2.72.1**, publicada el 2026-10-29, con un `redocly.yaml` en `docs/api/openapi/`.
+   - **Regla de versión:** no se fija una versión con menos de dos semanas de publicada. Así una release rota o comprometida tiene tiempo de detectarse y retirarse. La versión se cambia en `redocly.yaml`, en el Makefile y en el CI a la vez.
+   - Necesita Node ≥ 20.19 o ≥ 22.12.
    - **Reglas** (ids comprobados en la lista de reglas integradas de Redocly):
      - el preset `recommended`;
      - `operation-operationId`, `operation-operationId-unique`, `operation-tag-defined` y `operation-singular-tag` como error;
@@ -172,7 +174,7 @@
 
 | Herramienta | Uso | Dónde corre | Estado |
 |---|---|---|---|
-| `@redocly/cli` (versión fijada, invocada con `npx`) | lint, bundle y HTML estático | `make lint`, `make docs/api` y el CI | **aprobada por el usuario** (versión fijada, invocada con `npx`) |
+| `@redocly/cli` 2.72.1 (invocada con `npx`; decisión 5) | lint, bundle y HTML estático | `make lint`, `make docs/api` y el CI | **aprobada por el usuario** (versión fijada, invocada con `npx`) |
 | `go.yaml.in/yaml/v3` (de indirecta a directa) | leer el spec en el test | `go test` | **aprobada por el tech-lead**. Ya está en el grafo (`go.mod:41`), así que no entra ningún módulo nuevo |
 
 **Permisos:** backend-dev y backend-dev-2 escriben en `docs/api/openapi/paquetes/`, cada uno solo en los archivos de sus paquetes (plan §2). La raíz `openapi.yaml` y `redocly.yaml` son del architect, salvo el bloque de `paths` que cada dev tiene reservado.

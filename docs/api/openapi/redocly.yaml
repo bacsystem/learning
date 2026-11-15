@@ -1,0 +1,30 @@
+# Lint del spec (ADR 0012, decisión 5). Versión fijada: @redocly/cli 2.72.1.
+#   npx --yes @redocly/cli@2.72.1 lint docs/api/openapi/openapi.yaml --config docs/api/openapi/redocly.yaml
+extends:
+  - recommended
+
+rules:
+  # Trazabilidad con routes.go: <paquete>.<Handler>, único.
+  operation-operationId: error
+  operation-operationId-unique: error
+  # Un tag por operación, el de su paquete Go, declarado en la raíz.
+  operation-tag-defined: error
+  operation-singular-tag: error
+  # Rol obligatorio; el test backend/internal/apispec lo compara con el código.
+  rule/operation-x-rol:
+    subject:
+      type: Operation
+      property: x-rol
+    assertions:
+      defined: true
+      enum:
+        - publico
+        - autenticado
+        - admin
+    message: Toda operación declara x-rol (publico, autenticado o admin), según la cadena de middlewares de su routes.go.
+    severity: error
+  # Los componentes comunes se crean en el esqueleto antes de que los usen los
+  # paquetes: aviso, no error.
+  no-unused-components: warn
+  # La API no se distribuye a terceros: el spec no declara licencia.
+  info-license: off

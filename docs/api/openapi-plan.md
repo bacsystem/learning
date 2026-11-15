@@ -1,7 +1,7 @@
 # Plan de trabajo: spec OpenAPI de la API
 
 - **Decisión:** [ADR 0012](../adr/0012-documentacion-openapi-spec-first.md). Spec primero, OpenAPI 3.1, un archivo por paquete Go y un test de rutas en `backend/internal/apispec`.
-- **Estado:** aprobado (2026-11-15). El usuario aprobó `@redocly/cli` (versión fijada, invocada con `npx`). El tech-lead aprobó el paso de `go.yaml.in/yaml/v3` a dependencia directa y autorizó a backend-dev y backend-dev-2 a escribir en `docs/api/openapi/paquetes/`, cada uno solo en sus paquetes.
+- **Estado:** aprobado (2026-11-15). El usuario aprobó `@redocly/cli` (fijada en 2.72.1, invocada con `npx`). El tech-lead aprobó el paso de `go.yaml.in/yaml/v3` a dependencia directa y autorizó a backend-dev y backend-dev-2 a escribir en `docs/api/openapi/paquetes/`, cada uno solo en sus paquetes.
 - **Sin migraciones ni cambios de comportamiento.** Ningún PR de este plan toca `handler.go`, `service.go`, `repository.go` ni `dto.go`.
 
 ## 1. Inventario: 153 operaciones (152 rutas en 15 paquetes, más `GET /health`)
@@ -169,7 +169,8 @@ En `plataforma-multi-institucion.md`, dos partes están diferidas y **no entran 
 ## 5. devops
 
 1. **Makefile:**
-   - en `lint` (`Makefile:95-101`), añadir `npx --yes @redocly/cli@<versión fijada> lint docs/api/openapi/openapi.yaml --config docs/api/openapi/redocly.yaml`;
+   - en `lint` (`Makefile:95-101`), añadir `npx --yes @redocly/cli@2.72.1 lint docs/api/openapi/openapi.yaml --config docs/api/openapi/redocly.yaml`. La versión va en una variable del Makefile (`REDOCLY_VERSION := 2.72.1`) que usan también `docs/api` y el CI;
+   - **regla de versión** (ADR 0012, decisión 5): no se fija una versión con menos de dos semanas de publicada. Al cambiarla se actualizan a la vez el Makefile, el CI y el comentario de `redocly.yaml`;
    - un target nuevo, `docs/api` (`redocly build-docs`, que genera `docs/api/openapi/dist/index.html`), con `##` para `make help`. No se usa `redocly preview`, que necesita un paquete de producto de Redocly (ADR 0012, decisión 6).
 2. **`.gitignore`:** añadir `docs/api/openapi/dist/`.
 3. **CI:** añadir el mismo `redocly lint` a un workflow que tenga Node (`frontend.yml`, o un job nuevo). El test `apispec` ya corre dentro de `go test ./...` (`backend.yml:76-77`) y no necesita ningún cambio, porque el checkout trae todo el repo.
