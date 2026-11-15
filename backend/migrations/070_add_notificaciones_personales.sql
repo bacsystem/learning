@@ -1,7 +1,9 @@
 -- PLT-12: notificaciones personales (docs/api/plataforma-avisos-idioma.md §2.3; ADR 0011).
 -- Expand: columnas nuevas NULL. Las filas existentes ('todos' o 'rol:*') tienen
--- usuario_id NULL y cumplen los CHECK, y el binario anterior no ve las personales
--- (su destinatario es 'usuario'), así que la migración es compatible hacia atrás.
+-- usuario_id NULL y cumplen los CHECK, y el binario anterior no las muestra a los
+-- postulantes (su destinatario es 'usuario'): es compatible hacia atrás. Salvedad:
+-- el ListAll y el Delete del admin del binario anterior no filtran, así que en la
+-- ventana de despliegue el panel admin puede listar y borrar las personales.
 -- +goose Up
 ALTER TABLE notificaciones ADD COLUMN usuario_id BIGINT REFERENCES usuarios(id) ON DELETE CASCADE;
 ALTER TABLE notificaciones ADD COLUMN clave VARCHAR(60);
