@@ -70,7 +70,7 @@ func sembrar(ctx context.Context, conn *sqlx.DB, gcm cipher.AEAD, rawKey []byte,
 	s := &sembrador{db: conn, gcm: gcm, rawKey: rawKey, cfg: cfg,
 		cat: catalogs.NewService(catalogs.NewRepository(conn)), preg: qSvc,
 		sim:    simulations.NewService(simulations.NewRepository(conn), simulations.NewQuestionsAdapter(qSvc)),
-		ins:    inscripciones.NewService(inscripciones.NewRepository(conn, gcm, rawKey)),
+		ins:    inscripciones.NewService(inscripciones.NewRepository(conn, gcm, rawKey), urlFrontendDemo),
 		temas:  temas.NewService(temas.NewRepository(conn)),
 		creado: map[string]int{}, hashes: map[string][]byte{}}
 	if err := s.todo(ctx); err != nil {

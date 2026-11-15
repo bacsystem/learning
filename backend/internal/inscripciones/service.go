@@ -2,18 +2,30 @@ package inscripciones
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/cbaciliod/learning/internal/audit"
 	"github.com/cbaciliod/learning/internal/examen"
+	"github.com/rs/zerolog/log"
 )
+
+// maxObservacion bounds the admin's note (and the motivo of a rejection).
+const maxObservacion = 500
 
 var (
 	ErrProcesoNotFound     = errors.New("El proceso no existe o no está activo.")
 	ErrYaInscrito          = errors.New("Ya estás inscrito en este proceso.")
 	ErrInscripcionNotFound = errors.New("Inscripción no encontrada.")
 	ErrEstadoInvalido      = errors.New("Estado inválido. Valores permitidos: aprobado, rechazado.")
+	// ErrMotivoRequerido: a rejection must say why (the postulante reads it).
+	ErrMotivoRequerido = errors.New("El motivo del rechazo es obligatorio.")
+	// ErrObservacionLarga: the observación exceeds maxObservacion characters.
+	ErrObservacionLarga = errors.New("La observación no puede superar los 500 caracteres.")
 	// Access errors of the proceso (403), decided by examen.AccesoProceso.
 	ErrNivelNoPermitido       = examen.ErrNivelNoPermitido
 	ErrInstitucionNoPermitida = examen.ErrInstitucionNoPermitida
@@ -25,11 +37,12 @@ var (
 )
 
 type Service struct {
-	repo *Repository
+	repo            *Repository
+	frontendBaseURL string // no trailing slash; the e-mails link to it
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, frontendBaseURL string) *Service {
+	return &Service{repo: repo, frontendBaseURL: frontendBaseURL}
 }
 
 // ── Stats públicos ────────────────────────────────────────────────────────────
@@ -188,11 +201,47 @@ func (s *Service) ListInscripciones(ctx context.Context, estado string, page, pe
 	return toAdminDTOs(rows), nil
 }
 
+// UpdateEstado decides a pendiente inscripción and tells the postulante, by
+// e-mail and in the app, in the same transaction (PLT-12). A rejection needs a
+// motivo of 1 to 500 characters; an approval may carry one of up to 500.
 func (s *Service) UpdateEstado(ctx context.Context, id int64, estado, observacion string, adminID int64, auditFn audit.TxFunc) error {
-	if estado != "aprobado" && estado != "rechazado" {
+	if estado != estadoAprobado && estado != estadoRechazado {
 		return ErrEstadoInvalido
 	}
-	return s.repo.UpdateEstado(ctx, id, estado, observacion, adminID, auditFn)
+	observacion = strings.TrimSpace(observacion)
+	if utf8.RuneCountInString(observacion) > maxObservacion {
+		return ErrObservacionLarga
+	}
+	if estado == estadoRechazado && observacion == "" {
+		return ErrMotivoRequerido
+	}
+	return s.repo.UpdateEstado(ctx, id, estado, observacion, adminID, auditFn, s.avisar(adminID))
+}
+
+// avisar renders the notice of a decision and writes it inside its
+// transaction: the in-app notification always, the e-mail when the persona has
+// an address. A failure here reverts the decision; a later SMTP failure does
+// not, because the worker retries the queued e-mail.
+func (s *Service) avisar(adminID int64) AvisoFunc {
+	return func(ctx context.Context, tx execer, d datosAviso) error {
+		a := renderAviso(d, s.frontendBaseURL)
+		params, err := json.Marshal(a.Parametros)
+		if err != nil {
+			return fmt.Errorf("aviso: parámetros: %w", err)
+		}
+		if err := s.repo.insertNotificacion(ctx, tx, adminID, d.UsuarioID, a, params); err != nil {
+			return fmt.Errorf("aviso: notificación: %w", err)
+		}
+		if d.Email == "" {
+			log.Warn().Str("op", "inscripciones.aviso").Int64("inscripcion_id", d.InscripcionID).
+				Int64("usuario_id", d.UsuarioID).Msg("no e-mail address; only the in-app notice was created")
+			return nil
+		}
+		if err := s.repo.encolarCorreo(ctx, tx, d.Email, a.Asunto, a.CorreoHTML); err != nil {
+			return fmt.Errorf("aviso: correo: %w", err)
+		}
+		return nil
+	}
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

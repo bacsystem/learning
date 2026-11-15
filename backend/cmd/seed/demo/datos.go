@@ -12,8 +12,9 @@ const (
 	procesoSERUMS2        = "SERUMS 2026-II" // second proceso of the same institution
 	procesoCompatibilidad = "Proceso de compatibilidad demo"
 	montoInscripcion      = 0.00
-	prefijoUsuario        = "demo_"         // every demo username; production ones never carry it
-	dominioEmail          = "@demo.invalid" // RFC 6761: never delivered
+	urlFrontendDemo       = "http://localhost:3000" // link of the notices sent when the seed approves inscripciones
+	prefijoUsuario        = "demo_"                 // every demo username; production ones never carry it
+	dominioEmail          = "@demo.invalid"         // RFC 6761: never delivered
 	tiempoSimulacroSeg    = 3600
 	preguntasPorArea      = 10 // servable questions seeded per area and proceso
 	preguntasExamen       = 2  // numero_preguntas per area (≤ preguntasPorArea)

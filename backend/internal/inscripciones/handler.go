@@ -22,6 +22,10 @@ const (
 	codigoNoEncontrado        = "no_encontrado"
 	codigoYaInscrito          = "ya_inscrito"
 	codigoSinMontoConfigurado = "sin_monto_configurado"
+	codigoParametroInvalido   = "parametro_invalido"
+	codigoTransicionInvalida  = "transicion_invalida"
+	codigoValidacion          = "validacion"
+	codigoMotivoRequerido     = "motivo_requerido"
 )
 
 type Handler struct {
@@ -197,6 +201,8 @@ func (h *Handler) ListInscripciones(w http.ResponseWriter, r *http.Request) {
 
 // PATCH /admin/inscripciones/{id}/estado  body: {"estado":"aprobado","observacion":"..."}
 // Only pendiente inscriptions can be decided: 404 unknown id, 409 already decided.
+// A rejection needs an observación (the motivo, 1 to 500 characters). Errors use
+// the coded format of the API contract (plataforma-avisos-idioma §2.1).
 func (h *Handler) UpdateInscripcionEstado(w http.ResponseWriter, r *http.Request) {
 	claims := claimsFrom(r)
 	if claims == nil {
@@ -205,7 +211,7 @@ func (h *Handler) UpdateInscripcionEstado(w http.ResponseWriter, r *http.Request
 	}
 	id, ok := pathID(r, "id")
 	if !ok {
-		jsonError(w, http.StatusBadRequest, "ID inválido.")
+		httpx.JSONErrorCode(w, http.StatusBadRequest, codigoParametroInvalido, "ID inválido.", nil)
 		return
 	}
 	var req struct {
@@ -213,7 +219,7 @@ func (h *Handler) UpdateInscripcionEstado(w http.ResponseWriter, r *http.Request
 		Observacion string `json:"observacion"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Estado) == "" {
-		jsonError(w, http.StatusBadRequest, "estado es requerido.")
+		httpx.JSONErrorCode(w, http.StatusBadRequest, httpx.CodeInvalidBody, "estado es requerido.", nil)
 		return
 	}
 	auditFn := func(ctx context.Context, tx sqlx.ExecerContext) error {
@@ -222,17 +228,28 @@ func (h *Handler) UpdateInscripcionEstado(w http.ResponseWriter, r *http.Request
 			audit.ClientIP(r), r.UserAgent())
 	}
 	if err := h.svc.UpdateEstado(r.Context(), id, req.Estado, req.Observacion, claims.UserID, auditFn); err != nil {
-		switch {
-		case errors.Is(err, ErrInscripcionNotFound):
-			jsonError(w, http.StatusNotFound, err.Error())
-		case errors.Is(err, ErrTransicionInvalida):
-			jsonError(w, http.StatusConflict, err.Error())
-		case errors.Is(err, ErrEstadoInvalido):
-			jsonError(w, http.StatusUnprocessableEntity, err.Error())
-		default:
-			internalError(w, "update_estado", err, "Error al actualizar la inscripción.")
-		}
+		updateEstadoError(w, err)
 		return
 	}
 	jsonOK(w, http.StatusOK, map[string]string{"message": "Inscripción actualizada."})
+}
+
+// updateEstadoError answers the errors of the decision in the coded format.
+func updateEstadoError(w http.ResponseWriter, err error) {
+	var transicion *TransicionError
+	switch {
+	case errors.Is(err, ErrInscripcionNotFound):
+		httpx.JSONErrorCode(w, http.StatusNotFound, codigoNoEncontrado, err.Error(), nil)
+	case errors.As(err, &transicion):
+		httpx.JSONErrorCode(w, http.StatusConflict, codigoTransicionInvalida, err.Error(),
+			map[string]any{"estado_actual": transicion.Actual})
+	case errors.Is(err, ErrEstadoInvalido):
+		httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codigoValidacion, err.Error(), map[string]any{"campo": "estado"})
+	case errors.Is(err, ErrObservacionLarga):
+		httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codigoValidacion, err.Error(), map[string]any{"campo": "observacion"})
+	case errors.Is(err, ErrMotivoRequerido):
+		httpx.JSONErrorCode(w, http.StatusUnprocessableEntity, codigoMotivoRequerido, err.Error(), nil)
+	default:
+		httpx.InternalErrorCode(w, "inscripciones.update_estado", err)
+	}
 }

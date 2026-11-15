@@ -26,7 +26,7 @@ func setup(t *testing.T) (*sqlx.DB, *Handler, *Repository) {
 	t.Helper()
 	db := dbtest.Open(t)
 	repo := NewRepository(db, dbtest.GCM(t), nil)
-	return db, NewHandler(NewService(repo), audit.New(db)), repo
+	return db, NewHandler(NewService(repo, testBase), audit.New(db)), repo
 }
 
 func setConfigPago(t *testing.T, db *sqlx.DB, anio int, monto string) {
@@ -464,7 +464,7 @@ func TestInternalErrorsAreLogged(t *testing.T) {
 	log.Logger = zerolog.New(&buf)
 	t.Cleanup(func() { log.Logger = prev })
 
-	h := NewHandler(NewService(NewRepository(dbtest.Closed(t), nil, nil)), nil)
+	h := NewHandler(NewService(NewRepository(dbtest.Closed(t), nil, nil), testBase), nil)
 	cases := []struct {
 		name string
 		fn   http.HandlerFunc

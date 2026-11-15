@@ -98,7 +98,7 @@ func run() int {
 	audLog := audit.New(database)
 
 	insRepo := inscripciones.NewRepository(database, gcm, rawKey)
-	insSvc := inscripciones.NewService(insRepo)
+	insSvc := inscripciones.NewService(insRepo, frontendBase)
 	tesRepo := testimonios.NewRepository(database, gcm)
 	tesSvc := testimonios.NewService(tesRepo)
 

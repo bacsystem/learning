@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cbaciliod/learning/internal/correo"
 	"github.com/cbaciliod/learning/internal/locale"
 )
 
@@ -24,7 +25,7 @@ const (
 	markerPendingES    = "en revisión"
 	langAttrEN         = `<html lang="en">`
 	langAttrES         = `<html lang="es">`
-	brandHeaderPattern = ">" + emailBrand + "</p>"
+	brandHeaderPattern = ">" + correo.Brand + "</p>"
 )
 
 // postJSON sends a raw JSON body to a public auth route on a fresh mux, so the
@@ -240,8 +241,8 @@ func TestEmailTemplates_LanguagesDoNotLeak(t *testing.T) {
 		},
 	}
 	shared := map[string][]string{
-		locale.ES: {buttonFallback(locale.ES), layoutAutoNotice(locale.ES)},
-		locale.EN: {buttonFallback(locale.EN), layoutAutoNotice(locale.EN)},
+		locale.ES: {correo.ButtonFallback(locale.ES), correo.AutoNotice(locale.ES)},
+		locale.EN: {correo.ButtonFallback(locale.EN), correo.AutoNotice(locale.EN)},
 	}
 	for name, render := range templates {
 		t.Run(name, func(t *testing.T) {

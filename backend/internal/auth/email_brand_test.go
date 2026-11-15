@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/cbaciliod/learning/internal/correo"
 )
 
 func TestEmailTemplates_Brand(t *testing.T) {
@@ -18,11 +20,11 @@ func TestEmailTemplates_Brand(t *testing.T) {
 		"inactive":      func() (string, string) { return emailInactivo("Ana", "Perez") },
 		"email changed": func() (string, string) { return emailCorreoCambiado() },
 	}
-	footer := fmt.Sprintf("© %d %s", time.Now().Year(), emailBrand)
+	footer := fmt.Sprintf("© %d %s", time.Now().Year(), correo.Brand)
 	for name, render := range templates {
 		t.Run(name, func(t *testing.T) {
 			_, body := render()
-			if !strings.Contains(body, ">"+emailBrand+"</p>") {
+			if !strings.Contains(body, ">"+correo.Brand+"</p>") {
 				t.Error("header does not carry the brand")
 			}
 			if !strings.Contains(body, footer) {

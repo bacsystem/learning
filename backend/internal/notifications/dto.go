@@ -1,6 +1,9 @@
 package notifications
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // Notificacion is the full notification record.
 type Notificacion struct {
@@ -12,6 +15,11 @@ type Notificacion struct {
 	CreadoPor    *int64    `db:"creado_por"   json:"creado_por,omitempty"`
 	CreatedAt    time.Time `db:"created_at"   json:"created_at"`
 	Leida        bool      `db:"leida"        json:"leida"`
+	// Clave and Parametros are set on the personal notifications (PLT-12): the
+	// bell translates the clave in the current language and interpolates the
+	// parametros. Both are null on the broadcast ones.
+	Clave      *string          `db:"clave"      json:"clave"`
+	Parametros *json.RawMessage `db:"parametros" json:"parametros"`
 }
 
 // CreateRequest is the payload for POST /admin/notificaciones.
