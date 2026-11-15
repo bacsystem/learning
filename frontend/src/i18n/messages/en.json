@@ -1003,6 +1003,7 @@
     "auth-contrasena-no-coinciden": "Passwords do not match",
     "auth-acepta-terminos": "By continuing you accept the <terminos>terms and conditions</terminos> and the <privacidad>privacy policy</privacidad>.",
     "auth-terminos": "Terms and conditions",
+    "auth-documento-solo-espanol": "This document is available in Spanish only.",
     "auth-privacidad": "Privacy policy",
     "auth-correo": "Email",
     "auth-correo-placeholder": "you@email.com",

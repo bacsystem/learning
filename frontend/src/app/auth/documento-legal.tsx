@@ -1,8 +1,16 @@
+import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 import { TarjetaAuth } from "@/app/auth/tarjeta-auth";
+import { Alerta } from "@/components/feedback/alerta";
 
-/** Página legal pública (términos, privacidad): tarjeta de lectura con título, introducción y secciones numeradas. */
+/** Idioma del cuerpo legal: solo existe en español (borrador pendiente de revisión legal, sin traducción aprobada). */
+const IDIOMA_DEL_CUERPO = "es";
+
+/**
+ * Página legal pública (términos, privacidad): tarjeta de lectura con título, introducción y secciones numeradas.
+ * Con la interfaz en otro idioma, un aviso antes del cuerpo dice que el documento solo está en español.
+ */
 export function DocumentoLegal({
   titulo,
   intro,
@@ -12,9 +20,14 @@ export function DocumentoLegal({
   intro: ReactNode;
   children: ReactNode;
 }) {
+  const t = useTranslations("dashboard");
+  const locale = useLocale();
   return (
     <TarjetaAuth ancho="documento" titulo={titulo} descripcion={intro}>
-      <div className="border-border/60 flex flex-col gap-6 border-t pt-6">{children}</div>
+      <div className="border-border/60 flex flex-col gap-6 border-t pt-6">
+        {locale === IDIOMA_DEL_CUERPO ? null : <Alerta tono="info">{t("auth-documento-solo-espanol")}</Alerta>}
+        {children}
+      </div>
     </TarjetaAuth>
   );
 }
