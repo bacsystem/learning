@@ -3,6 +3,7 @@ import {
   aValores,
   CAMPOS_CONFIGURACION,
   camposRechazados,
+  errorVisible,
   esquemaConfiguracion,
   estadoGasto,
   parseNumero,
@@ -167,5 +168,21 @@ describe("porcentajeConsumo", () => {
     [0, 0, 100],
   ])("%i of %i is %i %%", (usados, limite, esperado) => {
     expect(porcentajeConsumo({ usados, limite })).toBe(esperado);
+  });
+});
+
+describe("errorVisible", () => {
+  it("shows the error as soon as the value changes, before leaving the field", () => {
+    expect(errorVisible(false, "5000", "5")).toBe(true);
+    expect(errorVisible(undefined, "", "5")).toBe(true);
+  });
+
+  it("shows the error of a field that was touched even if the value is the initial one", () => {
+    expect(errorVisible(true, "5", "5")).toBe(true);
+  });
+
+  it("stays quiet for an untouched, unchanged field", () => {
+    expect(errorVisible(false, "5", "5")).toBe(false);
+    expect(errorVisible(undefined, "5", "5")).toBe(false);
   });
 });

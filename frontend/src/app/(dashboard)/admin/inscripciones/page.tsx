@@ -17,6 +17,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { GrupoBotones } from "@/components/ui/grupo-botones";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useAuth } from "@/lib/auth/auth-context";
 import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_DESTRUCTIVO, BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA } from "@/lib/estilos";
@@ -44,15 +45,15 @@ const ESTADO_CLAVE: Record<string, string> = {
   rechazado: "admin-inscripciones-estado-rechazado",
 };
 
-/** "dd/mm/yyyy hh:mm" (formato del backend) → "yyyy-mm-dd hh:mm", que sí ordena como fecha. */
-const fechaOrdenable = (s: string) => {
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2}))?$/.exec(s ?? "");
-  return m ? `${m[3]}-${m[2]}-${m[1]} ${m[4] ?? "00"}:${m[5] ?? "00"}` : (s ?? "");
-};
-
 export default function Page() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
+  // Instante RFC 3339 del servidor → fecha y hora de Lima en el idioma activo, como el resto de las pantallas.
+  const fechaVisible = useCallback(
+    (instante: string | null | undefined) => (instante ? fechaHora(instante) : ""),
+    [fechaHora],
+  );
   const toast = useToast();
   const tipoLabel = useCallback((tipo: string) => (TIPO_CLAVE[tipo] ? t(TIPO_CLAVE[tipo]) : tipo), [t]);
   const estadoLabel = useCallback((estado: string) => (ESTADO_CLAVE[estado] ? t(ESTADO_CLAVE[estado]) : estado), [t]);
@@ -183,9 +184,11 @@ export default function Page() {
         id: "fecha_solicitud",
         titulo: t("admin-inscripciones-col-fecha"),
         ordenable: true,
-        valor: (r) => fechaOrdenable(r.fecha_solicitud),
-        // Buscar, exportar e imprimir con la fecha tal como se ve (la celda pinta `fecha_solicitud`); `valor` solo ordena.
-        texto: (r) => r.fecha_solicitud ?? "",
+        // Ordena por el instante (RFC 3339), no por el texto que se ve.
+        valor: (r) => r.fecha_solicitud,
+        // Buscar, exportar e imprimir con la fecha tal como se ve.
+        texto: (r) => fechaVisible(r.fecha_solicitud),
+        render: (r) => fechaVisible(r.fecha_solicitud),
         className: "whitespace-nowrap tabular-nums",
       },
       {
@@ -231,13 +234,16 @@ export default function Page() {
           ) : (
             <span className="text-etiqueta text-texto-terciario whitespace-nowrap">
               {r.revisado_por
-                ? t("admin-inscripciones-revisado-por", { usuario: r.revisado_por, fecha: r.revisado_at ?? "—" })
+                ? t("admin-inscripciones-revisado-por", {
+                    usuario: r.revisado_por,
+                    fecha: r.revisado_at ? fechaVisible(r.revisado_at) : "—",
+                  })
                 : t("admin-inscripciones-revisada")}
             </span>
           ),
       },
     ],
-    [openDialog, t, estadoLabel, tipoLabel],
+    [openDialog, t, estadoLabel, tipoLabel, fechaVisible],
   );
 
   const contar = (v: TabVal) => (v === "todos" ? allRows.length : allRows.filter((r) => r.estado === v).length);

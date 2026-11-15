@@ -6,6 +6,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { Alerta } from "@/components/feedback/alerta";
 import { FilaMetricas, Metrica } from "@/components/patrones/metricas";
 import { Chip } from "@/components/patrones/pill-estado";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { TARJETA } from "@/lib/estilos";
 import type { VistaPreviaBalotario } from "@/lib/serums-ia/balotario/api";
 import { cn } from "@/lib/utils";
@@ -14,10 +15,9 @@ import { CheckCircleIcon, ListChecksIcon, WarningCircleIcon, WarningIcon } from 
 /** Lo que el servidor encontró: de qué fuente y versión, los totales, la ruta de revisión y las importaciones previas. */
 export function ResumenBalotario({ vista }: { vista: VistaPreviaBalotario }) {
   const t = useTranslations("dashboard");
+  const { fechaHora: fecha } = useFormatoFecha();
   const formato = useFormatter();
   const { fuente, totales, ruta_revision: ruta, importacion, otras_importaciones: otras } = vista;
-  const fecha = (iso: string) =>
-    formato.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short", timeZone: "America/Lima" });
 
   return (
     <section className={cn(TARJETA, "flex flex-col gap-4 p-4")} aria-labelledby="balotario-resumen">

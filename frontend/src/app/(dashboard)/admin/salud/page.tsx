@@ -1,13 +1,14 @@
 "use client";
 
 import pkg from "../../../../../package.json";
-import { PillEstadoServicio, SkeletonTarjetas, TarjetaFrontend, TarjetaServicio, ZONA_HORARIA } from "./componentes";
+import { PillEstadoServicio, SkeletonTarjetas, TarjetaFrontend, TarjetaServicio } from "./componentes";
 import { useSalud } from "./use-salud";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
 import { Alerta } from "@/components/feedback/alerta";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { Chip } from "@/components/patrones/pill-estado";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_SECUNDARIA, AYUDA_CAMPO, CONTENEDOR_PAGINA, ROTULO } from "@/lib/estilos";
 import { PESO_ICONO_FUNCIONAL } from "@/lib/iconos";
@@ -21,12 +22,10 @@ const MS_POR_SEGUNDO = 1000;
 export default function SaludServiciosPage() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
-  const formato = useFormatter();
+  const { fechaHora: hora } = useFormatoFecha();
   const { salud, fase, enCurso, actualizar } = useSalud(token);
 
   const desactualizado = fase === "desactualizado";
-  const hora = (iso: string) =>
-    formato.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "medium", timeZone: ZONA_HORARIA });
 
   return (
     <div className={CONTENEDOR_PAGINA}>

@@ -5,10 +5,15 @@ import { useRef, useState } from "react";
 import { Calendario } from "@/components/formularios/calendario";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CAMPO, CONTROL_FILTRO } from "@/lib/estilos";
-import { formatearFecha } from "@/lib/formato";
+import { esLocaleFecha, formatearFecha, type LocaleFecha } from "@/lib/formato";
 import { PESO_ICONO } from "@/lib/iconos";
 import { cn } from "@/lib/utils";
 import { CalendarBlankIcon, CaretDownIcon, XIcon } from "@phosphor-icons/react";
+
+const TEXTOS: Record<LocaleFecha, { elegir: string; quitar: string }> = {
+  es: { elegir: "Elegir fecha", quitar: "Quitar la fecha" },
+  en: { elegir: "Pick a date", quitar: "Clear date" },
+};
 
 /**
  * Fecha con calendario propio en un popover (el selector nativo del navegador no se puede estilizar y cambiaba con
@@ -26,9 +31,10 @@ export function EntradaFecha({
   min,
   max,
   disabled,
-  placeholder = "Elegir fecha",
+  placeholder,
   limpiable = false,
-  etiquetaLimpiar = "Quitar la fecha",
+  etiquetaLimpiar,
+  locale = "es",
   nombre,
   enBarra = false,
   invalido,
@@ -46,6 +52,8 @@ export function EntradaFecha({
   limpiable?: boolean;
   /** Nombre accesible de la ✕. */
   etiquetaLimpiar?: string;
+  /** Idioma de la fecha escrita, del calendario y de los textos por defecto (`placeholder`, `etiquetaLimpiar`); `es` por defecto. */
+  locale?: LocaleFecha;
   /** Nombre del `<input type="hidden">` que lleva el ISO en un `<form>` nativo. */
   nombre?: string;
   /** Sin efecto desde 0.5.0: el disparador ya muestra la fecha formateada. Se conserva por compatibilidad. */
@@ -59,6 +67,9 @@ export function EntradaFecha({
   describidoPor?: string;
   className?: string;
 }) {
+  const idioma = esLocaleFecha(locale) ? locale : "es";
+  const elegir = placeholder ?? TEXTOS[idioma].elegir;
+  const quitar = etiquetaLimpiar ?? TEXTOS[idioma].quitar;
   const [abierto, setAbierto] = useState(false);
   const caja = useRef<HTMLDivElement>(null);
   const conValor = !!valor;
@@ -83,7 +94,7 @@ export function EntradaFecha({
         >
           <CalendarBlankIcon weight={PESO_ICONO} className="text-muted-foreground size-4 shrink-0" />
           <span className={cn("min-w-0 flex-1 truncate tabular-nums", !conValor && "text-texto-terciario")}>
-            {conValor ? formatearFecha(valor) : placeholder}
+            {conValor ? formatearFecha(valor, idioma) : elegir}
           </span>
           {conLimpiar ? null : (
             <CaretDownIcon
@@ -99,6 +110,7 @@ export function EntradaFecha({
         >
           <div ref={caja}>
             <Calendario
+              locale={idioma}
               valor={valor}
               min={min}
               max={max}
@@ -113,8 +125,8 @@ export function EntradaFecha({
       {conLimpiar ? (
         <button
           type="button"
-          aria-label={etiquetaLimpiar}
-          title={etiquetaLimpiar}
+          aria-label={quitar}
+          title={quitar}
           onClick={() => onCambio?.("")}
           className="text-texto-terciario hover:bg-secondary hover:text-foreground focus-visible:ring-ring/50 absolute top-1/2 right-2 grid size-5 -translate-y-1/2 place-items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >

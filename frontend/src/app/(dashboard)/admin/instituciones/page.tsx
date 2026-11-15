@@ -19,12 +19,12 @@ import { useToast } from "@/components/feedback/toast";
 import { Entrada } from "@/components/formularios/campo";
 import { MenuAcciones } from "@/components/navegacion/menu-acciones";
 import { ChipCodigo } from "@/components/patrones/pill-estado";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, type Institucion } from "@/lib/catalogs/api";
 import { ERRORES_INSTITUCION } from "@/lib/catalogs/errores";
 import { claveErrorApi } from "@/lib/errores-api";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import { BankIcon, CheckCircleIcon, EyeSlashIcon, PencilSimpleIcon, PlusIcon } from "@phosphor-icons/react";
 
 type DialogMode = "create" | "edit";
@@ -39,6 +39,7 @@ const largo = (s: string) => Array.from(s.trim()).length;
 export default function InstitucionesPage() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
   const toast = useToast();
 
   const [tab, setTab] = useState<TabEstado>("todos");
@@ -162,8 +163,8 @@ export default function InstitucionesPage() {
         ancho: "180px",
         ordenable: true,
         className: "whitespace-nowrap tabular-nums text-muted-foreground",
-        texto: (r) => (r.created_at ? formatearFechaHora(r.created_at) : ""),
-        render: (r) => (r.created_at ? formatearFechaHora(r.created_at) : "—"),
+        texto: (r) => (r.created_at ? fechaHora(r.created_at) : ""),
+        render: (r) => (r.created_at ? fechaHora(r.created_at) : "—"),
       },
       {
         id: "acciones",
@@ -184,7 +185,7 @@ export default function InstitucionesPage() {
         ),
       },
     ],
-    [openEdit, openConfirm, t],
+    [openEdit, openConfirm, t, fechaHora],
   );
 
   const desactivando = confirmDialog.row?.estado === "activo";

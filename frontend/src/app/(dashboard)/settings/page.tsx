@@ -16,11 +16,11 @@ import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { FilaMetricas, Metrica, type Tono } from "@/components/patrones/metricas";
 import { Chip, PillEstado } from "@/components/patrones/pill-estado";
 import { Avatar } from "@/components/ui/avatar";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { type HealthStatus, systemApi, tourApi } from "@/lib/auth/auth-api";
 import { useAuth } from "@/lib/auth/auth-context";
 import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import { cargarTodo } from "@/lib/paginar-todo";
 import { type HistorialItem, practicasApi } from "@/lib/practices/api";
 import { type HistorialSimulacroItem, simulacrosApi } from "@/lib/simulations/api";
@@ -99,6 +99,7 @@ function Estrellas({ valor }: { valor: number }) {
 export default function Settings() {
   const { user, token, updateUser } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
   const toast = useToast();
   const [simHistorial, setSimHistorial] = useState<HistorialSimulacroItem[]>([]);
   const [pracHistorial, setPracHistorial] = useState<HistorialItem[]>([]);
@@ -397,9 +398,7 @@ export default function Settings() {
                           <p className="text-control text-foreground truncate font-medium">
                             {t("perfil-simulacro-numero", { n: sim.numero })} — {sim.proceso}
                           </p>
-                          <p className="text-etiqueta text-texto-terciario tabular-nums">
-                            {formatearFechaHora(sim.fecha)}
-                          </p>
+                          <p className="text-etiqueta text-texto-terciario tabular-nums">{fechaHora(sim.fecha)}</p>
                         </div>
                         <div className="flex shrink-0 items-center gap-3">
                           <p className="text-control text-foreground font-semibold tabular-nums">

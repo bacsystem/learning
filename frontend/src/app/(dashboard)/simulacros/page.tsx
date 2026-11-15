@@ -15,10 +15,10 @@ import { PillEstado } from "@/components/patrones/pill-estado";
 import { Button } from "@/components/ui/button";
 import { Menu, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA, SEGMENTADO, SEGMENTO } from "@/lib/estilos";
 import { type ColumnaExportable, descargarCsv, imprimirTabla } from "@/lib/exportar";
-import { formatearFechaHora } from "@/lib/formato";
 import { POR_PAGINA_DEFECTO } from "@/lib/paginacion";
 import { HistorialSimulacroItem, simulacrosApi } from "@/lib/simulations/api";
 import { cn } from "@/lib/utils";
@@ -63,6 +63,7 @@ function formatTime(sec: number): string {
 
 export default function SimulacrosPage() {
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
   const toast = useToast();
   const { token } = useAuth();
   const router = useRouter();
@@ -151,8 +152,8 @@ export default function SimulacrosPage() {
       {
         id: "fecha",
         titulo: t("simulacros-fecha"),
-        render: (r) => <span className="text-muted-foreground tabular-nums">{formatearFechaHora(r.fecha)}</span>,
-        texto: (r) => formatearFechaHora(r.fecha),
+        render: (r) => <span className="text-muted-foreground tabular-nums">{fechaHora(r.fecha)}</span>,
+        texto: (r) => fechaHora(r.fecha),
       },
       {
         id: "actions",
@@ -172,7 +173,7 @@ export default function SimulacrosPage() {
         ),
       },
     ],
-    [t],
+    [t, fechaHora],
   );
 
   const visibles = columns.filter((c) => !ocultas.includes(c.id));

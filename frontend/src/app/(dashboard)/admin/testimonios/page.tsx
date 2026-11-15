@@ -12,9 +12,9 @@ import { BotonAsync } from "@/components/patrones/boton-async";
 import type { Tono } from "@/components/patrones/metricas";
 import { PillEstado } from "@/components/patrones/pill-estado";
 import { Avatar } from "@/components/ui/avatar";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useAuth } from "@/lib/auth/auth-context";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import { fetchTestimoniosAdmin, type TestimonioAdmin, updateTestimonioEstado } from "@/lib/testimonios/api";
 import { cn } from "@/lib/utils";
 import { ChatCircleTextIcon, CheckCircleIcon, StarIcon, XCircleIcon } from "@phosphor-icons/react";
@@ -75,6 +75,7 @@ function TarjetaCargando() {
 export default function TestimoniosAdminPage() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
   const toast = useToast();
   const [tab, setTab] = useState<TabValue>("pendiente");
   const [pagina, setPagina] = useState(1);
@@ -191,7 +192,7 @@ export default function TestimoniosAdminPage() {
                             {t("admin-testimonios-cita", { contenido: row.contenido })}
                           </p>
                           <p className="text-etiqueta text-texto-terciario">
-                            @{row.username} · <span className="tabular-nums">{formatearFechaHora(row.created_at)}</span>
+                            @{row.username} · <span className="tabular-nums">{fechaHora(row.created_at)}</span>
                           </p>
                         </div>
                       </div>

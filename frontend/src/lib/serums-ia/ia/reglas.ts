@@ -97,3 +97,10 @@ export function porcentajeConsumo(v: Pick<VentanaConsumo, "usados" | "limite">):
   if (v.limite <= 0) return 100;
   return Math.min(100, Math.max(0, (v.usados / v.limite) * 100));
 }
+
+/**
+ * ¿Se muestra el error de un campo del formulario de límites? Al salir del campo o en cuanto su valor cambia: «Guardar» se
+ * deshabilita con el error y tiene que decir por qué, sin esperar al `blur`.
+ */
+export const errorVisible = (tocado: boolean | undefined, valor: string, inicial: string): boolean =>
+  Boolean(tocado) || valor !== inicial;

@@ -7,7 +7,7 @@ import { TablaDatos } from "@/components/app/tabla-datos";
 import { type Columna } from "@/components/datos/tabla-datos";
 import { Skeleton } from "@/components/feedback/skeleton";
 import { PillEstado } from "@/components/patrones/pill-estado";
-import { formatearFechaHora } from "@/lib/formato";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { type HistorialSimulacroItem } from "@/lib/simulations/api";
 import { cn } from "@/lib/utils";
 import { ClockCounterClockwiseIcon } from "@phosphor-icons/react";
@@ -17,10 +17,10 @@ interface Props {
   loading: boolean;
 }
 
-const fechaCorta = (valor?: string | null) => (valor ? formatearFechaHora(valor) : "—");
-
 export default function SectionRecientes({ simulacros, loading }: Props) {
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
+  const fechaCorta = (valor?: string | null) => (valor ? fechaHora(valor) : "—");
 
   const columnas: Columna<HistorialSimulacroItem>[] = [
     {

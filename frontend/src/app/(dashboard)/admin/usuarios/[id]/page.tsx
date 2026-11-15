@@ -23,6 +23,7 @@ import { PillEstado } from "@/components/patrones/pill-estado";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { adminGetUsuario, adminPatchUsuarioRol, type UsuarioDetalle } from "@/lib/admin/api";
 import { ERRORES_CORREO_USUARIO } from "@/lib/admin/errores-usuario";
 import { excede, LIMITES } from "@/lib/admin/limites";
@@ -36,7 +37,6 @@ import {
   CONTENEDOR_PAGINA,
   TARJETA,
 } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import { inscripcionesApi } from "@/lib/inscripciones/api";
 import { cn } from "@/lib/utils";
 import {
@@ -78,6 +78,7 @@ export default function UsuarioDetallePage() {
   const { id } = useParams<{ id: string }>();
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
   const toast = useToast();
   /** Etiquetas traducidas; un valor desconocido del backend se muestra tal cual. */
   const etiquetaEstado = (estado: string) => (ESTADOS.includes(estado) ? t(`admin-usuarios-estado-${estado}`) : estado);
@@ -269,7 +270,8 @@ export default function UsuarioDetallePage() {
           destacada
           ayuda={t("admin-usuarios-promedio-simulacros")}
         >
-          {usuario.nota_promedio.toFixed(1)}
+          {/* Sin simulacros no hay promedio: «—», como el panel del propio usuario. */}
+          {usuario.total_simulacros > 0 ? usuario.nota_promedio.toFixed(1) : "—"}
         </Metrica>
       </FilaMetricas>
 
@@ -300,13 +302,13 @@ export default function UsuarioDetallePage() {
                   ? [
                       {
                         etiqueta: t("admin-usuarios-activado-el"),
-                        valor: <span className="tabular-nums">{formatearFechaHora(usuario.activated_at)}</span>,
+                        valor: <span className="tabular-nums">{fechaHora(usuario.activated_at)}</span>,
                       },
                     ]
                   : []),
                 {
                   etiqueta: t("admin-usuarios-registrado-el"),
-                  valor: <span className="tabular-nums">{formatearFechaHora(usuario.created_at)}</span>,
+                  valor: <span className="tabular-nums">{fechaHora(usuario.created_at)}</span>,
                 },
               ]}
             />

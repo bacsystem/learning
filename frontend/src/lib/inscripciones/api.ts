@@ -51,10 +51,11 @@ export interface InscripcionAdmin {
   proceso_anio: number;
   estado: string;
   observacion?: string;
+  /** Request instant, RFC 3339 (docs/api, #256). */
   fecha_solicitud: string;
   /** Username of the admin who decided it (absent while pendiente). */
   revisado_por?: string;
-  /** Decision date, "dd/mm/yyyy hh:mm" (absent while pendiente). */
+  /** Decision instant, RFC 3339 (absent while pendiente). */
   revisado_at?: string;
 }
 

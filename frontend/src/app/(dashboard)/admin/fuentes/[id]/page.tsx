@@ -17,6 +17,7 @@ import { useToast } from "@/components/feedback/toast";
 import { DialogoConfirmacion } from "@/components/navegacion/dialogo-confirmacion";
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { useCarga } from "@/hooks/use-carga";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useSondeo } from "@/hooks/use-sondeo";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
@@ -63,6 +64,7 @@ export default function FuenteDetallePage() {
   const fuenteId = Number(id);
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaHora: fecha } = useFormatoFecha();
   const formato = useFormatter();
   const toast = useToast();
   const opciones = useOpcionesFuente(token);
@@ -73,9 +75,6 @@ export default function FuenteDetallePage() {
   );
   const fuente = carga.datos;
   useSondeo(Boolean(fuente && enProceso(fuente)), carga.refrescar, REFRESCO_MS);
-
-  const fecha = (iso: string) =>
-    formato.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short", timeZone: "America/Lima" });
 
   /** Aplica la respuesta de una acción (la fuente actualizada) y cierra el diálogo. */
   function aplicar(actualizada: FuenteDetalle, aviso: string) {

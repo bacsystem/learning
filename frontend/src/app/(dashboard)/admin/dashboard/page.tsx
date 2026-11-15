@@ -14,6 +14,7 @@ import { Chip, PillEstado } from "@/components/patrones/pill-estado";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import {
   adminGetDashboard,
   adminGetDashboardActividad,
@@ -23,7 +24,6 @@ import {
 import { systemApi, type UsuarioOnline } from "@/lib/auth/auth-api";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_SECUNDARIA, CABECERA_TABLA, CONTENEDOR_PAGINA, FOCO, TARJETA } from "@/lib/estilos";
-import { formatearFecha } from "@/lib/formato";
 import { type IconoComponente, PESO_ICONO, PESO_ICONO_FUNCIONAL } from "@/lib/iconos";
 import { cn } from "@/lib/utils";
 import {
@@ -127,6 +127,7 @@ function OnlineUserRow({ u }: { u: UsuarioOnline }) {
 export default function AdminDashboardPage() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaCorta } = useFormatoFecha();
   const idActividad = useId();
 
   const [stats, setStats] = useState<DashboardData | null>(null);
@@ -177,8 +178,8 @@ export default function AdminDashboardPage() {
   // The series are zero-filled (H142): an all-zero week is still "no data".
   const sinActividad = [...practicasValues, ...simulacrosValues].every((v) => v === 0);
 
-  // "2026-03-05" → "5 Mar" (formatearFecha sin el año).
-  const dateLabels = allDates.map((d) => formatearFecha(d).replace(/ \d{4}$/, ""));
+  // "2026-03-05" → "5 Mar" / "Mar 5" (la fecha sin el año).
+  const dateLabels = allDates.map(fechaCorta);
 
   const topAsignaturas = actividad?.top_asignaturas ?? [];
   const totalPracticasSemana = practicasValues.reduce((s, v) => s + v, 0);
@@ -274,6 +275,7 @@ export default function AdminDashboardPage() {
             ) : (
               <GraficoBarras
                 plano
+                enteros
                 etiquetadoPor={idActividad}
                 alto={280}
                 categorias={dateLabels}

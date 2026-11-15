@@ -1,6 +1,16 @@
 const SIMBOLOS: Record<string, string> = { PEN: "S/", USD: "$" };
 
-const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"];
+/** Idiomas de las fechas escritas: castellano (por defecto) e inglés. */
+export const LOCALES_FECHA = ["es", "en"] as const;
+export type LocaleFecha = (typeof LOCALES_FECHA)[number];
+
+/** ¿Es un idioma que sabemos escribir? Para acotar lo que llega de fuera (cookie, `useLocale()`, JS sin tipos). */
+export const esLocaleFecha = (valor: unknown): valor is LocaleFecha => LOCALES_FECHA.some((l) => l === valor);
+
+const MESES: Record<LocaleFecha, readonly string[]> = {
+  es: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic"],
+  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+};
 
 /** Número con separador de miles y 2 decimales (formato SUNAT: 1,234.56). */
 export function formatearNumero(valor: number): string {
@@ -29,14 +39,18 @@ export function sumarDias(iso: string, dias: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function formatearFecha(iso: string): string {
+/** Fecha ISO `YYYY-MM-DD` a texto: «15 Nov 2026» (`es`, por defecto) o «Nov 15, 2026» (`en`). Si no es una fecha, la devuelve tal cual. */
+export function formatearFecha(iso: string, locale: LocaleFecha = "es"): string {
+  // Un idioma desconocido (`fr`, `null`) cae en castellano en ejecución, aunque el tipo no lo permita.
+  const idioma = esLocaleFecha(locale) ? locale : "es";
   const [anio, mes, dia] = iso.split("-").map(Number);
-  if (!anio || !mes || !dia) return iso;
-  return `${dia} ${MESES[mes - 1]} ${anio}`;
+  const nombreMes = MESES[idioma][mes - 1];
+  if (!anio || !mes || !dia || !nombreMes) return iso;
+  return idioma === "en" ? `${nombreMes} ${dia}, ${anio}` : `${dia} ${nombreMes} ${anio}`;
 }
 
-/** Instante ISO (UTC) a fecha y hora de Lima: "15 Set 2026, 10:32". */
-export function formatearFechaHora(iso: string): string {
+/** Instante ISO (UTC) a fecha y hora de Lima: «15 Set 2026, 10:32» (`es`, por defecto) o «Sep 15, 2026, 10:32» (`en`). */
+export function formatearFechaHora(iso: string, locale: LocaleFecha = "es"): string {
   const fecha = new Date(iso);
   if (Number.isNaN(fecha.getTime())) return iso;
   const partes = new Intl.DateTimeFormat("en-CA", {
@@ -49,5 +63,17 @@ export function formatearFechaHora(iso: string): string {
     hour12: false,
   }).formatToParts(fecha);
   const v = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? "";
-  return `${formatearFecha(`${v("year")}-${v("month")}-${v("day")}`)}, ${v("hour")}:${v("minute")}`;
+  return `${formatearFecha(`${v("year")}-${v("month")}-${v("day")}`, locale)}, ${v("hour")}:${v("minute")}`;
+}
+
+const SEGUNDOS_POR_MINUTO = 60;
+
+/**
+ * Segundos a `mm:ss` (`65 → "01:05"`) para una cuenta regresiva. Los minutos no se limitan a 2 dígitos (`6000 → "100:00"`);
+ * un valor negativo o no finito (`NaN`, `Infinity`) da `00:00` y los decimales se truncan.
+ */
+export function formatearMmSs(segundos: number): string {
+  const total = Number.isFinite(segundos) && segundos > 0 ? Math.floor(segundos) : 0;
+  const dos = (n: number) => String(n).padStart(2, "0");
+  return `${dos(Math.floor(total / SEGUNDOS_POR_MINUTO))}:${dos(total % SEGUNDOS_POR_MINUTO)}`;
 }
