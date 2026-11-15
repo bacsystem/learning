@@ -345,10 +345,11 @@ func (r *Repository) GetAuditLog(ctx context.Context, page, perPage int, from, t
 	toParam := sql.NullString{String: to, Valid: to != ""}
 	q = db.EscapeLike(q)
 
+	// host() drops the netmask that CAST(inet AS TEXT) appends ("/32", "/128").
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT al.id, al.usuario_id, COALESCE(u.username,'') AS username,
 		       al.accion, al.entidad, al.entidad_id,
-		       al.detalle, CAST(al.ip AS TEXT), al.user_agent, al.created_at
+		       al.detalle, host(al.ip), al.user_agent, al.created_at
 		FROM audit_log al
 		LEFT JOIN usuarios u ON u.id = al.usuario_id
 		WHERE ($1::date IS NULL OR al.created_at >= ($1::date)::timestamp AT TIME ZONE `+zonaSQL+`)
