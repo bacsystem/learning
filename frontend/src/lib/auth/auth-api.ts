@@ -78,7 +78,7 @@ export const authApi = {
     });
   },
 
-  register(payload: { dni: string; email: string }): Promise<{ message: string }> {
+  register(payload: { dni: string; email: string; locale?: string }): Promise<{ message: string }> {
     // 202 with one generic message whether or not the data matched: the
     // account is only created when the e-mailed link is opened (verifyEmail).
     return request("/auth/register", {
@@ -96,6 +96,7 @@ export const authApi = {
     username: string;
     password: string;
     confirm_password: string;
+    locale?: string;
   }): Promise<{ message: string }> {
     return request("/auth/verify-email", {
       method: "POST",
@@ -110,17 +111,22 @@ export const authApi = {
     });
   },
 
-  forgotPassword(email: string): Promise<{ message: string }> {
+  forgotPassword(email: string, locale?: string): Promise<{ message: string }> {
     return request("/auth/forgot-password", {
       method: "POST",
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, locale }),
     });
   },
 
-  resetPassword(token: string, password: string, confirm_password: string): Promise<{ message: string }> {
+  resetPassword(
+    token: string,
+    password: string,
+    confirm_password: string,
+    locale?: string,
+  ): Promise<{ message: string }> {
     return request("/auth/reset-password", {
       method: "POST",
-      body: JSON.stringify({ token, password, confirm_password }),
+      body: JSON.stringify({ token, password, confirm_password, locale }),
     });
   },
 

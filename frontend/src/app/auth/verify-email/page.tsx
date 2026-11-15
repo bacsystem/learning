@@ -2,7 +2,7 @@
 import { useFormik } from "formik";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as yup from "yup";
 
@@ -43,6 +43,7 @@ function EstadoDisponibilidad({ estado }: { estado: UsernameStatus }) {
 
 export default function Page() {
   const t = useTranslations("dashboard");
+  const locale = useLocale();
   const etiquetasContrasena = useEtiquetasContrasena();
   const searchParams = useSearchParams();
   // Read once: the token is then removed from the URL (and the history entry).
@@ -84,7 +85,7 @@ export default function Page() {
       setApiError(null);
       setUsernameError(null);
       try {
-        await authApi.verifyEmail({ token, ...values });
+        await authApi.verifyEmail({ token, ...values, locale });
         setStatus("success");
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };

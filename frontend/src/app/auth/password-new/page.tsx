@@ -2,7 +2,7 @@
 import { useFormik } from "formik";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import React, { useEffect, useMemo, useState } from "react";
 import * as yup from "yup";
 
@@ -21,6 +21,7 @@ import { ArrowLeftIcon, LockKeyIcon } from "@phosphor-icons/react";
 export default function Page() {
   const router = useRouter();
   const t = useTranslations("dashboard");
+  const locale = useLocale();
   const etiquetasContrasena = useEtiquetasContrasena();
   const searchParams = useSearchParams();
   // Read once: the token is then removed from the URL (and the history entry).
@@ -45,7 +46,7 @@ export default function Page() {
       setApiError(null);
       setEnlaceVencido(false);
       try {
-        await authApi.resetPassword(token, values.password, values.confirm_password);
+        await authApi.resetPassword(token, values.password, values.confirm_password, locale);
         setSuccess(true);
         setTimeout(() => router.push("/auth/sign-in"), 2000);
       } catch (err: unknown) {
