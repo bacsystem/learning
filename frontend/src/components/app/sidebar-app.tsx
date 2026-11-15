@@ -7,7 +7,7 @@ import { useState } from "react";
 import { AcercaDe } from "@/components/app/acerca-de";
 import { MarcaSidebar } from "@/components/app/marca";
 import { ICONO_PERFIL, NAVEGACION } from "@/components/app/navegacion";
-import { useTextosMenuUsuario } from "@/components/app/use-textos-khipu";
+import { useTextosMenuUsuario, useTextosNav } from "@/components/app/use-textos-khipu";
 import { MenuUsuario } from "@/components/nav/menu-usuario";
 import { SidebarContent } from "@/components/nav/sidebar";
 import type { GrupoNav } from "@/components/nav/sidebar-nav";
@@ -18,12 +18,15 @@ import { InfoIcon } from "@phosphor-icons/react";
 export function SidebarApp() {
   const t = useTranslations("dashboard");
   const textos = useTextosMenuUsuario();
+  const textosNav = useTextosNav();
   const { user, logout } = useAuth();
   const router = useRouter();
   const [acercaDe, setAcercaDe] = useState(false);
   const esAdmin = user?.rol === "admin";
 
   const grupos: GrupoNav[] = NAVEGACION.filter((g) => !g.soloAdmin || esAdmin).map((g) => ({
+    id: g.id,
+    colapsable: g.colapsable,
     titulo: t(g.titulo),
     items: g.items.map((i) => ({ href: i.href, label: t(i.etiqueta), icon: i.icono, exacto: i.exacto })),
   }));
@@ -34,6 +37,7 @@ export function SidebarApp() {
     <SidebarContent
       marca={<MarcaSidebar />}
       grupos={grupos}
+      textosNav={textosNav}
       usuario={
         user ? (
           // `data-tour="settings"`: paso «Tu perfil y estadísticas» del tour (antes `id="settings"` del menú de la plantilla).

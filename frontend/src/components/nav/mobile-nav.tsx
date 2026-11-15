@@ -9,8 +9,8 @@ import { OBJETIVO_TACTIL } from "@/lib/estilos";
 import { ListIcon } from "@phosphor-icons/react";
 
 /**
- * Hamburguesa de la top bar que abre el mismo `SidebarContent` en un cajón lateral; se cierra al navegar. El cajón se desplaza: en una pantalla baja el usuario del pie
- * (tema, apariencia, cerrar sesión) quedaba fuera. `etiqueta` es el nombre accesible del botón.
+ * Hamburguesa de la top bar que abre el mismo `SidebarContent` en un cajón lateral; se cierra al navegar. Es una columna de la altura del cajón: solo la navegación se desplaza (`SidebarContent`), así que en una pantalla baja el usuario del pie
+ * (tema, apariencia, cerrar sesión) sigue a la vista. `etiqueta` es el nombre accesible del botón.
  */
 export function MobileNav({ children, etiqueta = "Abrir menú" }: { children: ReactNode; etiqueta?: string }) {
   const [open, setOpen] = useState(false);
@@ -31,10 +31,7 @@ export function MobileNav({ children, etiqueta = "Abrir menú" }: { children: Re
         showCloseButton={false}
         className="bg-sidebar text-sidebar-foreground w-[248px] max-w-[85vw] p-0"
       >
-        {/* `SidebarContent` es `h-full overflow-hidden`: se le da un contenedor que se desplaza y se lo deja crecer al contenido. */}
-        <div className="h-full overflow-y-auto [&>div]:h-auto [&>div]:min-h-full [&>div]:overflow-visible">
-          {children}
-        </div>
+        {children}
       </SheetContent>
     </Sheet>
   );
