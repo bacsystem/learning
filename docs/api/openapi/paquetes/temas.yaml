@@ -1,0 +1,691 @@
+# Paquete temas (backend-dev). Rutas: backend/internal/temas/routes.go:18-25.
+# Contrato de apoyo: docs/api/serums-ia-e1-taxonomia.md §1 (T1–T7). Todos los errores usan ErrorCodigo.
+paths:
+  /admin/temas:
+    get:
+      operationId: "temas.Listar"
+      tags: ["temas"]
+      summary: "Listar temas de una asignatura (T1)"
+      description: |
+        Lista paginada. Paginación **estricta**: un `page`, `per_page`, `estado` o id mal formado da `400 parametro_invalido`; `per_page` defecto 20, máximo 100 (más se recorta).
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - name: "asignatura_id"
+          in: "query"
+          required: true
+          description: "Área cuyos temas se listan. Obligatorio."
+          schema:
+            type: "integer"
+            format: "int64"
+            minimum: 1
+          example: 7
+        - name: "especialidad_id"
+          in: "query"
+          required: false
+          description: "Opcional: solo los temas de esa especialidad más los que aplican a todas."
+          schema:
+            type: "integer"
+            format: "int64"
+            minimum: 1
+        - name: "estado"
+          in: "query"
+          required: false
+          description: "Opcional: filtra por estado."
+          schema:
+            type: "string"
+            enum: ["activo", "archivado"]
+        - $ref: "../openapi.yaml#/components/parameters/Page"
+        - $ref: "../openapi.yaml#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: "Página de temas."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/ListaTemas"
+        "400":
+          description: "Falta `asignatura_id` o algún parámetro es inválido (`parametro_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "parametro_invalido"
+                message: "Parámetro inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    post:
+      operationId: "temas.Crear"
+      tags: ["temas"]
+      summary: "Crear un tema (T3)"
+      description: |
+        Crea un tema `activo` al final del orden y lo audita (en la misma transacción). Máximo 60 temas activos por área.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/CrearTemaRequest"
+      responses:
+        "201":
+          description: "Tema creado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Tema"
+        "400":
+          description: "JSON mal formado o con campos desconocidos (`cuerpo_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "cuerpo_invalido"
+                message: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "`validacion` (con `detalle.campos`: campo → `requerido`, `min`, `max`, `invalido` o `repetido`), `referencia_invalida` (el área o alguna especialidad no existe o está inactiva), `tema_duplicado` (mismo nombre en el área) o `limite_temas` (con `detalle.maximo`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                validacion:
+                  value:
+                    error: "validacion"
+                    message: "Datos inválidos."
+                    detalle:
+                      campos:
+                        nombre: "min"
+                referencia_invalida:
+                  value:
+                    error: "referencia_invalida"
+                    message: "El área o alguna especialidad no existe o está inactiva."
+                tema_duplicado:
+                  value:
+                    error: "tema_duplicado"
+                    message: "Ya existe un tema con ese nombre en esta área."
+                    detalle:
+                      campo: "nombre"
+                limite_temas:
+                  value:
+                    error: "limite_temas"
+                    message: "El área ya tiene el máximo de temas activos."
+                    detalle:
+                      maximo: 60
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /admin/temas/{id}:
+    get:
+      operationId: "temas.Obtener"
+      tags: ["temas"]
+      summary: "Obtener un tema (T2)"
+      description: |
+        Devuelve un tema con sus especialidades y su conteo de preguntas.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "200":
+          description: "El tema."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Tema"
+        "400":
+          description: "Id inválido (`parametro_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "parametro_invalido"
+                message: "Parámetro inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El tema no existe (`no_encontrado`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "no_encontrado"
+                message: "Tema no encontrado."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    put:
+      operationId: "temas.Editar"
+      tags: ["temas"]
+      summary: "Editar un tema (T4)"
+      description: |
+        Edita nombre, descripción y especialidades de un tema y lo audita. El área no se puede cambiar.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/EditarTemaRequest"
+      responses:
+        "200":
+          description: "Tema actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Tema"
+        "400":
+          description: "Id inválido (`parametro_invalido`) o JSON mal formado / campo desconocido (`cuerpo_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                parametro_invalido:
+                  value:
+                    error: "parametro_invalido"
+                    message: "Parámetro inválido."
+                cuerpo_invalido:
+                  value:
+                    error: "cuerpo_invalido"
+                    message: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El tema no existe (`no_encontrado`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "no_encontrado"
+                message: "Tema no encontrado."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "`validacion`, `referencia_invalida` o `tema_duplicado` (misma forma que al crear)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                validacion:
+                  value:
+                    error: "validacion"
+                    message: "Datos inválidos."
+                    detalle:
+                      campos:
+                        nombre: "min"
+                referencia_invalida:
+                  value:
+                    error: "referencia_invalida"
+                    message: "El área o alguna especialidad no existe o está inactiva."
+                tema_duplicado:
+                  value:
+                    error: "tema_duplicado"
+                    message: "Ya existe un tema con ese nombre en esta área."
+                    detalle:
+                      campo: "nombre"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /admin/temas/{id}/estado:
+    patch:
+      operationId: "temas.CambiarEstado"
+      tags: ["temas"]
+      summary: "Archivar o reactivar un tema (T5)"
+      description: |
+        Cambia el estado y lo audita. Reactivar un tema respeta el máximo de 60 activos por área.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/CambiarEstadoTemaRequest"
+      responses:
+        "200":
+          description: "Tema actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Tema"
+        "400":
+          description: "Id inválido (`parametro_invalido`) o cuerpo inválido (`cuerpo_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                parametro_invalido:
+                  value:
+                    error: "parametro_invalido"
+                    message: "Parámetro inválido."
+                cuerpo_invalido:
+                  value:
+                    error: "cuerpo_invalido"
+                    message: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El tema no existe (`no_encontrado`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "no_encontrado"
+                message: "Tema no encontrado."
+        "409":
+          description: "El tema ya está en ese estado (`estado_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "estado_invalido"
+                message: "El tema ya está en ese estado."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "`validacion` (`estado` no es `activo` ni `archivado`) o `limite_temas` al reactivar."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                validacion:
+                  value:
+                    error: "validacion"
+                    message: "Datos inválidos."
+                    detalle:
+                      campos:
+                        estado: "invalido"
+                limite_temas:
+                  value:
+                    error: "limite_temas"
+                    message: "El área ya tiene el máximo de temas activos."
+                    detalle:
+                      maximo: 60
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /admin/asignaturas/{id}/temas/orden:
+    put:
+      operationId: "temas.Reordenar"
+      tags: ["temas"]
+      summary: "Reordenar los temas de una asignatura (T6)"
+      description: |
+        Fija el orden de **todos** los temas activos del área y lo audita. `{id}` es el id de la asignatura.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/ReordenarTemasRequest"
+      responses:
+        "200":
+          description: "Nuevas posiciones."
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/schemas/PosicionTema"
+              example:
+                data:
+                  - id: 41
+                    orden: 1
+                  - id: 42
+                    orden: 2
+        "400":
+          description: "Id inválido (`parametro_invalido`) o `tema_ids` ausente/nulo, JSON mal formado (`cuerpo_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                parametro_invalido:
+                  value:
+                    error: "parametro_invalido"
+                    message: "Parámetro inválido."
+                cuerpo_invalido:
+                  value:
+                    error: "cuerpo_invalido"
+                    message: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "La asignatura no existe (`no_encontrado`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "no_encontrado"
+                message: "Área no encontrada."
+        "409":
+          description: "La lista no coincide con los temas activos actuales (`orden_desactualizado`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "orden_desactualizado"
+                message: "El orden está desactualizado; recarga la lista."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "La forma de la lista es inválida: más de 60 ids, repetidos o ≤ 0 (`orden_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "orden_invalido"
+                message: "La lista de orden es inválida."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /asignaturas/{id}/temas:
+    get:
+      operationId: "temas.ListarActivos"
+      tags: ["temas"]
+      summary: "Temas activos de una asignatura (T7)"
+      description: |
+        Solo los temas `activo`, ordenados, sin paginar (≤ 60). `{id}` es el id de la asignatura. No incluye `preguntas_count`.
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+        - name: "especialidad_id"
+          in: "query"
+          required: false
+          description: "Opcional: solo los temas de esa especialidad más los que aplican a todas."
+          schema:
+            type: "integer"
+            format: "int64"
+            minimum: 1
+      responses:
+        "200":
+          description: "Temas activos."
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required: ["data"]
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/schemas/TemaActivo"
+        "400":
+          description: "Id o `especialidad_id` inválidos (`parametro_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "parametro_invalido"
+                message: "Parámetro inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "404":
+          description: "La asignatura no existe (`no_encontrado`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "no_encontrado"
+                message: "Área no encontrada."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+schemas:
+  EspecialidadRef:
+    type: "object"
+    required: ["id", "nombre"]
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 2
+      nombre:
+        type: "string"
+        example: "Especialidad Ejemplo"
+  Tema:
+    type: "object"
+    description: "Vista de administración de un tema (T1–T5)."
+    required:
+      - "id"
+      - "asignatura_id"
+      - "nombre"
+      - "descripcion"
+      - "estado"
+      - "orden"
+      - "aplica_a_todas"
+      - "especialidades"
+      - "preguntas_count"
+      - "created_at"
+      - "updated_at"
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 41
+      asignatura_id:
+        type: "integer"
+        format: "int64"
+        example: 7
+      nombre:
+        type: "string"
+        example: "Vigilancia epidemiológica"
+      descripcion:
+        type: ["string", "null"]
+      estado:
+        type: "string"
+        enum: ["activo", "archivado"]
+      orden:
+        type: "integer"
+        description: "Posición entre los temas activos de la asignatura."
+        example: 1
+      aplica_a_todas:
+        type: "boolean"
+        description: "Verdadero si el tema no tiene especialidades asociadas."
+        example: false
+      especialidades:
+        type: "array"
+        items:
+          $ref: "#/schemas/EspecialidadRef"
+      preguntas_count:
+        type: "integer"
+        example: 12
+      created_at:
+        type: "string"
+        format: "date-time"
+        example: "2026-11-15T15:04:05Z"
+      updated_at:
+        type: "string"
+        format: "date-time"
+        example: "2026-11-15T15:04:05Z"
+  ListaTemas:
+    allOf:
+      - $ref: "../openapi.yaml#/components/schemas/PaginaMeta"
+      - type: "object"
+        required: ["data"]
+        properties:
+          data:
+            type: "array"
+            items:
+              $ref: "#/schemas/Tema"
+  TemaActivo:
+    type: "object"
+    description: "Vista de catálogo de un tema activo (T7); sin datos de administración."
+    required:
+      - "id"
+      - "nombre"
+      - "descripcion"
+      - "orden"
+      - "aplica_a_todas"
+      - "especialidad_ids"
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 41
+      nombre:
+        type: "string"
+        example: "Vigilancia epidemiológica"
+      descripcion:
+        type: ["string", "null"]
+      orden:
+        type: "integer"
+        example: 1
+      aplica_a_todas:
+        type: "boolean"
+        example: false
+      especialidad_ids:
+        type: "array"
+        items:
+          type: "integer"
+          format: "int64"
+        example: [2, 5]
+  CrearTemaRequest:
+    type: "object"
+    required: ["asignatura_id", "nombre"]
+    properties:
+      asignatura_id:
+        type: "integer"
+        description: "Área (asignatura) del tema; no se puede cambiar después."
+        format: "int64"
+        minimum: 1
+        example: 7
+      nombre:
+        type: "string"
+        description: "Se recortan y colapsan los espacios; 3 a 120 caracteres. Único (sin tildes ni mayúsculas) en el área."
+        minLength: 3
+        maxLength: 120
+        example: "Vigilancia epidemiológica"
+      descripcion:
+        type: ["string", "null"]
+        description: "Hasta 500 caracteres; vacío se guarda como nulo."
+        maxLength: 500
+      especialidad_ids:
+        type: "array"
+        items:
+          type: "integer"
+          format: "int64"
+          minimum: 1
+        description: "Hasta 50 ids sin repetir. Ausente o vacío = aplica a todas las especialidades; las inactivas no se aceptan."
+        maxItems: 50
+        uniqueItems: true
+    additionalProperties: false
+  EditarTemaRequest:
+    type: "object"
+    description: "`asignatura_id` no es editable: enviarlo es un campo desconocido (`400 cuerpo_invalido`)."
+    required: ["nombre"]
+    properties:
+      nombre:
+        type: "string"
+        minLength: 3
+        maxLength: 120
+        example: "Vigilancia epidemiológica"
+      descripcion:
+        type: ["string", "null"]
+        maxLength: 500
+      especialidad_ids:
+        type: "array"
+        items:
+          type: "integer"
+          format: "int64"
+          minimum: 1
+        description: "Hasta 50 ids sin repetir. Se aceptan las especialidades inactivas que el tema ya tenía."
+        maxItems: 50
+        uniqueItems: true
+    additionalProperties: false
+  CambiarEstadoTemaRequest:
+    type: "object"
+    required: ["estado"]
+    properties:
+      estado:
+        type: "string"
+        enum: ["activo", "archivado"]
+    additionalProperties: false
+  ReordenarTemasRequest:
+    type: "object"
+    required: ["tema_ids"]
+    properties:
+      tema_ids:
+        type: "array"
+        items:
+          type: "integer"
+          format: "int64"
+          minimum: 1
+        description: "Ids de **todos** los temas activos de la asignatura, en el orden nuevo. Hasta 60, sin repetir; ausente o `null` da `400`."
+        maxItems: 60
+        uniqueItems: true
+    additionalProperties: false
+  PosicionTema:
+    type: "object"
+    required: ["id", "orden"]
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 41
+      orden:
+        type: "integer"
+        example: 1
