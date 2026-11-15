@@ -1,15 +1,13 @@
 import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
+import { avisarSoloEspanol } from "@/app/auth/documento-legal-idioma";
 import { TarjetaAuth } from "@/app/auth/tarjeta-auth";
 import { Alerta } from "@/components/feedback/alerta";
 
-/** Idioma del cuerpo legal: solo existe en español (borrador pendiente de revisión legal, sin traducción aprobada). */
-const IDIOMA_DEL_CUERPO = "es";
-
 /**
- * Página legal pública (términos, privacidad): tarjeta de lectura con título, introducción y secciones numeradas.
- * Con la interfaz en otro idioma, un aviso antes del cuerpo dice que el documento solo está en español.
+ * Página legal pública (términos, privacidad): tarjeta de lectura con título, aviso de idioma, introducción y secciones
+ * numeradas. Con la interfaz en otro idioma, el aviso va antes de la introducción y dice que el documento solo está en español.
  */
 export function DocumentoLegal({
   titulo,
@@ -23,11 +21,10 @@ export function DocumentoLegal({
   const t = useTranslations("dashboard");
   const locale = useLocale();
   return (
-    <TarjetaAuth ancho="documento" titulo={titulo} descripcion={intro}>
-      <div className="border-border/60 flex flex-col gap-6 border-t pt-6">
-        {locale === IDIOMA_DEL_CUERPO ? null : <Alerta tono="info">{t("auth-documento-solo-espanol")}</Alerta>}
-        {children}
-      </div>
+    <TarjetaAuth ancho="documento" titulo={titulo}>
+      {avisarSoloEspanol(locale) ? <Alerta tono="info">{t("auth-documento-solo-espanol")}</Alerta> : null}
+      <p className="text-cuerpo text-muted-foreground leading-relaxed">{intro}</p>
+      <div className="border-border/60 flex flex-col gap-6 border-t pt-6">{children}</div>
     </TarjetaAuth>
   );
 }
