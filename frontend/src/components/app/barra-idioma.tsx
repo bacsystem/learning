@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/menu";
 import type { LocaleOption } from "@/constants";
 import { setClientLocale } from "@/i18n/locale";
+import { useAuth } from "@/lib/auth/auth-context";
+import { guardarIdiomaDelUsuario } from "@/lib/auth/idioma";
 import { TranslateIcon } from "@phosphor-icons/react";
 
 const IDIOMAS: LocaleOption[] = ["es", "en"];
@@ -26,12 +28,14 @@ export function BarraIdioma() {
   const t = useTranslations("dashboard");
   const locale = useLocale();
   const router = useRouter();
+  const { token } = useAuth();
   const [pendiente, startTransition] = useTransition();
 
   const cambiar = (valor: LocaleOption) => {
     if (valor === locale) return;
     startTransition(async () => {
       await setClientLocale(valor);
+      guardarIdiomaDelUsuario(token, valor);
       router.refresh();
     });
   };

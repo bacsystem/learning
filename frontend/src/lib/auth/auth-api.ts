@@ -105,6 +105,11 @@ export const authApi = {
     });
   },
 
+  /** Saves the UI language in the profile (docs/api/plataforma-avisos-idioma.md §1.3). */
+  setIdioma(token: string, idioma: LocaleOption): Promise<{ idioma: LocaleOption }> {
+    return request("/auth/idioma", { method: "PUT", headers: authHeader(token), body: JSON.stringify({ idioma }) });
+  },
+
   logout(token: string): Promise<{ message: string }> {
     return request("/auth/logout", {
       method: "POST",
