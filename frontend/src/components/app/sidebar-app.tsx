@@ -6,11 +6,10 @@ import { useState } from "react";
 
 import { AcercaDe } from "@/components/app/acerca-de";
 import { MarcaSidebar } from "@/components/app/marca";
-import { ICONO_PERFIL, NAVEGACION } from "@/components/app/navegacion";
+import { gruposDelSidebar, ICONO_PERFIL } from "@/components/app/navegacion";
 import { useTextosMenuUsuario, useTextosNav } from "@/components/app/use-textos-khipu";
 import { MenuUsuario } from "@/components/nav/menu-usuario";
 import { SidebarContent } from "@/components/nav/sidebar";
-import type { GrupoNav } from "@/components/nav/sidebar-nav";
 import { useAuth } from "@/lib/auth/auth-context";
 import { InfoIcon } from "@phosphor-icons/react";
 
@@ -24,12 +23,7 @@ export function SidebarApp() {
   const [acercaDe, setAcercaDe] = useState(false);
   const esAdmin = user?.rol === "admin";
 
-  const grupos: GrupoNav[] = NAVEGACION.filter((g) => !g.soloAdmin || esAdmin).map((g) => ({
-    id: g.id,
-    colapsable: g.colapsable,
-    titulo: t(g.titulo),
-    items: g.items.map((i) => ({ href: i.href, label: t(i.etiqueta), icon: i.icono, exacto: i.exacto })),
-  }));
+  const grupos = gruposDelSidebar(esAdmin, t);
 
   const nombre = [user?.nombres, user?.apellido_paterno].filter(Boolean).join(" ") || undefined;
 

@@ -1,6 +1,6 @@
 import en from "../../i18n/messages/en.json";
 import es from "../../i18n/messages/es.json";
-import { NAVEGACION, RUTAS_EXTRA } from "./navegacion";
+import { gruposDelSidebar, NAVEGACION, RUTAS_EXTRA } from "./navegacion";
 import { describe, expect, it } from "vitest";
 
 const gruposAdmin = NAVEGACION.filter((g) => g.soloAdmin);
@@ -50,5 +50,37 @@ describe("navegacion del administrador", () => {
       expect(tieneClave(es.dashboard, clave), `es ${clave}`).toBe(true);
       expect(tieneClave(en.dashboard, clave), `en ${clave}`).toBe(true);
     }
+  });
+});
+
+describe("gruposDelSidebar", () => {
+  const t = (clave: string) => `t:${clave}`;
+
+  it("passes id and collapsible to the sidebar for the admin groups and not for the study block", () => {
+    const grupos = gruposDelSidebar(true, t);
+    expect(grupos).toHaveLength(NAVEGACION.length);
+    for (const [i, grupo] of grupos.entries()) {
+      expect(grupo.id).toBe(NAVEGACION[i].id);
+      expect(grupo.colapsable).toBe(NAVEGACION[i].colapsable);
+    }
+    expect(grupos.filter((g) => g.colapsable).map((g) => g.id)).toEqual([
+      "personas",
+      "contenido",
+      "catalogos",
+      "sistema",
+    ]);
+  });
+
+  it("hides the admin groups from who is not admin", () => {
+    const grupos = gruposDelSidebar(false, t);
+    expect(grupos).toHaveLength(NAVEGACION.filter((g) => !g.soloAdmin).length);
+    expect(grupos.some((g) => g.colapsable)).toBe(false);
+  });
+
+  it("translates titles and labels and keeps href and exact match", () => {
+    const grupos = gruposDelSidebar(true, t);
+    const configuracion = grupos.flatMap((g) => g.items).find((i) => i.href === "/admin/configuracion");
+    expect(configuracion).toMatchObject({ label: "t:menu-admin-configuracion", exacto: true });
+    expect(grupos[0].titulo).toBe(`t:${NAVEGACION[0].titulo}`);
   });
 });

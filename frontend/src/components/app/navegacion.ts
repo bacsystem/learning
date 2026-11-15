@@ -1,3 +1,4 @@
+import type { GrupoNav } from "@/components/nav/sidebar-nav";
 import type { IconoComponente } from "@/lib/iconos";
 import {
   BellIcon,
@@ -129,6 +130,22 @@ export const NAVEGACION: GrupoDestinos[] = [
     ],
   },
 ];
+
+/** Grupos del sidebar para el rol dado: los de `soloAdmin` se ocultan a quien no es admin y los títulos y etiquetas se traducen con `t`. */
+export function gruposDelSidebar(
+  esAdmin: boolean,
+  t: (clave: string) => string,
+  grupos: GrupoDestinos[] = NAVEGACION,
+): GrupoNav[] {
+  return grupos
+    .filter((g) => !g.soloAdmin || esAdmin)
+    .map((g) => ({
+      id: g.id,
+      colapsable: g.colapsable,
+      titulo: t(g.titulo),
+      items: g.items.map((i) => ({ href: i.href, label: t(i.etiqueta), icon: i.icono, exacto: i.exacto })),
+    }));
+}
 
 /** Rutas sin ítem propio en el sidebar, para la miga de la barra superior. */
 export const RUTAS_EXTRA: { prefijo: string; seccion: string; pagina: string }[] = [
