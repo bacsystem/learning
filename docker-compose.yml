@@ -64,6 +64,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-}
+      # Vacío = el del código (contact@bacsystemsolutions.com). Mismo valor que NEXT_PUBLIC_CONTACT_EMAIL.
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
       # Vacío = nivel por defecto según ENV (debug en development, info en el resto).
       LOG_LEVEL: ${LOG_LEVEL:-}
       # Espera máxima por el advisory lock de migraciones (entrypoint.sh, cmd/migrate).

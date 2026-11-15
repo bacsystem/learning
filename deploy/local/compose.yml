@@ -70,6 +70,8 @@ services:
       CORS_ORIGINS: http://localhost:3110
       FRONTEND_BASE_URL: http://localhost:3110
       TRUSTED_PROXIES: ""
+      # Vacío = el del código (mismo valor que NEXT_PUBLIC_CONTACT_EMAIL).
+      CONTACT_EMAIL: ""
       LOG_LEVEL: info
       MIGRATE_LOCK_TIMEOUT: 10m
       SMTP_HOST: mailpit
