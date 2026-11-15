@@ -2060,6 +2060,12 @@
       }
     },
     "menu-admin-ia": "AI",
+    "acceso-proceso-institucion-no-permitida": "This process belongs to another institution. Choose a process from your institution.",
+    "acceso-proceso-nivel-no-permitido": "This process does not match your level. Choose a process for your level.",
+    "acceso-proceso-inscripcion-requerida": "You need an approved enrollment in this process. Enroll in Processes and wait for approval.",
+    "acceso-proceso-ya-inscrito": "You already have a pending or approved enrollment in this process. Check its status in Processes.",
+    "acceso-proceso-sin-monto": "This process does not have its enrollment fee set yet. Try again later or contact the administrator.",
+    "acceso-proceso-no-encontrado": "This process is no longer available. Refresh the list and try another process.",
     "barra-superior-abrir-menu": "Open menu",
     "barra-superior-ubicacion": "Location"
   }

@@ -17,8 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
+import { claveErrorApi } from "@/lib/errores-api";
 import { AYUDA_CAMPO, BOTON_PRIMARIO, CONTENEDOR_PAGINA, ETIQUETA_CAMPO, TARJETA } from "@/lib/estilos";
 import { inscripcionesApi } from "@/lib/inscripciones/api";
+import { ERROR_CREAR_PRACTICA } from "@/lib/inscripciones/errores";
 import { MAX_PREGUNTAS_PRACTICA, practicasApi } from "@/lib/practices/api";
 import { cn } from "@/lib/utils";
 import {
@@ -158,13 +160,9 @@ export default function NuevaPracticaPage() {
       const err = e as { status?: number; practica_id?: number };
       if (err.status === 409 && err.practica_id) {
         setConflictDialog({ open: true, practicaId: err.practica_id });
-      } else if (err.status === 403) {
-        setError(t("practicas-error-sin-acceso"));
-      } else if (err.status === 422) {
-        setError(t("practicas-error-preguntas"));
       } else {
-        // H33: always the translated key (the server message is Spanish-only).
-        setError(t("practicas-error-crear"));
+        // H33: always a translated key (the server message is Spanish-only).
+        setError(t(claveErrorApi(e, ERROR_CREAR_PRACTICA)));
       }
     } finally {
       setLoading(false);

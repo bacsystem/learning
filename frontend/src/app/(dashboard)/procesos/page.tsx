@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
 import { Inscripcion, inscripcionesApi, Proceso } from "@/lib/inscripciones/api";
+import { ERROR_INSCRIBIR } from "@/lib/inscripciones/errores";
 import { cn } from "@/lib/utils";
 import { CheckSquareIcon, ClockIcon, GraduationCapIcon, ListChecksIcon, XIcon } from "@phosphor-icons/react";
 
@@ -129,7 +130,7 @@ export default function Page() {
       setConfirm(null);
       load();
     } catch (e: unknown) {
-      setError(t(claveErrorApi(e, { generico: "procesos-error-inscribir" })));
+      setError(t(claveErrorApi(e, ERROR_INSCRIBIR)));
       setConfirm(null);
     } finally {
       setSubmitting(false);

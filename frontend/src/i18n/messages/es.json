@@ -2060,6 +2060,12 @@
       }
     },
     "menu-admin-ia": "IA",
+    "acceso-proceso-institucion-no-permitida": "Este proceso pertenece a otra institución. Elige un proceso de tu institución.",
+    "acceso-proceso-nivel-no-permitido": "Este proceso no corresponde a tu nivel. Elige un proceso para tu nivel.",
+    "acceso-proceso-inscripcion-requerida": "Necesitas una inscripción aprobada en este proceso. Inscríbete en Procesos y espera la aprobación.",
+    "acceso-proceso-ya-inscrito": "Ya tienes una inscripción pendiente o aprobada en este proceso. Revisa su estado en Procesos.",
+    "acceso-proceso-sin-monto": "Este proceso aún no tiene el monto de inscripción configurado. Inténtalo más tarde o contacta al administrador.",
+    "acceso-proceso-no-encontrado": "Este proceso ya no está disponible. Actualiza la lista e inténtalo con otro proceso.",
     "barra-superior-abrir-menu": "Abrir menú",
     "barra-superior-ubicacion": "Ubicación"
   }
