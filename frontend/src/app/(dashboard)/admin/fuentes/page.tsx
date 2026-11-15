@@ -19,10 +19,10 @@ import { SelectCampo } from "@/components/formularios/select-campo";
 import { CONTENEDOR_TABLA } from "@/components/patrones/pie-tabla";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCarga } from "@/hooks/use-carga";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useSondeo } from "@/hooks/use-sondeo";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_PRINCIPAL, CABECERA_TABLA, CONTENEDOR_PAGINA } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import {
   type EstadoFuente,
   type FuenteListQuery,
@@ -41,6 +41,7 @@ const ESPERA_BUSQUEDA_MS = 300;
 export default function FuentesPage() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
   const formato = useFormatter();
   const toast = useToast();
   const router = useRouter();
@@ -236,9 +237,7 @@ export default function FuentesPage() {
                         ) : null}
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground font-mono">
-                      {formatearFechaHora(f.updated_at)}
-                    </TableCell>
+                    <TableCell className="text-muted-foreground font-mono">{fechaHora(f.updated_at)}</TableCell>
                   </TableRow>
                 ))
               )}

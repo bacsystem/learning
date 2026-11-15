@@ -17,10 +17,10 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { GrupoBotones } from "@/components/ui/grupo-botones";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useAuth } from "@/lib/auth/auth-context";
 import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_DESTRUCTIVO, BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import { InscripcionAdmin, inscripcionesApi } from "@/lib/inscripciones/api";
 import { CheckCircleIcon, XCircleIcon, XIcon } from "@phosphor-icons/react";
 
@@ -45,12 +45,15 @@ const ESTADO_CLAVE: Record<string, string> = {
   rechazado: "admin-inscripciones-estado-rechazado",
 };
 
-/** Instante RFC 3339 del servidor → «15 Nov 2026, 00:49» en hora de Lima, como el resto de las pantallas. */
-const fechaVisible = (instante: string | null | undefined) => (instante ? formatearFechaHora(instante) : "");
-
 export default function Page() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
+  // Instante RFC 3339 del servidor → fecha y hora de Lima en el idioma activo, como el resto de las pantallas.
+  const fechaVisible = useCallback(
+    (instante: string | null | undefined) => (instante ? fechaHora(instante) : ""),
+    [fechaHora],
+  );
   const toast = useToast();
   const tipoLabel = useCallback((tipo: string) => (TIPO_CLAVE[tipo] ? t(TIPO_CLAVE[tipo]) : tipo), [t]);
   const estadoLabel = useCallback((estado: string) => (ESTADO_CLAVE[estado] ? t(ESTADO_CLAVE[estado]) : estado), [t]);
@@ -240,7 +243,7 @@ export default function Page() {
           ),
       },
     ],
-    [openDialog, t, estadoLabel, tipoLabel],
+    [openDialog, t, estadoLabel, tipoLabel, fechaVisible],
   );
 
   const contar = (v: TabVal) => (v === "todos" ? allRows.length : allRows.filter((r) => r.estado === v).length);

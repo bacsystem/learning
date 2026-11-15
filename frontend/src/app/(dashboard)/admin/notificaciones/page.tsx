@@ -15,6 +15,7 @@ import { CabeceraDialogo, PieDialogo } from "@/components/patrones/cabecera-dial
 import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { Chip } from "@/components/patrones/pill-estado";
 import { Dialog } from "@/components/ui/dialog";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useAuth } from "@/lib/auth/auth-context";
 import { claveErrorApi } from "@/lib/errores-api";
 import {
@@ -25,7 +26,6 @@ import {
   CONTENEDOR_PAGINA,
   TARJETA,
 } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import type { IconoComponente } from "@/lib/iconos";
 import {
   CreateNotificacionPayload,
@@ -94,6 +94,7 @@ function PillTipo({ tipo, etiqueta }: { tipo: NotifTipo; etiqueta: string }) {
 export default function AdminNotificacionesPage() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
   const toast = useToast();
   const [rows, setRows] = useState<Notificacion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -218,9 +219,9 @@ export default function AdminNotificacionesPage() {
         titulo: t("admin-notif-col-enviada"),
         ordenable: true,
         className: "tabular-nums text-muted-foreground",
-        texto: (r) => (r.created_at ? formatearFechaHora(r.created_at) : ""),
+        texto: (r) => (r.created_at ? fechaHora(r.created_at) : ""),
         valor: (r) => r.created_at,
-        render: (r) => (r.created_at ? formatearFechaHora(r.created_at) : ""),
+        render: (r) => (r.created_at ? fechaHora(r.created_at) : ""),
       },
       {
         id: "acciones",
@@ -239,7 +240,7 @@ export default function AdminNotificacionesPage() {
         ),
       },
     ],
-    [openConfirm, t, tipoLabel, destinatarioLabel],
+    [openConfirm, t, tipoLabel, destinatarioLabel, fechaHora],
   );
 
   return (

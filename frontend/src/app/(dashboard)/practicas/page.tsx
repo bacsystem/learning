@@ -16,10 +16,10 @@ import { PillEstado } from "@/components/patrones/pill-estado";
 import { Button } from "@/components/ui/button";
 import { Menu, MenuContent, MenuGroup, MenuGroupLabel, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CABECERA_TABLA, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { type ColumnaExportable, descargarCsv, imprimirTabla } from "@/lib/exportar";
-import { formatearFechaHora } from "@/lib/formato";
 import { POR_PAGINA_DEFECTO } from "@/lib/paginacion";
 import { HistorialItem, MAX_ELIMINAR_PRACTICAS, practicasApi } from "@/lib/practices/api";
 import { cn } from "@/lib/utils";
@@ -98,6 +98,7 @@ type Columna = {
 
 export default function PracticasPage() {
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
   const { token } = useAuth();
   const router = useRouter();
 
@@ -235,8 +236,8 @@ export default function PracticasPage() {
       {
         id: "fecha",
         titulo: t("practicas-fecha"),
-        render: (f) => <span className="whitespace-nowrap tabular-nums">{formatearFechaHora(f.fecha)}</span>,
-        texto: (f) => formatearFechaHora(f.fecha),
+        render: (f) => <span className="whitespace-nowrap tabular-nums">{fechaHora(f.fecha)}</span>,
+        texto: (f) => fechaHora(f.fecha),
         orden: (f) => f.fecha,
       },
       {
@@ -249,7 +250,7 @@ export default function PracticasPage() {
         orden: (f) => f.estado,
       },
     ],
-    [t],
+    [t, fechaHora],
   );
 
   const visibles = columnas.filter((c) => !ocultas.includes(c.id));

@@ -1,8 +1,10 @@
 /**
  * Aritmética de fechas para el calendario de `EntradaFecha`. Todo es ISO `YYYY-MM-DD` en hora local: una fecha de
  * calendario no tiene zona horaria, y construirla con `new Date("2026-09-01")` (UTC) la corría un día en Lima.
- * Sin dependencias: lo usan los componentes y los tests de node.
+ * Sin dependencias de ejecución (solo un tipo de `lib/formato`): lo usan los componentes y los tests de node.
  */
+
+import type { LocaleFecha } from "@/lib/formato";
 
 export type DiaCalendario = { iso: string; dia: number; delMes: boolean };
 
@@ -22,6 +24,21 @@ const MESES = [
   "Diciembre",
 ];
 
+const MESES_EN = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 /** Encabezados de columna, semana de lunes a domingo. */
 export const DIAS_SEMANA = [
   { corto: "L", largo: "lunes" },
@@ -31,6 +48,16 @@ export const DIAS_SEMANA = [
   { corto: "V", largo: "viernes" },
   { corto: "S", largo: "sábado" },
   { corto: "D", largo: "domingo" },
+];
+
+export const DIAS_SEMANA_EN = [
+  { corto: "M", largo: "Monday" },
+  { corto: "T", largo: "Tuesday" },
+  { corto: "W", largo: "Wednesday" },
+  { corto: "T", largo: "Thursday" },
+  { corto: "F", largo: "Friday" },
+  { corto: "S", largo: "Saturday" },
+  { corto: "S", largo: "Sunday" },
 ];
 
 const dosCifras = (n: number) => String(n).padStart(2, "0");
@@ -74,9 +101,12 @@ export function dentroDeRango(iso: string, min?: string, max?: string): boolean 
   return (!min || iso >= min) && (!max || iso <= max);
 }
 
-/** «Setiembre 2026». `mes` empieza en 0. */
-export function nombreMes(anio: number, mes: number): string {
-  return `${MESES[mes]} ${anio}`;
+const MESES_POR_LOCALE: Record<LocaleFecha, readonly string[]> = { es: MESES, en: MESES_EN };
+
+/** «Setiembre 2026» (`es`) o «September 2026» (`en`); otro idioma cae en castellano. `mes` empieza en 0. */
+export function nombreMes(anio: number, mes: number, locale: LocaleFecha = "es"): string {
+  const meses = Object.hasOwn(MESES_POR_LOCALE, locale) ? MESES_POR_LOCALE[locale] : MESES;
+  return `${meses[mes]} ${anio}`;
 }
 
 /** Seis semanas (lunes a domingo) que contienen el mes; los días de los meses vecinos van con `delMes: false`. */

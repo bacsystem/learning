@@ -8,8 +8,8 @@ import { Campo } from "@/components/app/campo";
 import { Alerta } from "@/components/feedback/alerta";
 import { Entrada } from "@/components/formularios/campo";
 import { BotonAsync } from "@/components/patrones/boton-async";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { BOTON_PRIMARIO, TARJETA } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import type { CambioConfiguracionIa, ConfiguracionIa } from "@/lib/serums-ia/ia/api";
 import { claveErrorIa } from "@/lib/serums-ia/ia/errores";
 import {
@@ -35,6 +35,7 @@ export function FormularioLimites({
   onGuardar: (cambio: CambioConfiguracionIa) => Promise<void>;
 }) {
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
 
   const validationSchema = useMemo(
@@ -122,7 +123,7 @@ export function FormularioLimites({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-etiqueta text-muted-foreground">
           {t("serumsIa.ia.configuracion.actualizada", {
-            fecha: formatearFechaHora(configuracion.updated_at),
+            fecha: fechaHora(configuracion.updated_at),
           })}
         </p>
         <BotonAsync

@@ -20,12 +20,12 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTitle } from "@/components/ui/dialog";
 import { GrupoBotones } from "@/components/ui/grupo-botones";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { ERRORES_CORREO_USUARIO } from "@/lib/admin/errores-usuario";
 import { excede, LIMITES } from "@/lib/admin/limites";
 import { useAuth } from "@/lib/auth/auth-context";
 import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_DESTRUCTIVO, BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA } from "@/lib/estilos";
-import { formatearFecha, formatearFechaHora } from "@/lib/formato";
 import { inscripcionesApi, SesionHistorialItem, UsuarioPendiente } from "@/lib/inscripciones/api";
 import { cn } from "@/lib/utils";
 import {
@@ -74,6 +74,7 @@ function FichaUsuario({ usuario }: { usuario: UsuarioPendiente }) {
 export default function Page() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fecha, fechaHora } = useFormatoFecha();
   const toast = useToast();
   const router = useRouter();
   /** Etiqueta traducida de un estado de cuenta; si el backend manda uno desconocido, se muestra tal cual. */
@@ -269,8 +270,8 @@ export default function Page() {
         titulo: t("admin-usuarios-col-fecha-registro"),
         ordenable: true,
         className: "whitespace-nowrap tabular-nums",
-        render: (r) => formatearFecha(r.fecha_solicitud),
-        texto: (r) => formatearFecha(r.fecha_solicitud),
+        render: (r) => fecha(r.fecha_solicitud),
+        texto: (r) => fecha(r.fecha_solicitud),
       },
       {
         id: "estado",
@@ -538,11 +539,11 @@ export default function Page() {
                 datos={[
                   {
                     etiqueta: t("admin-usuarios-ultimo-acceso"),
-                    valor: <span className="tabular-nums">{formatearFechaHora(sesion.last_seen_at)}</span>,
+                    valor: <span className="tabular-nums">{fechaHora(sesion.last_seen_at)}</span>,
                   },
                   {
                     etiqueta: t("admin-usuarios-inicio-sesion"),
-                    valor: <span className="tabular-nums">{formatearFechaHora(sesion.created_at)}</span>,
+                    valor: <span className="tabular-nums">{fechaHora(sesion.created_at)}</span>,
                   },
                   { etiqueta: t("admin-usuarios-ip"), valor: sesion.ip || "—", mono: true },
                   {

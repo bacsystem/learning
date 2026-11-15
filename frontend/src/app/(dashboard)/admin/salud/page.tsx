@@ -8,9 +8,9 @@ import { useTranslations } from "next-intl";
 import { Alerta } from "@/components/feedback/alerta";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { Chip } from "@/components/patrones/pill-estado";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_SECUNDARIA, AYUDA_CAMPO, CONTENEDOR_PAGINA, ROTULO } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import { PESO_ICONO_FUNCIONAL } from "@/lib/iconos";
 import { REFRESCO_SALUD_MS, versionBackend, versionesDistintas } from "@/lib/salud/reglas";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
@@ -22,10 +22,10 @@ const MS_POR_SEGUNDO = 1000;
 export default function SaludServiciosPage() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaHora: hora } = useFormatoFecha();
   const { salud, fase, enCurso, actualizar } = useSalud(token);
 
   const desactualizado = fase === "desactualizado";
-  const hora = formatearFechaHora;
 
   return (
     <div className={CONTENEDOR_PAGINA}>

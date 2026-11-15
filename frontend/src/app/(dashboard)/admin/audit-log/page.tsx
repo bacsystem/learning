@@ -13,11 +13,11 @@ import { CABECERA_TABLA, CONTENEDOR_TABLA, CONTROL_FILTRO, FilaVacia } from "@/c
 import { Chip } from "@/components/patrones/pill-estado";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { adminGetAuditLog, type AuditLogItem } from "@/lib/admin/api";
 import { useAuth } from "@/lib/auth/auth-context";
 import { claveErrorApi } from "@/lib/errores-api";
 import { ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import { ArrowClockwiseIcon, ListMagnifyingGlassIcon, XIcon } from "@phosphor-icons/react";
 
@@ -37,6 +37,7 @@ const COLUMNAS: { id: string; clave: string; className?: string }[] = [
 export default function AuditLogPage() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { fechaHora, locale } = useFormatoFecha();
 
   const [rows, setRows] = useState<AuditLogItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -145,6 +146,7 @@ export default function AuditLogPage() {
         </label>
         <EntradaFecha
           id="audit-desde"
+          locale={locale}
           enBarra
           limpiable
           placeholder={t("admin-audit-desde")}
@@ -161,6 +163,7 @@ export default function AuditLogPage() {
         </label>
         <EntradaFecha
           id="audit-hasta"
+          locale={locale}
           enBarra
           limpiable
           placeholder={t("admin-audit-hasta")}
@@ -230,7 +233,7 @@ export default function AuditLogPage() {
                       {r.ip || "—"}
                     </TableCell>
                     <TableCell className="px-3 py-2 whitespace-nowrap tabular-nums">
-                      {r.created_at ? formatearFechaHora(r.created_at) : "—"}
+                      {r.created_at ? fechaHora(r.created_at) : "—"}
                     </TableCell>
                     <TableCell className="py-2 pr-4 pl-3">
                       {r.detalle ? (

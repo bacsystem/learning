@@ -19,6 +19,7 @@ import { CabeceraSeccion } from "@/components/patrones/cabecera-seccion";
 import { FilaMetricas, Metrica } from "@/components/patrones/metricas";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import {
   adminGetIngresos,
   adminGetIngresosConfig,
@@ -30,7 +31,7 @@ import {
 import { useAuth } from "@/lib/auth/auth-context";
 import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
-import { formatearFecha, formatearMonto } from "@/lib/formato";
+import { formatearMonto } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import {
   CalendarIcon,
@@ -48,12 +49,10 @@ const soles = (v: number) => formatearMonto("PEN", v);
 // Mismo patrón que montoRe en backend/internal/admin/handler.go: DECIMAL(10,2), 0 … 99999999.99, sin signo ni exponente.
 const MONTO_RE = /^(0|[1-9][0-9]{0,7})(\.[0-9]{1,2})?$/;
 
-/** "2026-03" → "Mar 2026" (formatearFecha da "1 Mar 2026"; se quita el día). */
-const etiquetaMes = (mes: string) => formatearFecha(`${mes}-01`).replace(/^\d+ /, "");
-
 export default function IngresosPage() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const { mesAnio } = useFormatoFecha();
   const toast = useToast();
 
   const [data, setData] = useState<IngresosData | null>(null);
@@ -131,7 +130,7 @@ export default function IngresosPage() {
     }
   };
 
-  const monthLabels = (data?.serie_mensual ?? []).map((m) => etiquetaMes(m.mes));
+  const monthLabels = (data?.serie_mensual ?? []).map((m) => mesAnio(m.mes));
   // Charting needs numbers; the displayed totals stay exact decimal strings.
   const monthAmounts = (data?.serie_mensual ?? []).map((m) => Number(m.total));
   // The series is zero-filled (H142): twelve empty months are still "no data".

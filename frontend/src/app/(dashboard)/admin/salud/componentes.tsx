@@ -8,8 +8,8 @@ import { Skeleton } from "@/components/feedback/skeleton";
 import type { Tono } from "@/components/patrones/metricas";
 import { PillEstado } from "@/components/patrones/pill-estado";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { AYUDA_CAMPO } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import type { IconoComponente } from "@/lib/iconos";
 import {
   type CategoriaFallo,
@@ -87,10 +87,10 @@ function TarjetaBase({
 
 function useDatosServicio(servicio: ServicioSalud): DatoLista[] {
   const t = useTranslations("dashboard");
+  const { fechaHora } = useFormatoFecha();
   const formato = useFormatter();
   const numero = (n: number | null, clave?: string) =>
     n === null ? SIN_DATO : clave ? t(clave, { valor: n }) : formato.number(n);
-  const fechaHora = formatearFechaHora;
   /** `claveNunca`: «Nunca» para el correo, «Ninguna» para la copia. */
   const textoMomento = (momento: Momento, claveNunca: string) => {
     switch (momento.tipo) {

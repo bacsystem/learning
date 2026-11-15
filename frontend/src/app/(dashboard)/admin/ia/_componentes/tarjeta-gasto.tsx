@@ -7,8 +7,8 @@ import { ProgresoLineal, type TonoProgreso } from "@/components/feedback/progres
 import { FilaMetricas, Metrica } from "@/components/patrones/metricas";
 import { CONTENEDOR_TABLA, FilaVacia } from "@/components/patrones/pie-tabla";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFormatoFecha } from "@/hooks/use-formato-fecha";
 import { CABECERA_TABLA, TARJETA } from "@/lib/estilos";
-import { formatearFechaHora } from "@/lib/formato";
 import type { GastoIa } from "@/lib/serums-ia/ia/api";
 import { type EstadoGasto, estadoGasto, porcentajeBarra } from "@/lib/serums-ia/ia/reglas";
 import { cn } from "@/lib/utils";
@@ -20,11 +20,11 @@ const TONO_ALERTA = { normal: "ok", alerta: "aviso", agotado: "error" } as const
 /** Gasto del mes en curso: presupuesto, avance, estado de la alerta del 80 % y detalle por operación (sin cifras por usuario). */
 export function TarjetaGasto({ gasto }: { gasto: GastoIa }) {
   const t = useTranslations("dashboard");
+  const { fechaHora: fecha } = useFormatoFecha();
   const formato = useFormatter();
   // Con el formato del idioma activo, como el resto de las cifras de esta pantalla.
   const dolares = (v: number) => formato.number(v, { style: "currency", currency: "USD" });
   const estado = estadoGasto(gasto);
-  const fecha = formatearFechaHora;
   // El mes llega como `AAAA-MM`; se ancla a mediodía de Lima para que la zona no lo corra de mes.
   const mes = formato.dateTime(new Date(`${gasto.mes}-01T12:00:00-05:00`), {
     month: "long",
