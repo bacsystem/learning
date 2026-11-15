@@ -27,7 +27,7 @@ import {
   contenidoDePregunta,
   editarContenidoLaRetira,
 } from "@/lib/questions/estados";
-import { type ErroresPregunta, validarPregunta } from "@/lib/questions/pregunta";
+import { armarRetroalimentacion, type ErroresPregunta, validarPregunta } from "@/lib/questions/pregunta";
 
 /** Renumbers orden after a move/removal; ids stay attached to their text. */
 const renumber = (rows: RespuestaRow[]) => rows.map((r, i) => ({ ...r, orden: i + 1 }));
@@ -92,6 +92,7 @@ export default function EditPreguntaPage() {
   const [confirmarRevision, setConfirmarRevision] = useState(false);
   const mensajesValidacion = useMensajesValidacionPregunta();
   const [intentosEnvio, setIntentosEnvio] = useState(0);
+  const [rechazos, setRechazos] = useState(0);
   // Tras el primer envío los errores se recalculan en cada cambio (también al mover o quitar alternativas, que cambian los índices).
   const valoresValidables = {
     proceso_id: 1,
@@ -226,7 +227,10 @@ export default function EditPreguntaPage() {
     if (!pregunta) return;
     setIntentosEnvio((n) => n + 1);
     // `errores` aún es el del render anterior (vacío en el primer envío): se valida con los valores actuales.
-    if (Object.keys(validarPregunta(valoresValidables, mensajesValidacion, false)).length > 0) return;
+    if (Object.keys(validarPregunta(valoresValidables, mensajesValidacion, false)).length > 0) {
+      setRechazos((n) => n + 1);
+      return;
+    }
     const editado = {
       enunciado,
       tipo,
@@ -262,9 +266,7 @@ export default function EditPreguntaPage() {
         es_correcta: r.es_correcta,
         orden: r.orden,
       })),
-      retroalimentacion: retroExplicacion.trim()
-        ? { explicacion: retroExplicacion.trim(), referencia: retroReferencia.trim() || null }
-        : null,
+      retroalimentacion: armarRetroalimentacion(retroExplicacion, retroReferencia),
     };
 
     try {
@@ -386,7 +388,7 @@ export default function EditPreguntaPage() {
         retroMinimo
         error={error}
         errores={errores}
-        intentosEnvio={intentosEnvio}
+        rechazosDeValidacion={rechazos}
         enviando={submitting}
         textoEnviar={t("admin-actualizar-pregunta")}
         textoEnviando={t("comun-guardando")}

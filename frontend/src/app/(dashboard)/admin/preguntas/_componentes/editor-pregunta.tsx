@@ -114,7 +114,7 @@ export function EditorPregunta({
   retroMinimo,
   error,
   errores = {},
-  intentosEnvio = 0,
+  rechazosDeValidacion = 0,
   enviando,
   textoEnviar,
   textoEnviando,
@@ -157,8 +157,8 @@ export function EditorPregunta({
   error: string | null;
   /** Errores de validación por campo (ver `validarPregunta`); el formulario no usa la validación nativa del navegador. */
   errores?: ErroresPregunta;
-  /** Cuenta los envíos: cada uno que deja errores lleva el foco al primer campo inválido. */
-  intentosEnvio?: number;
+  /** Cuenta los envíos que la validación rechazó: cada uno lleva el foco al primer campo inválido. */
+  rechazosDeValidacion?: number;
   enviando: boolean;
   textoEnviar: string;
   textoEnviando: string;
@@ -184,15 +184,11 @@ export function EditorPregunta({
     alertaRef.current?.scrollIntoView({ behavior: sinMovimiento ? "auto" : "smooth", block: "start" });
   }, [error]);
   const formRef = useRef<HTMLFormElement>(null);
-  // Con errores de validación tras un envío, el foco va al primer campo inválido.
-  // En el primer envío los errores llegan después del contador: se espera a que estén pintados y se enfoca una vez por envío.
-  const hayErrores = Object.keys(errores).length > 0;
-  const envioEnfocado = useRef(0);
+  // Cada envío rechazado por la validación lleva el foco al primer campo inválido (ya pintado cuando corre el efecto).
   useEffect(() => {
-    if (intentosEnvio === 0 || !hayErrores || envioEnfocado.current === intentosEnvio) return;
-    envioEnfocado.current = intentosEnvio;
+    if (rechazosDeValidacion === 0) return;
     formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
-  }, [intentosEnvio, hayErrores]);
+  }, [rechazosDeValidacion]);
   // En edición el proceso es fijo: cuenta como elegido.
   const procesoID = proceso.modo === "elegir" ? proceso.valor : 1;
   const correctas = respuestas.filter((r) => r.es_correcta).length;

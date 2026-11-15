@@ -11,7 +11,7 @@ import { useMensajesValidacionPregunta } from "../_componentes/use-mensajes-vali
 import { useFormik } from "formik";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { useToast } from "@/components/feedback/toast";
 import { CabeceraPagina, EnlaceVolver } from "@/components/patrones/cabecera-pagina";
@@ -19,7 +19,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, Especialidad, Grado, Proceso, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
 import { CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { CreateRespuestaPayload, Etiqueta, questionsApi } from "@/lib/questions/api";
-import { validarPregunta } from "@/lib/questions/pregunta";
+import { armarRetroalimentacion, validarPregunta } from "@/lib/questions/pregunta";
 
 interface ValoresNuevaPregunta {
   proceso_id: number;
@@ -91,9 +91,7 @@ export default function NuevaPreguntaPage() {
           dificultad: valores.dificultad,
           etiqueta_ids: valores.etiqueta_ids,
           respuestas,
-          retroalimentacion: valores.retro_explicacion.trim()
-            ? { explicacion: valores.retro_explicacion.trim(), referencia: valores.retro_referencia.trim() || null }
-            : null,
+          retroalimentacion: armarRetroalimentacion(valores.retro_explicacion, valores.retro_referencia),
         });
         // P1 (SIA-E3-02): toda pregunta nueva nace en borrador y no se sirve hasta aprobarla.
         toast.ok(t("serumsIa.avisosPregunta.creadaBorrador"));
@@ -106,7 +104,15 @@ export default function NuevaPreguntaPage() {
       }
     },
   });
-  const { values, setFieldValue } = formik;
+  const { values, setFieldValue, setValues } = formik;
+  const [rechazos, setRechazos] = useState(0);
+  // Se valida antes de enviar para saber si el envío es rechazado y llevar el foco al primer campo inválido.
+  const enviar = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const invalidos = await formik.validateForm();
+    if (Object.keys(invalidos).length > 0) setRechazos((n) => n + 1);
+    formik.handleSubmit();
+  };
   const procesoID = values.proceso_id;
   const asignaturaID = values.asignatura_id;
   // Los errores se muestran desde el primer envío; antes, el formulario no regaña a quien aún no terminó de escribir.
@@ -208,17 +214,14 @@ export default function NuevaPreguntaPage() {
           opciones: procesos,
           onCambio: (id) => {
             // H19: una asignatura o etiqueta de otro proceso ya no es válida.
-            setFieldValue("proceso_id", id);
-            setFieldValue("asignatura_id", 0);
-            setFieldValue("etiqueta_ids", []);
+            void setValues({ ...values, proceso_id: id, asignatura_id: 0, etiqueta_ids: [] });
           },
         }}
         asignaturas={asignaturas}
         asignaturaID={asignaturaID}
         onAsignatura={(id) => {
           // H19: las etiquetas pertenecen a la asignatura.
-          setFieldValue("asignatura_id", id);
-          setFieldValue("etiqueta_ids", []);
+          void setValues({ ...values, asignatura_id: id, etiqueta_ids: [] });
         }}
         grados={grados}
         gradoID={values.grado_id}
@@ -255,12 +258,12 @@ export default function NuevaPreguntaPage() {
         retroMinimo
         error={error}
         errores={errores as Record<string, string>}
-        intentosEnvio={formik.submitCount}
+        rechazosDeValidacion={rechazos}
         enviando={formik.isSubmitting || redirigiendo}
         textoEnviar={t("admin-crear-pregunta")}
         textoEnviando={t("comun-guardando")}
         onCancelar={() => router.push("/admin/preguntas")}
-        onEnviar={formik.handleSubmit}
+        onEnviar={enviar}
       />
     </div>
   );

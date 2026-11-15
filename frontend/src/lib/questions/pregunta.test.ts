@@ -1,4 +1,9 @@
-import { claveErrorRespuesta, validarPregunta, type ValoresValidablesPregunta } from "./pregunta";
+import {
+  armarRetroalimentacion,
+  claveErrorRespuesta,
+  validarPregunta,
+  type ValoresValidablesPregunta,
+} from "./pregunta";
 import { describe, expect, it } from "vitest";
 
 const m = {
@@ -59,5 +64,20 @@ describe("validarPregunta", () => {
 
   it("requires at least two answers", () => {
     expect(validarPregunta({ ...valido, respuestas: [{ texto: "a" }] }, m, true)).toEqual({ respuestas: "RMIN" });
+  });
+});
+
+describe("armarRetroalimentacion", () => {
+  it("trims both texts", () => {
+    expect(armarRetroalimentacion("  Porque sí.  ", " ref ")).toEqual({ explicacion: "Porque sí.", referencia: "ref" });
+  });
+
+  it("sends a null reference when it is blank", () => {
+    expect(armarRetroalimentacion("Texto", "   ")).toEqual({ explicacion: "Texto", referencia: null });
+  });
+
+  it("is null when the explanation is empty or only spaces", () => {
+    expect(armarRetroalimentacion("", "ref")).toBeNull();
+    expect(armarRetroalimentacion("   ", "ref")).toBeNull();
   });
 });

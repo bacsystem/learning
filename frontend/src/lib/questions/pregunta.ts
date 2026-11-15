@@ -83,3 +83,15 @@ export function validarPregunta(
     return errores;
   }
 }
+
+/**
+ * Retroalimentación del cuerpo de la pregunta: explicación y referencia sin espacios en los extremos, y `null` si la
+ * explicación queda vacía (el backend rechaza una explicación de solo espacios).
+ */
+export function armarRetroalimentacion(
+  explicacion: string,
+  referencia: string,
+): { explicacion: string; referencia: string | null } | null {
+  const texto = explicacion.trim();
+  return texto ? { explicacion: texto, referencia: referencia.trim() || null } : null;
+}
