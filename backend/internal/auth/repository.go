@@ -434,9 +434,16 @@ func (r *Repository) ExistsByEmail(ctx context.Context, email string) (bool, err
 	return err == nil, err
 }
 
+// usuarioLoginCols lists the usuarios columns FindByID and FindByUsername read.
+// Never SELECT *: sqlx fails on any column the struct does not map, so a new
+// column (idioma, migration 069) would break the binary that is still running
+// when the migration is applied, and a rollback to it.
+const usuarioLoginCols = `id, persona_id, username, password_hash, rol, estado, login_intentos,
+	bloqueado_hasta, activated_at, activated_by, tour_completado, created_at, updated_at`
+
 func (r *Repository) FindByID(ctx context.Context, id int64) (*usuarioRow, error) {
 	var u usuarioRow
-	err := r.db.GetContext(ctx, &u, `SELECT * FROM usuarios WHERE id=$1`, id)
+	err := r.db.GetContext(ctx, &u, `SELECT `+usuarioLoginCols+` FROM usuarios WHERE id=$1`, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -445,7 +452,7 @@ func (r *Repository) FindByID(ctx context.Context, id int64) (*usuarioRow, error
 
 func (r *Repository) FindByUsername(ctx context.Context, username string) (*usuarioRow, error) {
 	var u usuarioRow
-	err := r.db.GetContext(ctx, &u, `SELECT * FROM usuarios WHERE username=$1`, username)
+	err := r.db.GetContext(ctx, &u, `SELECT `+usuarioLoginCols+` FROM usuarios WHERE username=$1`, username)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
