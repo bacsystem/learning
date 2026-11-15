@@ -1,6 +1,6 @@
 import en from "../../../i18n/messages/en.json";
 import es from "../../../i18n/messages/es.json";
-import { claveErrorBalotario, especialidadesDeError, pideRecargar, valoresDeError } from "./errores";
+import { claveErrorBalotario, esErrorPermanente, especialidadesDeError, pideRecargar, valoresDeError } from "./errores";
 import { describe, expect, it } from "vitest";
 
 const error = (code?: string, detalle?: Record<string, unknown>) =>
@@ -88,5 +88,20 @@ describe("especialidadesDeError", () => {
     expect(especialidadesDeError(error("x", { especialidad_ids: "2" }))).toEqual([]);
     expect(especialidadesDeError(error("x", { especialidad_ids: [2, "3", null] }))).toEqual([2]);
     expect(especialidadesDeError(null)).toEqual([]);
+  });
+});
+
+describe("esErrorPermanente", () => {
+  it("is true for codes that retrying cannot fix", () => {
+    for (const code of ["tipo_fuente_invalido", "fuente_no_activa", "no_encontrado", "limite_preguntas"]) {
+      expect(esErrorPermanente(error(code))).toBe(true);
+    }
+  });
+
+  it("is false for transient, unknown and uncoded errors", () => {
+    expect(esErrorPermanente(error("error_interno"))).toBe(false);
+    expect(esErrorPermanente(error("version_desactualizada"))).toBe(false);
+    expect(esErrorPermanente(error())).toBe(false);
+    expect(esErrorPermanente(new TypeError("Failed to fetch"))).toBe(false);
   });
 });

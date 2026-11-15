@@ -7,9 +7,11 @@ import {
   type RespuestaRow,
   type TipoPregunta,
 } from "../_componentes/editor-pregunta";
+import { useMensajesValidacionPregunta } from "../_componentes/use-mensajes-validacion-pregunta";
+import { useFormik } from "formik";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { useToast } from "@/components/feedback/toast";
 import { CabeceraPagina, EnlaceVolver } from "@/components/patrones/cabecera-pagina";
@@ -17,11 +19,38 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { catalogsApi, Especialidad, Grado, Proceso, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
 import { CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { CreateRespuestaPayload, Etiqueta, questionsApi } from "@/lib/questions/api";
+import { armarRetroalimentacion, validarPregunta } from "@/lib/questions/pregunta";
 
-const DEFAULT_RESPUESTAS: RespuestaRow[] = [
-  { texto: "", es_correcta: false, orden: 1 },
-  { texto: "", es_correcta: false, orden: 2 },
-];
+interface ValoresNuevaPregunta {
+  proceso_id: number;
+  asignatura_id: number;
+  grado_id: number;
+  especialidad_id: number;
+  enunciado: string;
+  tipo: TipoPregunta;
+  dificultad: DificultadPregunta;
+  etiqueta_ids: number[];
+  respuestas: RespuestaRow[];
+  retro_explicacion: string;
+  retro_referencia: string;
+}
+
+const VALORES_INICIALES: ValoresNuevaPregunta = {
+  proceso_id: 0,
+  asignatura_id: 0,
+  grado_id: 0,
+  especialidad_id: 0,
+  enunciado: "",
+  tipo: "unica",
+  dificultad: "medio",
+  etiqueta_ids: [],
+  respuestas: [
+    { texto: "", es_correcta: false, orden: 1 },
+    { texto: "", es_correcta: false, orden: 2 },
+  ],
+  retro_explicacion: "",
+  retro_referencia: "",
+};
 
 export default function NuevaPreguntaPage() {
   const { token } = useAuth();
@@ -34,21 +63,61 @@ export default function NuevaPreguntaPage() {
   const [grados, setGrados] = useState<Grado[]>([]);
   const [especialidades, setEspecialidades] = useState<Especialidad[]>([]);
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
-
-  const [procesoID, setProcesoID] = useState<number>(0);
-  const [asignaturaID, setAsignaturaID] = useState<number>(0);
-  const [gradoID, setGradoID] = useState<number>(0);
-  const [especialidadID, setEspecialidadID] = useState<number>(0);
-  const [enunciado, setEnunciado] = useState("");
-  const [tipo, setTipo] = useState<TipoPregunta>("unica");
-  const [dificultad, setDificultad] = useState<DificultadPregunta>("medio");
-  const [selectedEtiquetas, setSelectedEtiquetas] = useState<number[]>([]);
-  const [respuestas, setRespuestas] = useState<RespuestaRow[]>(DEFAULT_RESPUESTAS);
-  const [retroExplicacion, setRetroExplicacion] = useState("");
-  const [retroReferencia, setRetroReferencia] = useState("");
-
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [redirigiendo, setRedirigiendo] = useState(false);
+
+  const mensajes = useMensajesValidacionPregunta();
+
+  const formik = useFormik<ValoresNuevaPregunta>({
+    initialValues: VALORES_INICIALES,
+    // Sin validación nativa del navegador: los mensajes salen del selector de idioma de la app.
+    validate: (valores) => validarPregunta(valores, mensajes, true),
+    onSubmit: async (valores) => {
+      if (!token) return;
+      setError(null);
+      const respuestas: CreateRespuestaPayload[] = valores.respuestas.map((r) => ({
+        texto: r.texto,
+        es_correcta: r.es_correcta,
+        orden: r.orden,
+      }));
+      try {
+        await questionsApi.createPregunta(token, {
+          proceso_id: valores.proceso_id,
+          asignatura_id: valores.asignatura_id,
+          grado_id: valores.grado_id || null,
+          especialidad_id: valores.especialidad_id || null,
+          enunciado: valores.enunciado,
+          tipo: valores.tipo,
+          dificultad: valores.dificultad,
+          etiqueta_ids: valores.etiqueta_ids,
+          respuestas,
+          retroalimentacion: armarRetroalimentacion(valores.retro_explicacion, valores.retro_referencia),
+        });
+        // P1 (SIA-E3-02): toda pregunta nueva nace en borrador y no se sirve hasta aprobarla.
+        toast.ok(t("serumsIa.avisosPregunta.creadaBorrador"));
+        // formik apaga `isSubmitting` al terminar, antes de que la navegación acabe: se mantiene pendiente hasta salir.
+        setRedirigiendo(true);
+        router.push("/admin/preguntas");
+      } catch (e: unknown) {
+        const err = e as { message?: string };
+        setError(err.message ?? t("admin-error-crear-pregunta"));
+      }
+    },
+  });
+  const { values, setFieldValue, setValues } = formik;
+  const [rechazos, setRechazos] = useState(0);
+  // Se valida antes de enviar para saber si el envío es rechazado y llevar el foco al primer campo inválido.
+  const enviar = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const invalidos = await formik.validateForm();
+    if (Object.keys(invalidos).length > 0) setRechazos((n) => n + 1);
+    formik.handleSubmit();
+  };
+  const procesoID = values.proceso_id;
+  const asignaturaID = values.asignatura_id;
+  // Los errores se muestran desde el primer envío; antes, el formulario no regaña a quien aún no terminó de escribir.
+  const errores = formik.submitCount > 0 ? formik.errors : {};
+
   // Contadores de petición: solo se aplica la respuesta de la última (cambiar rápido de proceso o asignatura no deja
   // las asignaturas o etiquetas de la anterior).
   const asignaturasReq = useRef(0);
@@ -74,7 +143,6 @@ export default function NuevaPreguntaPage() {
     const reqId = ++asignaturasReq.current;
     if (!token || !procesoID) {
       setAsignaturas([]);
-      setAsignaturaID(0);
       setEtiquetas([]);
       return;
     }
@@ -100,76 +168,36 @@ export default function NuevaPreguntaPage() {
       .catch(() => {});
   }, [token, asignaturaID]);
 
-  const addRespuesta = useCallback(() => {
-    if (respuestas.length >= MAX_RESPUESTAS) return;
+  const setRespuestas = useCallback(
+    (actualizar: (prev: RespuestaRow[]) => RespuestaRow[]) =>
+      setFieldValue("respuestas", actualizar(values.respuestas)),
+    [setFieldValue, values.respuestas],
+  );
+
+  const addRespuesta = () => {
+    if (values.respuestas.length >= MAX_RESPUESTAS) return;
     setRespuestas((prev) => [...prev, { texto: "", es_correcta: false, orden: prev.length + 1 }]);
-  }, [respuestas.length]);
-
-  const removeRespuesta = useCallback(
-    (index: number) => {
-      if (respuestas.length <= MIN_RESPUESTAS) return;
-      setRespuestas((prev) => prev.filter((_, i) => i !== index).map((r, i) => ({ ...r, orden: i + 1 })));
-    },
-    [respuestas.length],
-  );
-
-  const updateRespuesta = useCallback((index: number, field: keyof RespuestaRow, value: string | boolean) => {
-    setRespuestas((prev) =>
-      prev.map((r, i) => {
-        if (i !== index) return r;
-        return { ...r, [field]: value };
-      }),
-    );
-  }, []);
-
-  const toggleCorrecta = useCallback(
-    (index: number) => {
-      if (tipo === "unica") {
-        // Only one correct
-        setRespuestas((prev) => prev.map((r, i) => ({ ...r, es_correcta: i === index })));
-      } else {
-        setRespuestas((prev) => prev.map((r, i) => (i === index ? { ...r, es_correcta: !r.es_correcta } : r)));
-      }
-    },
-    [tipo],
-  );
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) return;
-    setSubmitting(true);
-    setError(null);
-
-    const payload: CreateRespuestaPayload[] = respuestas.map((r) => ({
-      texto: r.texto,
-      es_correcta: r.es_correcta,
-      orden: r.orden,
-    }));
-
-    try {
-      await questionsApi.createPregunta(token, {
-        proceso_id: procesoID,
-        asignatura_id: asignaturaID,
-        grado_id: gradoID || null,
-        especialidad_id: especialidadID || null,
-        enunciado,
-        tipo,
-        dificultad,
-        etiqueta_ids: selectedEtiquetas,
-        respuestas: payload,
-        retroalimentacion: retroExplicacion
-          ? { explicacion: retroExplicacion, referencia: retroReferencia || null }
-          : null,
-      });
-      // P1 (SIA-E3-02): toda pregunta nueva nace en borrador y no se sirve hasta aprobarla.
-      toast.ok(t("serumsIa.avisosPregunta.creadaBorrador"));
-      router.push("/admin/preguntas");
-    } catch (e: unknown) {
-      const err = e as { message?: string };
-      setError(err.message ?? t("admin-error-crear-pregunta"));
-      setSubmitting(false);
-    }
   };
+
+  const removeRespuesta = (index: number) => {
+    if (values.respuestas.length <= MIN_RESPUESTAS) return;
+    setRespuestas((prev) => prev.filter((_, i) => i !== index).map((r, i) => ({ ...r, orden: i + 1 })));
+  };
+
+  const updateTexto = (index: number, texto: string) =>
+    setRespuestas((prev) => prev.map((r, i) => (i === index ? { ...r, texto } : r)));
+
+  const toggleCorrecta = (index: number) =>
+    setRespuestas((prev) =>
+      // Única: solo una correcta; múltiple: cada una se alterna.
+      prev.map((r, i) =>
+        values.tipo === "unica"
+          ? { ...r, es_correcta: i === index }
+          : i === index
+            ? { ...r, es_correcta: !r.es_correcta }
+            : r,
+      ),
+    );
 
   return (
     <div className={CONTENEDOR_PAGINA}>
@@ -186,52 +214,56 @@ export default function NuevaPreguntaPage() {
           opciones: procesos,
           onCambio: (id) => {
             // H19: una asignatura o etiqueta de otro proceso ya no es válida.
-            setProcesoID(id);
-            setAsignaturaID(0);
-            setSelectedEtiquetas([]);
+            void setValues({ ...values, proceso_id: id, asignatura_id: 0, etiqueta_ids: [] });
           },
         }}
         asignaturas={asignaturas}
         asignaturaID={asignaturaID}
         onAsignatura={(id) => {
           // H19: las etiquetas pertenecen a la asignatura.
-          setAsignaturaID(id);
-          setSelectedEtiquetas([]);
+          void setValues({ ...values, asignatura_id: id, etiqueta_ids: [] });
         }}
         grados={grados}
-        gradoID={gradoID}
-        onGrado={setGradoID}
+        gradoID={values.grado_id}
+        onGrado={(id) => setFieldValue("grado_id", id)}
         especialidades={especialidades}
-        especialidadID={especialidadID}
-        onEspecialidad={setEspecialidadID}
-        dificultad={dificultad}
-        onDificultad={setDificultad}
-        tipo={tipo}
-        onTipo={setTipo}
-        enunciado={enunciado}
-        onEnunciado={setEnunciado}
+        especialidadID={values.especialidad_id}
+        onEspecialidad={(id) => setFieldValue("especialidad_id", id)}
+        dificultad={values.dificultad}
+        onDificultad={(v) => setFieldValue("dificultad", v)}
+        tipo={values.tipo}
+        onTipo={(v) => setFieldValue("tipo", v)}
+        enunciado={values.enunciado}
+        onEnunciado={(v) => setFieldValue("enunciado", v)}
         mostrarEtiquetas={asignaturaID > 0}
         etiquetas={etiquetas}
-        etiquetasSeleccionadas={selectedEtiquetas}
+        etiquetasSeleccionadas={values.etiqueta_ids}
         onAlternarEtiqueta={(id) =>
-          setSelectedEtiquetas((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+          setFieldValue(
+            "etiqueta_ids",
+            values.etiqueta_ids.includes(id)
+              ? values.etiqueta_ids.filter((x) => x !== id)
+              : [...values.etiqueta_ids, id],
+          )
         }
-        respuestas={respuestas}
+        respuestas={values.respuestas}
         onAgregarRespuesta={addRespuesta}
         onQuitarRespuesta={removeRespuesta}
-        onTextoRespuesta={(idx, texto) => updateRespuesta(idx, "texto", texto)}
+        onTextoRespuesta={updateTexto}
         onAlternarCorrecta={toggleCorrecta}
-        retroExplicacion={retroExplicacion}
-        onRetroExplicacion={setRetroExplicacion}
-        retroReferencia={retroReferencia}
-        onRetroReferencia={setRetroReferencia}
+        retroExplicacion={values.retro_explicacion}
+        onRetroExplicacion={(v) => setFieldValue("retro_explicacion", v)}
+        retroReferencia={values.retro_referencia}
+        onRetroReferencia={(v) => setFieldValue("retro_referencia", v)}
         retroMinimo
         error={error}
-        enviando={submitting}
+        errores={errores as Record<string, string>}
+        rechazosDeValidacion={rechazos}
+        enviando={formik.isSubmitting || redirigiendo}
         textoEnviar={t("admin-crear-pregunta")}
         textoEnviando={t("comun-guardando")}
         onCancelar={() => router.push("/admin/preguntas")}
-        onEnviar={handleSubmit}
+        onEnviar={enviar}
       />
     </div>
   );

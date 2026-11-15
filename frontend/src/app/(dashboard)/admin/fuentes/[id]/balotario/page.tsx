@@ -11,20 +11,22 @@ import { useState } from "react";
 
 import { BotonReintentar } from "@/components/app/boton-reintentar";
 import { Alerta } from "@/components/feedback/alerta";
+import { EstadoVacio } from "@/components/feedback/estado-vacio";
 import { Skeleton } from "@/components/feedback/skeleton";
 import { useToast } from "@/components/feedback/toast";
 import { useCarga } from "@/hooks/use-carga";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
+import { apiErrorCode } from "@/lib/http/api-error";
 import {
   balotarioApi,
   type ImportacionCreada,
   PROBLEMAS_POR_PAGINA,
   type VistaPreviaBalotario,
 } from "@/lib/serums-ia/balotario/api";
-import { claveErrorBalotario, valoresDeError } from "@/lib/serums-ia/balotario/errores";
+import { claveErrorBalotario, esErrorPermanente, valoresDeError } from "@/lib/serums-ia/balotario/errores";
 import { sePuedeImportar } from "@/lib/serums-ia/balotario/reglas";
-import { ArrowLeftIcon, FileArrowDownIcon } from "@phosphor-icons/react";
+import { ArrowLeftIcon, FileArrowDownIcon, FileXIcon } from "@phosphor-icons/react";
 
 /** Vista previa de la importación del balotario de una fuente (SIA-E3-03): analiza la versión vigente sin guardar nada. */
 export default function ImportarBalotarioPage() {
@@ -56,6 +58,29 @@ export default function ImportarBalotarioPage() {
     </Link>
   );
 
+  if (carga.error && !vista && esErrorPermanente(carga.error)) {
+    // Sin fuente no hay a dónde volver: la salida es el listado.
+    const fuenteInexistente = apiErrorCode(carga.error) === "no_encontrado";
+    return (
+      <div className={CONTENEDOR_PAGINA}>
+        <EstadoVacio
+          icon={FileXIcon}
+          titulo={t("serumsIa.balotario.noSePuedeImportar")}
+          accion={
+            <Link
+              href={fuenteInexistente ? "/admin/fuentes" : `/admin/fuentes/${fuenteId}`}
+              className={ACCION_SECUNDARIA}
+            >
+              <ArrowLeftIcon className="size-4" />
+              {t(fuenteInexistente ? "serumsIa.balotario.volverFuentes" : "serumsIa.balotario.volver")}
+            </Link>
+          }
+        >
+          {t(claveErrorBalotario(carga.error, t.has), valoresDeError(carga.error))}
+        </EstadoVacio>
+      </div>
+    );
+  }
   if (carga.error && !vista) {
     return (
       <div className={CONTENEDOR_PAGINA}>
