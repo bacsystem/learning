@@ -28,7 +28,7 @@ func TestEmailTemplates_Brand(t *testing.T) {
 			if !strings.Contains(body, footer) {
 				t.Errorf("footer %q missing", footer)
 			}
-			for _, gone := range []string{"Sistema de Capacitación", "Ejército del Perú"} {
+			for _, gone := range []string{"Sistema de Capacitación", "Ejército del Perú", "tu unidad", "your unit"} {
 				if strings.Contains(body, gone) {
 					t.Errorf("body still contains %q", gone)
 				}
