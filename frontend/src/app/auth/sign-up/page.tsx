@@ -1,7 +1,7 @@
 "use client";
 import { useFormik } from "formik";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import React, { useMemo, useRef, useState } from "react";
 import * as yup from "yup";
 
@@ -13,6 +13,7 @@ import { Spinner } from "@/components/feedback/spinner";
 import { Entrada } from "@/components/formularios/campo";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { Chip } from "@/components/patrones/pill-estado";
+import { comoLocale } from "@/constants";
 import { authApi, type CheckDNIResult } from "@/lib/auth/auth-api";
 import { claveErrorAuth } from "@/lib/auth/errores-auth";
 import { BOTON_PRIMARIO, BOTON_SECUNDARIO } from "@/lib/estilos";
@@ -46,6 +47,7 @@ function Verificando() {
 
 export default function Page() {
   const t = useTranslations("dashboard");
+  const locale = comoLocale(useLocale());
   const dniRef = useRef<HTMLInputElement>(null);
   // Step 2 only confirms the e-mail: username and password are chosen on the
   // page the e-mailed link opens (/auth/verify-email).
@@ -125,7 +127,7 @@ export default function Page() {
       try {
         // The backend answers 202 with the same message whether or not the
         // data matched (no oracle), so the UI always shows "check your e-mail".
-        await authApi.register({ dni, email: values.email });
+        await authApi.register({ dni, email: values.email, locale });
         setSentTo(emailHint ?? values.email);
       } catch (err: unknown) {
         setApiError(t(claveErrorAuth(err, "sign-up-error")));

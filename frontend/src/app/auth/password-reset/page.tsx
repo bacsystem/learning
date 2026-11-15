@@ -1,7 +1,7 @@
 "use client";
 import { useFormik } from "formik";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import React, { useMemo, useState } from "react";
 import * as yup from "yup";
 
@@ -10,6 +10,7 @@ import { Campo } from "@/components/app/campo";
 import { Alerta } from "@/components/feedback/alerta";
 import { Entrada } from "@/components/formularios/campo";
 import { BotonAsync } from "@/components/patrones/boton-async";
+import { comoLocale } from "@/constants";
 import { authApi } from "@/lib/auth/auth-api";
 import { claveErrorAuth } from "@/lib/auth/errores-auth";
 import { BOTON_PRIMARIO } from "@/lib/estilos";
@@ -20,6 +21,7 @@ export default function Page() {
   const [sent, setSent] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const t = useTranslations("dashboard");
+  const locale = comoLocale(useLocale());
   const validationSchema = useMemo(
     () => yup.object({ email: yup.string().required(t("auth-campo-requerido")).email(t("auth-correo-invalido")) }),
     [t],
@@ -32,7 +34,7 @@ export default function Page() {
     onSubmit: async (values, { setSubmitting }) => {
       setApiError(null);
       try {
-        await authApi.forgotPassword(values.email);
+        await authApi.forgotPassword(values.email, locale);
         setSent(true);
       } catch (err: unknown) {
         // 429 (rate limit), 422 (validation), 5xx and network errors each get their own message.

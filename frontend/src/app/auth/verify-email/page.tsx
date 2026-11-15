@@ -2,7 +2,7 @@
 import { useFormik } from "formik";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as yup from "yup";
 
@@ -15,6 +15,7 @@ import { Spinner } from "@/components/feedback/spinner";
 import { Entrada } from "@/components/formularios/campo";
 import { Contrasena } from "@/components/formularios/contrasena";
 import { BotonAsync } from "@/components/patrones/boton-async";
+import { comoLocale } from "@/constants";
 import { authApi } from "@/lib/auth/auth-api";
 import { claveErrorAuth } from "@/lib/auth/errores-auth";
 import { ACCION_SECUNDARIA, BOTON_PRIMARIO } from "@/lib/estilos";
@@ -43,6 +44,7 @@ function EstadoDisponibilidad({ estado }: { estado: UsernameStatus }) {
 
 export default function Page() {
   const t = useTranslations("dashboard");
+  const locale = comoLocale(useLocale());
   const etiquetasContrasena = useEtiquetasContrasena();
   const searchParams = useSearchParams();
   // Read once: the token is then removed from the URL (and the history entry).
@@ -84,7 +86,7 @@ export default function Page() {
       setApiError(null);
       setUsernameError(null);
       try {
-        await authApi.verifyEmail({ token, ...values });
+        await authApi.verifyEmail({ token, ...values, locale });
         setStatus("success");
       } catch (err: unknown) {
         const e = err as { status?: number; message?: string };
