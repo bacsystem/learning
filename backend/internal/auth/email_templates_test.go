@@ -10,9 +10,9 @@ import (
 func TestEmailTemplates_EscapeUserData(t *testing.T) {
 	const evil = `<a href=x>clic</a>`
 	cases := map[string]func() (string, string){
-		"activado":  func() (string, string) { return emailActivado(evil, evil, evil, "https://app.test/auth/sign-in") },
-		"rechazado": func() (string, string) { return emailRechazado(evil, evil) },
-		"inactivo":  func() (string, string) { return emailInactivo(evil, evil) },
+		"activado":  func() (string, string) { return emailActivado("es", evil, evil, evil, "https://app.test/auth/sign-in") },
+		"rechazado": func() (string, string) { return emailRechazado("es", evil, evil) },
+		"inactivo":  func() (string, string) { return emailInactivo("es", evil, evil) },
 		"registroPendiente": func() (string, string) {
 			return emailRegistroPendiente("es", evil, evil, evil)
 		},

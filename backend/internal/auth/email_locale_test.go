@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -197,18 +198,64 @@ func TestRegisterAndVerifyEmail_EmailLanguage(t *testing.T) {
 	}
 }
 
-// E-mails triggered by an administrator are always Spanish, with the brand.
-func TestAdminEmails_StaySpanishWithBrand(t *testing.T) {
-	for name, render := range map[string]func() (string, string){
-		"activated": func() (string, string) { return emailActivado("Ana", "Perez", "ana", "https://x/login") },
-		"rejected":  func() (string, string) { return emailRechazado("Ana", "Perez") },
-		"inactive":  func() (string, string) { return emailInactivo("Ana", "Perez") },
-		"changed":   func() (string, string) { return emailCorreoCambiado() },
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, body := render()
-			if !strings.Contains(body, langAttrES) || !strings.Contains(body, brandHeaderPattern) {
-				t.Error("admin e-mail must be Spanish and signed Capacitate")
+// Account e-mails triggered by an administrator are written in the language
+// of the affected user (PLT-13), signed Capacitate; the e-mail-changed notice
+// stays Spanish (P7).
+func TestAdminEmails_FollowUserLanguage(t *testing.T) {
+	for _, loc := range []string{locale.ES, locale.EN} {
+		lang := map[string]string{locale.ES: langAttrES, locale.EN: langAttrEN}[loc]
+		for name, render := range map[string]func() (string, string){
+			"activated": func() (string, string) { return emailActivado(loc, "Ana", "Perez", "ana", "https://x/login") },
+			"rejected":  func() (string, string) { return emailRechazado(loc, "Ana", "Perez") },
+			"inactive":  func() (string, string) { return emailInactivo(loc, "Ana", "Perez") },
+		} {
+			t.Run(loc+" "+name, func(t *testing.T) {
+				_, body := render()
+				if !strings.Contains(body, lang) || !strings.Contains(body, brandHeaderPattern) {
+					t.Errorf("want %s and the brand", lang)
+				}
+			})
+		}
+	}
+	t.Run("changed stays Spanish", func(t *testing.T) {
+		_, body := emailCorreoCambiado()
+		if !strings.Contains(body, langAttrES) || !strings.Contains(body, brandHeaderPattern) {
+			t.Error("email-changed notice must stay Spanish and signed Capacitate")
+		}
+	})
+}
+
+// UpdateEstado e-mails the affected user in usuarios.idioma, whatever the
+// admin's language is. (The database CHECK keeps any other value out; the
+// fallback to Spanish is locale.Normalize's, tested in the locale package.)
+func TestUpdateEstado_EmailInUserLanguage(t *testing.T) {
+	tests := []struct {
+		name, idioma, estado string
+		wantLang, otherLang  string
+	}{
+		{"activated en", "en", "activo", langAttrEN, langAttrES},
+		{"activated es", "es", "activo", langAttrES, langAttrEN},
+		{"rejected en", "en", "rechazado", langAttrEN, langAttrES},
+		{"rejected es", "es", "rechazado", langAttrES, langAttrEN},
+		{"inactive en", "en", "inactivo", langAttrEN, langAttrES},
+		{"inactive es", "es", "inactivo", langAttrES, langAttrEN},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t)
+			adminID, _ := f.activeUser("lang", "admin")
+			email := f.email("tgt")
+			pid, _ := f.persona(email)
+			target := f.user(pid, f.username("tgt"), "Password123!", "usuario", "pendiente")
+			if _, err := f.db.Exec(`UPDATE usuarios SET idioma=$1 WHERE id=$2`, tt.idioma, target); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.svc.UpdateEstado(context.Background(), target, UpdateUsuarioEstadoRequest{Estado: tt.estado}, adminID, "127.0.0.1"); err != nil {
+				t.Fatal(err)
+			}
+			_, body := f.lastEmail(email)
+			if !strings.Contains(body, tt.wantLang) || strings.Contains(body, tt.otherLang) {
+				t.Errorf("want %s only, got:\n%s", tt.wantLang, body)
 			}
 		})
 	}
@@ -239,6 +286,18 @@ func TestEmailTemplates_LanguagesDoNotLeak(t *testing.T) {
 			sub, body := emailRegistroPendiente(loc, "Ana", "Perez", "ana")
 			return rendered{sub, body, textsOf(registroPendienteCopy(loc))}
 		},
+	}
+	templates["activated"] = func(loc string) rendered {
+		sub, body := emailActivado(loc, "Ana", "Perez", "ana", "https://x/l")
+		return rendered{sub, body, textsOf(activadoCopy(loc))}
+	}
+	templates["rejected"] = func(loc string) rendered {
+		sub, body := emailRechazado(loc, "Ana", "Perez")
+		return rendered{sub, body, textsOf(rechazadoCopy(loc))}
+	}
+	templates["inactive"] = func(loc string) rendered {
+		sub, body := emailInactivo(loc, "Ana", "Perez")
+		return rendered{sub, body, textsOf(inactivoCopy(loc))}
 	}
 	shared := map[string][]string{
 		locale.ES: {correo.ButtonFallback(locale.ES), correo.AutoNotice(locale.ES)},

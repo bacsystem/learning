@@ -15,9 +15,9 @@ func TestEmailTemplates_Brand(t *testing.T) {
 		"reset done":    func() (string, string) { return emailPasswordRestablecida("es", "https://x/login") },
 		"verify":        func() (string, string) { return emailVerificarRegistro("es", "Ana", "Perez", "https://x/v") },
 		"registration":  func() (string, string) { return emailRegistroPendiente("es", "Ana", "Perez", "ana") },
-		"activated":     func() (string, string) { return emailActivado("Ana", "Perez", "ana", "https://x/login") },
-		"rejected":      func() (string, string) { return emailRechazado("Ana", "Perez") },
-		"inactive":      func() (string, string) { return emailInactivo("Ana", "Perez") },
+		"activated":     func() (string, string) { return emailActivado("es", "Ana", "Perez", "ana", "https://x/login") },
+		"rejected":      func() (string, string) { return emailRechazado("es", "Ana", "Perez") },
+		"inactive":      func() (string, string) { return emailInactivo("es", "Ana", "Perez") },
 		"email changed": func() (string, string) { return emailCorreoCambiado() },
 	}
 	footer := fmt.Sprintf("© %d %s", time.Now().Year(), correo.Brand)

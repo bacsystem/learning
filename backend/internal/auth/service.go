@@ -509,13 +509,15 @@ func (s *Service) UpdateEstado(ctx context.Context, targetID int64, req UpdateUs
 	} else {
 		var subject, body string
 		loginURL := s.frontendBaseURL + "/auth/sign-in"
+		// The language of the affected user, not the admin's.
+		loc := locale.Normalize(profile.Idioma)
 		switch req.Estado {
 		case "activo":
-			subject, body = emailActivado(profile.Nombres, profile.ApellidoPaterno, profile.Username, loginURL)
+			subject, body = emailActivado(loc, profile.Nombres, profile.ApellidoPaterno, profile.Username, loginURL)
 		case "rechazado":
-			subject, body = emailRechazado(profile.Nombres, profile.ApellidoPaterno)
+			subject, body = emailRechazado(loc, profile.Nombres, profile.ApellidoPaterno)
 		case "inactivo":
-			subject, body = emailInactivo(profile.Nombres, profile.ApellidoPaterno)
+			subject, body = emailInactivo(loc, profile.Nombres, profile.ApellidoPaterno)
 		}
 		if subject != "" {
 			s.notifyUsuario(ctx, targetID, "update_estado", subject, body)
