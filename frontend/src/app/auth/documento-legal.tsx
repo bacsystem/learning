@@ -21,9 +21,12 @@ export function DocumentoLegal({
   const t = useTranslations("dashboard");
   const locale = useLocale();
   return (
-    <TarjetaAuth ancho="documento" titulo={titulo}>
-      {avisarSoloEspanol(locale) ? <Alerta tono="info">{t("auth-documento-solo-espanol")}</Alerta> : null}
-      <p className="text-cuerpo text-muted-foreground leading-relaxed">{intro}</p>
+    <TarjetaAuth
+      ancho="documento"
+      titulo={titulo}
+      aviso={avisarSoloEspanol(locale) ? <Alerta tono="info">{t("auth-documento-solo-espanol")}</Alerta> : null}
+      descripcion={intro}
+    >
       <div className="border-border/60 flex flex-col gap-6 border-t pt-6">{children}</div>
     </TarjetaAuth>
   );
