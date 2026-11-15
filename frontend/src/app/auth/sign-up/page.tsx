@@ -76,6 +76,9 @@ export default function Page() {
   // Masked hint of the e-mail on file (the user must type the full address).
   const emailHint = persona?.email_masked || null;
 
+  // Reenvío: repite el mismo registro (el backend responde igual haya o no coincidencia) y el último enlace es el válido.
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
   const isStep2 = persona !== null && sentTo === null;
 
   const handleCheckDNI = async () => {
@@ -98,6 +101,20 @@ export default function Page() {
       );
     } finally {
       setChecking(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    setResent(false);
+    setApiError(null);
+    try {
+      await authApi.register({ dni, email: formik.values.email, locale });
+      setResent(true);
+    } catch (err: unknown) {
+      setApiError(t(claveErrorAuth(err, "sign-up-error")));
+    } finally {
+      setResending(false);
     }
   };
 
@@ -153,7 +170,22 @@ export default function Page() {
             })}
           </p>
           <p className="text-control text-muted-foreground leading-relaxed">{t("sign-up-enlace-vence")}</p>
+          <p className="text-control text-muted-foreground leading-relaxed">{t("sign-up-no-recibes")}</p>
         </header>
+        {apiError ? <Alerta tono="error">{apiError}</Alerta> : null}
+        {resent ? (
+          <p role="status" className="text-control text-success-foreground font-medium">
+            {t("sign-up-reenviado")}
+          </p>
+        ) : null}
+        <BotonAsync
+          pendiente={resending}
+          textoPendiente={t("sign-up-reenviando")}
+          className={BOTON_PRIMARIO}
+          onClick={handleResend}
+        >
+          {t("sign-up-reenviar")}
+        </BotonAsync>
         <Link href="/auth/sign-in" className={BOTON_SECUNDARIO}>
           <ArrowLeftIcon weight="bold" className="size-4" />
           {t("auth-volver-sign-in")}

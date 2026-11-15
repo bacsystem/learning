@@ -23,6 +23,9 @@ import { cn } from "@/lib/utils";
 import { ArrowLeftIcon, CheckCircleIcon, UserPlusIcon, XCircleIcon } from "@phosphor-icons/react";
 
 type Status = "form" | "success" | "invalid";
+/** Mismo formato que el backend (alphanum): sin él no se consulta ni se muestra la disponibilidad. */
+const FORMATO_USUARIO = /^[a-zA-Z0-9]+$/;
+
 type UsernameStatus = "idle" | "checking" | "available" | "taken";
 
 /** Indicador dentro del campo mientras se verifica la disponibilidad del usuario. */
@@ -71,7 +74,7 @@ export default function Page() {
           .required(t("verify-email-usuario-requerido"))
           .min(4, t("verify-email-usuario-min"))
           .max(30, t("verify-email-usuario-max"))
-          .matches(/^[a-zA-Z0-9]+$/, t("verify-email-usuario-alfanumerico")),
+          .matches(FORMATO_USUARIO, t("verify-email-usuario-alfanumerico")),
         ...esquemaContrasena(t),
       }),
     [t],
@@ -112,7 +115,7 @@ export default function Page() {
   useEffect(() => {
     const username = formik.values.username;
     const reqId = ++usernameReq.current;
-    if (status !== "form" || username.length < 4) {
+    if (status !== "form" || username.length < 4 || !FORMATO_USUARIO.test(username)) {
       setUsernameStatus("idle");
       return;
     }
@@ -210,7 +213,9 @@ export default function Page() {
               }}
               onBlur={formik.handleBlur}
             />
-            {formik.values.username.length >= 4 ? <EstadoDisponibilidad estado={usernameStatus} /> : null}
+            {formik.values.username.length >= 4 && FORMATO_USUARIO.test(formik.values.username) ? (
+              <EstadoDisponibilidad estado={usernameStatus} />
+            ) : null}
           </div>
         </Campo>
 

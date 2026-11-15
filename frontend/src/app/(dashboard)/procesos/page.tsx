@@ -7,6 +7,7 @@ import { DialogContent } from "@/components/app/dialogo";
 import { Alerta } from "@/components/feedback/alerta";
 import { EstadoVacio } from "@/components/feedback/estado-vacio";
 import { Skeleton } from "@/components/feedback/skeleton";
+import { useToast } from "@/components/feedback/toast";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { CabeceraDialogo, PieDialogo } from "@/components/patrones/cabecera-dialogo";
 import type { Tono } from "@/components/patrones/metricas";
@@ -70,6 +71,7 @@ function TarjetaProcesoCargando() {
 export default function Page() {
   const { token } = useAuth();
   const t = useTranslations("dashboard");
+  const toast = useToast();
   const [procesos, setProcesos] = useState<Proceso[]>([]);
   const [misIns, setMisIns] = useState<Inscripcion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,6 +128,7 @@ export default function Page() {
     setSubmitting(true);
     try {
       await inscripcionesApi.inscribir(token, confirm.id);
+      toast.ok(t("procesos-inscripcion-enviada"), t("procesos-inscripcion-enviada-detalle", { proceso: confirm.nombre }));
       setConfirm(null);
       load();
     } catch (e: unknown) {
