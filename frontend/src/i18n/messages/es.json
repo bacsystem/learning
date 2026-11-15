@@ -1003,6 +1003,7 @@
     "auth-contrasena-no-coinciden": "Las contraseñas no coinciden",
     "auth-acepta-terminos": "Al continuar aceptas los <terminos>términos y condiciones</terminos> y la <privacidad>política de privacidad</privacidad>.",
     "auth-terminos": "Términos y condiciones",
+    "auth-documento-solo-espanol": "Este documento está disponible solo en español.",
     "auth-privacidad": "Política de privacidad",
     "auth-correo": "Correo electrónico",
     "auth-correo-placeholder": "tu@correo.com",

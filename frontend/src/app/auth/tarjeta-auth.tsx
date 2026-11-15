@@ -24,6 +24,7 @@ const ANCHOS = {
  */
 export function TarjetaAuth({
   titulo,
+  aviso,
   descripcion,
   children,
   pie,
@@ -33,6 +34,8 @@ export function TarjetaAuth({
   className,
 }: {
   titulo?: ReactNode;
+  /** Aviso entre el título y la descripción (p. ej. el idioma del documento). */
+  aviso?: ReactNode;
   descripcion?: ReactNode;
   children?: ReactNode;
   pie?: ReactNode;
@@ -47,9 +50,10 @@ export function TarjetaAuth({
         children
       ) : (
         <div className={cn("flex flex-col gap-6 px-6 py-8 sm:px-10 sm:py-10", centrado && "items-center text-center")}>
-          {titulo || descripcion ? (
+          {titulo || aviso || descripcion ? (
             <header className="flex flex-col gap-1.5">
               {titulo ? <h1 className="text-titulo-pagina text-foreground text-balance">{titulo}</h1> : null}
+              {aviso}
               {descripcion ? <p className="text-cuerpo text-muted-foreground leading-relaxed">{descripcion}</p> : null}
             </header>
           ) : null}
