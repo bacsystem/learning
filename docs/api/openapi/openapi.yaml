@@ -1,0 +1,344 @@
+openapi: 3.1.0
+# Capacitate API: raíz del spec (ADR 0012, docs/adr/0012-documentacion-openapi-spec-first.md).
+# Plan de trabajo y reparto: docs/api/openapi-plan.md.
+#
+# Reglas de este archivo:
+# - Solo `info`, `servers`, `security`, `tags`, `components` comunes y `paths`.
+# - Cada entrada de `paths` es solo un `$ref` al archivo de su paquete Go:
+#     /ruta:
+#       $ref: './paquetes/<paquete>.yaml#/paths/~1ruta'
+#   (en el puntero JSON, `/` se escribe `~1` y `~` se escribe `~0`).
+# - Cada dev escribe solo en el bloque reservado de su paquete. Un componente
+#   común nuevo se pide al architect; no se duplica en los paquetes.
+# - Los ejemplos son sintéticos (@example.com, DNI 00000000, «Persona Ejemplo»).
+#   El repo es público: nunca datos de assets/, de la base ni de logs.
+info:
+  title: Capacitate API
+  version: 0.0.0-dev
+  summary: API de práctica y simulacros para los exámenes de ascenso, con panel de administración.
+  description: |
+    Documentación de la API de Capacitate (backend Go sobre `net/http.ServeMux`).
+
+    **Fuente de verdad de la forma** de cada endpoint (ruta, método, rol,
+    parámetros, request, response y códigos de error). Los contratos de
+    diseño (reglas, modelo de datos, migraciones) siguen en `docs/api/*.md`.
+    Un test de Go (`backend/internal/apispec`) compara este spec con las rutas
+    registradas y con el rol que aplica cada middleware.
+
+    ## Roles (`x-rol`)
+
+    Cada operación declara `x-rol`:
+
+    | Valor | Significado | Middleware |
+    |---|---|---|
+    | `publico` | Sin sesión (`security: []`). Algunas rutas tienen rate limit (429) | ninguno o `Limit` |
+    | `autenticado` | Cualquier sesión válida: `usuario` (postulante) o `admin` | `RequireAuth` |
+    | `admin` | Solo el rol `admin` | `RequireAuth` + `RequireAdmin` |
+
+    El rol se lee de la base en cada request, no del token. Tampoco se deduce
+    del prefijo de la ruta: hay rutas de admin fuera de `/admin` y rutas bajo
+    `/admin` abiertas a cualquier sesión.
+
+    Las operaciones `autenticado` responden `401` (`NoAutenticado`) y `503`
+    (`ServicioNoDisponible`); las `admin`, además, `403` (`AccesoDenegado`).
+
+    ## Errores
+
+    Conviven dos formatos; cada respuesta documenta el que devuelve su handler:
+
+    - `ErrorCodigo`: `{"error": "<codigo>", "message": "<texto>", "detalle": {…}}`.
+      El código es el contrato estable; `message` va en español y solo sirve
+      para logs del cliente.
+    - `ErrorTexto`: `{"error": "<texto>"}`, el formato heredado. Lo usan los
+      middlewares de sesión y rol (401, 403, 503), el rate limiter (429) y los
+      handlers anteriores al módulo SERUMS IA.
+
+    ## Paginación
+
+    Sobre `{"data": [...], "total": n, "page": p, "per_page": pp}`
+    (`PaginaMeta` + `data`). Cada listado dice si su parámetro es **estricto**
+    (`400` si el valor es inválido) o **tolerante** (cae al valor por defecto).
+    Los catálogos usan `limit` (entero o `all`) en lugar de `per_page`.
+
+    ## Formatos
+
+    JSON en `snake_case`; fechas en RFC 3339 UTC; los nulos se declaran como
+    `type: [<tipo>, "null"]`. Cuerpo JSON máximo: 1 MB (413).
+servers:
+  - url: http://localhost:8080
+    description: Desarrollo local (`make dev`)
+security:
+  - bearerAuth: []
+tags:
+  - name: server
+    description: Estado del proceso (`cmd/server`).
+  - name: auth
+    description: Cuenta, sesión, registro, idioma y tour; administración de personas, usuarios, sesiones y configuración.
+  - name: admin
+    description: Panel de administración, detalle y rol de usuarios, auditoría e ingresos.
+  - name: catalogs
+    description: Instituciones, grados, especialidades, asignaturas, procesos y pesos.
+  - name: temas
+    description: Temas por asignatura (SERUMS IA, E1).
+  - name: perfiles
+    description: Profesión del postulante (SERUMS IA, E1).
+  - name: questions
+    description: Banco de preguntas, ciclo de revisión, citas y etiquetas.
+  - name: fuentes
+    description: Fuentes de conocimiento, versiones y búsqueda de pasajes (SERUMS IA, E2).
+  - name: balotario
+    description: Importación de balotarios (SERUMS IA, E3).
+  - name: ia
+    description: Consumo, cuotas y presupuesto del servicio de IA (SERUMS IA, E6).
+  - name: practices
+    description: Prácticas del postulante.
+  - name: simulations
+    description: Simulacros del postulante y su configuración.
+  - name: inscripciones
+    description: Procesos abiertos, inscripciones y su decisión por el admin.
+  - name: testimonios
+    description: Testimonios del postulante y su moderación.
+  - name: notifications
+    description: Notificaciones de la campana y su administración.
+  - name: salud
+    description: Estado operativo de los servicios para el admin.
+
+paths:
+  # ── server ── (architect)
+  /health:
+    $ref: './paquetes/server.yaml#/paths/~1health'
+
+  # ── catalogs ── (backend-dev)
+
+  # ── temas ── (backend-dev)
+
+  # ── perfiles ── (backend-dev)
+
+  # ── questions ── (backend-dev)
+
+  # ── fuentes ── (backend-dev)
+
+  # ── balotario ── (backend-dev)
+
+  # ── ia ── (backend-dev)
+
+  # ── practices ── (backend-dev)
+
+  # ── simulations ── (backend-dev)
+
+  # ── auth ── (backend-dev-2)
+
+  # ── admin ── (backend-dev-2)
+
+  # ── inscripciones ── (backend-dev-2)
+
+  # ── testimonios ── (backend-dev-2)
+
+  # ── notifications ── (backend-dev-2)
+
+  # ── salud ── (backend-dev-2)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Token de `POST /auth/login`. Además de validar el JWT, el servidor
+        exige una sesión viva en la base y lee de ella el rol y el estado en
+        cada request (`auth.RequireAuth`).
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: Id del recurso. Entero > 0; si no, `400`.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 1
+    Page:
+      name: page
+      in: query
+      required: false
+      description: |
+        Página, base 1. Una página más allá del final devuelve `data: []`.
+        La operación dice si el parámetro es estricto o tolerante.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      description: |
+        Elementos por página. Un valor mayor que el máximo se recorta al
+        máximo. La operación dice si es estricto o tolerante y, si difieren,
+        su defecto y su máximo.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: |
+        Solo catálogos (`catalogs`): elementos por página, o `all` para la
+        lista completa. Estricto: un valor inválido da `400`.
+      schema:
+        oneOf:
+          - type: integer
+            minimum: 1
+          - type: string
+            const: all
+
+  schemas:
+    ErrorCodigo:
+      type: object
+      description: |
+        Error con código estable (README de docs/api §3). Se extiende con
+        `allOf` cuando una respuesta añade campos en la raíz (por ejemplo,
+        `ErrorTiempoAgotado`).
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          pattern: '^[a-z0-9_]+$'
+          description: Código estable en `snake_case`. Es el contrato; no cambia por un cambio de texto.
+          example: validacion
+        message:
+          type: string
+          description: Texto en español para los logs del cliente. La UI traduce por código.
+          example: Los datos enviados no son válidos.
+        detalle:
+          type: object
+          description: Datos adicionales sin datos personales.
+          additionalProperties: true
+          example:
+            campos:
+              nombre: min
+    ErrorTexto:
+      type: object
+      description: |
+        Formato heredado: `error` es un texto para mostrar, no un código.
+        Lo usan los middlewares y los handlers anteriores al módulo SERUMS IA.
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: No autenticado.
+    ErrorTiempoAgotado:
+      description: |
+        `409 tiempo_agotado` de prácticas y simulacros: el intento venció y
+        se finalizó. `resultado_id` va en la raíz, no en `detalle`.
+      allOf:
+        - $ref: '#/components/schemas/ErrorCodigo'
+        - type: object
+          required: [resultado_id]
+          properties:
+            error:
+              const: tiempo_agotado
+            resultado_id:
+              type: integer
+              format: int64
+              minimum: 1
+    PaginaMeta:
+      type: object
+      description: |
+        Metadatos de un listado paginado. Cada listado se declara como
+        `allOf: [PaginaMeta, {required: [data], properties: {data: {type: array, items: …}}}]`.
+      required: [total, page, per_page]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Total de elementos que cumplen el filtro.
+        page:
+          type: integer
+          minimum: 1
+        per_page:
+          type: integer
+          minimum: 1
+
+  responses:
+    NoAutenticado:
+      description: Sin sesión, token inválido o expirado, o sesión revocada (`auth.RequireAuth`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorTexto'
+          examples:
+            sinSesion:
+              value:
+                error: 'No autenticado.'
+            revocada:
+              value:
+                error: 'Sesión revocada.'
+    AccesoDenegado:
+      description: La sesión no tiene el rol `admin` (`auth.RequireAdmin`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorTexto'
+          example:
+            error: 'Acceso denegado.'
+    ServicioNoDisponible:
+      description: No se pudo comprobar la sesión por un error de la base (`auth.RequireAuth`, ADR 0005).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorTexto'
+          example:
+            error: 'Servicio no disponible.'
+    DemasiadasSolicitudes:
+      description: Rate limit por IP superado (`middleware/ratelimit.go`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorTexto'
+          example:
+            error: 'Demasiadas solicitudes. Intenta más tarde.'
+    CuerpoDemasiadoGrande:
+      description: |
+        Cuerpo demasiado grande: `cuerpo_demasiado_grande` (JSON, 1 MB) o
+        `archivo_demasiado_grande` (multipart en una ruta de subida). Lo
+        responde el middleware global (`middleware/bodylimit.go:41-47`) o el
+        handler al leer el cuerpo. Los handlers que todavía mapean el 413 con
+        el formato heredado (p. ej. `auth`) documentan su propia respuesta
+        con `ErrorTexto`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorCodigo'
+          examples:
+            cuerpo:
+              value:
+                error: cuerpo_demasiado_grande
+                message: 'El cuerpo de la solicitud es demasiado grande.'
+            archivo:
+              value:
+                error: archivo_demasiado_grande
+                message: 'El cuerpo de la solicitud es demasiado grande.'
+    ErrorInternoCodigo:
+      description: Error inesperado (handlers con formato de código, `httpx.InternalErrorCode`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorCodigo'
+          example:
+            error: error_interno
+            message: 'Error interno del servidor.'
+    ErrorInternoTexto:
+      description: Error inesperado (handlers con formato heredado, `httpx.InternalError`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorTexto'
+          example:
+            error: 'Error interno del servidor.'

@@ -1,0 +1,46 @@
+# Paquete cmd/server (architect). Rutas: backend/cmd/server/main.go:118.
+# Contrato: docs/api/plataforma-salud.md («GET /health (existente, no cambia)»).
+paths:
+  /health:
+    get:
+      operationId: server.healthHandler
+      tags: [server]
+      summary: Estado del proceso y de la base
+      description: |
+        Público. Hace `PingContext` a la base (`cmd/server/health.go:28-38`).
+        No da más detalle: el estado de cada servicio está en `GET /admin/salud`.
+      x-rol: publico
+      security: []
+      responses:
+        '200':
+          description: El proceso responde y la base está accesible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Health'
+              example:
+                status: ok
+                version: 1.2.0
+        '503':
+          description: La base no responde. No incluye `version`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Health'
+              example:
+                status: unhealthy
+
+schemas:
+  Health:
+    type: object
+    required: [status]
+    properties:
+      status:
+        type: string
+        enum: [ok, unhealthy]
+      version:
+        type: string
+        description: |
+          Versión del binario, sin la «v» del tag (`1.2.0`). Fuera de un build
+          de release vale `0.0.0-dev` (`cmd/server/health.go:13`). Solo con
+          `status = ok` (`omitempty`).
