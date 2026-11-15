@@ -664,12 +664,17 @@ func (r *Repository) ListEtiquetas(ctx context.Context, asignaturaID int64, esta
 // CreateEtiqueta inserts a new tag and returns it.
 func (r *Repository) CreateEtiqueta(ctx context.Context, req CreateEtiquetaRequest) (EtiquetaResponse, error) {
 	var id int64
-	err := r.db.QueryRowContext(ctx, `
-		INSERT INTO etiquetas_pregunta (asignatura_id, nombre)
-		VALUES ($1, $2)
-		RETURNING id`,
-		req.AsignaturaID, req.Nombre,
-	).Scan(&id)
+	err := enTransaccion(ctx, r.db, func(tx *sqlx.Tx) error {
+		if err := rechazarEtiquetaDuplicada(ctx, tx, req.AsignaturaID, req.Nombre, 0); err != nil {
+			return err
+		}
+		return tx.QueryRowContext(ctx, `
+			INSERT INTO etiquetas_pregunta (asignatura_id, nombre)
+			VALUES ($1, $2)
+			RETURNING id`,
+			req.AsignaturaID, req.Nombre,
+		).Scan(&id)
+	})
 	if err != nil {
 		return EtiquetaResponse{}, err
 	}
@@ -683,6 +688,46 @@ func (r *Repository) CreateEtiqueta(ctx context.Context, req CreateEtiquetaReque
 		}
 	}
 	return EtiquetaResponse{}, ErrNotFound
+}
+
+// enTransaccion runs fn in a transaction: commit when it returns nil, rollback
+// otherwise.
+func enTransaccion(ctx context.Context, db *sqlx.DB, fn func(tx *sqlx.Tx) error) error {
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// rechazarEtiquetaDuplicada returns ErrConflict when the asignatura already has
+// a tag with the same name ignoring case and surrounding spaces (excluding the
+// tag exceptoID, 0 for none). The table only has UNIQUE(asignatura_id, nombre),
+// which is case-sensitive, so the check and the write are serialized per
+// (asignatura, name) with a transaction-scoped advisory lock: two concurrent
+// requests cannot both pass the check.
+func rechazarEtiquetaDuplicada(ctx context.Context, tx *sqlx.Tx, asignaturaID int64, nombre string, exceptoID int64) error {
+	if _, err := tx.ExecContext(ctx,
+		`SELECT pg_advisory_xact_lock(hashtextextended($1::text || ':' || lower(btrim($2)), 0))`,
+		asignaturaID, nombre); err != nil {
+		return err
+	}
+	var existe bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM etiquetas_pregunta
+			WHERE asignatura_id = $1 AND lower(btrim(nombre)) = lower(btrim($2)) AND id <> $3)`,
+		asignaturaID, nombre, exceptoID).Scan(&existe); err != nil {
+		return err
+	}
+	if existe {
+		return ErrConflict
+	}
+	return nil
 }
 
 // UpdateEtiqueta updates a tag's nombre and/or estado.
@@ -707,16 +752,26 @@ func (r *Repository) UpdateEtiqueta(ctx context.Context, id int64, req UpdateEti
 	}
 
 	args = append(args, id)
-	res, err := r.db.ExecContext(ctx,
-		fmt.Sprintf("UPDATE etiquetas_pregunta SET %s WHERE id = $%d", strings.Join(sets, ", "), i),
-		args...,
-	)
+	err := enTransaccion(ctx, r.db, func(tx *sqlx.Tx) error {
+		var asignaturaID int64
+		if err := tx.QueryRowContext(ctx, `SELECT asignatura_id FROM etiquetas_pregunta WHERE id = $1`, id).Scan(&asignaturaID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+		if req.Nombre != "" {
+			if err := rechazarEtiquetaDuplicada(ctx, tx, asignaturaID, req.Nombre, id); err != nil {
+				return err
+			}
+		}
+		_, err := tx.ExecContext(ctx,
+			fmt.Sprintf("UPDATE etiquetas_pregunta SET %s WHERE id = $%d", strings.Join(sets, ", "), i),
+			args...)
+		return err
+	})
 	if err != nil {
 		return EtiquetaResponse{}, err
-	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return EtiquetaResponse{}, ErrNotFound
 	}
 
 	// Fetch updated
