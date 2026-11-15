@@ -23,7 +23,7 @@ const fuentes = [sans, jakarta, manrope, dmSans, figtree, mono].map((f) => f.var
 
 export const metadata: Metadata = {
   title: "Capacitate",
-  description: "Practica y rinde simulacros para tus exámenes de ascenso, nombramiento y contrato docente.",
+  description: "Practica y rinde simulacros para tus exámenes de selección, ascenso o habilitación profesional.",
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
