@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { excede, LIMITES } from "@/lib/admin/limites";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Asignatura, catalogsApi, Grado, Institucion, Proceso, ProcesoAsignaturaItem } from "@/lib/catalogs/api";
+import { ERRORES_PROCESO } from "@/lib/catalogs/errores";
 import { claveErrorApi } from "@/lib/errores-api";
 import {
   ACCION_PRINCIPAL,
@@ -237,7 +238,7 @@ export default function ProcesosPage() {
       closeDialog();
       load();
     } catch (e: unknown) {
-      toast.error(t(claveErrorApi(e, { generico: "comun-error-guardar" })));
+      toast.error(t(claveErrorApi(e, ERRORES_PROCESO.guardar)));
       setDialog((d) => ({ ...d, submitting: false }));
     }
   };
@@ -255,7 +256,7 @@ export default function ProcesosPage() {
       closeConfirm();
       load();
     } catch (e: unknown) {
-      toast.error(t(claveErrorApi(e, { generico: "comun-error-estado" })));
+      toast.error(t(claveErrorApi(e, ERRORES_PROCESO.estado)));
       setConfirmDialog((d) => ({ ...d, submitting: false }));
     }
   };

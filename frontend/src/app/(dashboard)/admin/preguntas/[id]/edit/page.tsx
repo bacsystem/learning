@@ -281,10 +281,9 @@ export default function EditPreguntaPage() {
         setSubmitting(false);
         return;
       }
-      // The backend sends a specific message for every 409 (alternative with
-      // attempts, duplicated statement…) and 400 (invalid subject/tags). The
-      // key change on a question that already graded attempts (H133) gets its
-      // translated text.
+      // The server's message is never shown (it is Spanish, with internal field names). Only the key change on a question
+      // that already graded attempts (H133, a 409) is told apart, by its text, and gets its translation; the other
+      // errors use the generic one.
       setError(
         err.status === 409 && err.message?.includes("respuesta correcta")
           ? t("admin-preguntas-clave-con-intentos")

@@ -26,6 +26,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { adminGetUsuario, adminPatchUsuarioRol, type UsuarioDetalle } from "@/lib/admin/api";
 import { excede, LIMITES } from "@/lib/admin/limites";
 import { useAuth } from "@/lib/auth/auth-context";
+import { ERRORES_CORREO_USUARIO } from "@/lib/catalogs/errores";
 import { claveErrorApi } from "@/lib/errores-api";
 import {
   ACCION_SECUNDARIA,
@@ -150,7 +151,7 @@ export default function UsuarioDetallePage() {
       load();
     } catch (e: unknown) {
       // H21: 409 (email in use) / 422 must be visible over the dialog.
-      toast.error(t(claveErrorApi(e, { generico: "admin-usuarios-error-correo" })));
+      toast.error(t(claveErrorApi(e, { ...ERRORES_CORREO_USUARIO, generico: "admin-usuarios-error-correo" })));
       setEmailDialog((d) => ({ ...d, submitting: false }));
     }
   };
