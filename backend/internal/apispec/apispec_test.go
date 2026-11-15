@@ -12,6 +12,10 @@ import (
 // any route missing from the spec fails.
 var paquetesDocumentados = []string{
 	"server",
+	"inscripciones",
+	"testimonios",
+	"notifications",
+	"salud",
 }
 
 // TestRutasCoincidenConElSpec compares the routes registered in the code (and

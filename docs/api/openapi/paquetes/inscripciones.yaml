@@ -1,0 +1,567 @@
+# Paquete internal/inscripciones (backend-dev-2). Rutas: backend/internal/inscripciones/routes.go:17-29.
+# Escrito leyendo handler.go, service.go, repository.go y correo.go.
+# Contratos de diseño: plataforma-multi-institucion.md §2.2-2.3 (elegibilidad) y
+# plataforma-avisos-idioma.md §2.1 (motivo y aviso de la decisión).
+paths:
+  /stats/publico:
+    get:
+      operationId: inscripciones.GetStatsPublicos
+      tags: [inscripciones]
+      summary: Estadísticas públicas de la plataforma
+      description: |
+        Público. Conteos globales para la página de inicio. Sin parámetros.
+        Rol: `publico`.
+      x-rol: publico
+      security: []
+      responses:
+        '200':
+          description: Conteos actuales.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/StatsPublicos'
+              example:
+                total_usuarios: 120
+                total_simulacros: 340
+                total_practicas: 910
+                total_procesos: 4
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /procesos/publico:
+    get:
+      operationId: inscripciones.ListProcesosPublico
+      tags: [inscripciones]
+      summary: Procesos activos (vista pública)
+      description: |
+        Público. Todos los procesos con `estado = activo`, de cualquier
+        institución y nivel, ordenados por año descendente y nombre. Sin
+        paginar. Rol: `publico`.
+      x-rol: publico
+      security: []
+      responses:
+        '200':
+          description: Lista de procesos activos; `[]` si no hay ninguno.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/schemas/Proceso'
+              example:
+                - id: 1
+                  nombre: Ascenso 2027
+                  tipo: ascenso
+                  grado: Grado Ejemplo
+                  nivel: suboficial
+                  descripcion: Proceso de ejemplo.
+                  anio: 2027
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /procesos:
+    get:
+      operationId: inscripciones.ListProcesos
+      tags: [inscripciones]
+      summary: Procesos a los que el postulante puede inscribirse
+      description: |
+        Rol: `autenticado`. Procesos activos de la institución de la persona
+        del usuario cuyo nivel está vacío o coincide con el nivel de su
+        grado (PLT-06). La institución y el grado se leen de la base, no del
+        token. Sin paginar.
+      x-rol: autenticado
+      responses:
+        '200':
+          description: Procesos elegibles; `[]` si no hay ninguno.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/schemas/Proceso'
+              example:
+                - id: 1
+                  nombre: Ascenso 2027
+                  tipo: ascenso
+                  grado: Grado Ejemplo
+                  nivel: suboficial
+                  anio: 2027
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /inscripciones:
+    post:
+      operationId: inscripciones.Inscribir
+      tags: [inscripciones]
+      summary: Inscribirse a un proceso
+      description: |
+        Rol: `autenticado`. Crea la inscripción en estado `pendiente`, o
+        reabre una `rechazada` (queda `pendiente` de nuevo, sin motivo, y se
+        audita `reinscribir_inscripcion`). Orden de las comprobaciones:
+        el proceso existe y está activo, la institución, el nivel, y que no
+        haya una inscripción `pendiente` o `aprobada`. El monto sale de la
+        configuración de pago del año del proceso.
+
+        El cuerpo se lee sin rechazar campos desconocidos.
+      x-rol: autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/InscribirRequest'
+            example:
+              proceso_id: 1
+      responses:
+        '201':
+          description: Inscripción creada o reabierta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Inscripcion'
+              example:
+                id: 7
+                proceso_id: 1
+                proceso_nombre: Ascenso 2027
+                proceso_tipo: ascenso
+                proceso_anio: 2027
+                estado: pendiente
+        '400':
+          description: |
+            `cuerpo_invalido`: JSON mal formado o `proceso_id` ausente o no
+            positivo.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              example:
+                error: cuerpo_invalido
+                message: proceso_id es requerido.
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          description: |
+            El proceso no es accesible para este usuario:
+            `institucion_no_permitida` (es de otra institución) o
+            `nivel_no_permitido` (no coincide con el nivel de su grado).
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              examples:
+                institucion:
+                  value:
+                    error: institucion_no_permitida
+                    message: Este proceso pertenece a otra institución.
+                nivel:
+                  value:
+                    error: nivel_no_permitido
+                    message: No tienes acceso a este proceso.
+        '404':
+          description: |
+            `no_encontrado`: el proceso no existe o no está activo.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              example:
+                error: no_encontrado
+                message: El proceso no existe o no está activo.
+        '409':
+          description: |
+            `ya_inscrito` (hay una inscripción `pendiente` o `aprobada`) o
+            `sin_monto_configurado` (el año del proceso no tiene monto de
+            inscripción).
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              examples:
+                yaInscrito:
+                  value:
+                    error: ya_inscrito
+                    message: Ya estás inscrito en este proceso.
+                sinMonto:
+                  value:
+                    error: sin_monto_configurado
+                    message: El proceso no tiene un monto de inscripción configurado para su año. Contacta al administrador.
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoCodigo'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /inscripciones/me:
+    get:
+      operationId: inscripciones.MisInscripciones
+      tags: [inscripciones]
+      summary: Mis inscripciones
+      description: |
+        Rol: `autenticado`. Las inscripciones del usuario de la sesión, de la
+        más reciente a la más antigua. Sin paginar.
+      x-rol: autenticado
+      responses:
+        '200':
+          description: Inscripciones del usuario; `[]` si no tiene ninguna.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/schemas/Inscripcion'
+              example:
+                - id: 7
+                  proceso_id: 1
+                  proceso_nombre: Ascenso 2027
+                  proceso_tipo: ascenso
+                  proceso_anio: 2027
+                  estado: rechazado
+                  observacion: Motivo de ejemplo.
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/inscripciones:
+    get:
+      operationId: inscripciones.ListInscripciones
+      tags: [inscripciones]
+      summary: Listar inscripciones (admin)
+      description: |
+        Rol: `admin`. Una página de inscripciones, de la más reciente a la
+        más antigua. Responde un **array** (sin `total`).
+
+        Paginación **tolerante**: un `page` o `per_page` inválido cae al
+        defecto y uno enorme se recorta (`page` ≤ 1 000 000, `per_page` ≤
+        500). Defecto de `per_page`: 500.
+      x-rol: admin
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          description: |
+            Filtra por estado. No se valida: un valor desconocido devuelve
+            `[]`. Sin él, devuelve todas.
+          schema:
+            type: string
+            examples: [pendiente]
+        - $ref: '../openapi.yaml#/components/parameters/Page'
+        - name: per_page
+          in: query
+          required: false
+          description: Tolerante. Defecto 500, máximo 500.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 500
+      responses:
+        '200':
+          description: Página de inscripciones; `[]` si no hay ninguna.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/schemas/InscripcionAdmin'
+              example:
+                - id: 7
+                  usuario_id: 12
+                  username: persona.ejemplo
+                  nombre_completo: Persona Ejemplo Ejemplo
+                  dni: '00000000'
+                  grado: Grado Ejemplo
+                  especialidad: Especialidad Ejemplo
+                  proceso_nombre: Ascenso 2027
+                  proceso_tipo: ascenso
+                  proceso_anio: 2027
+                  estado: pendiente
+                  fecha_solicitud: '2026-11-01T15:04:05Z'
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/inscripciones/{id}/estado:
+    patch:
+      operationId: inscripciones.UpdateInscripcionEstado
+      tags: [inscripciones]
+      summary: Aprobar o rechazar una inscripción
+      description: |
+        Rol: `admin`. Solo se decide una inscripción `pendiente`; una ya
+        decidida es definitiva. En la misma transacción se audita
+        (`cambiar_estado_inscripcion`), se crea la notificación personal del
+        postulante y, si su persona tiene correo, se encola el correo (en
+        `usuarios.idioma`). Un fallo del aviso revierte la decisión.
+
+        Orden: el `id`, el cuerpo, el estado (`aprobado` | `rechazado`), la
+        longitud de `observacion` (≤ 500 caracteres) y el motivo obligatorio
+        del rechazo; después, que la inscripción exista (404) y siga
+        pendiente (409). `observacion` se recorta de espacios.
+      x-rol: admin
+      parameters:
+        - $ref: '../openapi.yaml#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/DecidirInscripcionRequest'
+            examples:
+              aprobar:
+                value:
+                  estado: aprobado
+              rechazar:
+                value:
+                  estado: rechazado
+                  observacion: Motivo de ejemplo.
+      responses:
+        '200':
+          description: Decisión registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Mensaje'
+              example:
+                message: Inscripción actualizada.
+        '400':
+          description: |
+            `parametro_invalido` (el `id` no es un entero positivo) o
+            `cuerpo_invalido` (JSON mal formado o `estado` vacío).
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              examples:
+                id:
+                  value:
+                    error: parametro_invalido
+                    message: ID inválido.
+                cuerpo:
+                  value:
+                    error: cuerpo_invalido
+                    message: estado es requerido.
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '404':
+          description: '`no_encontrado`: no existe la inscripción.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              example:
+                error: no_encontrado
+                message: Inscripción no encontrada.
+        '409':
+          description: |
+            `transicion_invalida`: la inscripción ya fue revisada.
+            `detalle.estado_actual` trae su estado.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              example:
+                error: transicion_invalida
+                message: 'La inscripción ya fue revisada; solo se pueden aprobar o rechazar inscripciones pendientes. Estado actual: aprobado.'
+                detalle:
+                  estado_actual: aprobado
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: |
+            `validacion` (`detalle.campo` = `estado` si no es `aprobado` ni
+            `rechazado`; `observacion` si pasa de 500 caracteres) o
+            `motivo_requerido` (un rechazo sin `observacion`).
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorCodigo'
+              examples:
+                estado:
+                  value:
+                    error: validacion
+                    message: 'Estado inválido. Valores permitidos: aprobado, rechazado.'
+                    detalle:
+                      campo: estado
+                motivo:
+                  value:
+                    error: motivo_requerido
+                    message: El motivo del rechazo es obligatorio.
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoCodigo'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+schemas:
+  StatsPublicos:
+    type: object
+    required: [total_usuarios, total_simulacros, total_practicas, total_procesos]
+    properties:
+      total_usuarios:
+        type: integer
+        format: int64
+        minimum: 0
+      total_simulacros:
+        type: integer
+        format: int64
+        minimum: 0
+      total_practicas:
+        type: integer
+        format: int64
+        minimum: 0
+      total_procesos:
+        type: integer
+        format: int64
+        minimum: 0
+
+  Proceso:
+    type: object
+    description: Proceso de examen visible para inscribirse.
+    required: [id, nombre, tipo, grado, nivel, anio]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      nombre:
+        type: string
+      tipo:
+        type: string
+      grado:
+        type: string
+        description: Nombre del grado del proceso; `""` si el proceso no tiene grado.
+      nivel:
+        type: string
+        description: Nivel exigido; `""` si el proceso es para cualquier nivel.
+      descripcion:
+        type: string
+        description: Se omite si el proceso no tiene descripción.
+      anio:
+        type: integer
+
+  InscribirRequest:
+    type: object
+    required: [proceso_id]
+    properties:
+      proceso_id:
+        type: integer
+        format: int64
+        minimum: 1
+
+  Inscripcion:
+    type: object
+    required: [id, proceso_id, proceso_nombre, proceso_tipo, proceso_anio, estado]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      proceso_id:
+        type: integer
+        format: int64
+        minimum: 1
+      proceso_nombre:
+        type: string
+      proceso_tipo:
+        type: string
+      proceso_anio:
+        type: integer
+      estado:
+        type: string
+        enum: [pendiente, aprobado, rechazado]
+      observacion:
+        type: string
+        description: Motivo o nota del admin. Se omite si no hay.
+
+  InscripcionAdmin:
+    type: object
+    required:
+      - id
+      - usuario_id
+      - username
+      - nombre_completo
+      - dni
+      - grado
+      - especialidad
+      - proceso_nombre
+      - proceso_tipo
+      - proceso_anio
+      - estado
+      - fecha_solicitud
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      usuario_id:
+        type: integer
+        format: int64
+        minimum: 1
+      username:
+        type: string
+      nombre_completo:
+        type: string
+        description: Nombres y apellidos de la persona, descifrados.
+      dni:
+        type: string
+        description: DNI de la persona, descifrado.
+      grado:
+        type: string
+      especialidad:
+        type: string
+      proceso_nombre:
+        type: string
+      proceso_tipo:
+        type: string
+      proceso_anio:
+        type: integer
+      estado:
+        type: string
+        enum: [pendiente, aprobado, rechazado]
+      observacion:
+        type: string
+        description: Se omite si no hay.
+      fecha_solicitud:
+        type: string
+        format: date-time
+      revisado_por:
+        type: string
+        description: Username de quien decidió. Se omite mientras está pendiente.
+      revisado_at:
+        type: string
+        format: date-time
+        description: Se omite mientras está pendiente.
+
+  DecidirInscripcionRequest:
+    type: object
+    required: [estado]
+    properties:
+      estado:
+        type: string
+        enum: [aprobado, rechazado]
+      observacion:
+        type: string
+        maxLength: 500
+        description: |
+          Motivo. Obligatorio (1 a 500 caracteres, sin contar espacios de los
+          extremos) si `estado` es `rechazado`; opcional en una aprobación.
+
+  Mensaje:
+    type: object
+    required: [message]
+    properties:
+      message:
+        type: string

@@ -131,12 +131,50 @@ paths:
   # ── admin ── (backend-dev-2)
 
   # ── inscripciones ── (backend-dev-2)
+  /stats/publico:
+    $ref: './paquetes/inscripciones.yaml#/paths/~1stats~1publico'
+  /procesos/publico:
+    $ref: './paquetes/inscripciones.yaml#/paths/~1procesos~1publico'
+  /procesos:
+    $ref: './paquetes/inscripciones.yaml#/paths/~1procesos'
+  /inscripciones:
+    $ref: './paquetes/inscripciones.yaml#/paths/~1inscripciones'
+  /inscripciones/me:
+    $ref: './paquetes/inscripciones.yaml#/paths/~1inscripciones~1me'
+  /admin/inscripciones:
+    $ref: './paquetes/inscripciones.yaml#/paths/~1admin~1inscripciones'
+  /admin/inscripciones/{id}/estado:
+    $ref: './paquetes/inscripciones.yaml#/paths/~1admin~1inscripciones~1{id}~1estado'
 
   # ── testimonios ── (backend-dev-2)
+  /testimonios/publico:
+    $ref: './paquetes/testimonios.yaml#/paths/~1testimonios~1publico'
+  /testimonios/me:
+    $ref: './paquetes/testimonios.yaml#/paths/~1testimonios~1me'
+  /testimonios:
+    $ref: './paquetes/testimonios.yaml#/paths/~1testimonios'
+  /admin/testimonios:
+    $ref: './paquetes/testimonios.yaml#/paths/~1admin~1testimonios'
+  /admin/testimonios/{id}/estado:
+    $ref: './paquetes/testimonios.yaml#/paths/~1admin~1testimonios~1{id}~1estado'
 
   # ── notifications ── (backend-dev-2)
+  /notificaciones:
+    $ref: './paquetes/notifications.yaml#/paths/~1notificaciones'
+  /notificaciones/no-leidas:
+    $ref: './paquetes/notifications.yaml#/paths/~1notificaciones~1no-leidas'
+  /notificaciones/{id}/leer:
+    $ref: './paquetes/notifications.yaml#/paths/~1notificaciones~1{id}~1leer'
+  /notificaciones/leer-todo:
+    $ref: './paquetes/notifications.yaml#/paths/~1notificaciones~1leer-todo'
+  /admin/notificaciones:
+    $ref: './paquetes/notifications.yaml#/paths/~1admin~1notificaciones'
+  /admin/notificaciones/{id}:
+    $ref: './paquetes/notifications.yaml#/paths/~1admin~1notificaciones~1{id}'
 
   # ── salud ── (backend-dev-2)
+  /admin/salud:
+    $ref: './paquetes/salud.yaml#/paths/~1admin~1salud'
 
 components:
   securitySchemes:
