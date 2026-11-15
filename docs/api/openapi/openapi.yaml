@@ -169,12 +169,54 @@ paths:
     $ref: './paquetes/perfiles.yaml#/paths/~1serums-ia~1profesion'
 
   # ── questions ── (backend-dev)
+  /preguntas/stats:
+    $ref: './paquetes/questions.yaml#/paths/~1preguntas~1stats'
+  /preguntas/import:
+    $ref: './paquetes/questions.yaml#/paths/~1preguntas~1import'
+  /preguntas/preview:
+    $ref: './paquetes/questions.yaml#/paths/~1preguntas~1preview'
+  /preguntas/generate-set:
+    $ref: './paquetes/questions.yaml#/paths/~1preguntas~1generate-set'
+  /preguntas:
+    $ref: './paquetes/questions.yaml#/paths/~1preguntas'
+  /preguntas/{id}:
+    $ref: './paquetes/questions.yaml#/paths/~1preguntas~1{id}'
+  /preguntas/{id}/estado:
+    $ref: './paquetes/questions.yaml#/paths/~1preguntas~1{id}~1estado'
+  /preguntas/{id}/citas:
+    $ref: './paquetes/questions.yaml#/paths/~1preguntas~1{id}~1citas'
+  /etiquetas:
+    $ref: './paquetes/questions.yaml#/paths/~1etiquetas'
+  /etiquetas/{id}:
+    $ref: './paquetes/questions.yaml#/paths/~1etiquetas~1{id}'
 
   # ── fuentes ── (backend-dev)
+  /admin/fuentes:
+    $ref: './paquetes/fuentes.yaml#/paths/~1admin~1fuentes'
+  /admin/fuentes/versiones:
+    $ref: './paquetes/fuentes.yaml#/paths/~1admin~1fuentes~1versiones'
+  /admin/fuentes/{id}:
+    $ref: './paquetes/fuentes.yaml#/paths/~1admin~1fuentes~1{id}'
+  /admin/fuentes/{id}/estado:
+    $ref: './paquetes/fuentes.yaml#/paths/~1admin~1fuentes~1{id}~1estado'
+  /admin/fuentes/{id}/oficial:
+    $ref: './paquetes/fuentes.yaml#/paths/~1admin~1fuentes~1{id}~1oficial'
+  /admin/pasajes:
+    $ref: './paquetes/fuentes.yaml#/paths/~1admin~1pasajes'
 
   # ── balotario ── (backend-dev)
+  /admin/fuentes/{id}/balotario:
+    $ref: './paquetes/balotario.yaml#/paths/~1admin~1fuentes~1{id}~1balotario'
+  /admin/fuentes/{id}/balotario/importaciones:
+    $ref: './paquetes/balotario.yaml#/paths/~1admin~1fuentes~1{id}~1balotario~1importaciones'
 
   # ── ia ── (backend-dev)
+  /serums-ia/ia/consumo:
+    $ref: './paquetes/ia.yaml#/paths/~1serums-ia~1ia~1consumo'
+  /admin/ia/configuracion:
+    $ref: './paquetes/ia.yaml#/paths/~1admin~1ia~1configuracion'
+  /admin/ia/gasto:
+    $ref: './paquetes/ia.yaml#/paths/~1admin~1ia~1gasto'
 
   # ── practices ── (backend-dev)
 
