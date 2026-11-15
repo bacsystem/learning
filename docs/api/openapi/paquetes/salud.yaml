@@ -1,0 +1,115 @@
+# Paquete internal/salud (backend-dev-2). Ruta: backend/internal/salud/routes.go:13.
+# Contrato de diseño: docs/api/plataforma-salud.md (S1). Escrito leyendo
+# handler.go, dto.go, service.go, comprobaciones.go, correo.go y copia.go.
+paths:
+  /admin/salud:
+    get:
+      operationId: salud.Obtener
+      tags: [salud]
+      summary: Estado de los servicios
+      description: |
+        Rol: `admin`. Sin parámetros ni cuerpo. Con la sesión válida
+        **siempre** responde `200`: el fallo de un servicio va en el cuerpo
+        (`estado` y `categoria`), nunca como status. Las comprobaciones corren
+        en paralelo con 2 s de tope cada una y el resultado se cachea 15 s
+        por réplica; `comprobado_en` es el de la ejecución cacheada.
+
+        Con la base totalmente caída la autenticación falla antes y la
+        respuesta es `503` del middleware, no `200` con `base_datos: caido`.
+      x-rol: admin
+      responses:
+        '200':
+          description: Estado global y de cada servicio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Salud'
+              example:
+                estado: degradado
+                comprobado_en: '2026-11-11T15:04:05Z'
+                servicios:
+                  - id: api
+                    estado: operativo
+                    categoria: null
+                    datos:
+                      version: 1.4.0
+                      en_marcha_s: 86400
+                  - id: base_datos
+                    estado: operativo
+                    categoria: null
+                    datos:
+                      latencia_ms: 20
+                  - id: correo
+                    estado: degradado
+                    categoria: atrasado
+                    datos:
+                      sin_enviar: 2
+                      antiguedad_max_min: 12
+                      fallidos_24h: 0
+                      ultimo_enviado_en: '2026-11-11T14:50:00Z'
+                  - id: copia_r2
+                    estado: operativo
+                    categoria: null
+                    datos:
+                      ultima_correcta_en: '2026-11-11T05:00:40Z'
+                      tamano_bytes: 52428800
+                      ultima_ejecucion: correcta
+                      ultima_ejecucion_en: '2026-11-11T05:00:40Z'
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+schemas:
+  Salud:
+    type: object
+    required: [estado, comprobado_en, servicios]
+    properties:
+      estado:
+        type: string
+        enum: [operativo, degradado, caido]
+        description: |
+          El peor de los individuales (`caido` > `degradado` = `desconocido` >
+          `operativo`; `no_configurado` no cuenta). El global nunca es
+          `desconocido`: cuenta como `degradado`.
+      comprobado_en:
+        type: string
+        format: date-time
+        description: Instante UTC de la ejecución, truncado al segundo.
+      servicios:
+        type: array
+        description: |
+          Lista abierta en orden fijo: `api`, `base_datos`, `correo`,
+          `copia_r2`. El cliente ignora los `id` que no conoce.
+        items:
+          $ref: '#/schemas/Servicio'
+
+  Servicio:
+    type: object
+    required: [id, estado, categoria, datos]
+    properties:
+      id:
+        type: string
+        examples: [base_datos]
+      estado:
+        type: string
+        enum: [operativo, degradado, caido, no_configurado, desconocido]
+      categoria:
+        type: [string, 'null']
+        enum: [sin_conexion, tiempo_agotado, error_interno, atrasado, sin_datos, null]
+        description: Categoría cerrada del problema; nunca el texto del error.
+      datos:
+        type: object
+        description: |
+          Propio de cada servicio, solo con números, versiones y fechas UTC
+          (sin hosts, URLs, credenciales ni direcciones). Nunca es `null`; un
+          dato que no se pudo obtener va como `null` dentro del objeto.
+          - `api`: `version` (texto), `en_marcha_s` (segundos).
+          - `base_datos`: `latencia_ms`.
+          - `correo`: `sin_enviar`, `antiguedad_max_min`, `fallidos_24h`,
+            `ultimo_enviado_en`.
+          - `copia_r2`: `ultima_correcta_en`, `tamano_bytes`,
+            `ultima_ejecucion`, `ultima_ejecucion_en`.
+        additionalProperties: true

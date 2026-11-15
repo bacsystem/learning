@@ -1,0 +1,358 @@
+# Paquete internal/testimonios (backend-dev-2). Rutas: backend/internal/testimonios/routes.go:15-19.
+# Escrito leyendo handler.go, dto.go, service.go y repository.go. Todos los
+# errores usan el formato heredado (ErrorTexto): el paquete es anterior al
+# módulo SERUMS IA.
+paths:
+  /testimonios/publico:
+    get:
+      operationId: testimonios.GetPublicos
+      tags: [testimonios]
+      summary: Testimonios aprobados (vista pública)
+      description: |
+        Público. Hasta 20 testimonios `aprobado`, del más reciente al más
+        antiguo. Se muestra a visitantes, así que solo lleva «Nombre I.»
+        (nombre y la inicial del apellido paterno), sin grado ni otro dato
+        que identifique. Sin paginar. Rol: `publico`.
+      x-rol: publico
+      security: []
+      responses:
+        '200':
+          description: Testimonios aprobados; `[]` si no hay.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items:
+                  $ref: '#/schemas/TestimonioPublico'
+              example:
+                - id: 3
+                  nombre_publico: Persona E.
+                  calificacion: 5
+                  contenido: Texto de ejemplo del testimonio.
+                  created_at: '2026-11-01T15:04:05Z'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+
+  /testimonios/me:
+    get:
+      operationId: testimonios.GetMio
+      tags: [testimonios]
+      summary: Mi testimonio
+      description: |
+        Rol: `autenticado`. El testimonio del usuario de la sesión (hay a lo
+        sumo uno por usuario). Si no ha enviado ninguno, responde `200` con
+        el cuerpo `null`.
+      x-rol: autenticado
+      responses:
+        '200':
+          description: El testimonio, o `null` si no tiene.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/schemas/MiTestimonio'
+                  - type: 'null'
+              examples:
+                conTestimonio:
+                  value:
+                    id: 3
+                    calificacion: 5
+                    contenido: Texto de ejemplo del testimonio.
+                    estado: pendiente
+                    created_at: '2026-11-01T15:04:05Z'
+                sinTestimonio:
+                  value: null
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /testimonios:
+    post:
+      operationId: testimonios.Submit
+      tags: [testimonios]
+      summary: Enviar o reemplazar mi testimonio
+      description: |
+        Rol: `autenticado`. Un solo testimonio por usuario: si ya existe, se
+        reemplaza su contenido y calificación y vuelve a `pendiente` para su
+        moderación.
+      x-rol: autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/SubmitRequest'
+            example:
+              contenido: Texto de ejemplo del testimonio.
+              calificacion: 5
+      responses:
+        '201':
+          description: Guardado, pendiente de aprobación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Mensaje'
+              example:
+                message: Testimonio enviado. Pendiente de aprobación.
+        '400':
+          description: JSON mal formado o con un tipo incorrecto.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: Cuerpo de solicitud inválido.
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: '`contenido` fuera de 10 a 300 caracteres o `calificacion` fuera de 1 a 5.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: El comentario debe tener entre 10 y 300 caracteres y la calificación entre 1 y 5.
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/testimonios:
+    get:
+      operationId: testimonios.ListAdmin
+      tags: [testimonios]
+      summary: Moderación de testimonios
+      description: |
+        Rol: `admin`. Testimonios de cualquier estado, del más reciente al
+        más antiguo, con los datos de su autor.
+
+        Paginación **tolerante**: un `page` o `per_page` inválido cae al
+        defecto y uno enorme se recorta (`page` ≤ 1 000 000, `per_page` ≤
+        100). Defecto de `per_page`: 20.
+      x-rol: admin
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          description: |
+            Filtra por estado. No se valida: un valor desconocido devuelve
+            una página vacía con `total: 0`.
+          schema:
+            type: string
+            examples: [pendiente]
+        - $ref: '../openapi.yaml#/components/parameters/Page'
+        - $ref: '../openapi.yaml#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Página de testimonios.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '../openapi.yaml#/components/schemas/PaginaMeta'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/schemas/TestimonioAdmin'
+              example:
+                total: 1
+                page: 1
+                per_page: 20
+                data:
+                  - id: 3
+                    usuario_id: 12
+                    username: persona.ejemplo
+                    nombre_completo: Persona Ejemplo Ejemplo
+                    grado: Grado Ejemplo
+                    calificacion: 5
+                    contenido: Texto de ejemplo del testimonio.
+                    estado: pendiente
+                    created_at: '2026-11-01T15:04:05Z'
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/testimonios/{id}/estado:
+    patch:
+      operationId: testimonios.UpdateEstado
+      tags: [testimonios]
+      summary: Aprobar o rechazar un testimonio
+      description: |
+        Rol: `admin`. Cambia el estado a `aprobado` o `rechazado` (se puede
+        cambiar de nuevo). Se audita `actualizar_estado_testimonio`.
+      x-rol: admin
+      parameters:
+        - $ref: '../openapi.yaml#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/UpdateEstadoRequest'
+            example:
+              estado: aprobado
+      responses:
+        '200':
+          description: Estado actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Mensaje'
+              example:
+                message: Estado actualizado.
+        '400':
+          description: '`id` que no es un entero positivo, o JSON mal formado.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              examples:
+                id:
+                  value:
+                    error: ID inválido.
+                cuerpo:
+                  value:
+                    error: Cuerpo de solicitud inválido.
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '404':
+          description: No existe el testimonio.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: Testimonio no encontrado.
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '422':
+          description: '`estado` ausente o distinto de `aprobado` y `rechazado`.'
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: 'Estado inválido. Use: aprobado o rechazado.'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+schemas:
+  TestimonioPublico:
+    type: object
+    required: [id, nombre_publico, calificacion, contenido, created_at]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      nombre_publico:
+        type: string
+        description: '«Nombre I.»: nombre e inicial del apellido paterno.'
+      calificacion:
+        type: integer
+        minimum: 1
+        maximum: 5
+      contenido:
+        type: string
+      created_at:
+        type: string
+        format: date-time
+
+  MiTestimonio:
+    type: object
+    required: [id, calificacion, contenido, estado, created_at]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      calificacion:
+        type: integer
+        minimum: 1
+        maximum: 5
+      contenido:
+        type: string
+      estado:
+        type: string
+        enum: [pendiente, aprobado, rechazado]
+      created_at:
+        type: string
+        format: date-time
+
+  TestimonioAdmin:
+    type: object
+    required: [id, usuario_id, username, nombre_completo, grado, calificacion, contenido, estado, created_at]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      usuario_id:
+        type: integer
+        format: int64
+        minimum: 1
+      username:
+        type: string
+      nombre_completo:
+        type: string
+      grado:
+        type: string
+        description: '`""` si la persona no tiene grado.'
+      calificacion:
+        type: integer
+        minimum: 1
+        maximum: 5
+      contenido:
+        type: string
+      estado:
+        type: string
+        enum: [pendiente, aprobado, rechazado]
+      created_at:
+        type: string
+        format: date-time
+
+  SubmitRequest:
+    type: object
+    required: [contenido, calificacion]
+    properties:
+      contenido:
+        type: string
+        minLength: 10
+        maxLength: 300
+      calificacion:
+        type: integer
+        minimum: 1
+        maximum: 5
+
+  UpdateEstadoRequest:
+    type: object
+    required: [estado]
+    properties:
+      estado:
+        type: string
+        enum: [aprobado, rechazado]
+
+  Mensaje:
+    type: object
+    required: [message]
+    properties:
+      message:
+        type: string

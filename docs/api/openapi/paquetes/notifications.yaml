@@ -1,0 +1,356 @@
+# Paquete internal/notifications (backend-dev-2). Rutas: backend/internal/notifications/routes.go:20-28.
+# Escrito leyendo handler.go, dto.go y repository.go. Errores en formato
+# heredado (ErrorTexto). Avisos personales (clave y parametros):
+# plataforma-avisos-idioma.md §2.3.
+paths:
+  /notificaciones:
+    get:
+      operationId: notifications.List
+      tags: [notifications]
+      summary: Mis notificaciones
+      description: |
+        Rol: `autenticado`. Las últimas 100 notificaciones visibles para el
+        usuario, de la más reciente a la más antigua: las dirigidas a
+        `todos`, las de su rol (`rol:<rol>`, con el rol de la sesión) y las
+        personales (creadas para él, como el aviso de una inscripción).
+        `leida` es por usuario. Sin paginar.
+      x-rol: autenticado
+      responses:
+        '200':
+          description: Notificaciones visibles; `[]` si no hay.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 100
+                items:
+                  $ref: '#/schemas/Notificacion'
+              examples:
+                general:
+                  value:
+                    - id: 5
+                      titulo: Mantenimiento programado
+                      cuerpo: Texto de ejemplo.
+                      tipo: mantenimiento
+                      destinatario: todos
+                      creado_por: 1
+                      created_at: '2026-11-01T15:04:05Z'
+                      leida: false
+                      clave: null
+                      parametros: null
+                personal:
+                  value:
+                    - id: 9
+                      titulo: Inscripción aprobada
+                      cuerpo: Tu inscripción al proceso Ascenso 2027 fue aprobada.
+                      tipo: sistema
+                      destinatario: usuario
+                      creado_por: 1
+                      created_at: '2026-11-02T10:00:00Z'
+                      leida: false
+                      clave: inscripcion_aprobada
+                      parametros:
+                        proceso: Ascenso 2027
+                        institucion: Institución Ejemplo
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /notificaciones/no-leidas:
+    get:
+      operationId: notifications.UnreadCount
+      tags: [notifications]
+      summary: Cantidad de notificaciones sin leer
+      description: |
+        Rol: `autenticado`. Cuenta las notificaciones visibles para el
+        usuario (mismas reglas que `GET /notificaciones`) que no ha leído.
+        A diferencia del listado, no se limita a 100.
+      x-rol: autenticado
+      responses:
+        '200':
+          description: Cantidad sin leer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/ConteoNoLeidas'
+              example:
+                count: 2
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /notificaciones/{id}/leer:
+    post:
+      operationId: notifications.MarkRead
+      tags: [notifications]
+      summary: Marcar una notificación como leída
+      description: |
+        Rol: `autenticado`. Idempotente. Solo se pueden marcar las visibles
+        para el usuario; una ajena o inexistente responde igual `404`. Sin
+        cuerpo.
+      x-rol: autenticado
+      parameters:
+        - $ref: '../openapi.yaml#/components/parameters/Id'
+      responses:
+        '204':
+          description: Marcada como leída.
+        '400':
+          description: El `id` no es un entero positivo.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: ID inválido.
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '404':
+          description: No existe o no es visible para el usuario.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: Notificación no encontrada.
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /notificaciones/leer-todo:
+    post:
+      operationId: notifications.MarkAllRead
+      tags: [notifications]
+      summary: Marcar todas como leídas
+      description: |
+        Rol: `autenticado`. Marca todas las notificaciones visibles para el
+        usuario. Idempotente y seguro ante llamadas concurrentes. Sin cuerpo.
+      x-rol: autenticado
+      responses:
+        '204':
+          description: Todas marcadas como leídas.
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/notificaciones:
+    get:
+      operationId: notifications.AdminList
+      tags: [notifications]
+      summary: Notificaciones generales (admin)
+      description: |
+        Rol: `admin`. Las últimas 200 notificaciones **generales** (sin
+        usuario destinatario), de la más reciente a la más antigua. Las
+        personales no se listan. `leida` es siempre `false` y `clave` y
+        `parametros` son `null`. Sin paginar.
+      x-rol: admin
+      responses:
+        '200':
+          description: Notificaciones generales; `[]` si no hay.
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 200
+                items:
+                  $ref: '#/schemas/Notificacion'
+              example:
+                - id: 5
+                  titulo: Mantenimiento programado
+                  cuerpo: Texto de ejemplo.
+                  tipo: mantenimiento
+                  destinatario: todos
+                  creado_por: 1
+                  created_at: '2026-11-01T15:04:05Z'
+                  leida: false
+                  clave: null
+                  parametros: null
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+    post:
+      operationId: notifications.AdminCreate
+      tags: [notifications]
+      summary: Crear una notificación general
+      description: |
+        Rol: `admin`. Crea una notificación para `todos` o para un rol. Se
+        audita `crear_notificacion`. El valor heredado `rol:user` se acepta y
+        se guarda como `rol:usuario`.
+      x-rol: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/schemas/CrearNotificacionRequest'
+            example:
+              titulo: Mantenimiento programado
+              cuerpo: Texto de ejemplo.
+              tipo: mantenimiento
+              destinatario: todos
+      responses:
+        '201':
+          description: Notificación creada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/schemas/Notificacion'
+              example:
+                id: 5
+                titulo: Mantenimiento programado
+                cuerpo: Texto de ejemplo.
+                tipo: mantenimiento
+                destinatario: todos
+                creado_por: 1
+                created_at: '2026-11-01T15:04:05Z'
+                leida: false
+                clave: null
+                parametros: null
+        '400':
+          description: |
+            JSON mal formado (`Cuerpo de solicitud inválido.`) o un campo
+            que no cumple las reglas: el texto es el mensaje del validador.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: Cuerpo de solicitud inválido.
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '413':
+          $ref: '../openapi.yaml#/components/responses/CuerpoDemasiadoGrande'
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+  /admin/notificaciones/{id}:
+    delete:
+      operationId: notifications.AdminDelete
+      tags: [notifications]
+      summary: Eliminar una notificación general
+      description: |
+        Rol: `admin`. Solo las generales; una personal responde `404` como
+        un id desconocido. Se audita `eliminar_notificacion`.
+      x-rol: admin
+      parameters:
+        - $ref: '../openapi.yaml#/components/parameters/Id'
+      responses:
+        '204':
+          description: Eliminada.
+        '400':
+          description: El `id` no es un entero positivo.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: ID inválido.
+        '401':
+          $ref: '../openapi.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: '../openapi.yaml#/components/responses/AccesoDenegado'
+        '404':
+          description: No existe o es personal.
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorTexto'
+              example:
+                error: Notificación no encontrada.
+        '500':
+          $ref: '../openapi.yaml#/components/responses/ErrorInternoTexto'
+        '503':
+          $ref: '../openapi.yaml#/components/responses/ServicioNoDisponible'
+
+schemas:
+  Notificacion:
+    type: object
+    required: [id, titulo, cuerpo, tipo, destinatario, created_at, leida, clave, parametros]
+    properties:
+      id:
+        type: integer
+        format: int64
+        minimum: 1
+      titulo:
+        type: string
+      cuerpo:
+        type: string
+      tipo:
+        type: string
+        description: |
+          Tipo de la notificación general: `sistema`, `mantenimiento`,
+          `funcionalidad` o `alerta`. Las personales usan `sistema`.
+      destinatario:
+        type: string
+        description: |
+          `todos`, `rol:admin` o `rol:usuario`; `usuario` en una notificación
+          personal.
+      creado_por:
+        type: integer
+        format: int64
+        description: Id del admin que la creó. Se omite si no se conoce.
+      created_at:
+        type: string
+        format: date-time
+      leida:
+        type: boolean
+        description: Si el usuario de la sesión ya la leyó.
+      clave:
+        type: [string, 'null']
+        description: |
+          Solo en las personales: clave de traducción (p. ej.
+          `inscripcion_aprobada`, `inscripcion_rechazada`). La UI la traduce
+          en el idioma actual con `parametros`; si no la conoce, muestra
+          `titulo` y `cuerpo`, que van en el idioma guardado del usuario.
+      parametros:
+        type: [object, 'null']
+        description: |
+          Solo en las personales: datos para interpolar la clave (nombre del
+          proceso, institución y motivo). Son datos, no se traducen.
+        additionalProperties:
+          type: string
+
+  ConteoNoLeidas:
+    type: object
+    required: [count]
+    properties:
+      count:
+        type: integer
+        minimum: 0
+
+  CrearNotificacionRequest:
+    type: object
+    required: [titulo, cuerpo, tipo, destinatario]
+    properties:
+      titulo:
+        type: string
+        minLength: 3
+        maxLength: 200
+      cuerpo:
+        type: string
+        minLength: 3
+      tipo:
+        type: string
+        enum: [sistema, mantenimiento, funcionalidad, alerta]
+      destinatario:
+        type: string
+        enum: [todos, 'rol:admin', 'rol:usuario']
+        description: El valor heredado `rol:user` se normaliza a `rol:usuario`.
