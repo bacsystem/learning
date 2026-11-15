@@ -109,10 +109,64 @@ paths:
     $ref: './paquetes/server.yaml#/paths/~1health'
 
   # ── catalogs ── (backend-dev)
+  /instituciones:
+    $ref: './paquetes/catalogs.yaml#/paths/~1instituciones'
+  /instituciones/{id}:
+    $ref: './paquetes/catalogs.yaml#/paths/~1instituciones~1{id}'
+  /instituciones/{id}/estado:
+    $ref: './paquetes/catalogs.yaml#/paths/~1instituciones~1{id}~1estado'
+  /grados:
+    $ref: './paquetes/catalogs.yaml#/paths/~1grados'
+  /grados/{id}:
+    $ref: './paquetes/catalogs.yaml#/paths/~1grados~1{id}'
+  /grados/{id}/estado:
+    $ref: './paquetes/catalogs.yaml#/paths/~1grados~1{id}~1estado'
+  /especialidades:
+    $ref: './paquetes/catalogs.yaml#/paths/~1especialidades'
+  /especialidades/{id}:
+    $ref: './paquetes/catalogs.yaml#/paths/~1especialidades~1{id}'
+  /especialidades/{id}/estado:
+    $ref: './paquetes/catalogs.yaml#/paths/~1especialidades~1{id}~1estado'
+  /asignaturas:
+    $ref: './paquetes/catalogs.yaml#/paths/~1asignaturas'
+  /asignaturas/{id}:
+    $ref: './paquetes/catalogs.yaml#/paths/~1asignaturas~1{id}'
+  /asignaturas/{id}/estado:
+    $ref: './paquetes/catalogs.yaml#/paths/~1asignaturas~1{id}~1estado'
+  /admin/procesos:
+    $ref: './paquetes/catalogs.yaml#/paths/~1admin~1procesos'
+  /admin/procesos/{id}:
+    $ref: './paquetes/catalogs.yaml#/paths/~1admin~1procesos~1{id}'
+  /admin/procesos/{id}/estado:
+    $ref: './paquetes/catalogs.yaml#/paths/~1admin~1procesos~1{id}~1estado'
+  /procesos/{id}/asignaturas:
+    $ref: './paquetes/catalogs.yaml#/paths/~1procesos~1{id}~1asignaturas'
+  /admin/procesos/{id}/asignaturas:
+    $ref: './paquetes/catalogs.yaml#/paths/~1admin~1procesos~1{id}~1asignaturas'
+  /admin/procesos/{id}/asignaturas/{asignaturaId}:
+    $ref: './paquetes/catalogs.yaml#/paths/~1admin~1procesos~1{id}~1asignaturas~1{asignaturaId}'
+  /admin/procesos/{id}/pesos:
+    $ref: './paquetes/catalogs.yaml#/paths/~1admin~1procesos~1{id}~1pesos'
+  /admin/procesos/{id}/pesos/{especialidadId}:
+    $ref: './paquetes/catalogs.yaml#/paths/~1admin~1procesos~1{id}~1pesos~1{especialidadId}'
 
   # ── temas ── (backend-dev)
+  /admin/temas:
+    $ref: './paquetes/temas.yaml#/paths/~1admin~1temas'
+  /admin/temas/{id}:
+    $ref: './paquetes/temas.yaml#/paths/~1admin~1temas~1{id}'
+  /admin/temas/{id}/estado:
+    $ref: './paquetes/temas.yaml#/paths/~1admin~1temas~1{id}~1estado'
+  /admin/asignaturas/{id}/temas/orden:
+    $ref: './paquetes/temas.yaml#/paths/~1admin~1asignaturas~1{id}~1temas~1orden'
+  /asignaturas/{id}/temas:
+    $ref: './paquetes/temas.yaml#/paths/~1asignaturas~1{id}~1temas'
 
   # ── perfiles ── (backend-dev)
+  /serums-ia/profesion/opciones:
+    $ref: './paquetes/perfiles.yaml#/paths/~1serums-ia~1profesion~1opciones'
+  /serums-ia/profesion:
+    $ref: './paquetes/perfiles.yaml#/paths/~1serums-ia~1profesion'
 
   # ── questions ── (backend-dev)
 

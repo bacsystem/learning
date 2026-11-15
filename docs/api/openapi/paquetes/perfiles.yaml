@@ -1,0 +1,291 @@
+# Paquete perfiles (backend-dev). Rutas: backend/internal/perfiles/routes.go:17-19.
+# Contrato de apoyo: docs/api/serums-ia-e1-taxonomia.md §3 (F1–F3). Todos los errores usan ErrorCodigo.
+paths:
+  /serums-ia/profesion/opciones:
+    get:
+      operationId: "perfiles.Opciones"
+      tags: ["perfiles"]
+      summary: "Opciones de profesión (F1)"
+      description: |
+        Procesos con inscripción aprobada del usuario y, por cada uno, las especialidades activas de su institución. Solo lectura. El usuario sale de la sesión, nunca de un parámetro.
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      responses:
+        "200":
+          description: "Opciones y preselección."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Opciones"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /serums-ia/profesion:
+    get:
+      operationId: "perfiles.Perfil"
+      tags: ["perfiles"]
+      summary: "Perfil de profesión activo (F2)"
+      description: |
+        Devuelve el perfil activo del usuario con los pesos de su especialidad (estimados si no tiene configuración propia).
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      responses:
+        "200":
+          description: "El perfil activo."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Perfil"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          description: "La inscripción del perfil dejó de estar aprobada (`inscripcion_requerida`); el perfil se conserva."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "inscripcion_requerida"
+                message: "Necesitas una inscripción aprobada en el proceso."
+        "404":
+          description: "Aún no eligió profesión (`profesion_no_definida`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "profesion_no_definida"
+                message: "Aún no elegiste tu profesión."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    put:
+      operationId: "perfiles.Elegir"
+      tags: ["perfiles"]
+      summary: "Elegir o cambiar la profesión (F3)"
+      description: |
+        Orden de las reglas: cuerpo válido, inscripción aprobada, especialidad válida, mismo par (idempotente), confirmación del reinicio, cambio. Cambiar archiva el perfil anterior y su dominio. No modifica los datos de la persona. No se audita.
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/ElegirProfesionRequest"
+      responses:
+        "200":
+          description: "Perfil activo tras la elección (sin cambios si era el mismo par)."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Perfil"
+        "400":
+          description: "JSON mal formado o con campos desconocidos (`cuerpo_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "cuerpo_invalido"
+                message: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          description: "Sin inscripción aprobada en `proceso_id`; un proceso inexistente cuenta igual para no revelar qué existe (`inscripcion_requerida`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "inscripcion_requerida"
+                message: "Necesitas una inscripción aprobada en el proceso."
+        "409":
+          description: "`confirmacion_requerida` (hay un perfil distinto y falta `confirmar_reinicio`; `detalle.actual` trae el par actual) o `estado_invalido` (carrera entre dos PUT)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                confirmacion_requerida:
+                  value:
+                    error: "confirmacion_requerida"
+                    message: "Cambiar de profesión reinicia tu dominio; confírmalo para continuar."
+                    detalle:
+                      actual:
+                        proceso_id: 12
+                        especialidad_id: 2
+                estado_invalido:
+                  value:
+                    error: "estado_invalido"
+                    message: "Tu profesión cambió mientras guardabas; vuelve a intentarlo."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "`validacion` (un id falta o es ≤ 0) o `especialidad_invalida` (no existe, está inactiva o no es de la institución del proceso)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                validacion:
+                  value:
+                    error: "validacion"
+                    message: "Datos inválidos."
+                    detalle:
+                      campos:
+                        proceso_id: "requerido"
+                especialidad_invalida:
+                  value:
+                    error: "especialidad_invalida"
+                    message: "La profesión no existe, está inactiva o no corresponde al proceso."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+schemas:
+  EspecialidadOpcion:
+    type: "object"
+    required: ["id", "nombre", "codigo", "pesos"]
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 5
+      nombre:
+        type: "string"
+        example: "Enfermería"
+      codigo:
+        type: "string"
+        example: "ENF"
+      pesos:
+        type: "string"
+        description: "Si la especialidad tiene una configuración de pesos propia (`completa`) o usa pesos estimados (`estimada`)."
+        enum: ["completa", "estimada"]
+  ProcesoOpcion:
+    type: "object"
+    required: ["id", "nombre", "anio", "especialidades"]
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 12
+      nombre:
+        type: "string"
+        example: "Proceso Ejemplo 2026-I"
+      anio:
+        type: "integer"
+        example: 2026
+      especialidades:
+        type: "array"
+        items:
+          $ref: "#/schemas/EspecialidadOpcion"
+  Preseleccion:
+    type: "object"
+    description: "Sugerencia del servidor; no se guarda nada."
+    required: ["proceso_id", "especialidad_id"]
+    properties:
+      proceso_id:
+        type: ["integer", "null"]
+        description: "Único proceso disponible; `null` si hay varios."
+        format: "int64"
+      especialidad_id:
+        type: "integer"
+        format: "int64"
+        example: 5
+  Opciones:
+    type: "object"
+    required: ["procesos", "preseleccion"]
+    properties:
+      procesos:
+        type: "array"
+        items:
+          $ref: "#/schemas/ProcesoOpcion"
+        description: "Procesos donde el usuario tiene una inscripción aprobada."
+      preseleccion:
+        oneOf:
+          - $ref: "#/schemas/Preseleccion"
+          - type: "null"
+        description: "`null` si no hay una sugerencia válida."
+  Ref:
+    type: "object"
+    required: ["id", "nombre"]
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 12
+      nombre:
+        type: "string"
+        example: "Proceso Ejemplo 2026-I"
+  AreaPesoPerfil:
+    type: "object"
+    required: ["asignatura_id", "nombre", "peso_porcentual"]
+    properties:
+      asignatura_id:
+        type: "integer"
+        format: "int64"
+        example: 7
+      nombre:
+        type: "string"
+        example: "Salud pública"
+      peso_porcentual:
+        type: "number"
+        example: 25.0
+  Perfil:
+    type: "object"
+    description: "Perfil activo del postulante (F2, y respuesta de F3)."
+    required: ["id", "proceso", "especialidad", "estado", "created_at", "pesos"]
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 301
+      proceso:
+        $ref: "#/schemas/Ref"
+      especialidad:
+        $ref: "#/schemas/Ref"
+      estado:
+        type: "string"
+        example: "activo"
+      created_at:
+        type: "string"
+        format: "date-time"
+        example: "2026-11-15T15:04:05Z"
+      pesos:
+        type: "object"
+        required: ["pesos_estimados", "areas"]
+        properties:
+          pesos_estimados:
+            type: "boolean"
+            example: true
+          areas:
+            type: "array"
+            items:
+              $ref: "#/schemas/AreaPesoPerfil"
+  ElegirProfesionRequest:
+    type: "object"
+    required: ["proceso_id", "especialidad_id"]
+    properties:
+      proceso_id:
+        type: "integer"
+        format: "int64"
+        minimum: 1
+        example: 12
+      especialidad_id:
+        type: "integer"
+        format: "int64"
+        minimum: 1
+        example: 5
+      confirmar_reinicio:
+        type: "boolean"
+        description: "Debe ser `true` para cambiar un perfil activo distinto; ausente = `false`."
+        default: false
+    additionalProperties: false

@@ -18,6 +18,9 @@ var paquetesDocumentados = []string{
 	"salud",
 	"auth",
 	"admin",
+	"catalogs",
+	"temas",
+	"perfiles",
 }
 
 // TestRutasCoincidenConElSpec compares the routes registered in the code (and

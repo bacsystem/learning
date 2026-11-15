@@ -1,0 +1,2460 @@
+# Paquete catalogs (backend-dev). Rutas: backend/internal/catalogs/routes.go:23-67.
+# Escrito leyendo el código (handler.go, pesos_handler.go, dto.go, pesos_dto.go).
+# Contrato de apoyo: docs/api/serums-ia-e1-taxonomia.md §2 (pesos, PE1–PE3, PE5).
+# Los handlers de catálogos son anteriores a SERUMS IA: responden ErrorTexto,
+# salvo `peso_duplicado` y los endpoints de pesos, que responden ErrorCodigo.
+paths:
+  /instituciones:
+    get:
+      operationId: "catalogs.ListInstituciones"
+      tags: ["catalogs"]
+      summary: "Listar instituciones"
+      description: |
+        Lista instituciones. Devuelve un **array** (no `{data, total}`). Paginación estricta: `limit` entero de 1 a 100 (más se recorta a 100) o `all` (o ausente) para el catálogo completo, con un tope de 1000 filas; `page` (base 1) solo tiene efecto con un `limit` numérico. Un `limit` o `page` mal formado, o un filtro numérico inválido, da `400`.
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      parameters:
+        - name: "estado"
+          in: "query"
+          required: false
+          description: "Filtra por estado. Cualquier otro valor no devuelve filas (no se valida)."
+          schema:
+            type: "string"
+            enum: ["activo", "inactivo"]
+        - $ref: "../openapi.yaml#/components/parameters/Limit"
+        - $ref: "../openapi.yaml#/components/parameters/Page"
+      responses:
+        "200":
+          description: "Array de instituciones (vacío si no hay)."
+          content:
+            "application/json":
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/schemas/Institucion"
+        "400":
+          description: "Parámetro de consulta inválido (`limit`, `page`, `institucion_id` o `anio`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Parámetros de consulta inválidos."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    post:
+      operationId: "catalogs.CreateInstitucion"
+      tags: ["catalogs"]
+      summary: "Crear institución"
+      description: |
+        Crea un registro y lo audita.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/InstitucionRequest"
+      responses:
+        "201":
+          description: "Registro creado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Institucion"
+        "400":
+          description: "El cuerpo no es un JSON válido."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe una institución con esas siglas."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "El cuerpo no cumple las reglas de validación (`validate`); el texto es el del validador."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /instituciones/{id}:
+    get:
+      operationId: "catalogs.GetInstitucion"
+      tags: ["catalogs"]
+      summary: "Obtener institución"
+      description: |
+        Devuelve un registro por id.
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "200":
+          description: "El registro."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Institucion"
+        "400":
+          description: "El id de la ruta no es un entero > 0."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    put:
+      operationId: "catalogs.UpdateInstitucion"
+      tags: ["catalogs"]
+      summary: "Actualizar institución"
+      description: |
+        Reemplaza los campos editables y lo audita.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/InstitucionRequest"
+      responses:
+        "200":
+          description: "Registro actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Institucion"
+        "400":
+          description: "Id o cuerpo inválidos."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe una institución con esas siglas."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "El cuerpo no cumple las reglas de validación (`validate`); el texto es el del validador."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /instituciones/{id}/estado:
+    patch:
+      operationId: "catalogs.UpdateInstitucionEstado"
+      tags: ["catalogs"]
+      summary: "Cambiar el estado de institución"
+      description: |
+        Activa o desactiva el registro y lo audita. **Desactivar** una institución desactiva en cascada sus grados, especialidades y procesos, en una transacción; reactivarla no los reactiva.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/EstadoRequest"
+      responses:
+        "200":
+          description: "Estado actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Mensaje"
+              example:
+                message: "Estado actualizado."
+        "400":
+          description: "Id o cuerpo inválidos."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "El cuerpo no cumple las reglas de validación (`validate`); el texto es el del validador."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /grados:
+    get:
+      operationId: "catalogs.ListGrados"
+      tags: ["catalogs"]
+      summary: "Listar grados"
+      description: |
+        Lista grados. Devuelve un **array** (no `{data, total}`). Paginación estricta: `limit` entero de 1 a 100 (más se recorta a 100) o `all` (o ausente) para el catálogo completo, con un tope de 1000 filas; `page` (base 1) solo tiene efecto con un `limit` numérico. Un `limit` o `page` mal formado, o un filtro numérico inválido, da `400`.
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      parameters:
+        - name: "institucion_id"
+          in: "query"
+          required: false
+          description: "Filtra por institución; `0` o ausente = todas. Un valor negativo o no numérico da `400`."
+          schema:
+            type: "integer"
+            format: "int64"
+            minimum: 0
+        - name: "estado"
+          in: "query"
+          required: false
+          description: "Filtra por estado. Cualquier otro valor no devuelve filas (no se valida)."
+          schema:
+            type: "string"
+            enum: ["activo", "inactivo"]
+        - $ref: "../openapi.yaml#/components/parameters/Limit"
+        - $ref: "../openapi.yaml#/components/parameters/Page"
+      responses:
+        "200":
+          description: "Array de grados (vacío si no hay)."
+          content:
+            "application/json":
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/schemas/Grado"
+        "400":
+          description: "Parámetro de consulta inválido (`limit`, `page`, `institucion_id` o `anio`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Parámetros de consulta inválidos."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    post:
+      operationId: "catalogs.CreateGrado"
+      tags: ["catalogs"]
+      summary: "Crear grado"
+      description: |
+        Crea un registro y lo audita.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/GradoRequest"
+      responses:
+        "201":
+          description: "Registro creado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Grado"
+        "400":
+          description: "El cuerpo no es un JSON válido."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe un grado con ese nombre u orden para esta institución."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "Datos inválidos (texto del validador) o referencia inválida (la institución o el grado no existen; `Referencia inválida.: …`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /grados/{id}:
+    get:
+      operationId: "catalogs.GetGrado"
+      tags: ["catalogs"]
+      summary: "Obtener grado"
+      description: |
+        Devuelve un registro por id.
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "200":
+          description: "El registro."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Grado"
+        "400":
+          description: "El id de la ruta no es un entero > 0."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    put:
+      operationId: "catalogs.UpdateGrado"
+      tags: ["catalogs"]
+      summary: "Actualizar grado"
+      description: |
+        Reemplaza los campos editables y lo audita.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/GradoRequest"
+      responses:
+        "200":
+          description: "Registro actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Grado"
+        "400":
+          description: "Id o cuerpo inválidos."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe un grado con ese nombre u orden para esta institución."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "Datos inválidos (texto del validador) o referencia inválida (`Referencia inválida.: …`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /grados/{id}/estado:
+    patch:
+      operationId: "catalogs.UpdateGradoEstado"
+      tags: ["catalogs"]
+      summary: "Cambiar el estado de grado"
+      description: |
+        Activa o desactiva el registro y lo audita.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/EstadoRequest"
+      responses:
+        "200":
+          description: "Estado actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Mensaje"
+              example:
+                message: "Estado actualizado."
+        "400":
+          description: "Id o cuerpo inválidos."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Existen usuarios activos vinculados a este grado."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "El cuerpo no cumple las reglas de validación (`validate`); el texto es el del validador."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /especialidades:
+    get:
+      operationId: "catalogs.ListEspecialidades"
+      tags: ["catalogs"]
+      summary: "Listar especialidades"
+      description: |
+        Lista especialidades. Devuelve un **array** (no `{data, total}`). Paginación estricta: `limit` entero de 1 a 100 (más se recorta a 100) o `all` (o ausente) para el catálogo completo, con un tope de 1000 filas; `page` (base 1) solo tiene efecto con un `limit` numérico. Un `limit` o `page` mal formado, o un filtro numérico inválido, da `400`.
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      parameters:
+        - name: "institucion_id"
+          in: "query"
+          required: false
+          description: "Filtra por institución; `0` o ausente = todas. Un valor negativo o no numérico da `400`."
+          schema:
+            type: "integer"
+            format: "int64"
+            minimum: 0
+        - name: "estado"
+          in: "query"
+          required: false
+          description: "Filtra por estado. Cualquier otro valor no devuelve filas (no se valida)."
+          schema:
+            type: "string"
+            enum: ["activo", "inactivo"]
+        - name: "nivel"
+          in: "query"
+          required: false
+          description: "Filtra por nivel de la especialidad."
+          schema:
+            type: "string"
+            enum: ["suboficial", "oficial"]
+        - $ref: "../openapi.yaml#/components/parameters/Limit"
+        - $ref: "../openapi.yaml#/components/parameters/Page"
+      responses:
+        "200":
+          description: "Array de especialidades (vacío si no hay)."
+          content:
+            "application/json":
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/schemas/Especialidad"
+        "400":
+          description: "Parámetro de consulta inválido (`limit`, `page`, `institucion_id` o `anio`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Parámetros de consulta inválidos."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    post:
+      operationId: "catalogs.CreateEspecialidad"
+      tags: ["catalogs"]
+      summary: "Crear especialidad"
+      description: |
+        Crea un registro y lo audita.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/EspecialidadRequest"
+      responses:
+        "201":
+          description: "Registro creado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Especialidad"
+        "400":
+          description: "El cuerpo no es un JSON válido."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe una especialidad con ese código para esta institución."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "Datos inválidos (texto del validador) o referencia inválida (la institución o el grado no existen; `Referencia inválida.: …`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /especialidades/{id}:
+    get:
+      operationId: "catalogs.GetEspecialidad"
+      tags: ["catalogs"]
+      summary: "Obtener especialidad"
+      description: |
+        Devuelve un registro por id.
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "200":
+          description: "El registro."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Especialidad"
+        "400":
+          description: "El id de la ruta no es un entero > 0."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    put:
+      operationId: "catalogs.UpdateEspecialidad"
+      tags: ["catalogs"]
+      summary: "Actualizar especialidad"
+      description: |
+        Reemplaza los campos editables y lo audita.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/EspecialidadRequest"
+      responses:
+        "200":
+          description: "Registro actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Especialidad"
+        "400":
+          description: "Id o cuerpo inválidos."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe una especialidad con ese código para esta institución."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "Datos inválidos (texto del validador) o referencia inválida (`Referencia inválida.: …`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /especialidades/{id}/estado:
+    patch:
+      operationId: "catalogs.UpdateEspecialidadEstado"
+      tags: ["catalogs"]
+      summary: "Cambiar el estado de especialidad"
+      description: |
+        Activa o desactiva el registro y lo audita.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/EstadoRequest"
+      responses:
+        "200":
+          description: "Estado actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Mensaje"
+              example:
+                message: "Estado actualizado."
+        "400":
+          description: "Id o cuerpo inválidos."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Existen usuarios activos vinculados a esta especialidad."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "El cuerpo no cumple las reglas de validación (`validate`); el texto es el del validador."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /asignaturas:
+    get:
+      operationId: "catalogs.ListAsignaturas"
+      tags: ["catalogs"]
+      summary: "Listar asignaturas"
+      description: |
+        Lista asignaturas. Devuelve un **array** (no `{data, total}`). Paginación estricta: `limit` entero de 1 a 100 (más se recorta a 100) o `all` (o ausente) para el catálogo completo, con un tope de 1000 filas; `page` (base 1) solo tiene efecto con un `limit` numérico. Un `limit` o `page` mal formado, o un filtro numérico inválido, da `400`.
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      parameters:
+        - name: "estado"
+          in: "query"
+          required: false
+          description: "Filtra por estado. Cualquier otro valor no devuelve filas (no se valida)."
+          schema:
+            type: "string"
+            enum: ["activo", "inactivo"]
+        - $ref: "../openapi.yaml#/components/parameters/Limit"
+        - $ref: "../openapi.yaml#/components/parameters/Page"
+      responses:
+        "200":
+          description: "Array de asignaturas (vacío si no hay)."
+          content:
+            "application/json":
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/schemas/Asignatura"
+        "400":
+          description: "Parámetro de consulta inválido (`limit`, `page`, `institucion_id` o `anio`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Parámetros de consulta inválidos."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    post:
+      operationId: "catalogs.CreateAsignatura"
+      tags: ["catalogs"]
+      summary: "Crear asignatura"
+      description: |
+        Crea un registro y lo audita.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/AsignaturaRequest"
+      responses:
+        "201":
+          description: "Registro creado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Asignatura"
+        "400":
+          description: "El cuerpo no es un JSON válido."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe una asignatura con ese código."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "El cuerpo no cumple las reglas de validación (`validate`); el texto es el del validador."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /asignaturas/{id}:
+    get:
+      operationId: "catalogs.GetAsignatura"
+      tags: ["catalogs"]
+      summary: "Obtener asignatura"
+      description: |
+        Devuelve un registro por id.
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "200":
+          description: "El registro."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Asignatura"
+        "400":
+          description: "El id de la ruta no es un entero > 0."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    put:
+      operationId: "catalogs.UpdateAsignatura"
+      tags: ["catalogs"]
+      summary: "Actualizar asignatura"
+      description: |
+        Reemplaza los campos editables y lo audita.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/AsignaturaRequest"
+      responses:
+        "200":
+          description: "Registro actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Asignatura"
+        "400":
+          description: "Id o cuerpo inválidos."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe una asignatura con ese código."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "El cuerpo no cumple las reglas de validación (`validate`); el texto es el del validador."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /asignaturas/{id}/estado:
+    patch:
+      operationId: "catalogs.UpdateAsignaturaEstado"
+      tags: ["catalogs"]
+      summary: "Cambiar el estado de asignatura"
+      description: |
+        Activa o desactiva el registro y lo audita.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/EstadoRequest"
+      responses:
+        "200":
+          description: "Estado actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Mensaje"
+              example:
+                message: "Estado actualizado."
+        "400":
+          description: "Id o cuerpo inválidos."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "El cuerpo no cumple las reglas de validación (`validate`); el texto es el del validador."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /admin/procesos:
+    get:
+      operationId: "catalogs.ListProcesos"
+      tags: ["catalogs"]
+      summary: "Listar procesos (admin)"
+      description: |
+        Lista todos los procesos, de cualquier institución y estado (la lista del postulante es `GET /procesos`, de `inscripciones`). Devuelve un **array** (no `{data, total}`). Paginación estricta: `limit` entero de 1 a 100 (más se recorta a 100) o `all` (o ausente) para el catálogo completo, con un tope de 1000 filas; `page` (base 1) solo tiene efecto con un `limit` numérico. Un `limit` o `page` mal formado, o un filtro numérico inválido, da `400`.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - name: "institucion_id"
+          in: "query"
+          required: false
+          description: "Filtra por institución; `0` o ausente = todas. Un valor negativo o no numérico da `400`."
+          schema:
+            type: "integer"
+            format: "int64"
+            minimum: 0
+        - name: "tipo"
+          in: "query"
+          required: false
+          description: "Filtra por tipo de proceso."
+          schema:
+            type: "string"
+            enum: ["ascenso", "pase_efectividad", "admision"]
+        - name: "anio"
+          in: "query"
+          required: false
+          description: "Filtra por año; `0` o ausente = todos. Un valor negativo o no numérico da `400`."
+          schema:
+            type: "integer"
+            minimum: 0
+        - name: "estado"
+          in: "query"
+          required: false
+          description: "Filtra por estado. Cualquier otro valor no devuelve filas (no se valida)."
+          schema:
+            type: "string"
+            enum: ["activo", "inactivo"]
+        - $ref: "../openapi.yaml#/components/parameters/Limit"
+        - $ref: "../openapi.yaml#/components/parameters/Page"
+      responses:
+        "200":
+          description: "Array de procesos."
+          content:
+            "application/json":
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/schemas/Proceso"
+        "400":
+          description: "Parámetro de consulta inválido (`limit`, `page`, `institucion_id` o `anio`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Parámetros de consulta inválidos."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    post:
+      operationId: "catalogs.CreateProceso"
+      tags: ["catalogs"]
+      summary: "Crear proceso"
+      description: |
+        Crea un proceso. Con `tipo: pase_efectividad` el `grado_id` es obligatorio y debe ser el de abreviatura «SO 3°» (`400` si no).
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/ProcesoRequest"
+      responses:
+        "201":
+          description: "Proceso creado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Proceso"
+        "400":
+          description: "Cuerpo inválido, o grado que no corresponde al tipo `pase_efectividad`."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El `grado_id` no existe (solo se comprueba con `pase_efectividad`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe un proceso con ese nombre para esta institución."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "Datos inválidos (texto del validador) o referencia inválida (la institución o el grado no existen)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /admin/procesos/{id}:
+    get:
+      operationId: "catalogs.GetProceso"
+      tags: ["catalogs"]
+      summary: "Obtener proceso con sus asignaturas"
+      description: |
+        Devuelve el proceso y sus asignaturas de compatibilidad.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "200":
+          description: "El proceso."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/ProcesoDetalle"
+        "400":
+          description: "El id de la ruta no es un entero > 0."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    put:
+      operationId: "catalogs.UpdateProceso"
+      tags: ["catalogs"]
+      summary: "Actualizar proceso"
+      description: |
+        Reemplaza los campos editables del proceso. Mismas reglas de `tipo`/`grado_id` que al crear.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/ProcesoRequest"
+      responses:
+        "200":
+          description: "Proceso actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Proceso"
+        "400":
+          description: "Id o cuerpo inválidos, o grado que no corresponde al tipo."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Ya existe un proceso con ese nombre para esta institución."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "Datos inválidos (texto del validador) o referencia inválida."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /admin/procesos/{id}/estado:
+    patch:
+      operationId: "catalogs.UpdateProcesoEstado"
+      tags: ["catalogs"]
+      summary: "Cambiar el estado de un proceso"
+      description: |
+        Activa o desactiva el proceso. **Activar** exige que los pesos de compatibilidad sumen 100 (±0.01); si no, `400` con el texto de la suma actual.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/EstadoRequest"
+      responses:
+        "200":
+          description: "Estado actualizado."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Mensaje"
+              example:
+                message: "Estado actualizado."
+        "400":
+          description: "Id o cuerpo inválidos, o los pesos no suman 100 al activar."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Error de validación.: la suma de pesos porcentuales debe ser 100% (actual: 80.00%)"
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "El cuerpo no cumple las reglas de validación (`validate`); el texto es el del validador."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /procesos/{id}/asignaturas:
+    get:
+      operationId: "catalogs.ListProcesoAsignaturas"
+      tags: ["catalogs"]
+      summary: "Asignaturas del proceso para el postulante"
+      description: |
+        Devuelve el conjunto de pesos que aplica a la especialidad de la sesión (las filas de esa especialidad si el proceso tiene alguna; si no, las de compatibilidad). La especialidad se toma de los claims de la sesión. No comprueba la institución del proceso (hueco conocido, #276).
+
+        Rol: cualquier sesión válida (`usuario` o `admin`).
+      x-rol: "autenticado"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "200":
+          description: "Array de asignaturas del proceso (vacío si no hay)."
+          content:
+            "application/json":
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/schemas/ProcesoAsignaturaItem"
+        "400":
+          description: "El id de la ruta no es un entero > 0."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /admin/procesos/{id}/asignaturas:
+    get:
+      operationId: "catalogs.ListProcesoAsignaturasAdmin"
+      tags: ["catalogs"]
+      summary: "Asignaturas de compatibilidad del proceso"
+      description: |
+        Devuelve solo las filas de compatibilidad (sin especialidad), sea cual sea la especialidad del admin.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "200":
+          description: "Array de asignaturas (vacío si no hay)."
+          content:
+            "application/json":
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/schemas/ProcesoAsignaturaItem"
+        "400":
+          description: "El id de la ruta no es un entero > 0."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    post:
+      operationId: "catalogs.AsignarAsignatura"
+      tags: ["catalogs"]
+      summary: "Asignar una asignatura al proceso"
+      description: |
+        Añade una fila de compatibilidad (sin especialidad). Si el proceso está activo, los pesos deben seguir sumando 100.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/AsignarAsignaturaRequest"
+      responses:
+        "201":
+          description: "Asignatura asignada."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/ProcesoAsignaturaItem"
+        "400":
+          description: "Id o cuerpo inválidos."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El registro no existe."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "La asignatura ya está asignada (`peso_duplicado`, formato con código), o el proceso está activo y la suma de pesos quedaría distinta de 100 (texto)."
+          content:
+            "application/json":
+              schema:
+                oneOf:
+                  - $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+                  - $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                texto:
+                  value:
+                    error: "Conflicto: el proceso está activo y la suma de pesos quedaría en 80.00% (debe ser 100%). Desactívalo para reorganizar los pesos."
+                peso_duplicado:
+                  value:
+                    error: "peso_duplicado"
+                    message: "Esta asignatura ya está asignada al proceso."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "Datos inválidos (texto del validador) o la asignatura no existe (`Referencia inválida.: …`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /admin/procesos/{id}/asignaturas/{asignaturaId}:
+    put:
+      operationId: "catalogs.UpdateProcesoAsignatura"
+      tags: ["catalogs"]
+      summary: "Actualizar una asignatura del proceso"
+      description: |
+        Cambia preguntas, peso y coeficiente de una fila de compatibilidad. Si el proceso está activo, los pesos deben seguir sumando 100.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+        - name: "asignaturaId"
+          in: "path"
+          required: true
+          description: "Id de la asignatura. Entero > 0; si no, `400`."
+          schema:
+            type: "integer"
+            format: "int64"
+            minimum: 1
+          example: 3
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/ActualizarProcesoAsignaturaRequest"
+      responses:
+        "200":
+          description: "Asignatura actualizada."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Mensaje"
+              example:
+                message: "Asignatura actualizada."
+        "400":
+          description: "Ids o cuerpo inválidos."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID de asignatura inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El proceso no existe o la asignatura no está asignada."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Conflicto: el proceso está activo y la suma de pesos quedaría en 80.00% (debe ser 100%). Desactívalo para reorganizar los pesos."
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "El cuerpo no cumple las reglas de validación (`validate`); el texto es el del validador."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Key: 'CreateInstitucionRequest.Nombre' Error:Field validation for 'Nombre' failed on the 'min' tag"
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    delete:
+      operationId: "catalogs.DeleteProcesoAsignatura"
+      tags: ["catalogs"]
+      summary: "Quitar una asignatura del proceso"
+      description: |
+        Elimina una fila de compatibilidad. Si el proceso está activo, los pesos deben seguir sumando 100.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+        - name: "asignaturaId"
+          in: "path"
+          required: true
+          description: "Id de la asignatura. Entero > 0; si no, `400`."
+          schema:
+            type: "integer"
+            format: "int64"
+            minimum: 1
+          example: 3
+      responses:
+        "200":
+          description: "Asignatura eliminada del proceso."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/Mensaje"
+              example:
+                message: "Asignatura eliminada del proceso."
+        "400":
+          description: "Ids inválidos."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "ID de asignatura inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El proceso no existe o la asignatura no está asignada."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Registro no encontrado."
+        "409":
+          description: "Conflicto con un registro existente o con el estado actual."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorTexto"
+              example:
+                error: "Conflicto: el proceso está activo y la suma de pesos quedaría en 80.00% (debe ser 100%). Desactívalo para reorganizar los pesos."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoTexto"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /admin/procesos/{id}/pesos:
+    get:
+      operationId: "catalogs.ResumenPesos"
+      tags: ["catalogs"]
+      summary: "Resumen de pesos de un proceso (PE1)"
+      description: |
+        Estado de la configuración de pesos de cada especialidad del proceso y la suma de las filas de compatibilidad.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+      responses:
+        "200":
+          description: "Resumen del proceso."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/ResumenPesos"
+        "400":
+          description: "El id del proceso no es un entero > 0 (`parametro_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "parametro_invalido"
+                message: "Parámetro inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El proceso no existe (`no_encontrado`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "no_encontrado"
+                message: "Proceso no encontrado."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+  /admin/procesos/{id}/pesos/{especialidadId}:
+    get:
+      operationId: "catalogs.ConfiguracionPesos"
+      tags: ["catalogs"]
+      summary: "Configuración de pesos de una especialidad (PE2)"
+      description: |
+        Devuelve la configuración guardada (`completa`) o, si nunca se guardó, `incompleta` con la plantilla de compatibilidad.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+        - name: "especialidadId"
+          in: "path"
+          required: true
+          description: "Id de la especialidad. Entero > 0; si no, `400`."
+          schema:
+            type: "integer"
+            format: "int64"
+            minimum: 1
+          example: 2
+      responses:
+        "200":
+          description: "La configuración."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/ConfiguracionPesos"
+        "400":
+          description: "Un id no es un entero > 0 (`parametro_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "parametro_invalido"
+                message: "Parámetro inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El proceso o la especialidad no existen (`no_encontrado`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "no_encontrado"
+                message: "Proceso no encontrado."
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+    put:
+      operationId: "catalogs.GuardarPesos"
+      tags: ["catalogs"]
+      summary: "Guardar la configuración de pesos (PE3)"
+      description: |
+        Reemplaza **toda** la configuración de la especialidad en una transacción y la audita (`pesos.guardar`). Orden de validación: forma de cada área, áreas repetidas, Σ preguntas ≤ 200, Σ pesos = 100 ± 0.01. El área omitida sale de la configuración.
+
+        Rol: solo `admin`.
+      x-rol: "admin"
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/Id"
+        - name: "especialidadId"
+          in: "path"
+          required: true
+          description: "Id de la especialidad. Entero > 0; si no, `400`."
+          schema:
+            type: "integer"
+            format: "int64"
+            minimum: 1
+          example: 2
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/schemas/GuardarPesosRequest"
+      responses:
+        "200":
+          description: "Configuración guardada (`estado: completa`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/schemas/ConfiguracionPesos"
+        "400":
+          description: "Id inválido (`parametro_invalido`) o cuerpo mal formado o con campos desconocidos (`cuerpo_invalido`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                parametro_invalido:
+                  value:
+                    error: "parametro_invalido"
+                    message: "Parámetro inválido."
+                cuerpo_invalido:
+                  value:
+                    error: "cuerpo_invalido"
+                    message: "Cuerpo de solicitud inválido."
+        "401":
+          $ref: "../openapi.yaml#/components/responses/NoAutenticado"
+        "403":
+          $ref: "../openapi.yaml#/components/responses/AccesoDenegado"
+        "404":
+          description: "El proceso o la especialidad no existen (`no_encontrado`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "no_encontrado"
+                message: "Proceso no encontrado."
+        "409":
+          description: "Un área se repite en el cuerpo (`peso_duplicado`, con `detalle.asignatura_id`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              example:
+                error: "peso_duplicado"
+                message: "El área se repite en la configuración."
+                detalle:
+                  asignatura_id: 3
+        "413":
+          $ref: "../openapi.yaml#/components/responses/CuerpoDemasiadoGrande"
+        "422":
+          description: "Errores de validación: `validacion` (con `detalle.campos`), `referencia_invalida` (la asignatura o la especialidad no existen o están inactivas), `limite_preguntas` (con `detalle.suma_preguntas`) y `pesos_no_suman_100` (con `detalle.suma_pesos`)."
+          content:
+            "application/json":
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorCodigo"
+              examples:
+                validacion:
+                  value:
+                    error: "validacion"
+                    message: "Datos de pesos inválidos."
+                    detalle:
+                      campos:
+                        "areas[0].peso_porcentual": "decimales"
+                referencia_invalida:
+                  value:
+                    error: "referencia_invalida"
+                    message: "Referencia inválida."
+                limite_preguntas:
+                  value:
+                    error: "limite_preguntas"
+                    message: "La suma de preguntas supera el máximo de 200."
+                    detalle:
+                      suma_preguntas: 240
+                pesos_no_suman_100:
+                  value:
+                    error: "pesos_no_suman_100"
+                    message: "Los pesos deben sumar 100."
+                    detalle:
+                      suma_pesos: 90.0
+        "500":
+          $ref: "../openapi.yaml#/components/responses/ErrorInternoCodigo"
+        "503":
+          $ref: "../openapi.yaml#/components/responses/ServicioNoDisponible"
+schemas:
+  Mensaje:
+    type: "object"
+    description: "Confirmación de una mutación sin recurso."
+    required: ["message"]
+    properties:
+      message:
+        type: "string"
+        example: "Estado actualizado."
+  EstadoRequest:
+    type: "object"
+    description: "Cuerpo de los `PATCH …/estado`."
+    required: ["estado"]
+    properties:
+      estado:
+        type: "string"
+        enum: ["activo", "inactivo"]
+  InstitucionRequest:
+    type: "object"
+    required: ["nombre", "siglas"]
+    properties:
+      nombre:
+        type: "string"
+        minLength: 3
+        maxLength: 150
+        example: "Institución Ejemplo"
+      siglas:
+        type: "string"
+        minLength: 2
+        maxLength: 20
+        example: "IEJ"
+  Institucion:
+    type: "object"
+    required: ["id", "nombre", "siglas", "estado", "created_at"]
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      nombre:
+        type: "string"
+        example: "Institución Ejemplo"
+      siglas:
+        type: "string"
+        example: "IEJ"
+      estado:
+        type: "string"
+        enum: ["activo", "inactivo"]
+      created_at:
+        type: "string"
+        description: "Fecha de creación en texto de PostgreSQL (`created_at::text`, p. ej. `2026-11-15 15:04:05.123456+00`); no es RFC 3339."
+        example: "2026-11-15 15:04:05.123456+00"
+  GradoRequest:
+    type: "object"
+    required: ["institucion_id", "nombre", "abreviatura", "nivel", "orden"]
+    properties:
+      institucion_id:
+        type: "integer"
+        format: "int64"
+        minimum: 1
+        example: 1
+      nombre:
+        type: "string"
+        minLength: 2
+        maxLength: 100
+        example: "Grado Ejemplo"
+      abreviatura:
+        type: "string"
+        minLength: 2
+        maxLength: 20
+        example: "GE"
+      nivel:
+        type: "string"
+        enum: ["suboficial", "oficial"]
+      orden:
+        type: "integer"
+        minimum: 1
+        example: 1
+  Grado:
+    type: "object"
+    required:
+      - "id"
+      - "institucion_id"
+      - "institucion"
+      - "nombre"
+      - "abreviatura"
+      - "nivel"
+      - "orden"
+      - "estado"
+      - "created_at"
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      institucion_id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      institucion:
+        type: "string"
+        example: "Institución Ejemplo"
+      nombre:
+        type: "string"
+        example: "Grado Ejemplo"
+      abreviatura:
+        type: "string"
+        example: "GE"
+      nivel:
+        type: "string"
+        enum: ["suboficial", "oficial"]
+      orden:
+        type: "integer"
+        example: 1
+      estado:
+        type: "string"
+        enum: ["activo", "inactivo"]
+      created_at:
+        type: "string"
+        description: "Fecha de creación en texto de PostgreSQL (`created_at::text`, p. ej. `2026-11-15 15:04:05.123456+00`); no es RFC 3339."
+        example: "2026-11-15 15:04:05.123456+00"
+  EspecialidadRequest:
+    type: "object"
+    required: ["institucion_id", "nombre", "codigo"]
+    properties:
+      institucion_id:
+        type: "integer"
+        format: "int64"
+        minimum: 1
+        example: 1
+      nombre:
+        type: "string"
+        minLength: 3
+        maxLength: 150
+        example: "Especialidad Ejemplo"
+      codigo:
+        type: "string"
+        minLength: 2
+        maxLength: 20
+        example: "ESP"
+      nivel:
+        type: "string"
+        description: "Opcional: vacío o ausente = todos los niveles."
+        enum: ["suboficial", "oficial", ""]
+  Especialidad:
+    type: "object"
+    required:
+      - "id"
+      - "institucion_id"
+      - "institucion"
+      - "nombre"
+      - "codigo"
+      - "nivel"
+      - "estado"
+      - "created_at"
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      institucion_id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      institucion:
+        type: "string"
+        example: "Institución Ejemplo"
+      nombre:
+        type: "string"
+        example: "Especialidad Ejemplo"
+      codigo:
+        type: "string"
+        example: "ESP"
+      nivel:
+        type: "string"
+        description: "Vacío si la especialidad no restringe el nivel."
+        enum: ["suboficial", "oficial", ""]
+      estado:
+        type: "string"
+        enum: ["activo", "inactivo"]
+      created_at:
+        type: "string"
+        description: "Fecha de creación en texto de PostgreSQL (`created_at::text`, p. ej. `2026-11-15 15:04:05.123456+00`); no es RFC 3339."
+        example: "2026-11-15 15:04:05.123456+00"
+  AsignaturaRequest:
+    type: "object"
+    required: ["nombre", "codigo"]
+    properties:
+      nombre:
+        type: "string"
+        minLength: 3
+        maxLength: 100
+        example: "Asignatura Ejemplo"
+      codigo:
+        type: "string"
+        minLength: 2
+        maxLength: 20
+        example: "ASG"
+  Asignatura:
+    type: "object"
+    required: ["id", "nombre", "codigo", "estado", "created_at"]
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      nombre:
+        type: "string"
+        example: "Asignatura Ejemplo"
+      codigo:
+        type: "string"
+        example: "ASG"
+      estado:
+        type: "string"
+        enum: ["activo", "inactivo"]
+      created_at:
+        type: "string"
+        description: "Fecha de creación en texto de PostgreSQL (`created_at::text`, p. ej. `2026-11-15 15:04:05.123456+00`); no es RFC 3339."
+        example: "2026-11-15 15:04:05.123456+00"
+  ProcesoRequest:
+    type: "object"
+    required: ["institucion_id", "nombre", "tipo", "anio"]
+    properties:
+      institucion_id:
+        type: "integer"
+        format: "int64"
+        minimum: 1
+        example: 1
+      nombre:
+        type: "string"
+        minLength: 3
+        maxLength: 150
+        example: "Proceso Ejemplo 2026"
+      tipo:
+        type: "string"
+        enum: ["ascenso", "pase_efectividad", "admision"]
+      grado_id:
+        type: ["integer", "null"]
+        description: "Obligatorio con `tipo: pase_efectividad`, y entonces el grado debe tener abreviatura «SO 3°»."
+        format: "int64"
+      descripcion:
+        type: "string"
+        maxLength: 500
+        example: "Proceso de ejemplo."
+      anio:
+        type: "integer"
+        minimum: 2024
+        maximum: 2099
+        example: 2026
+  Proceso:
+    type: "object"
+    required:
+      - "id"
+      - "institucion_id"
+      - "institucion"
+      - "nombre"
+      - "tipo"
+      - "descripcion"
+      - "anio"
+      - "estado"
+      - "created_at"
+    properties:
+      id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      institucion_id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      institucion:
+        type: "string"
+        example: "Institución Ejemplo"
+      nombre:
+        type: "string"
+        example: "Proceso Ejemplo 2026"
+      tipo:
+        type: "string"
+        enum: ["ascenso", "pase_efectividad", "admision"]
+      grado_id:
+        type: "integer"
+        description: "Ausente si el proceso no tiene grado (`omitempty`)."
+        format: "int64"
+      grado:
+        type: "string"
+        description: "Nombre del grado; ausente si no hay (`omitempty`)."
+      descripcion:
+        type: "string"
+        example: "Proceso de ejemplo."
+      anio:
+        type: "integer"
+        example: 2026
+      estado:
+        type: "string"
+        enum: ["activo", "inactivo"]
+      created_at:
+        type: "string"
+        description: "Fecha de creación en texto de PostgreSQL (`created_at::text`, p. ej. `2026-11-15 15:04:05.123456+00`); no es RFC 3339."
+        example: "2026-11-15 15:04:05.123456+00"
+  ProcesoAsignaturaItem:
+    type: "object"
+    required:
+      - "asignatura_id"
+      - "nombre"
+      - "codigo"
+      - "numero_preguntas"
+      - "peso_porcentual"
+      - "coeficiente"
+      - "preguntas_disponibles"
+    properties:
+      asignatura_id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      nombre:
+        type: "string"
+        example: "Asignatura Ejemplo"
+      codigo:
+        type: "string"
+        example: "ASG"
+      numero_preguntas:
+        type: "integer"
+        example: 20
+      peso_porcentual:
+        type: "number"
+        example: 50.0
+      coeficiente:
+        type: "number"
+        example: 1.0
+      preguntas_disponibles:
+        type: "integer"
+        description: "Preguntas servibles de la asignatura en el proceso."
+        example: 40
+  ProcesoDetalle:
+    allOf:
+      - $ref: "#/schemas/Proceso"
+      - type: "object"
+        description: "Detalle de un proceso con sus asignaturas."
+        required: ["asignaturas"]
+        properties:
+          asignaturas:
+            type: "array"
+            items:
+              $ref: "#/schemas/ProcesoAsignaturaItem"
+  AsignarAsignaturaRequest:
+    type: "object"
+    required:
+      - "asignatura_id"
+      - "numero_preguntas"
+      - "peso_porcentual"
+      - "coeficiente"
+    properties:
+      asignatura_id:
+        type: "integer"
+        format: "int64"
+        minimum: 1
+        example: 1
+      numero_preguntas:
+        type: "integer"
+        minimum: 1
+        maximum: 200
+        example: 20
+      peso_porcentual:
+        type: "number"
+        description: "De 0.01 a 100, con a lo sumo 2 decimales."
+        minimum: 0.01
+        maximum: 100
+        example: 50.0
+      coeficiente:
+        type: "number"
+        description: "De 0.01 a 999.99, con a lo sumo 2 decimales."
+        minimum: 0.01
+        maximum: 999.99
+        example: 1.0
+  ActualizarProcesoAsignaturaRequest:
+    type: "object"
+    required: ["numero_preguntas", "peso_porcentual", "coeficiente"]
+    properties:
+      numero_preguntas:
+        type: "integer"
+        minimum: 1
+        maximum: 200
+        example: 20
+      peso_porcentual:
+        type: "number"
+        description: "De 0.01 a 100, con a lo sumo 2 decimales."
+        minimum: 0.01
+        maximum: 100
+        example: 50.0
+      coeficiente:
+        type: "number"
+        description: "De 0.01 a 999.99, con a lo sumo 2 decimales."
+        minimum: 0.01
+        maximum: 999.99
+        example: 1.0
+  AreaPesoRequest:
+    type: "object"
+    required:
+      - "asignatura_id"
+      - "peso_porcentual"
+      - "numero_preguntas"
+      - "coeficiente"
+    properties:
+      asignatura_id:
+        type: "integer"
+        format: "int64"
+        minimum: 1
+        example: 1
+      peso_porcentual:
+        type: "number"
+        description: "De 0.01 a 100, con a lo sumo 2 decimales."
+        example: 25.0
+      numero_preguntas:
+        type: "integer"
+        minimum: 1
+        maximum: 200
+        example: 10
+      coeficiente:
+        type: "number"
+        description: "De 0.01 a 999.99, con a lo sumo 2 decimales."
+        example: 1.0
+  GuardarPesosRequest:
+    type: "object"
+    required: ["areas"]
+    properties:
+      areas:
+        type: "array"
+        items:
+          $ref: "#/schemas/AreaPesoRequest"
+        description: "De 1 a 50 áreas, sin asignaturas repetidas; Σ preguntas ≤ 200 y Σ pesos = 100 ± 0.01. Reemplaza toda la configuración."
+        minItems: 1
+        maxItems: 50
+  AreaPeso:
+    type: "object"
+    required:
+      - "asignatura_id"
+      - "nombre"
+      - "codigo"
+      - "peso_porcentual"
+      - "numero_preguntas"
+      - "coeficiente"
+    properties:
+      asignatura_id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      nombre:
+        type: "string"
+        example: "Asignatura Ejemplo"
+      codigo:
+        type: "string"
+        example: "ASG"
+      peso_porcentual:
+        type: "number"
+        example: 25.0
+      numero_preguntas:
+        type: "integer"
+        example: 10
+      coeficiente:
+        type: "number"
+        example: 1.0
+  ConfiguracionPesos:
+    type: "object"
+    description: "Pesos de una especialidad en un proceso (PE2, PE3)."
+    required:
+      - "proceso_id"
+      - "especialidad_id"
+      - "especialidad"
+      - "estado"
+      - "areas"
+      - "suma_pesos"
+      - "suma_preguntas"
+      - "plantilla"
+    properties:
+      proceso_id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      especialidad_id:
+        type: "integer"
+        format: "int64"
+        example: 2
+      especialidad:
+        type: "string"
+        example: "Especialidad Ejemplo"
+      estado:
+        type: "string"
+        description: "Con `incompleta` nunca se guardó una configuración: `areas` va vacío y `plantilla` trae las filas de compatibilidad para precargar el formulario."
+        enum: ["completa", "incompleta"]
+      areas:
+        type: "array"
+        items:
+          $ref: "#/schemas/AreaPeso"
+      suma_pesos:
+        type: "number"
+        example: 100.0
+      suma_preguntas:
+        type: "integer"
+        example: 40
+      plantilla:
+        type: "array"
+        items:
+          $ref: "#/schemas/AreaPeso"
+  ResumenPesos:
+    type: "object"
+    description: "Resumen de pesos de un proceso (PE1)."
+    required: ["proceso_id", "compatibilidad", "especialidades"]
+    properties:
+      proceso_id:
+        type: "integer"
+        format: "int64"
+        example: 1
+      compatibilidad:
+        type: "object"
+        description: "Filas generales del proceso (sin especialidad)."
+        required: ["areas", "suma_pesos"]
+        properties:
+          areas:
+            type: "integer"
+            example: 4
+          suma_pesos:
+            type: "number"
+            example: 100.0
+      especialidades:
+        type: "array"
+        items:
+          type: "object"
+          required:
+            - "especialidad_id"
+            - "nombre"
+            - "estado"
+            - "areas"
+            - "suma_pesos"
+            - "suma_preguntas"
+          properties:
+            especialidad_id:
+              type: "integer"
+              format: "int64"
+              example: 2
+            nombre:
+              type: "string"
+              example: "Especialidad Ejemplo"
+            estado:
+              type: "string"
+              enum: ["completa", "incompleta"]
+            areas:
+              type: "integer"
+              example: 4
+            suma_pesos:
+              type: "number"
+              example: 100.0
+            suma_preguntas:
+              type: "integer"
+              example: 40
