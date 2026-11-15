@@ -20,7 +20,9 @@ import { GrupoBotones } from "@/components/ui/grupo-botones";
 import { useAuth } from "@/lib/auth/auth-context";
 import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_DESTRUCTIVO, BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA } from "@/lib/estilos";
+import { formatearFechaHora } from "@/lib/formato";
 import { InscripcionAdmin, inscripcionesApi } from "@/lib/inscripciones/api";
+import { instanteDeFechaServidor } from "@/lib/inscripciones/fechas";
 import { CheckCircleIcon, XCircleIcon, XIcon } from "@phosphor-icons/react";
 
 const TABS = ["todos", "pendiente", "aprobado", "rechazado"] as const;
@@ -44,10 +46,10 @@ const ESTADO_CLAVE: Record<string, string> = {
   rechazado: "admin-inscripciones-estado-rechazado",
 };
 
-/** "dd/mm/yyyy hh:mm" (formato del backend) → "yyyy-mm-dd hh:mm", que sí ordena como fecha. */
-const fechaOrdenable = (s: string) => {
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2}))?$/.exec(s ?? "");
-  return m ? `${m[3]}-${m[2]}-${m[1]} ${m[4] ?? "00"}:${m[5] ?? "00"}` : (s ?? "");
+/** Fecha del servidor → «15 Nov 2026, 00:49» en hora de Lima, como el resto de las pantallas; sin formato conocido, tal cual. */
+const fechaVisible = (fecha: string | null | undefined) => {
+  const instante = instanteDeFechaServidor(fecha);
+  return instante ? formatearFechaHora(instante) : (fecha ?? "");
 };
 
 export default function Page() {
@@ -183,9 +185,11 @@ export default function Page() {
         id: "fecha_solicitud",
         titulo: t("admin-inscripciones-col-fecha"),
         ordenable: true,
-        valor: (r) => fechaOrdenable(r.fecha_solicitud),
-        // Buscar, exportar e imprimir con la fecha tal como se ve (la celda pinta `fecha_solicitud`); `valor` solo ordena.
-        texto: (r) => r.fecha_solicitud ?? "",
+        // Ordena por el instante (ISO), no por el texto que se ve.
+        valor: (r) => instanteDeFechaServidor(r.fecha_solicitud) ?? r.fecha_solicitud,
+        // Buscar, exportar e imprimir con la fecha tal como se ve.
+        texto: (r) => fechaVisible(r.fecha_solicitud),
+        render: (r) => fechaVisible(r.fecha_solicitud),
         className: "whitespace-nowrap tabular-nums",
       },
       {
@@ -231,7 +235,10 @@ export default function Page() {
           ) : (
             <span className="text-etiqueta text-texto-terciario whitespace-nowrap">
               {r.revisado_por
-                ? t("admin-inscripciones-revisado-por", { usuario: r.revisado_por, fecha: r.revisado_at ?? "—" })
+                ? t("admin-inscripciones-revisado-por", {
+                    usuario: r.revisado_por,
+                    fecha: r.revisado_at ? fechaVisible(r.revisado_at) : "—",
+                  })
                 : t("admin-inscripciones-revisada")}
             </span>
           ),

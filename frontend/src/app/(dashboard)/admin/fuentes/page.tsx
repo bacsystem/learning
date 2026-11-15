@@ -22,6 +22,7 @@ import { useCarga } from "@/hooks/use-carga";
 import { useSondeo } from "@/hooks/use-sondeo";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_PRINCIPAL, CABECERA_TABLA, CONTENEDOR_PAGINA } from "@/lib/estilos";
+import { formatearFechaHora } from "@/lib/formato";
 import {
   type EstadoFuente,
   type FuenteListQuery,
@@ -236,7 +237,7 @@ export default function FuentesPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground font-mono">
-                      {formato.dateTime(new Date(f.updated_at), { dateStyle: "medium", timeZone: "America/Lima" })}
+                      {formatearFechaHora(f.updated_at)}
                     </TableCell>
                   </TableRow>
                 ))

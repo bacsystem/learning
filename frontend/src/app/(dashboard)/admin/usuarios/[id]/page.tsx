@@ -269,7 +269,8 @@ export default function UsuarioDetallePage() {
           destacada
           ayuda={t("admin-usuarios-promedio-simulacros")}
         >
-          {usuario.nota_promedio.toFixed(1)}
+          {/* Sin simulacros no hay promedio: «—», como el panel del propio usuario. */}
+          {usuario.total_simulacros > 0 ? usuario.nota_promedio.toFixed(1) : "—"}
         </Metrica>
       </FilaMetricas>
 

@@ -7,6 +7,7 @@ import { Alerta } from "@/components/feedback/alerta";
 import { FilaMetricas, Metrica } from "@/components/patrones/metricas";
 import { Chip } from "@/components/patrones/pill-estado";
 import { TARJETA } from "@/lib/estilos";
+import { formatearFechaHora } from "@/lib/formato";
 import type { VistaPreviaBalotario } from "@/lib/serums-ia/balotario/api";
 import { cn } from "@/lib/utils";
 import { CheckCircleIcon, ListChecksIcon, WarningCircleIcon, WarningIcon } from "@phosphor-icons/react";
@@ -16,8 +17,7 @@ export function ResumenBalotario({ vista }: { vista: VistaPreviaBalotario }) {
   const t = useTranslations("dashboard");
   const formato = useFormatter();
   const { fuente, totales, ruta_revision: ruta, importacion, otras_importaciones: otras } = vista;
-  const fecha = (iso: string) =>
-    formato.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short", timeZone: "America/Lima" });
+  const fecha = formatearFechaHora;
 
   return (
     <section className={cn(TARJETA, "flex flex-col gap-4 p-4")} aria-labelledby="balotario-resumen">

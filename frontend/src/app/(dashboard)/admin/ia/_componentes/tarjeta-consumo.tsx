@@ -1,11 +1,12 @@
 "use client";
 
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
 import { Alerta } from "@/components/feedback/alerta";
 import { ProgresoLineal } from "@/components/feedback/progreso";
 import { Metrica } from "@/components/patrones/metricas";
 import { TARJETA } from "@/lib/estilos";
+import { formatearFechaHora } from "@/lib/formato";
 import type { ConsumoIa } from "@/lib/serums-ia/ia/api";
 import { porcentajeConsumo } from "@/lib/serums-ia/ia/reglas";
 import { cn } from "@/lib/utils";
@@ -14,13 +15,8 @@ import { UserCircleIcon } from "@phosphor-icons/react";
 /** Consumo del día de quien consulta (regla 9 de E6-02): para un admin, solo la ventana diaria; `mes` llega `null`. */
 export function TarjetaConsumo({ consumo }: { consumo: ConsumoIa }) {
   const t = useTranslations("dashboard");
-  const formato = useFormatter();
   const { dia } = consumo;
-  const reinicia = formato.dateTime(new Date(dia.reinicia_at), {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "America/Lima",
-  });
+  const reinicia = formatearFechaHora(dia.reinicia_at);
   const porcentaje = porcentajeConsumo(dia);
 
   return (

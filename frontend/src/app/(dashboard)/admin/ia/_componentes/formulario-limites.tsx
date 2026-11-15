@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormik } from "formik";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
 import { Campo } from "@/components/app/campo";
@@ -9,6 +9,7 @@ import { Alerta } from "@/components/feedback/alerta";
 import { Entrada } from "@/components/formularios/campo";
 import { BotonAsync } from "@/components/patrones/boton-async";
 import { BOTON_PRIMARIO, TARJETA } from "@/lib/estilos";
+import { formatearFechaHora } from "@/lib/formato";
 import type { CambioConfiguracionIa, ConfiguracionIa } from "@/lib/serums-ia/ia/api";
 import { claveErrorIa } from "@/lib/serums-ia/ia/errores";
 import {
@@ -34,7 +35,6 @@ export function FormularioLimites({
   onGuardar: (cambio: CambioConfiguracionIa) => Promise<void>;
 }) {
   const t = useTranslations("dashboard");
-  const formato = useFormatter();
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
 
   const validationSchema = useMemo(
@@ -72,8 +72,10 @@ export function FormularioLimites({
     },
   });
 
+  // El error aparece al salir del campo o en cuanto el valor cambia: «Guardar» se deshabilita con él y debe decir por qué.
   const errorDe = (campo: CampoConfiguracion) => {
-    const e = formik.touched[campo] ? formik.errors[campo] : undefined;
+    const visible = formik.touched[campo] || formik.values[campo] !== formik.initialValues[campo];
+    const e = visible ? formik.errors[campo] : undefined;
     return typeof e === "string" ? e : undefined;
   };
 
@@ -120,11 +122,7 @@ export function FormularioLimites({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-etiqueta text-muted-foreground">
           {t("serumsIa.ia.configuracion.actualizada", {
-            fecha: formato.dateTime(new Date(configuracion.updated_at), {
-              dateStyle: "medium",
-              timeStyle: "short",
-              timeZone: "America/Lima",
-            }),
+            fecha: formatearFechaHora(configuracion.updated_at),
           })}
         </p>
         <BotonAsync

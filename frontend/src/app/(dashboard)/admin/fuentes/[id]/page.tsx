@@ -20,6 +20,7 @@ import { useCarga } from "@/hooks/use-carga";
 import { useSondeo } from "@/hooks/use-sondeo";
 import { useAuth } from "@/lib/auth/auth-context";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA, TARJETA } from "@/lib/estilos";
+import { formatearFechaHora } from "@/lib/formato";
 import type { IconoComponente } from "@/lib/iconos";
 import { type FuenteDetalle, fuentesApi, type VersionFuente } from "@/lib/serums-ia/fuentes/api";
 import { mensajeErrorFuente } from "@/lib/serums-ia/fuentes/errores";
@@ -74,8 +75,7 @@ export default function FuenteDetallePage() {
   const fuente = carga.datos;
   useSondeo(Boolean(fuente && enProceso(fuente)), carga.refrescar, REFRESCO_MS);
 
-  const fecha = (iso: string) =>
-    formato.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short", timeZone: "America/Lima" });
+  const fecha = formatearFechaHora;
 
   /** Aplica la respuesta de una acción (la fuente actualizada) y cierra el diálogo. */
   function aplicar(actualizada: FuenteDetalle, aviso: string) {

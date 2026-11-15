@@ -9,6 +9,7 @@ import type { Tono } from "@/components/patrones/metricas";
 import { PillEstado } from "@/components/patrones/pill-estado";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AYUDA_CAMPO } from "@/lib/estilos";
+import { formatearFechaHora } from "@/lib/formato";
 import type { IconoComponente } from "@/lib/iconos";
 import {
   type CategoriaFallo,
@@ -24,8 +25,6 @@ import {
 } from "@/lib/salud/reglas";
 import { CheckCircleIcon, MinusCircleIcon, QuestionIcon, WarningIcon, XCircleIcon } from "@phosphor-icons/react";
 
-/** Hora de Lima en toda la pantalla (PLT-02 regla 1, decisión 6 del PO). */
-export const ZONA_HORARIA = "America/Lima";
 const SIN_DATO = "—";
 
 /** Icono + texto + color por estado: el estado nunca se comunica solo con el color (PLT-02 regla 3). */
@@ -91,8 +90,7 @@ function useDatosServicio(servicio: ServicioSalud): DatoLista[] {
   const formato = useFormatter();
   const numero = (n: number | null, clave?: string) =>
     n === null ? SIN_DATO : clave ? t(clave, { valor: n }) : formato.number(n);
-  const fechaHora = (iso: string) =>
-    formato.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short", timeZone: ZONA_HORARIA });
+  const fechaHora = formatearFechaHora;
   /** `claveNunca`: «Nunca» para el correo, «Ninguna» para la copia. */
   const textoMomento = (momento: Momento, claveNunca: string) => {
     switch (momento.tipo) {
