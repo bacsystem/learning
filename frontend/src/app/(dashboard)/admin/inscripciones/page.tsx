@@ -22,7 +22,6 @@ import { claveErrorApi } from "@/lib/errores-api";
 import { BOTON_DESTRUCTIVO, BOTON_PRIMARIO, BOTON_SECUNDARIO, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { formatearFechaHora } from "@/lib/formato";
 import { InscripcionAdmin, inscripcionesApi } from "@/lib/inscripciones/api";
-import { instanteDeFechaServidor } from "@/lib/inscripciones/fechas";
 import { CheckCircleIcon, XCircleIcon, XIcon } from "@phosphor-icons/react";
 
 const TABS = ["todos", "pendiente", "aprobado", "rechazado"] as const;
@@ -46,11 +45,8 @@ const ESTADO_CLAVE: Record<string, string> = {
   rechazado: "admin-inscripciones-estado-rechazado",
 };
 
-/** Fecha del servidor → «15 Nov 2026, 00:49» en hora de Lima, como el resto de las pantallas; sin formato conocido, tal cual. */
-const fechaVisible = (fecha: string | null | undefined) => {
-  const instante = instanteDeFechaServidor(fecha);
-  return instante ? formatearFechaHora(instante) : (fecha ?? "");
-};
+/** Instante RFC 3339 del servidor → «15 Nov 2026, 00:49» en hora de Lima, como el resto de las pantallas. */
+const fechaVisible = (instante: string | null | undefined) => (instante ? formatearFechaHora(instante) : "");
 
 export default function Page() {
   const { token } = useAuth();
@@ -185,8 +181,8 @@ export default function Page() {
         id: "fecha_solicitud",
         titulo: t("admin-inscripciones-col-fecha"),
         ordenable: true,
-        // Ordena por el instante (ISO), no por el texto que se ve.
-        valor: (r) => instanteDeFechaServidor(r.fecha_solicitud) ?? r.fecha_solicitud,
+        // Ordena por el instante (RFC 3339), no por el texto que se ve.
+        valor: (r) => r.fecha_solicitud,
         // Buscar, exportar e imprimir con la fecha tal como se ve.
         texto: (r) => fechaVisible(r.fecha_solicitud),
         render: (r) => fechaVisible(r.fecha_solicitud),
