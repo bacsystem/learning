@@ -18,14 +18,12 @@ import { BotonAsync } from "@/components/patrones/boton-async";
 import { comoLocale } from "@/constants";
 import { authApi } from "@/lib/auth/auth-api";
 import { claveErrorAuth } from "@/lib/auth/errores-auth";
+import { FORMATO_USUARIO, USUARIO_LONGITUD_MAX, USUARIO_LONGITUD_MIN, usuarioConsultable } from "@/lib/auth/usuario";
 import { ACCION_SECUNDARIA, BOTON_PRIMARIO } from "@/lib/estilos";
 import { cn } from "@/lib/utils";
 import { ArrowLeftIcon, CheckCircleIcon, UserPlusIcon, XCircleIcon } from "@phosphor-icons/react";
 
 type Status = "form" | "success" | "invalid";
-/** Mismo formato que el backend (alphanum): sin él no se consulta ni se muestra la disponibilidad. */
-const FORMATO_USUARIO = /^[a-zA-Z0-9]+$/;
-
 type UsernameStatus = "idle" | "checking" | "available" | "taken";
 
 /** Indicador dentro del campo mientras se verifica la disponibilidad del usuario. */
@@ -72,8 +70,8 @@ export default function Page() {
         username: yup
           .string()
           .required(t("verify-email-usuario-requerido"))
-          .min(4, t("verify-email-usuario-min"))
-          .max(30, t("verify-email-usuario-max"))
+          .min(USUARIO_LONGITUD_MIN, t("verify-email-usuario-min"))
+          .max(USUARIO_LONGITUD_MAX, t("verify-email-usuario-max"))
           .matches(FORMATO_USUARIO, t("verify-email-usuario-alfanumerico")),
         ...esquemaContrasena(t),
       }),
@@ -115,7 +113,7 @@ export default function Page() {
   useEffect(() => {
     const username = formik.values.username;
     const reqId = ++usernameReq.current;
-    if (status !== "form" || username.length < 4 || !FORMATO_USUARIO.test(username)) {
+    if (status !== "form" || !usuarioConsultable(username)) {
       setUsernameStatus("idle");
       return;
     }
@@ -213,9 +211,7 @@ export default function Page() {
               }}
               onBlur={formik.handleBlur}
             />
-            {formik.values.username.length >= 4 && FORMATO_USUARIO.test(formik.values.username) ? (
-              <EstadoDisponibilidad estado={usernameStatus} />
-            ) : null}
+            {usuarioConsultable(formik.values.username) ? <EstadoDisponibilidad estado={usernameStatus} /> : null}
           </div>
         </Campo>
 
