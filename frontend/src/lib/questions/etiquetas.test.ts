@@ -1,5 +1,7 @@
-import { claveErrorEtiqueta, esquemaEtiqueta, NOMBRE_ETIQUETA_MAX } from "./etiquetas";
+import { ERRORES_ETIQUETA, esquemaEtiqueta, NOMBRE_ETIQUETA_MAX } from "./etiquetas";
 import { describe, expect, it } from "vitest";
+
+import { claveErrorApi } from "@/lib/errores-api";
 
 const mensajes = { asignaturaRequerida: "A", nombreRequerido: "N", nombreLongitud: "L" };
 
@@ -25,26 +27,18 @@ describe("esquemaEtiqueta", () => {
   });
 });
 
-describe("claveErrorEtiqueta", () => {
+describe("ERRORES_ETIQUETA", () => {
   it("maps 409 on save to the duplicate-name text", () => {
-    expect(claveErrorEtiqueta(apiError(409), "guardar")).toBe("admin-etiquetas-error-duplicada");
+    expect(claveErrorApi(apiError(409), "guardar", ERRORES_ETIQUETA.guardar)).toBe("admin-etiquetas-error-duplicada");
   });
 
-  it("maps 404 to the missing-tag text on every action", () => {
-    expect(claveErrorEtiqueta(apiError(404), "eliminar")).toBe("admin-etiquetas-error-no-existe");
-    expect(claveErrorEtiqueta(apiError(404), "estado")).toBe("admin-etiquetas-error-no-existe");
+  it("maps 404 to the missing-tag text on every action, saving included", () => {
+    for (const accion of ["guardar", "estado", "eliminar"] as const) {
+      expect(claveErrorApi(apiError(404), accion, ERRORES_ETIQUETA[accion])).toBe("admin-etiquetas-error-no-existe");
+    }
   });
 
-  it("falls back to the generic text of the action, never to the server message", () => {
-    expect(claveErrorEtiqueta(apiError(400, "Campos inválidos o faltantes: nombre."), "guardar")).toBe(
-      "comun-error-guardar",
-    );
-    expect(claveErrorEtiqueta(apiError(500), "estado")).toBe("comun-error-estado");
-    expect(claveErrorEtiqueta(new TypeError("Failed to fetch"), "eliminar")).toBe("comun-error-eliminar");
-    expect(claveErrorEtiqueta(apiError(409), "estado")).toBe("comun-error-estado");
-  });
-
-  it("uses the generic text for a coded error without translation", () => {
-    expect(claveErrorEtiqueta(apiError(409, "x", "codigo_nuevo"), "guardar")).toBe("comun-error-guardar");
+  it("does not read a 409 as a duplicate outside saving", () => {
+    expect(claveErrorApi(apiError(409), "estado", ERRORES_ETIQUETA.estado)).toBe("comun-error-estado");
   });
 });

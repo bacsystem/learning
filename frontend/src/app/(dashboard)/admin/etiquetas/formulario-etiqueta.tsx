@@ -8,9 +8,10 @@ import { useMemo, useState } from "react";
 import { Campo } from "@/components/app/campo";
 import { Entrada } from "@/components/formularios/campo";
 import { type OpcionSelect, SelectCampo } from "@/components/formularios/select-campo";
+import { claveErrorApi } from "@/lib/errores-api";
 import type { Etiqueta } from "@/lib/questions/api";
 import {
-  claveErrorEtiqueta,
+  ERRORES_ETIQUETA,
   esquemaEtiqueta,
   NOMBRE_ETIQUETA_MAX,
   type ValoresEtiqueta,
@@ -59,7 +60,7 @@ export function FormularioEtiqueta({
       try {
         await onGuardar({ ...valores, nombre: valores.nombre.trim() });
       } catch (e) {
-        setErrorServidor(t(claveErrorEtiqueta(e, "guardar")));
+        setErrorServidor(t(claveErrorApi(e, "guardar", ERRORES_ETIQUETA.guardar)));
       }
     },
   });

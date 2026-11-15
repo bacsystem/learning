@@ -1,6 +1,6 @@
 import * as yup from "yup";
 
-import { apiErrorCode } from "@/lib/http/api-error";
+import type { AccionApi, MapasDeError } from "@/lib/errores-api";
 
 /** Largo máximo del nombre de una etiqueta (`CreateEtiquetaRequest` y `UpdateEtiquetaRequest` del backend). */
 export const NOMBRE_ETIQUETA_MAX = 100;
@@ -26,28 +26,15 @@ export function esquemaEtiqueta(m: MensajesValidacionEtiqueta, modo: "create" | 
   });
 }
 
-/** Operación de etiquetas que falló; decide el texto genérico. */
-export type AccionEtiqueta = "guardar" | "estado" | "eliminar";
-
-const CLAVE_GENERICA: Record<AccionEtiqueta, string> = {
-  guardar: "comun-error-guardar",
-  estado: "comun-error-estado",
-  eliminar: "comun-error-eliminar",
-};
-
-const STATUS_CONFLICTO = 409;
-const STATUS_NO_ENCONTRADO = 404;
+const NO_EXISTE = { 404: "admin-etiquetas-error-no-existe" } as const;
 
 /**
- * Clave i18n (namespace `dashboard`) del error de una operación de etiquetas. Las etiquetas responden en el formato
- * heredado, sin `code` (docs/api/README.md §3), así que se traduce por status y, ante cualquier otro, el genérico de la
- * acción. Nunca el `message` del servidor: viene siempre en español y con nombres internos de campo (§8).
+ * Las etiquetas responden en el formato heredado, sin `code`: se traducen por status. Un 409 solo ocurre al
+ * guardar (nombre repetido en la asignatura); un 404, en cualquier operación (la etiqueta ya no existe).
  */
-export function claveErrorEtiqueta(err: unknown, accion: AccionEtiqueta): string {
-  const { status } = (err ?? {}) as { status?: unknown };
-  if (apiErrorCode(err) === undefined) {
-    if (status === STATUS_CONFLICTO && accion === "guardar") return "admin-etiquetas-error-duplicada";
-    if (status === STATUS_NO_ENCONTRADO) return "admin-etiquetas-error-no-existe";
-  }
-  return CLAVE_GENERICA[accion];
-}
+export const ERRORES_ETIQUETA: Record<AccionApi, MapasDeError> = {
+  cargar: { porStatus: NO_EXISTE },
+  guardar: { porStatus: { ...NO_EXISTE, 409: "admin-etiquetas-error-duplicada" } },
+  estado: { porStatus: NO_EXISTE },
+  eliminar: { porStatus: NO_EXISTE },
+};

@@ -19,9 +19,10 @@ import { SelectCampo } from "@/components/formularios/select-campo";
 import { MenuAcciones } from "@/components/navegacion/menu-acciones";
 import { useAuth } from "@/lib/auth/auth-context";
 import { type Asignatura, catalogsApi } from "@/lib/catalogs/api";
+import { claveErrorApi } from "@/lib/errores-api";
 import { ACCION_PRINCIPAL, ACCION_SECUNDARIA, CONTENEDOR_PAGINA } from "@/lib/estilos";
 import { type Etiqueta, questionsApi } from "@/lib/questions/api";
-import { claveErrorEtiqueta, type ValoresEtiqueta } from "@/lib/questions/etiquetas";
+import { ERRORES_ETIQUETA, type ValoresEtiqueta } from "@/lib/questions/etiquetas";
 import { CheckCircleIcon, EyeSlashIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 
 export default function EtiquetasPage() {
@@ -120,7 +121,7 @@ export default function EtiquetasPage() {
       load();
       return null;
     } catch (e: unknown) {
-      return t(claveErrorEtiqueta(e, "estado"));
+      return t(claveErrorApi(e, "estado", ERRORES_ETIQUETA.estado));
     }
   };
 
@@ -135,7 +136,7 @@ export default function EtiquetasPage() {
       load();
       return null;
     } catch (e: unknown) {
-      return t(claveErrorEtiqueta(e, "eliminar"));
+      return t(claveErrorApi(e, "eliminar", ERRORES_ETIQUETA.eliminar));
     }
   };
 
