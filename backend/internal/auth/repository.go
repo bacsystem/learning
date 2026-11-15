@@ -439,7 +439,7 @@ func (r *Repository) ExistsByEmail(ctx context.Context, email string) (bool, err
 // column (idioma, migration 069) would break the binary that is still running
 // when the migration is applied, and a rollback to it.
 const usuarioLoginCols = `id, persona_id, username, password_hash, rol, estado, login_intentos,
-	bloqueado_hasta, activated_at, activated_by, tour_completado, created_at, updated_at`
+	bloqueado_hasta, activated_at, activated_by, tour_completado, idioma, created_at, updated_at`
 
 func (r *Repository) FindByID(ctx context.Context, id int64) (*usuarioRow, error) {
 	var u usuarioRow

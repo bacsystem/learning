@@ -187,6 +187,23 @@ func TestIdioma_InMeAndLogin(t *testing.T) {
 	}
 }
 
+// The login lookups carry the stored language (PLT-13 reads it from FindByID).
+func TestFindBy_ReturnIdioma(t *testing.T) {
+	f := newFixture(t)
+	uid, username := f.activeUser("fnd", "usuario")
+	if _, err := f.db.Exec(`UPDATE usuarios SET idioma='en' WHERE id=$1`, uid); err != nil {
+		t.Fatal(err)
+	}
+	byID, err := f.repo.FindByID(context.Background(), uid)
+	if err != nil || byID == nil || byID.Idioma != "en" {
+		t.Fatalf("FindByID = %+v, %v; want idioma en", byID, err)
+	}
+	byName, err := f.repo.FindByUsername(context.Background(), username)
+	if err != nil || byName == nil || byName.Idioma != "en" {
+		t.Fatalf("FindByUsername = %+v, %v; want idioma en", byName, err)
+	}
+}
+
 // The CHECK is the last line of defence for any writer other than the API.
 func TestUsuariosIdiomaCheck(t *testing.T) {
 	f := newFixture(t)
