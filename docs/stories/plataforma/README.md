@@ -4,6 +4,15 @@ Historias transversales de operación de Capacitate que no son una capacidad del
 
 Fuente: pedido del usuario al tech-lead (2026-11-11): «desde el panel de administrador, ver el /health de todos los servicios, de tal manera que se pueda ver la salud».
 
+## Índice de épicas
+
+| Épica | Documento | Historias | Pts |
+|---|---|---|---|
+| PLT-E1 Salud de servicios | este README + PLT-01..05 | 5 | 12 |
+| PLT-E2 Multi-institución (crítica, antes de la ola 1). **En esta ronda solo PLT-06**; PLT-07..10 y PLT-14 están **Diferidas** | [sección en este README](#épica-plt-e2-multi-institución) | PLT-06..10, PLT-14 (6) | 16 (3 en la ronda) |
+| PLT-E3 Aviso de decisiones al postulante | [sección en este README](#épica-plt-e3-aviso-de-decisiones-al-postulante) | PLT-11..13 (3) | 7 |
+| Borrador de textos legales neutros (pendiente de aprobación del usuario) | [PLT-borrador-textos-legales-neutros.md](PLT-borrador-textos-legales-neutros.md) | — | — |
+
 ## Épica PLT-E1 Salud de servicios
 
 **Objetivo:** que un admin vea en una sola pantalla del panel si cada servicio de Capacitate funciona en este momento y cuándo se comprobó por última vez. Así puede detectar un problema (base de datos lenta, correos atascados, worker detenido, copia sin hacer) antes de que lo reporte un postulante.
@@ -84,3 +93,84 @@ Cada una ya tiene una decisión por defecto, para no bloquear al architect. Si e
 ## Fuera de alcance de la épica
 
 Alertas o notificaciones automáticas, histórico de estados, porcentaje de uptime, gráficos, métricas de Railway (CPU, memoria), acciones correctivas desde el panel (reiniciar, reencolar, lanzar una copia), monitor externo y página de estado pública.
+
+---
+
+## Épica PLT-E2 Multi-institución
+
+Fuente: informe de qa del 2026-11-15 y decisiones del usuario (elegibilidad, vocabulario por institución, prioridad crítica antes de la ola 1). La app nació para el Ejército del Perú y hoy sirve a varias instituciones. Dos problemas:
+1. **Fuga entre instituciones (crítico).** `inscripciones/repository.go:46-57` lista todos los procesos activos sin filtrar por institución, y `service.go` (`ListProcesosActivos`, `Inscribir`) solo compara `nivel`. qa reprodujo que una persona de una institución se inscribió a un proceso de otra. El subtítulo de /procesos promete «procesos activos de tu institución» (`es.json:333`).
+2. **Vocabulario militar fijo.** `nivel` solo admite `suboficial|oficial` (`catalogs/dto.go:42,64` y CHECK de la migración 012), el tipo de proceso es `ascenso|pase_efectividad|admision` (`dto.go:98`) y la regla «SO 3°» (`catalogs/validation.go:8-22`) está escrita a mano.
+
+| Id | Historia | Pts | Depende de | Roles |
+|---|---|---|---|---|
+| PLT-06 | [Elegibilidad por institución](PLT-06-elegibilidad-institucion.md) | 3 | — | postulante, admin |
+| PLT-07 | [Catálogo de niveles y tipos por institución: migración y API](PLT-07-catalogo-niveles-tipos-institucion.md) | 3 | — (tras PLT-06) | admin |
+| PLT-08 | [Regla de grado exigido genérica](PLT-08-regla-grado-exigido-generica.md) | 2 | PLT-07 | admin |
+| PLT-09 | [Pantallas de catálogo y selectores en el admin](PLT-09-pantallas-catalogo-admin.md) | 3 | PLT-07, PLT-08 | admin |
+| PLT-10 | [Institución filtrable en el admin; persona sin institución fija](PLT-10-institucion-filtrable-admin.md) | 3 | — | admin |
+| PLT-14 | [Institución visible al postulante y en la landing](PLT-14-institucion-visible-postulante-landing.md) | 2 | PLT-06 | postulante, visitante |
+
+Total: 6 historias, 16 pts (la Historia A completa excedía 8 pts, por eso se divide).
+
+**Alcance de la ronda (decisión del usuario, 15-nov):** solo las correcciones de lo que encontró qa: PLT-06, PLT-11, PLT-12 y PLT-13 (10 pts: 3 + 2 + 3 + 2). **Diferidas, sin borrar:** PLT-07, PLT-08, PLT-09, PLT-10 y PLT-14 (catálogo por institución, filtros y landing agrupada). Las decisiones P3 (PLT-10), P5 (PLT-07 y PLT-09) y P9 (PLT-10) quedan anotadas en esas historias y se aplican cuando se retomen.
+
+### Decisiones del PO (E2)
+
+1. **Institución del postulante** = la `institucion_id` de su persona. Verificado en el código: todo usuario tiene `usuarios.persona_id` y `personas.institucion_id` es NOT NULL, así que siempre tiene institución. El nivel (`userNivel`) sale del grado de esa persona. Pertenece a una sola institución.
+2. **Admin global:** ve y gestiona todas las instituciones. Admins por institución quedan fuera de alcance.
+3. **Elegibilidad** = misma institución **y** (como hoy) nivel compatible. Un proceso de otra institución no se lista y su inscripción se rechaza con 403 y código propio, distinto del de nivel.
+4. **Landing pública:** sigue mostrando todos los procesos, agrupados por institución; solo informativa, sin inscripción. Agrupar requiere ampliar `GET /procesos/publico` (PLT-14).
+5. **Catálogo por institución:** cada institución define sus **niveles** y **tipos de proceso** (código estable en minúsculas, nombre visible, orden, estado). El código no cambia; el nombre sí. Un valor en uso se inactiva, no se borra.
+6. **Regla de grado exigido genérica:** el tipo de proceso tiene `exige_grado`; si es sí, el proceso lleva un `grado_id` de su misma institución. Desaparece la comparación con «SO 3°».
+7. **Datos existentes:** migran como filas del catálogo, **sin cambiar** ningún proceso, grado ni inscripción. La migración se guía por los datos: por cada institución, todo nivel y tipo en uso se crea en su catálogo; las instituciones sin datos nacen con catálogo vacío. `pase_efectividad` queda con `exige_grado = sí` y los procesos existentes mantienen «SO 3°». **Vacío = todos los niveles** en `procesos.nivel` y `especialidades.nivel` se conserva (`inscripciones/service.go:93,132`). **Inscripciones cruzadas ya existentes:** no se borran ni modifican; backend entrega en el PR el conteo y los ids (sin datos personales) para que el PO decida caso por caso.
+8. **Orden de entrega:** PLT-06 primero y sin dependencias; luego PLT-07 → PLT-08 → PLT-09. PLT-10 y PLT-14 son independientes de PLT-07..09.
+9. **Alcance de la elegibilidad:** cubre **inscribirse**, **crear una práctica** (`practices/service.go:80`) y **crear un simulacro** (`simulations/service.go:74-89`, mismo hueco confirmado por el architect, P1). Las preguntas no tienen hueco (todos sus endpoints son admin). Las lecturas por `proceso_id` de configuración de simulacros y asignaturas quedan fuera (sin datos personales, P8) y van a un issue de prioridad baja.
+11. **Inscripciones cruzadas ya aprobadas (P2):** siguen visibles en `/inscripciones/me`; una práctica o un simulacro **nuevo** sobre ese proceso da 403 y los intentos en curso no se cortan. Las **pendientes** todavía se pueden aprobar (P10): el PR de PLT-06 trae el conteo y los ids y el usuario decide caso por caso.
+12. **`GET /procesos` aplica la regla a todos los roles (P4)**; las pantallas de admin usan `/admin/procesos`. En `/admin/inscripciones` la institución mostrada es la del **proceso** (P3).
+13. **`procesos.nivel` no se podía escribir por la API** (P5): PLT-07 agrega `nivel` opcional a `POST` y `PUT /admin/procesos` y PLT-09 el selector. Hasta entonces vale NULL en producción.
+14. **`PUT /admin/personas`** valida que grado y especialidad sean de la institución de la persona (P9, en PLT-10).
+10. **Capacitate no es certificadora ni ente oficial** (indicación del usuario, 15-nov): es una ayuda para estudiar y no tiene vínculo con las instituciones. «Inscripción» y «proceso» se refieren a la práctica dentro de la app. En los textos visibles no se usa «oficial», «certificado» ni «acreditado» para Capacitate, sus resultados o sus procesos. (Valores de catálogo como el nivel «oficial» son datos de la institución.) Se revisa en PLT-06, PLT-09 y PLT-14.
+
+### Preguntas abiertas (E2)
+
+| # | Pregunta | Decisión por defecto |
+|---|---|---|
+| Q1 | ¿Hay otras instituciones con datos que deban recibir catálogo en la migración? | Sí: se crea el catálogo con los valores que ya usan (decisión 7). |
+| Q2 | ¿Qué hacemos con inscripciones cruzadas ya existentes? | Se dejan y se listan para decisión del PO. |
+| Q3 | ¿Una persona puede pertenecer a dos instituciones? | No en esta épica. |
+
+---
+
+## Épica PLT-E3 Aviso de decisiones al postulante
+
+Fuente: informe de qa del 2026-11-15.
+- Al aprobar o rechazar una inscripción no se envía correo ni notificación, aunque el diálogo del admin dice «El usuario será notificado por correo». El motivo del rechazo solo se ve si el postulante vuelve a /procesos.
+- Los correos de cuenta activada y desactivada están fijos en español (`backend/internal/auth/email_templates.go:96-151`). Los de registro y recuperación ya usan el `locale` de la petición (`docs/api/auth-idioma-correos.md`); como la activación la dispara el admin, hace falta guardar el idioma del usuario.
+
+| Id | Historia | Pts | Depende de |
+|---|---|---|---|
+| PLT-11 | [Guardar el idioma del usuario](PLT-11-idioma-del-usuario.md) | 2 | — |
+| PLT-12 | [Aviso de aprobación o rechazo de inscripción](PLT-12-aviso-decision-inscripcion.md) | 3 | PLT-11 |
+| PLT-13 | [Correos de cuenta activada, rechazada y desactivada en el idioma del usuario](PLT-13-correos-cuenta-idioma-usuario.md) | 2 | PLT-11 |
+
+Total: 3 historias, 7 pts. Prioridad: Alta. En esta ronda entran PLT-11, PLT-12 y PLT-13 junto con PLT-06 (PLT-07..10 y PLT-14 diferidas).
+
+### Decisiones del PO (E3)
+
+1. **Idioma del usuario:** `es` o `en`. Se fija al **verificar el correo** (ahí se crea el usuario; P11) y se actualiza al cambiar de idioma con sesión iniciada. Usuarios existentes: `es`. Ausente o inválido se trata como `es`.
+2. **Qué se avisa:** aprobación y rechazo de inscripción (con motivo), cuenta activada, cuenta rechazada y cuenta desactivada (P7). «Correo cambiado» queda fuera.
+3. **Canales:** correo **y** notificación en la app para las decisiones de inscripción. Cuenta activada/desactivada: solo correo, en el idioma del usuario.
+4. **Motivo del rechazo:** lo escribe el admin en un solo idioma y se muestra tal cual; la plantilla que lo rodea va en el idioma del usuario. Se incluye completo en correo y notificación.
+5. **Un fallo de correo no deshace la decisión.** El correo sigue el mecanismo de envío existente (cola/reintentos, visible en la salud del correo, PLT-03). La notificación en la app se crea siempre.
+6. **Sin reenvíos:** el aviso se genera solo en la transición real de estado.
+7. **Notificación en el idioma actual:** se ve en el idioma que el usuario tenga al leerla. El architect decide el mecanismo y lo documenta en `docs/api/`.
+8. El diálogo del admin «El usuario será notificado por correo» pasa a ser verdad con PLT-12; solo se añade que también se notifica en la app.
+
+### Preguntas abiertas (E3)
+
+| # | Pregunta | Decisión por defecto |
+|---|---|---|
+| Q1 | ¿El motivo del rechazo se envía completo por correo? | Sí. |
+| Q2 | ¿Se avisa también cuando el admin reactiva una inscripción rechazada? | No en esta épica. |
+| Q3 | ¿Máximo de longitud del motivo? | **Resuelta (P6):** el servidor exige el motivo al rechazar, de 1 a 500 caracteres; al aprobar es opcional, hasta 500. |
