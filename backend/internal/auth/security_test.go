@@ -290,7 +290,7 @@ func TestResetPassword_ConcurrentSameToken_ExactlyOneSucceeds(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			errs[i] = f.svc.ResetPassword(context.Background(), token, fmt.Sprintf("NewPassword%d!", i), "127.0.0.1")
+			errs[i] = f.svc.ResetPassword(context.Background(), token, fmt.Sprintf("NewPassword%d!", i), "", "127.0.0.1")
 		}(i)
 	}
 	wg.Wait()
@@ -312,7 +312,7 @@ func TestResetPassword_UsedToken_Rejected(t *testing.T) {
 	uid, _ := f.activeUser("used", "usuario")
 	token := "tok-used-" + f.suffix
 	f.resetToken(uid, token, time.Now().Add(time.Hour), true)
-	if err := f.svc.ResetPassword(context.Background(), token, "NewPassword1!", "127.0.0.1"); !errors.Is(err, ErrInvalidToken) {
+	if err := f.svc.ResetPassword(context.Background(), token, "NewPassword1!", "", "127.0.0.1"); !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("want ErrInvalidToken for used token, got %v", err)
 	}
 }
@@ -322,7 +322,7 @@ func TestResetPassword_ExpiredToken_Rejected(t *testing.T) {
 	uid, _ := f.activeUser("exp", "usuario")
 	token := "tok-expired-" + f.suffix
 	f.resetToken(uid, token, time.Now().Add(-time.Minute), false)
-	if err := f.svc.ResetPassword(context.Background(), token, "NewPassword1!", "127.0.0.1"); !errors.Is(err, ErrInvalidToken) {
+	if err := f.svc.ResetPassword(context.Background(), token, "NewPassword1!", "", "127.0.0.1"); !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("want ErrInvalidToken for expired token, got %v", err)
 	}
 }
@@ -333,7 +333,7 @@ func TestResetPassword_ValidToken_ChangesPasswordAndRevokesSessions(t *testing.T
 	oldToken := f.login(username)
 	token := "tok-ok-" + f.suffix
 	f.resetToken(uid, token, time.Now().Add(time.Hour), false)
-	if err := f.svc.ResetPassword(context.Background(), token, "BrandNewPass1!", "127.0.0.1"); err != nil {
+	if err := f.svc.ResetPassword(context.Background(), token, "BrandNewPass1!", "", "127.0.0.1"); err != nil {
 		t.Fatalf("reset: %v", err)
 	}
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(oldToken)))
@@ -343,7 +343,7 @@ func TestResetPassword_ValidToken_ChangesPasswordAndRevokesSessions(t *testing.T
 	if _, err := f.svc.Login(context.Background(), LoginRequest{Username: username, Password: "BrandNewPass1!"}, "127.0.0.1", "t"); err != nil {
 		t.Fatalf("login with new password: %v", err)
 	}
-	if err := f.svc.ResetPassword(context.Background(), token, "Another1234!", "127.0.0.1"); !errors.Is(err, ErrInvalidToken) {
+	if err := f.svc.ResetPassword(context.Background(), token, "Another1234!", "", "127.0.0.1"); !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("token reuse: want ErrInvalidToken, got %v", err)
 	}
 }
@@ -526,7 +526,7 @@ func TestForgotPassword_PicksTheActiveUser(t *testing.T) {
 	p2, _ := f.persona(email)
 	pending := f.user(p1, f.username("pend"), "Password123!", "usuario", "pendiente")
 	active := f.user(p2, f.username("act"), "Password123!", "usuario", "activo")
-	if err := f.svc.ForgotPassword(context.Background(), strings.ToUpper(email), "127.0.0.1"); err != nil {
+	if err := f.svc.ForgotPassword(context.Background(), strings.ToUpper(email), "", "127.0.0.1"); err != nil {
 		t.Fatal(err)
 	}
 	if f.tokensFor(active) != 1 || f.tokensFor(pending) != 0 {
@@ -541,7 +541,7 @@ func TestForgotPassword_AmbiguousEmail_SendsNothing(t *testing.T) {
 	p2, _ := f.persona(email)
 	u1 := f.user(p1, f.username("dupa"), "Password123!", "usuario", "activo")
 	u2 := f.user(p2, f.username("dupb"), "Password123!", "usuario", "activo")
-	if err := f.svc.ForgotPassword(context.Background(), email, "127.0.0.1"); err != nil {
+	if err := f.svc.ForgotPassword(context.Background(), email, "", "127.0.0.1"); err != nil {
 		t.Fatal(err)
 	}
 	if f.tokensFor(u1)+f.tokensFor(u2) != 0 {

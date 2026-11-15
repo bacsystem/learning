@@ -36,7 +36,7 @@ func (f *fixture) bodyTo(addr, subject string) string {
 // that does not reveal the new one.
 func (f *fixture) checkEmailChangeCut(resetTok, userTok, oldEmail, newEmail string, pendingPID int64) {
 	f.t.Helper()
-	if err := f.svc.ResetPassword(context.Background(), resetTok, "BrandNewPass1!", "127.0.0.1"); !errors.Is(err, ErrInvalidToken) {
+	if err := f.svc.ResetPassword(context.Background(), resetTok, "BrandNewPass1!", "", "127.0.0.1"); !errors.Is(err, ErrInvalidToken) {
 		f.t.Fatalf("reset with a token sent to the old address: want ErrInvalidToken, got %v", err)
 	}
 	if f.sessionAlive(userTok) {

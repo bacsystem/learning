@@ -40,7 +40,7 @@ func TestService_ForgotPassword_UnknownEmail_Succeeds(t *testing.T) {
 	ctx := context.Background()
 
 	// ForgotPassword always succeeds silently (anti-enumeration)
-	err := svc.ForgotPassword(ctx, "unknown@example.com", "127.0.0.1")
+	err := svc.ForgotPassword(ctx, "unknown@example.com", "", "127.0.0.1")
 	if err != nil {
 		t.Errorf("expected nil error for unknown email, got %v", err)
 	}
@@ -50,7 +50,7 @@ func TestService_ResetPassword_InvalidToken(t *testing.T) {
 	_, svc := testSetup(t)
 	ctx := context.Background()
 
-	err := svc.ResetPassword(ctx, "invalid-token-value", "NewPassword123!", "127.0.0.1")
+	err := svc.ResetPassword(ctx, "invalid-token-value", "NewPassword123!", "", "127.0.0.1")
 	if err != ErrInvalidToken {
 		t.Errorf("want ErrInvalidToken, got %v", err)
 	}

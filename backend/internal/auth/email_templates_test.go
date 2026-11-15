@@ -14,10 +14,10 @@ func TestEmailTemplates_EscapeUserData(t *testing.T) {
 		"rechazado": func() (string, string) { return emailRechazado(evil, evil) },
 		"inactivo":  func() (string, string) { return emailInactivo(evil, evil) },
 		"registroPendiente": func() (string, string) {
-			return emailRegistroPendiente(evil, evil, evil)
+			return emailRegistroPendiente("es", evil, evil, evil)
 		},
 		"verificarRegistro": func() (string, string) {
-			return emailVerificarRegistro(evil, evil, "https://app.test/auth/verify-email?token=abc")
+			return emailVerificarRegistro("es", evil, evil, "https://app.test/auth/verify-email?token=abc")
 		},
 	}
 	for name, render := range cases {
@@ -35,7 +35,7 @@ func TestEmailTemplates_EscapeUserData(t *testing.T) {
 
 // URLs go into an href attribute and the visible text: they are escaped too.
 func TestEmailTemplates_EscapeURL(t *testing.T) {
-	_, body := emailOlvidePassword(`https://app.test/x?a=1&b="><script>`)
+	_, body := emailOlvidePassword("es", `https://app.test/x?a=1&b="><script>`)
 	if strings.Contains(body, `"><script>`) {
 		t.Fatalf("URL not escaped:\n%s", body)
 	}

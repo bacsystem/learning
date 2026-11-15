@@ -28,7 +28,7 @@ func TestRegister_NoEmailOnFile_EmailOfAnotherPersona_Rejected(t *testing.T) {
 	if f.countPendientes(pid) != 0 {
 		t.Fatal("pending registration created with another persona's e-mail")
 	}
-	if err := f.svc.ForgotPassword(context.Background(), victimEmail, "127.0.0.1"); err != nil {
+	if err := f.svc.ForgotPassword(context.Background(), victimEmail, "", "127.0.0.1"); err != nil {
 		t.Fatal(err)
 	}
 	if f.tokensFor(victimUID) != 1 {
