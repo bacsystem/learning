@@ -1067,7 +1067,7 @@
     "verify-email-invalido-detalle": "Este enlace de confirmación no es válido, ya fue usado o venció (es válido por 24 horas). Si te registraste más de una vez, solo funciona el último enlace recibido.",
     "verify-email-usuario-en-uso": "Ya está en uso",
     "verify-email-titulo": "Completa tu registro",
-    "verify-email-descripcion": "Tu correo quedó confirmado. Elige el usuario y la contraseña con los que accederás a la plataforma.",
+    "verify-email-descripcion": "Elige el usuario y la contraseña con los que accederás a la plataforma. Confirmaremos tu correo al terminar.",
     "verify-email-usuario": "Nombre de usuario",
     "verify-email-usuario-placeholder": "usuario123",
     "verify-email-repite-contrasena": "Repite tu contraseña",
